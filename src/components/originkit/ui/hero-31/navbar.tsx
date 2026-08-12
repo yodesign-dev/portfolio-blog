@@ -5,19 +5,17 @@ import React from "react";
 
 export const Navbar = () => {
   return (
-    <header className="absolute inset-x-0 top-0 z-[100] w-full bg-white text-neutral-900 border-b border-neutral-200">
-      {/* Container chạy full 100% chiều rộng màn hình, căn lề px đồng bộ với các đường kẻ Rails */}
-      <div className="flex h-20 w-full items-center justify-between px-6 md:px-14 lg:px-14">
-        
-        {/* LOGO bên trái */}
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight text-neutral-900">
-            Voice AI
-          </span>
-        </div>
+    <header className="flex h-[80px] w-full items-center justify-between bg-white pl-[20px] md:pl-[56px] pr-0 text-[#1c1c1c] antialiased">
+      {/* Khối Logo */}
+      <div className="flex items-center">
+        <span className="font-sans text-xl font-bold tracking-tight text-neutral-900">
+          Voice AI
+        </span>
+      </div>
 
-        {/* MENU ĐIỀU HƯỚNG BÊN PHẢI */}
-        <nav className="hidden md:flex items-center gap-8">
+      {/* Khối các liên kết điều hướng */}
+      <nav className="hidden md:flex items-center h-full">
+        <div className="flex items-center gap-8 mr-12">
           <a href="#home" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
             Home
           </a>
@@ -30,20 +28,21 @@ export const Navbar = () => {
           <a href="#tools" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
             Tools
           </a>
-          <button className="h-20 px-6 font-bold text-sm bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] -mr-6 md:-mr-14 lg:-mr-14 flex items-center">
-            Get In Touch
-          </button>
-        </nav>
-
-        {/* MOBILE HAMBURGER */}
-        <div className="flex md:hidden">
-          <button aria-label="Toggle Menu" className="p-2 text-neutral-700">
-            <svg xmlns="http://w3.org" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
+        
+        {/* Nút bấm Get In Touch góc phải ăn tràn viền chuẩn Concept */}
+        <button className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center">
+          Get In Touch
+        </button>
+      </nav>
 
+      {/* Mobile Menu Trigger */}
+      <div className="flex md:hidden pr-6">
+        <button aria-label="Toggle Menu" className="p-2 text-neutral-700">
+          <svg xmlns="http://w3.org" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
       </div>
     </header>
   );

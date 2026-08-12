@@ -5,23 +5,22 @@ import React from "react";
 
 export const InfoBand = () => {
   return (
-    <div className="w-full border-t border-b border-white/20 bg-transparent py-10">
-      {/* max-w-1920px kết hợp padding px y hệt h1 và navbar để dóng hàng dọc thẳng tắp */}
-      <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-x-12 gap-y-8 px-[20px] md:grid-cols-2 md:px-[56px]">
+    <div className="w-full border-t border-b border-white/20 bg-transparent text-white antialiased">
+      <div className="w-full grid grid-cols-1 md:grid-cols-2">
         
-        {/* ================= CỘT BÊN TRÁI ================= */}
-        <div className="flex flex-col gap-3 text-left">
-          <span className="text-sm font-bold uppercase tracking-wider text-white/60">
+        {/* CỘT TRÁI: Chứa phần mô tả tính năng */}
+        <div className="flex flex-col gap-6 py-10 pl-[20px] md:pl-[56px] pr-[20px] md:pr-12 border-b md:border-b-0 md:border-r border-white/20">
+          <span className="text-xs font-bold uppercase tracking-widest text-white/50">
             Who We Are:
           </span>
-          <p className="text-base font-medium leading-relaxed text-white max-w-md">
+          <p className="text-lg font-medium leading-relaxed max-w-md text-white/90">
             Custom AI voice agents that answer every call, schedule appointments, and support patients around the clock, without increasing headcount.
           </p>
         </div>
 
-        {/* ================= CỘT BÊN PHẢI ================= */}
-        <div className="flex flex-col justify-end gap-3">
-          <p className="text-sm font-bold uppercase tracking-wider text-white/60">
+        {/* CỘT PHẢI: Chứa tiêu đề phụ và ô Input đăng ký */}
+        <div className="flex flex-col justify-between gap-8 py-10 pl-[20px] md:pl-12 pr-[20px] md:pr-[56px]">
+          <p className="text-lg font-semibold text-white">
             Healthcare AI Receptionists
           </p>
           
@@ -30,7 +29,7 @@ export const InfoBand = () => {
               <input
                 type="email"
                 placeholder="Your email address"
-                className="w-full rounded border border-white/20 bg-white px-4 py-3 text-sm text-neutral-900 placeholder-neutral-400 outline-none"
+                className="w-full rounded border border-white/20 bg-white/10 px-4 py-3 text-sm text-white placeholder-white/40 outline-none backdrop-blur-sm transition focus:border-white/40"
               />
             </div>
             <button
