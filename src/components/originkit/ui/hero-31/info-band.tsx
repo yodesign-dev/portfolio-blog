@@ -6,11 +6,18 @@ import React from "react";
 export const InfoBand = () => {
   return (
     <div className="w-full border-t border-b border-white/20 bg-transparent text-white antialiased">
-      {/* Loại bỏ các padding trùng lặp ngoài, chia 2 cột đối xứng tăm tắp */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-2">
+      {/* 
+         Chia 2 cột đối xứng.
+         Thêm py-4 (hoặc py-6) để tạo khoảng trống đệm ở trên và dưới 
+         cho cả toàn bộ dải băng đúng như hình bạn muốn.
+      */}
+      <div className="w-full grid grid-cols-1 md:grid-cols-2 py-4 lg:py-6">
         
-        {/* CỘT TRÁI: Đoạn văn mô tả tính năng */}
-        <div className="flex flex-col gap-6 py-10 pr-0 md:pr-12 border-b md:border-b-0 md:border-r border-white/20 text-left">
+        {/* 
+           CỘT TRÁI: Thêm py-6 để tạo khoảng đệm dọc (padding-top và padding-bottom) 
+           giúp chữ không bị dính sát lề đáy như ô màu cam bạn vẽ bên trái.
+        */}
+        <div className="flex flex-col gap-6 py-6 pr-0 md:pr-12 border-b md:border-b-0 md:border-r border-white/20 text-left">
           <span className="text-xs font-bold uppercase tracking-widest text-white/50">
             Who We Are:
           </span>
@@ -19,13 +26,18 @@ export const InfoBand = () => {
           </p>
         </div>
 
-        {/* CỘT PHẢI: Tiêu đề phụ và Form Email màu Trắng */}
-        <div className="flex flex-col justify-between gap-8 py-10 pl-0 md:pl-12 text-left">
+        {/* 
+           CỘT PHẢI: Sử dụng py-6 đồng bộ để tạo khoảng đệm dọc.
+           Thay thế flex 'justify-between' bằng 'justify-start' kết hợp gap-6 
+           để kéo ô nhập Email và nút bấm xích lên trên, nằm gọn gàng bên trong hộp,
+           không bị tụt xuống đáy như ô màu cam bên phải của bạn.
+        */}
+        <div className="flex flex-col justify-start gap-6 py-6 pl-0 md:pl-12 text-left">
           <p className="text-lg font-semibold text-white">
             Healthcare AI Receptionists
           </p>
           
-          {/* Form nhập liệu: Ô input trắng tinh và nút xanh ngọc lam vuông vức chuẩn Concept */}
+          {/* Form nhập liệu: Ô input trắng và nút xanh nằm gọn gàng */}
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative w-full">
               <input
