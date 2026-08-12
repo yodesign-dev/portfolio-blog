@@ -2,9 +2,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { client } from '@/sanity/lib/client'
 import { urlFor } from '@/sanity/lib/image'
-import Hero37 from '@/components/originkit/hero-37' // 1. Import Hero Banner mới ở đây
+import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn import sang Hero 31
 
-// Cache dữ liệu 60 giây (ISR)
 export const revalidate = 60
 
 const POSTS_QUERY = `*[_type == "post"] | order(publishedAt desc) {
@@ -43,10 +42,9 @@ export default async function BlogPage() {
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
-      {/* 2. Đưa Hero Banner vào vị trí trang trọng nhất trên cùng */}
-      <Hero37 />
+      {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
+      <Hero31 />
 
-      {/* Tách phần danh sách bài viết xuống dưới Hero */}
       <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
         <h2 className="text-2xl font-bold tracking-tight text-neutral-900 mb-8 sm:text-3xl">
           Bài viết mới nhất

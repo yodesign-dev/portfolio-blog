@@ -32,3 +32,9 @@
 @theme {
   --font-covered: "Covered By Your Grace", cursive;
 }
+
+/* originkit:hero-31 */
+/* src/components/originkit/hero-31.css */
+@theme {
+  --font-helvetica: "Helvetica", Arial, ui-sans-serif, sans-serif;
+}
