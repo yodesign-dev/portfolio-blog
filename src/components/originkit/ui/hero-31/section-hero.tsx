@@ -41,7 +41,7 @@ export const SectionHero = () => (
     <div
       className={`${STAGE} z-10 flex flex-col justify-end min-h-[449px] md:min-h-[470px] lg:min-h-[429px] px-[20px] md:px-[56px] w-full max-w-[1280px] mx-auto`}
     >
-      <h1 className="mb-[191px] font-sans text-[clamp(36px,12vw,48px)] leading-[1.1] tracking-[-0.06em] text-white md:mb-[56px] md:text-[80px] lg:text-[100px]">
+      <h1 className="mb-[40px] font-sans text-[clamp(36px,12vw,48px)] leading-[1.1] tracking-[-0.06em] text-white md:mb-[56px] md:text-[80px] lg:text-[100px]">
         Your Front Desk,
         <br />
         Powered by AI

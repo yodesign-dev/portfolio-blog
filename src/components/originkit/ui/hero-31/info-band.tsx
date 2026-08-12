@@ -5,34 +5,42 @@ import React from "react";
 
 export const InfoBand = () => {
   return (
-    <div className="w-full border-t border-b border-white/20 bg-transparent py-6">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-6 px-6 md:flex-row md:items-center md:justify-between md:px-12">
+    <div className="w-full bg-transparent pb-12">
+      {/* Chia làm 2 cột rõ rệt trên màn hình máy tính (md:grid-cols-2) */}
+      <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-x-12 gap-y-8 px-[20px] md:grid-cols-2 md:px-[56px]">
         
-        {/* Khối chữ giới thiệu bên trái */}
-        <div className="flex flex-col gap-2 md:max-w-md">
-          <span className="text-xs font-bold uppercase tracking-wider text-white/60">
+        {/* ================= CỘT BÊN TRÁI ================= */}
+        <div className="flex flex-col gap-6 text-left">
+          <span className="text-sm font-medium text-white/80">
             Who We Are:
           </span>
-          <p className="text-sm font-medium text-white/90">
-            Healthcare AI Receptionists
+          <p className="text-lg font-medium leading-relaxed text-white max-w-md">
+            Custom AI voice agents that answer every call, schedule appointments, and support patients around the clock, without increasing headcount.
           </p>
         </div>
 
-        {/* Khối Form Email + Nút bấm Get In Touch bên phải */}
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center md:max-w-md md:justify-end">
-          <div className="relative w-full">
-            <input
-              type="email"
-              placeholder="Your email address"
-              className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm text-white placeholder-white/50 outline-none backdrop-blur-sm transition focus:border-white/40 focus:bg-white/20"
-            />
+        {/* ================= CỘT BÊN PHẢI ================= */}
+        <div className="flex flex-col justify-end gap-6">
+          <p className="text-sm font-medium text-white/80 md:translate-y-[-12px]">
+            Healthcare AI Receptionists
+          </p>
+          
+          {/* Ô nhập Email + Nút bấm Get In Touch */}
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full">
+              <input
+                type="email"
+                placeholder="Your email address"
+                className="w-full rounded border border-white/20 bg-white px-4 py-3 text-sm text-neutral-900 placeholder-neutral-400 outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full shrink-0 rounded bg-[#50d3f2] px-6 py-3 text-sm font-bold text-neutral-900 shadow-md transition hover:bg-[#3dbcdb] active:scale-[0.98] sm:w-auto"
+            >
+              Get In Touch
+            </button>
           </div>
-          <button
-            type="submit"
-            className="w-full shrink-0 rounded-lg bg-white px-5 py-3 text-sm font-bold text-[#002fff] shadow-lg transition hover:bg-white/90 active:scale-[0.98] sm:w-auto"
-          >
-            Get In Touch
-          </button>
         </div>
 
       </div>
