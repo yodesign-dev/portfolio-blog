@@ -9,7 +9,7 @@ const FADE_FILL =
   "linear-gradient(to top, #002fff 0, #002fff var(--fade-solid), transparent 100%)";
 
 export const SectionHero = () => (
-  <main className="animate-hero-reveal relative isolate flex min-h-dvh w-full flex-col overflow-hidden bg-[#002fff]">
+  <main className="animate-hero-reveal relative isolate flex min-h-dvh w-full flex-col overflow-hidden bg-[#002fff] pt-20">
     <WaveField />
 
     <div
@@ -23,29 +23,23 @@ export const SectionHero = () => (
       aria-hidden
       className="pointer-events-none absolute inset-y-0 left-1/2 z-[2] w-full max-w-[1920px] -translate-x-1/2"
     >
-      <span className="absolute inset-y-0 left-[16px] w-px bg-white/40 md:left-[48px]" />
-      <span className="absolute inset-y-0 right-[16px] w-px bg-white/40 md:right-[48px]" />
+      <span className="absolute inset-y-0 left-[16px] w-px bg-white/30 md:left-[48px]" />
+      <span className="absolute inset-y-0 right-[16px] w-px bg-white/30 md:right-[48px]" />
     </div>
 
-    {/* Khối Header điều hướng: Phải bọc trong div căn lề giống hệt sao cho khít lề kẻ dọc */}
-    <div className="w-full max-w-[1920px] mx-auto px-[16px] md:px-[48px] z-50 shrink-0">
-      <div className="px-[4px] md:px-[8px]">
-        <Navbar />
-      </div>
+    {/* Gọi Navbar chạy tràn viền độc lập */}
+    <Navbar />
+
+    {/* KHỐI NỘI DUNG CHỮ LỚN: Tăng font-weight lên mức tối đa font-[900] */}
+    <div className="w-full max-w-[1920px] mx-auto px-[20px] md:px-[56px] z-10 flex flex-col justify-end flex-grow pb-8 mt-12">
+      <h1 className="mb-0 font-sans text-[clamp(44px,7.5vw,80px)] lg:text-[100px] font-[900] leading-[1.02] tracking-[-0.05em] text-white antialiased">
+        Your Front Desk,
+        <br />
+        Powered by AI
+      </h1>
     </div>
 
-    {/* KHỐI NỘI DUNG CHỮ LỚN: Tách riêng ra để đẩy sát xuống nửa dưới */}
-    <div className="w-full max-w-[1920px] mx-auto px-[16px] md:px-[48px] z-10 flex flex-col justify-end flex-grow pb-8">
-      <div className="px-[4px] md:px-[8px]">
-        <h1 className="mb-0 font-sans text-[clamp(44px,7.5vw,80px)] lg:text-[100px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white antialiased">
-          Your Front Desk,
-          <br />
-          Powered by AI
-        </h1>
-      </div>
-    </div>
-
-    {/* KHỐI CHÂN TRANG INFOBAND: Nằm độc lập bên ngoài để ăn viền kẻ ngang dài ra viền */}
+    {/* KHỐI CHÂN TRANG INFOBAND */}
     <div className="w-full z-20 shrink-0">
       <InfoBand />
     </div>
