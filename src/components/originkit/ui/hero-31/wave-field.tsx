@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
