@@ -18,36 +18,39 @@ export const SectionHero = () => (
       className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[567px] [--fade-solid:266px] md:h-[629px] md:[--fade-solid:264px] lg:h-[416px] lg:[--fade-solid:116px]"
     />
 
-    {/* Rails — Các đường kẻ dọc mờ trang trí */}
+    {/* Rails — Các đường kẻ dọc mờ trang trí chạy full chiều cao màn hình */}
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-y-0 left-1/2 z-[2] w-full max-w-[1280px] -translate-x-1/2"
+      className="pointer-events-none absolute inset-y-0 left-1/2 z-[2] w-full max-w-[1920px] -translate-x-1/2"
     >
-      <span className="absolute inset-y-0 left-[16px] w-px bg-white/30 lg:left-[48px]" />
-      <span className="absolute inset-y-0 right-[16px] w-px bg-white/30 lg:right-[48px]" />
+      <span className="absolute inset-y-0 left-[16px] w-px bg-white/40 md:left-[48px]" />
+      <span className="absolute inset-y-0 right-[16px] w-px bg-white/40 md:right-[48px]" />
     </div>
 
-    {/* Navbar giữ nguyên trên cùng */}
-    <div className="w-full max-w-[1280px] mx-auto px-0 z-50 shrink-0">
-      <Navbar />
+    {/* Khối Header điều hướng: Phải bọc trong div căn lề giống hệt sao cho khít lề kẻ dọc */}
+    <div className="w-full max-w-[1920px] mx-auto px-[16px] md:px-[48px] z-50 shrink-0">
+      <div className="px-[4px] md:px-[8px]">
+        <Navbar />
+      </div>
     </div>
 
-    {/* KHỐI NỘI DUNG TẬP TRUNG: Đẩy toàn bộ nội dung chữ to và chữ nhỏ xuống nửa dưới màn hình */}
-    <div className="w-full max-w-[1280px] mx-auto px-6 lg:px-12 z-10 flex flex-col justify-end flex-grow pb-12">
-      
-      {/* Tiêu đề chính: Hạ thấp khoảng cách mb xuống chỉ còn mb-8 để bám sát khối chữ bên dưới */}
-      <h1 className="mb-8 font-sans text-[clamp(44px,7.5vw,80px)] lg:text-[100px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white antialiased">
-        Your Front Desk,
-        <br />
-        Powered by AI
-      </h1>
+    {/* KHỐI NỘI DUNG CHỮ LỚN: Tách riêng ra để đẩy sát xuống nửa dưới */}
+    <div className="w-full max-w-[1920px] mx-auto px-[16px] md:px-[48px] z-10 flex flex-col justify-end flex-grow pb-8">
+      <div className="px-[4px] md:px-[8px]">
+        <h1 className="mb-0 font-sans text-[clamp(44px,7.5vw,80px)] lg:text-[100px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white antialiased">
+          Your Front Desk,
+          <br />
+          Powered by AI
+        </h1>
+      </div>
+    </div>
 
-      {/* Gọi khối chân trang InfoBand nằm ngay dưới tiêu đề */}
+    {/* KHỐI CHÂN TRANG INFOBAND: Nằm độc lập bên ngoài để ăn viền kẻ ngang dài ra viền */}
+    <div className="w-full z-20 shrink-0">
       <InfoBand />
-      
     </div>
 
-    {/* Khoảng cách gap nhỏ cuối cùng dưới đáy màn hình */}
+    {/* Khoảng cách trống dưới chân trang */}
     <div
       aria-hidden
       className="h-[20px] shrink-0 md:h-[22px] lg:h-[24px]"
