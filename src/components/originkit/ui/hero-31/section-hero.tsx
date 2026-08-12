@@ -15,41 +15,53 @@ export const SectionHero = () => (
     <div
       aria-hidden
       style={{ backgroundImage: FADE_FILL }}
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-[567px] [--fade-solid:266px] md:h-[629px] md:[--fade-solid:264px] lg:h-[416px] lg:[--fade-solid:116px]"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z- h-[567px] [--fade-solid:266px] md:h-[629px] md:[--fade-solid:264px] lg:h-[416px] lg:[--fade-solid:116px]"
     />
 
-    {/* Rails — Đường kẻ lưới dọc trang trí chạy full-viewport */}
+    {/* Rails — Các đường kẻ dọc mờ trang trí chạy full chiều cao màn hình */}
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-y-0 left-0 z-[2] w-full"
+      className="pointer-events-none absolute inset-y-0 left-0 z- w-full"
     >
       <span className="absolute inset-y-0 left-[20px] w-px bg-white/15 md:left-[56px]" />
       <span className="absolute inset-y-0 right-[20px] w-px bg-white/15 md:right-[56px]" />
     </div>
 
-    {/* Thống nhất Navbar ôm sát viền lưới */}
+    {/* 1. KHỐI NAVBAR TRÊN CÙNG */}
     <div className="w-full z-50 shrink-0">
       <Navbar />
     </div>
 
-    {/* Khối chữ lớn tiêu đề: Sử dụng font dầy đậm đặc trưng của concept */}
-    <div className="w-full z-10 flex flex-col justify-end flex-grow pb-12 pl-[20px] md:pl-[56px] pr-[20px] md:pr-[56px] mt-16">
-        <h1 className="mb-0 font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
+    {/* 
+       2. KHỐI TRUNG TÂM TOÀN BỘ NỘI DUNG: 
+       Sử dụng h-[calc(100dvh-80px)] trừ đi chiều cao navbar để tính toán không gian,
+       loại bỏ hoàn toàn 'flex-grow' bậy bạ. Sử dụng padding-bottom chính xác để kiểm soát 
+       khoảng cách bám sát giữa Tiêu đề h1 và InfoBand.
+    */}
+    <div className="w-full max-w-[1920px] mx-auto px-[20px] md:px-[56px] z-10 flex flex-col justify-end h-[calc(100dvh-120px)] pb-6 lg:pb-12">
+      
+      {/* 
+         Tiêu đề h1: Đã được ghim cứng khoảng cách đáy bằng mb-16 (hoặc mb-20) 
+         giúp nó bám sát, ôm khít gọn gàng ngay phía trên khối text mô tả của InfoBand 
+         theo đúng tỷ lệ của bản Concept.
+      */}
+      <h1 className="mb-14 lg:mb-20 font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
         Your Front Desk,
         <br />
         Powered by AI
       </h1>
+
+      {/* Đưa InfoBand trực tiếp vào đây để dính liền theo khối trục dọc với h1 */}
+      <div className="w-full -mx-[20px] md:-mx-[56px] min-w-[calc(100%+40px)] md:min-w-[calc(100%+112px)]">
+        <InfoBand />
+      </div>
+
     </div>
 
-    {/* Cụm InfoBand chân trang */}
-    <div className="w-full z-20 shrink-0">
-      <InfoBand />
-    </div>
-
-    {/* Khoảng đệm đáy kết thúc layout */}
+    {/* Khoảng trống đệm cố định chân trang kết thúc layout */}
     <div
       aria-hidden
-      className="h-[40px] shrink-0 md:h-[22px] lg:h-[24px]"
+      className="h-[20px] shrink-0 md:h-[22px] lg:h-[24px]"
     />
   </main>
 );
