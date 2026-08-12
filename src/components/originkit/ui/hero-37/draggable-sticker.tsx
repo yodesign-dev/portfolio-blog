@@ -1268,14 +1268,14 @@ export default function StickerDrag(__props: StickerDragProps) {
       ensureTickRunning();
     };
 
-    window.addEventListener("touchmove", handleTouchMove, {
+    window.addEventListener("touchmove", handleTouchMove as EventListener, {
       passive: false,
     });
-    window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchend", handleTouchEnd as EventListener);
 
     return () => {
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchmove", handleTouchMove as EventListener);
+      window.removeEventListener("touchend", handleTouchEnd as EventListener);
     };
   }, [tiltSensitivity, tiltSmoothing, ensureTickRunning, sheenMode, maxTilt]);
 
