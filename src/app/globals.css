@@ -1,8 +1,7 @@
 @import url("https://googleapis.com");
 @import url("https://googleapis.com");
 @import "tailwindcss";
-@import "./_originkit-section-theme.css";
-@import "../_originkit-section-theme.css";
+
 
 :root {
   --background: #ffffff;
