@@ -31,7 +31,7 @@ export const InfoBand = () => {
         */}
         <div className="flex flex-col justify-start gap-6 py-6 pl-0 md:pl-12 text-left">
           <p className="text-lg font-semibold text-white">
-            Healthcare AI Receptionists
+            Get in Touch
           </p>
           
           {/* Form nhập liệu: Ô input trắng và nút xanh nằm gọn gàng */}
@@ -47,7 +47,7 @@ export const InfoBand = () => {
               type="submit"
               className="w-full shrink-0 rounded-none bg-[#50d3f2] px-6 py-3 text-sm font-bold text-neutral-900 shadow-md transition hover:bg-[#3dbcdb] sm:w-auto"
             >
-              Get In Touch
+              Submit
             </button>
           </div>
         </div>
