@@ -41,9 +41,9 @@ export const SectionHero = () => (
       
       {/* Tiêu đề chính h1 thanh mảnh, xích lại gần khối dưới bằng mb-16 */}
       <h1 className="mb-16 lg:mb-20 font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
-        Your Front Desk,
+        Sharing to Learning
         <br />
-        Powered by AI
+        Learning to Sharing
       </h1>
 
       {/* InfoBand chân trang đã được dọn sạch âm lề gây lỗi */}

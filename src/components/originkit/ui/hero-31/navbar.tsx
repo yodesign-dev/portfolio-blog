@@ -9,7 +9,7 @@ export const Navbar = () => {
       {/* Khối Logo */}
       <div className="flex items-center">
         <span className="font-sans text-xl font-bold tracking-tight text-neutral-900">
-          Voice AI
+          YoBlogs
         </span>
       </div>
 
@@ -19,11 +19,11 @@ export const Navbar = () => {
           <a href="#home" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
             Home
           </a>
-          <a href="#pricing" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
-            Pricing
+          <a href="#resume" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
+            Bogs
           </a>
-          <a href="#about" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
-            About
+          <a href="#blogs" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
+            Resume
           </a>
           <a href="#tools" className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition">
             Tools

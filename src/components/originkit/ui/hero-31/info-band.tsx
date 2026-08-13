@@ -17,10 +17,10 @@ export const InfoBand = () => {
         */}
         <div className="flex flex-col gap-6 py-6 pr-0 md:pr-12 border-b md:border-b-0 md:border-r border-white/20 text-left">
           <span className="text-xs font-bold uppercase tracking-widest text-white/50">
-            Who We Are:
+           About Me
           </span>
           <p className="text-lg font-medium leading-relaxed max-w-md text-white/90">
-            Custom AI voice agents that answer every call, schedule appointments, and support patients around the clock, without increasing headcount.
+            10+ years designing end-to-end product experiences, grounded in user research and UI/UX thinking. This past year, Bin's been using AI to move faster from research to high-fidelity work.
           </p>
         </div>
 
