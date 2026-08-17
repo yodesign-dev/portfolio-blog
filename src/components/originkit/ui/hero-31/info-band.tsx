@@ -3,13 +3,16 @@
 
 import React from "react";
 
+import { EmailCapture } from "@/components/originkit/ui/hero-31/email-capture";
+
 export const InfoBand = () => {
   return (
     <div className="w-full border-t border-b border-white/20 bg-transparent text-white antialiased">
       {/* 
-         Cố định khoảng đệm trên/dưới py-4 cho dải băng chính 
+         Padding dọc CHỈ khai báo ở mỗi cột (py-6 bên dưới) — bỏ py ở wrapper
+         này để tránh cộng dồn 2 lớp padding, giữ nhịp spacing khớp với Hero.
       */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-2 py-4 lg:py-6">
+      <div className="w-full grid grid-cols-1 md:grid-cols-2">
         
         {/* 
            CỘT TRÁI: Thêm py-6 tạo khoảng đệm dọc ở trên và dưới 
@@ -33,23 +36,10 @@ export const InfoBand = () => {
           <p className="text-lg font-semibold text-white">
             Get in Touch
           </p>
-          
-          {/* Form nhập liệu: Ô input trắng và nút xanh nằm gọn gàng */}
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative w-full">
-              <input
-                type="email"
-                placeholder="Your email address"
-                className="w-full rounded-none border border-white/20 bg-white px-4 py-3 text-sm text-neutral-900 placeholder-neutral-400 outline-none antialiased"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full shrink-0 rounded-none bg-[#50d3f2] px-6 py-3 text-sm font-bold text-neutral-900 shadow-md transition hover:bg-[#3dbcdb] sm:w-auto"
-            >
-              Submit
-            </button>
-          </div>
+
+          {/* Form nhập liệu dùng chung EmailCapture — đúng width/gap theo
+              breakpoint Figma (mobile/tablet/desktop) thay vì tự khai lại. */}
+          <EmailCapture />
         </div>
 
       </div>

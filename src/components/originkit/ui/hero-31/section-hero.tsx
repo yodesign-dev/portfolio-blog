@@ -4,6 +4,7 @@
 import { InfoBand } from "@/components/originkit/ui/hero-31/info-band";
 import { Navbar } from "@/components/originkit/ui/hero-31/navbar";
 import { WaveField } from "@/components/originkit/ui/hero-31/wave-field";
+import { STAGE } from "@/components/originkit/ui/hero-31/stage";
 
 const FADE_FILL =
   "linear-gradient(to top, #002fff 0, #002fff var(--fade-solid), transparent 100%)";
@@ -37,7 +38,7 @@ export const SectionHero = () => (
        Cố định padding-bottom và padding hai bên (px-[20px] md:px-[56px]) 
        để ép các khối dóng hàng dọc thẳng tắp, không bao giờ bị mất lề nữa.
     */}
-    <div className="w-full max-w-[1920px] mx-auto px-[20px] md:px-[56px] z-10 flex flex-col justify-end h-[calc(100dvh-120px)] pb-12">
+    <div className={`${STAGE} px-[20px] md:px-[56px] z-10 flex flex-col justify-end h-[calc(100dvh-120px)] pb-12`}>
       
       {/* Tiêu đề chính h1 thanh mảnh, xích lại gần khối dưới bằng mb-16 */}
       <h1 className="mb-16 lg:mb-20 text-center md:text-left font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
