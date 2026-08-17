@@ -40,7 +40,7 @@ export const SectionHero = () => (
     <div className="w-full max-w-[1920px] mx-auto px-[20px] md:px-[56px] z-10 flex flex-col justify-end h-[calc(100dvh-120px)] pb-12">
       
       {/* Tiêu đề chính h1 thanh mảnh, xích lại gần khối dưới bằng mb-16 */}
-      <h1 className="mb-16 lg:mb-20 font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
+      <h1 className="mb-16 lg:mb-20 text-center md:text-left font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
         Learn by Sharing
         <br />
         Share by Learning
