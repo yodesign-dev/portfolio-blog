@@ -1,7 +1,7 @@
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -12,6 +12,14 @@ export const Navbar = () => {
     { href: "#resume", label: "Resume" },
     { href: "#tools", label: "Tools" },
   ];
+
+  // Khóa scroll nền khi menu mobile đang mở
+  useEffect(() => {
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen]);
 
   return (
     <header className="relative flex h-[80px] w-full items-center justify-between bg-white pl-[20px] md:pl-[56px] pr-0 text-[#1c1c1c] antialiased">
@@ -26,7 +34,7 @@ export const Navbar = () => {
       <nav className="hidden md:flex items-center h-full">
         <div className="flex items-center gap-8 mr-12">
           {navLinks.map((link) => (
-            <a
+            
               key={link.href}
               href={link.href}
               className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition"
@@ -35,8 +43,7 @@ export const Navbar = () => {
             </a>
           ))}
         </div>
-        
-        {/* Nút bấm Get In Touch góc phải ăn tràn viền chuẩn Concept */}
+
         <button className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center">
           Get In Touch
         </button>
@@ -62,15 +69,15 @@ export const Navbar = () => {
         </button>
       </div>
 
-      {/* Mobile Sub-menu Panel */}
+      {/* Mobile Sub-menu Panel — giờ phủ hết phần còn lại của viewport */}
       <div
-        className={`absolute left-0 right-0 top-[80px] z-40 w-full origin-top overflow-hidden bg-white shadow-lg transition-all duration-300 ease-in-out md:hidden ${
-          isMenuOpen ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+        className={`fixed left-0 right-0 top-[80px] z-40 h-[calc(100dvh-80px)] w-full overflow-y-auto bg-white shadow-lg transition-opacity duration-300 ease-in-out md:hidden ${
+          isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
         <nav className="flex flex-col px-[20px] py-4">
           {navLinks.map((link) => (
-            <a
+            
               key={link.href}
               href={link.href}
               onClick={() => setIsMenuOpen(false)}

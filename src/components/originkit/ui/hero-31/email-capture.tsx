@@ -46,9 +46,9 @@ export const EmailCapture = () => {
       />
       <button
         type="submit"
-        className="flex shrink-0 cursor-pointer touch-manipulation items-center justify-center bg-[#00ddff] p-[12px] font-tight text-[16px] leading-[1.2] font-medium whitespace-nowrap text-[#0b1432] transition-[opacity,transform] duration-200 ease-out [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.97] motion-reduce:active:scale-100 ipad:p-[16px] [@media(hover:hover)_and_(pointer:fine)]:hover:opacity-90"
+        className="flex shrink-0 cursosr-pointer touch-manipulation items-center justify-center bg-[#00ddff] p-[12px] font-tight text-[16px] leading-[1.2] font-medium whitespace-nowrap text-[#0b1432] transition-[opacity,transform] duration-200 ease-out [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.97] motion-reduce:active:scale-100 ipad:p-[16px] [@media(hover:hover)_and_(pointer:fine)]:hover:opacity-90"
       >
-        Get In Touch
+        Submit
       </button>
     </form>
   );
