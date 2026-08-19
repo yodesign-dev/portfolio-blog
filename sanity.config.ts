@@ -7,6 +7,9 @@
 import {visionTool} from '@sanity/vision'
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
+// ⬇️ CẬP NHẬT: import plugin table — bắt buộc phải "npm install @sanity/table" trước
+// (nếu chưa cài, Studio sẽ báo lỗi "Cannot find module '@sanity/table'" khi build)
+import {table} from '@sanity/table'
 
 
 // Go to https://www.sanity.io/docs/api-versioning to learn how API versioning works
@@ -25,5 +28,8 @@ export default defineConfig({
     // Vision is for querying with GROQ from inside the Studio
     // https://www.sanity.io/docs/the-vision-plugin
     visionTool({defaultApiVersion: apiVersion}),
+    // ⬇️ CẬP NHẬT: đăng ký plugin table — cho phép field "body" trong post.ts
+    // (đã thêm { type: 'table' } vào mảng "of") render được UI tạo bảng trong Studio
+    table(),
   ],
 })
