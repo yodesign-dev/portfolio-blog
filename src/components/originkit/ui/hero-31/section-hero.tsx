@@ -33,14 +33,9 @@ export const SectionHero = () => (
       <Navbar />
     </div>
 
-    {/* 
-       2. KHỐI TRUNG TÂM TOÀN BỘ NỘI DUNG:
-       Dùng flex-1 + min-h-0 thay vì trừ cứng chiều cao Navbar/spacer,
-       để khối này luôn tự lấp đúng phần còn lại của viewport dù
-       Navbar hay spacer đổi chiều cao sau này.
-    */}
-    <div className={`${STAGE} min-h-0 flex-1 px-[20px] md:px-[56px] z-10 flex flex-col justify-end pb-12`}>
-      
+    {/* section-hero.tsx */}
+    <div className={`${STAGE} px-[40px] md:px-[80px] z-10 flex flex-col justify-end h-[calc(100dvh-120px)] pb-12`}>
+	
       {/* Tiêu đề chính h1 thanh mảnh, xích lại gần khối dưới bằng mb-16 */}
       <h1 className="mb-16 lg:mb-20 text-center md:text-left font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
         Learn by Sharing
