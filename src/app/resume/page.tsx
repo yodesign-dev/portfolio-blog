@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import React from 'react'
 import {client} from '@/sanity/lib/client'
 
 export const revalidate = 60
@@ -37,6 +38,34 @@ export default async function ResumePage() {
   const resume = await getResume()
   const fileUrl = resume?.file?.asset?.url
   const isAvailable = Boolean(resume?.isPublic && fileUrl)
+  const fileName = resume?.file?.asset?.originalFilename || 'resume.pdf'
+
+  const openButton = fileUrl
+    ? React.createElement(
+        'a',
+        {
+          href: fileUrl,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          className:
+            'flex-1 rounded-md bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700',
+        },
+        'Mở PDF'
+      )
+    : null
+
+  const downloadButton = fileUrl
+    ? React.createElement(
+        'a',
+        {
+          href: fileUrl,
+          download: fileName,
+          className:
+            'flex-1 rounded-md border border-neutral-300 px-6 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50',
+        },
+        'Tải xuống'
+      )
+    : null
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
@@ -54,52 +83,36 @@ export default async function ResumePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
-        {!isAvailable ? (
+      {!isAvailable ? (
+        <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
           <p className="text-center text-neutral-400">
             Resume hiện chưa được công khai, quay lại sau nhé.
           </p>
-        ) : (
-          <>
-            {/* Desktop (md trở lên): nhúng PDF trực tiếp để đọc ngay trên trang */}
-            <div className="hidden md:block">
-              <iframe
-                src={fileUrl}
-                title="Resume"
-                className="h-[85vh] w-full rounded-lg border border-neutral-200"
-              />
-            </div>
+        </main>
+      ) : (
+        <>
+          <main className="hidden md:block px-6 py-8 sm:px-8">
+            <iframe
+              src={fileUrl}
+              title="Resume"
+              className="mx-auto h-[calc(100vh-180px)] w-full max-w-5xl rounded-lg border border-neutral-200"
+            />
+          </main>
 
-            {/* Mobile: KHÔNG nhúng iframe — PDF trong iframe trên mobile browser
-                (đặc biệt Safari iOS và in-app webview của FB/LinkedIn/Zalo) hay
-                render lỗi hoặc rất khó đọc. Thay bằng 2 nút để mở/tải bằng
-                trình xem PDF gốc của máy, trải nghiệm mượt hơn hẳn. */}
-            <div className="flex flex-col items-center gap-4 rounded-lg border border-neutral-200 p-8 text-center md:hidden">
+          <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8 md:hidden">
+            <div className="flex flex-col items-center gap-4 rounded-lg border border-neutral-200 p-8 text-center">
               <p className="text-neutral-600">
                 Để có trải nghiệm đọc tốt nhất trên điện thoại, mở resume bằng
                 trình xem PDF của máy thay vì xem trực tiếp trên trang.
               </p>
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
-                <a
-                  href={fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 rounded-md bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700"
-                >
-                  Mở PDF
-                </a>
-                <a
-                  href={fileUrl}
-                  download={resume?.file?.asset?.originalFilename || 'resume.pdf'}
-                  className="flex-1 rounded-md border border-neutral-300 px-6 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
-                >
-                  Tải xuống
-                </a>
+                {openButton}
+                {downloadButton}
               </div>
             </div>
-          </>
-        )}
-      </main>
+          </main>
+        </>
+      )}
     </div>
   )
 }
