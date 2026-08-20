@@ -92,15 +92,18 @@ export default async function ResumePage() {
       ) : (
         <>
           {/* Desktop: nhúng PDF, thêm #view=FitH để trình xem PDF của trình
-              duyệt fit theo chiều RỘNG khung thay vì chiều cao — tránh bị
-              zoom thu nhỏ xuống 33-45% như hành vi mặc định trước đây.
-              max-w-3xl (hẹp hơn bản trước là max-w-5xl) để khung gần đúng
-              tỉ lệ khổ dọc A4, giúp FitH tính ra zoom gần 100%. */}
+              duyệt fit theo chiều RỘNG khung thay vì chiều cao. Đã bỏ hẳn
+              max-w (trước là max-w-3xl/max-w-5xl) — panel thumbnail bên
+              trái của Chrome PDF Viewer có độ rộng CỐ ĐỊNH (~230px), khung
+              càng hẹp thì panel đó càng ăn tỉ trọng lớn hơn của không gian
+              còn lại, kéo zoom càng nhỏ. Bỏ max-w để container full chiều
+              rộng viewport (chỉ còn giới hạn bởi px-6 sm:px-8 của <main>),
+              cho panel thumbnail nhiều "đất" hơn, phần PDF còn lại lớn hơn. */}
           <main className="hidden md:block px-6 py-8 sm:px-8">
             <iframe
               src={`${fileUrl}#view=FitH`}
               title="Resume"
-              className="mx-auto h-[calc(100vh-180px)] w-full max-w-3xl rounded-lg border border-neutral-200"
+              className="mx-auto h-[calc(100vh-180px)] w-full rounded-lg border border-neutral-200"
             />
           </main>
 
