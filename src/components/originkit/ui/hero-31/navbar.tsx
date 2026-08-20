@@ -1,16 +1,17 @@
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
+import Link from "next/link";
 import React, { useEffect, useState } from "react";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navLinks = [
-    { href: "#home", label: "Home" },
-    { href: "#blogs", label: "Blogs" },
-    { href: "#resume", label: "Resume" },
-    { href: "#tools", label: "Tools" },
+    { href: "/", label: "Home" },
+    { href: "/blog", label: "Blogs" },
+    { href: "/resume", label: "Resume" },
+    { href: "#tools", label: "Tools" }, // TODO: đổi thành "/tools" khi trang đó ra mắt
   ];
 
   useEffect(() => {
@@ -24,12 +25,11 @@ export const Navbar = () => {
     link: { href: string; label: string },
     className: string,
     onClick?: () => void
-  ) =>
-    React.createElement(
-      "a",
-      { key: link.href, href: link.href, className, onClick },
-      link.label
-    );
+  ) => (
+    <Link key={link.href} href={link.href} className={className} onClick={onClick}>
+      {link.label}
+    </Link>
+  );
 
   return (
     <header className="relative flex h-[80px] w-full items-center justify-between bg-white pl-[20px] md:pl-[56px] pr-0 text-[#1c1c1c] antialiased">
