@@ -4,14 +4,11 @@ import {notFound} from 'next/navigation'
 import {PortableText, type PortableTextComponents} from '@portabletext/react'
 import {client} from '@/sanity/lib/client'
 import {urlFor} from '@/sanity/lib/image'
-// ⬇️ CẬP NHẬT: import component nút chia sẻ (file mới, xem hướng dẫn tạo bên dưới)
 import {ShareButtons} from '@/components/originkit/ui/hero-31/share-buttons'
+import {ViewTracker} from '@/components/ViewTracker'
 
 export const revalidate = 60
 
-// ⬇️ CẬP NHẬT: base URL của site — dùng để build URL tuyệt đối cho OG tags và nút share.
-// Bắt buộc phải thêm biến này vào .env / Vercel Environment Variables:
-// NEXT_PUBLIC_SITE_URL=https://binblogs.vercel.app
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://binblogs.vercel.app'
 
 const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
@@ -20,6 +17,8 @@ const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
   slug,
   mainImage,
   publishedAt,
+  tags,
+  viewCount,
   body
 }`
 
@@ -32,6 +31,8 @@ type Post = {
     alt?: string
   }
   publishedAt: string
+  tags?: string[]
+  viewCount?: number
   body: any
 }
 
@@ -47,7 +48,12 @@ function formatDate(dateString: string) {
   })
 }
 
-// Định nghĩa cách hiển thị từng loại block trong nội dung Portable Text
+function formatViewCount(count?: number) {
+  const value = count ?? 0
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k lượt xem`
+  return `${value} lượt xem`
+}
+
 const portableTextComponents: PortableTextComponents = {
   types: {
     image: ({value}) => {
@@ -65,7 +71,6 @@ const portableTextComponents: PortableTextComponents = {
         </span>
       )
     },
-    // ⬇️ CẬP NHẬT: render bảng — MỚI, khớp với { type: 'table' } đã thêm vào schema post.ts
     table: ({value}) => {
       if (!value?.rows?.length) return null
       return (
@@ -75,10 +80,7 @@ const portableTextComponents: PortableTextComponents = {
               {value.rows.map((row: any, rowIndex: number) => (
                 <tr key={row._key ?? rowIndex}>
                   {row.cells?.map((cell: string, cellIndex: number) => (
-                    <td
-                      key={cellIndex}
-                      className="border border-neutral-200 px-4 py-2 text-gray-800"
-                    >
+                    <td key={cellIndex} className="border border-neutral-200 px-4 py-2 text-gray-800">
                       {cell}
                     </td>
                   ))}
@@ -124,8 +126,6 @@ const portableTextComponents: PortableTextComponents = {
   marks: {
     strong: ({children}) => <strong className="font-semibold text-neutral-900">{children}</strong>,
     em: ({children}) => <em className="italic">{children}</em>,
-    // ⬇️ CẬP NHẬT: render gạch chân, gạch ngang — khớp với "underline"/"strike-through"
-    // đã thêm vào marks.decorators trong schema post.ts
     underline: ({children}) => <span className="underline">{children}</span>,
     'strike-through': ({children}) => <span className="line-through">{children}</span>,
     code: ({children}) => (
@@ -143,11 +143,9 @@ const portableTextComponents: PortableTextComponents = {
         {children}
       </a>
     ),
-    // ⬇️ CẬP NHẬT: render màu chữ — MỚI, khớp với annotation "textColor" đã thêm vào schema
     textColor: ({children, value}) => (
       <span style={{color: value?.color || undefined}}>{children}</span>
     ),
-    // ⬇️ CẬP NHẬT: render font chữ — MỚI, khớp với annotation "fontFamily" đã thêm vào schema
     fontFamily: ({children, value}) => (
       <span style={{fontFamily: value?.font || undefined}}>{children}</span>
     ),
@@ -160,9 +158,6 @@ export async function generateMetadata({params}: {params: Promise<{slug: string}
 
   if (!post) return {title: 'Không tìm thấy bài viết'}
 
-  // ⬇️ CẬP NHẬT: toàn bộ khối bên dưới là MỚI — thêm Open Graph tags.
-  // Bắt buộc để Facebook/LinkedIn hiển thị đúng ảnh + tiêu đề khi bài viết được chia sẻ,
-  // vì 2 nền tảng này không đọc nội dung trang mà chỉ đọc các meta tag này.
   const postUrl = `${SITE_URL}/blog/${post.slug.current}`
   const ogImageUrl = post.mainImage
     ? urlFor(post.mainImage)?.width(1200).height(630).fit('crop').url()
@@ -197,11 +192,14 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
     ? urlFor(post.mainImage)?.width(1600).height(900).fit('crop').url()
     : null
 
-  // ⬇️ CẬP NHẬT: URL tuyệt đối của bài viết — truyền vào ShareButtons để build link chia sẻ
   const postUrl = `${SITE_URL}/blog/${post.slug.current}`
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
+      {/* MỚI: ViewTracker không render gì ra màn hình — chỉ tự gọi API
+          tăng viewCount 1 lần khi trình duyệt thật load xong trang. */}
+      <ViewTracker postId={post._id} />
+
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-3xl px-6 py-6 sm:px-8">
           <Link href="/blog" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
@@ -212,13 +210,30 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
 
       <main className="mx-auto max-w-3xl px-6 py-12 sm:px-8 sm:py-16">
         <article>
+          {/* MỚI: hiện tags dưới dạng pill, bấm vào lọc theo tag ở /blog */}
+          {post.tags && post.tags.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {post.tags.map((t) => (
+                <Link
+                  key={t}
+                  href={`/blog?tag=${encodeURIComponent(t)}`}
+                  className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-200"
+                >
+                  {t}
+                </Link>
+              ))}
+            </div>
+          )}
+
           <h1 className="text-3xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-4xl">
             {post.title}
           </h1>
 
-          {/* ⬇️ CẬP NHẬT: bọc ngày đăng + nút share trong 1 hàng flex, căn 2 đầu */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm text-neutral-400">{formatDate(post.publishedAt)}</p>
+            {/* MỚI: thêm view count cạnh ngày đăng */}
+            <p className="text-sm text-neutral-400">
+              {formatDate(post.publishedAt)} · {formatViewCount(post.viewCount)}
+            </p>
             <ShareButtons url={postUrl} title={post.title} />
           </div>
 
@@ -239,7 +254,6 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
             <PortableText value={post.body} components={portableTextComponents} />
           </div>
 
-          {/* ⬇️ CẬP NHẬT: nút share lặp lại ở cuối bài — tiện cho người đọc hết bài rồi mới muốn chia sẻ */}
           <div className="mt-12 border-t border-neutral-200 pt-8">
             <ShareButtons url={postUrl} title={post.title} />
           </div>

@@ -1,10 +1,6 @@
-// ⬇️ CẬP NHẬT: import React — cần để tự render annotation "textColor" và "fontFamily"
-// bằng React.createElement (file này là .ts nên không dùng JSX <span> trực tiếp được)
 import React from 'react'
 import {defineField, defineType} from 'sanity'
 
-// ⬇️ CẬP NHẬT: danh sách màu chữ cho phép chọn trong Studio
-// Sửa/thêm màu tại đây nếu cần — value là mã hex sẽ áp thẳng vào style color
 const TEXT_COLORS = [
   {title: 'Mặc định', value: ''},
   {title: 'Đỏ', value: '#e53e3e'},
@@ -14,7 +10,6 @@ const TEXT_COLORS = [
   {title: 'Tím', value: '#805ad5'},
 ]
 
-// ⬇️ CẬP NHẬT: danh sách font chữ cho phép chọn trong Studio
 const FONTS = [
   {title: 'Inter (mặc định)', value: 'Inter, sans-serif'},
   {title: 'Serif', value: 'Georgia, serif'},
@@ -63,6 +58,28 @@ export default defineType({
       type: 'datetime',
       initialValue: () => new Date().toISOString(),
     }),
+    // ⬇️ MỚI: tags — mảng chuỗi tự do, gõ Enter để thêm từng tag.
+    // Studio sẽ hiện dạng ô nhập kiểu "pill" nhờ options.layout = 'tags'.
+    defineField({
+      name: 'tags',
+      title: 'Tags',
+      type: 'array',
+      of: [{type: 'string'}],
+      options: {
+        layout: 'tags',
+      },
+    }),
+    // ⬇️ MỚI: viewCount — số lượt xem, readOnly để tránh sửa tay nhầm.
+    // Được tăng tự động qua API route /api/track-view, không cập nhật
+    // qua Studio thủ công. initialValue 0 để bài mới không bị undefined.
+    defineField({
+      name: 'viewCount',
+      title: 'Lượt xem',
+      type: 'number',
+      initialValue: 0,
+      readOnly: true,
+      description: 'Tự động tăng khi có người xem bài viết — không chỉnh tay ở đây.',
+    }),
     defineField({
       name: 'body',
       title: 'Nội dung bài viết',
@@ -70,8 +87,6 @@ export default defineType({
       of: [
         {
           type: 'block',
-          // ⬇️ CẬP NHẬT: thêm styles (H1/H2/H3/Quote) — trước đây block không khai
-          // báo styles nên Studio chỉ cho chọn "Normal", không có tiêu đề phụ
           styles: [
             {title: 'Normal', value: 'normal'},
             {title: 'H1', value: 'h1'},
@@ -79,14 +94,11 @@ export default defineType({
             {title: 'H3', value: 'h3'},
             {title: 'Quote', value: 'blockquote'},
           ],
-          // ⬇️ CẬP NHẬT: thêm danh sách bullet/numbered (trước đây chưa khai báo)
           lists: [
             {title: 'Bullet', value: 'bullet'},
             {title: 'Numbered', value: 'number'},
           ],
           marks: {
-            // ⬇️ CẬP NHẬT: thêm Underline, Strike, Code — trước đây "marks" chưa
-            // được khai báo nên Studio chỉ có Bold/Italic mặc định của Sanity
             decorators: [
               {title: 'Bold', value: 'strong'},
               {title: 'Italic', value: 'em'},
@@ -94,8 +106,6 @@ export default defineType({
               {title: 'Strike', value: 'strike-through'},
               {title: 'Code', value: 'code'},
             ],
-            // ⬇️ CẬP NHẬT: toàn bộ khối "annotations" là MỚI — đây là phần thêm
-            // chức năng đổi màu chữ, đổi font, và chèn link cho văn bản bôi đen
             annotations: [
               defineField({
                 name: 'textColor',
@@ -161,9 +171,6 @@ export default defineType({
             }),
           ],
         },
-        // ⬇️ CẬP NHẬT: thêm { type: 'table' } — MỚI, cho phép chèn bảng vào bài viết.
-        // Bắt buộc phải cài "npm install @sanity/table" và đã đăng ký table()
-        // trong plugins của sanity.config.ts, nếu không dòng này sẽ gây lỗi runtime.
         {
           type: 'table',
         },
