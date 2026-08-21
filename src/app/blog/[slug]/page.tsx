@@ -198,7 +198,7 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       {/* MỚI: ViewTracker không render gì ra màn hình — chỉ tự gọi API
           tăng viewCount 1 lần khi trình duyệt thật load xong trang. */}
-      <ViewTracker postId={post._id} />
+      <ViewTracker postId={post._id} slug={post.slug.current} />
 
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-3xl px-6 py-6 sm:px-8">
