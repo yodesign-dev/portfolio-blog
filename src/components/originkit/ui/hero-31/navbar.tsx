@@ -11,7 +11,7 @@ export const Navbar = () => {
     { href: "/", label: "Home" },
     { href: "/blog", label: "Blogs" },
     { href: "/resume", label: "Resume" },
-    { href: "#tools", label: "Tools" }, // TODO: đổi thành "/tools" khi trang đó ra mắt
+    { href: "/tools", label: "Tools" }, // TODO: đổi thành "/tools" khi trang đó ra mắt
   ];
 
   useEffect(() => {
