@@ -3,15 +3,17 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import { useContactModal } from "./contact-modal-context";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { openModal } = useContactModal();
 
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/blog", label: "Blogs" },
     { href: "/resume", label: "Resume" },
-    { href: "/tools", label: "Tools" }, // TODO: đổi thành "/tools" khi trang đó ra mắt
+    { href: "/tools", label: "Tools" },
   ];
 
   useEffect(() => {
@@ -49,7 +51,13 @@ export const Navbar = () => {
           )}
         </div>
 
-        <button className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center">
+        {/* ⬇️ CẬP NHẬT: thêm onClick mở ContactModal, trước đây nút này
+            không có chức năng gì */}
+        <button
+          type="button"
+          onClick={() => openModal()}
+          className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center"
+        >
           Get In Touch
         </button>
       </nav>
@@ -86,8 +94,14 @@ export const Navbar = () => {
               () => setIsMenuOpen(false)
             )
           )}
+          {/* ⬇️ CẬP NHẬT: nút Get In Touch trong menu mobile cũng mở modal,
+              đồng thời đóng menu mobile lại cho gọn */}
           <button
-            onClick={() => setIsMenuOpen(false)}
+            type="button"
+            onClick={() => {
+              setIsMenuOpen(false);
+              openModal();
+            }}
             className="mt-4 w-full bg-[#50d3f2] px-6 py-4 font-sans text-sm font-bold text-neutral-900 transition hover:bg-[#3dbcdb]"
           >
             Get In Touch

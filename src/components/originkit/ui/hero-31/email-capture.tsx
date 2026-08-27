@@ -1,16 +1,22 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useContactModal } from "./contact-modal-context";
 
 type EmailCaptureProps = {
-  fullWidth?: boolean; // true khi nằm trong container đã bị chia cột (như InfoBand)
+  fullWidth?: boolean;
 };
 
 export const EmailCapture = ({ fullWidth = false }: EmailCaptureProps) => {
   const [email, setEmail] = useState("");
+  const { openModal } = useContactModal();
 
+  // ⬇️ CẬP NHẬT: thay vì chỉ preventDefault (không làm gì), giờ mở
+  // ContactModal và mang theo email đã gõ sẵn — người dùng không phải
+  // gõ lại email lần 2 trong modal.
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    openModal(email);
   };
 
   return (
