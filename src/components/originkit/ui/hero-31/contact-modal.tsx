@@ -74,17 +74,26 @@ export function ContactModal() {
   };
 
   return (
+    // ⬇️ CẬP NHẬT: items-start (mobile) → sm:items-center. Trên mobile,
+    // modal neo gần đỉnh màn hình (kèm py-8) thay vì canh giữa tuyệt đối
+    // — tránh bị cắt mất phần đầu (nút đóng) khi bàn phím ảo mở, chiếm
+    // gần nửa viewport, vốn hay xảy ra với items-center trên màn hình
+    // thấp. Từ sm trở lên, màn hình đủ cao nên canh giữa như bình thường.
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 py-8 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm sm:items-center"
       onClick={closeModal}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-2xl bg-white p-8 text-neutral-900 shadow-2xl my-auto"
+        // ⬇️ CẬP NHẬT: p-6 sm:p-8 — bớt chật trên màn hình hẹp
+        className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8"
       >
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-neutral-900">Get in touch</h2>
+            {/* ⬇️ CẬP NHẬT: text-xl sm:text-2xl — heading không quá to trên mobile */}
+            <h2 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl">
+              Get in touch
+            </h2>
             <p className="mt-2 max-w-sm text-sm leading-relaxed text-neutral-500">
               Mình luôn sẵn sàng lắng nghe về dự án, cơ hội hợp tác, hoặc chỉ đơn giản là một lời chào.
             </p>
@@ -139,7 +148,9 @@ export function ContactModal() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* ⬇️ CẬP NHẬT: grid-cols-1 (mobile) → sm:grid-cols-2 — Tên và
+                Tiêu đề xếp dọc trên mobile thay vì chen chật 2 cột */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="contact-name" className="mb-1.5 block text-sm font-medium text-neutral-700">
                   Tên
@@ -151,7 +162,9 @@ export function ContactModal() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Tên của bạn"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                  // ⬇️ CẬP NHẬT: text-base (16px) thay vì text-sm (14px) —
+                  // chặn iOS Safari tự động zoom khi focus vào input
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                 />
               </div>
               <div>
@@ -165,7 +178,7 @@ export function ContactModal() {
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="Hợp tác dự án"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                 />
               </div>
             </div>
@@ -181,7 +194,7 @@ export function ContactModal() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ban@email.com"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
               />
             </div>
 
@@ -196,7 +209,7 @@ export function ContactModal() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Bạn muốn nhắn gì?"
-                className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
               />
             </div>
 
