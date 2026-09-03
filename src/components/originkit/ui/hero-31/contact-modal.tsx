@@ -74,27 +74,23 @@ export function ContactModal() {
   };
 
   return (
-    // ⬇️ CẬP NHẬT: items-start (mobile) → sm:items-center. Trên mobile,
-    // modal neo gần đỉnh màn hình (kèm py-8) thay vì canh giữa tuyệt đối
-    // — tránh bị cắt mất phần đầu (nút đóng) khi bàn phím ảo mở, chiếm
-    // gần nửa viewport, vốn hay xảy ra với items-center trên màn hình
-    // thấp. Từ sm trở lên, màn hình đủ cao nên canh giữa như bình thường.
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm sm:items-center"
       onClick={closeModal}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        // ⬇️ CẬP NHẬT: p-6 sm:p-8 — bớt chật trên màn hình hẹp
         className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8"
       >
         <div className="flex items-start justify-between">
           <div>
-            {/* ⬇️ CẬP NHẬT: text-xl sm:text-2xl — heading không quá to trên mobile */}
-            <h2 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl">
+            {/* ⬇️ CẬP NHẬT: font-extrabold (đậm hơn hẳn), giữ text-2xl
+                xuyên suốt thay vì thu nhỏ text-xl trên mobile */}
+            <h2 className="text-2xl font-extrabold tracking-tight text-neutral-900">
               Get in touch
             </h2>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-neutral-500">
+            {/* ⬇️ CẬP NHẬT: text-base thay vì text-sm — dễ đọc hơn trên mobile */}
+            <p className="mt-2 max-w-sm text-base leading-relaxed text-neutral-500">
               Mình luôn sẵn sàng lắng nghe về dự án, cơ hội hợp tác, hoặc chỉ đơn giản là một lời chào.
             </p>
           </div>
@@ -111,14 +107,16 @@ export function ContactModal() {
         </div>
 
         {status !== "success" && (
-          <div className="mt-5 flex flex-col gap-2.5">
+          // ⬇️ CẬP NHẬT: gap-2.5 → gap-4, giãn cách giữa 2 quick link cho
+          // đỡ chật, chữ text-sm → text-base
+          <div className="mt-5 flex flex-col gap-4">
             {QUICK_LINKS.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
                 target={link.href.startsWith("http") ? "_blank" : undefined}
                 rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="flex items-center gap-2 text-sm font-medium text-[#0b1432] transition hover:opacity-70"
+                className="flex items-center gap-2 text-base font-medium text-[#0b1432] transition hover:opacity-70"
               >
                 {link.icon}
                 {link.label}
@@ -134,26 +132,25 @@ export function ContactModal() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="mt-4 font-medium text-neutral-900">Đã gửi thành công!</p>
-            <p className="mt-1 text-sm text-neutral-500">
+            <p className="mt-4 text-base font-medium text-neutral-900">Đã gửi thành công!</p>
+            <p className="mt-1 text-base text-neutral-500">
               Mình sẽ phản hồi qua email sớm nhất có thể.
             </p>
             <button
               type="button"
               onClick={closeModal}
-              className="mt-6 w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700"
+              className="mt-6 w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-base font-semibold text-white transition hover:bg-neutral-700"
             >
               Đóng
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-            {/* ⬇️ CẬP NHẬT: grid-cols-1 (mobile) → sm:grid-cols-2 — Tên và
-                Tiêu đề xếp dọc trên mobile thay vì chen chật 2 cột */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="contact-name" className="mb-1.5 block text-sm font-medium text-neutral-700">
-                  Tên
+                {/* ⬇️ CẬP NHẬT: label "Tên" → "Họ và Tên", cỡ chữ text-base, font-semibold */}
+                <label htmlFor="contact-name" className="mb-1.5 block text-base font-semibold text-neutral-700">
+                  Họ và Tên
                 </label>
                 <input
                   id="contact-name"
@@ -161,14 +158,12 @@ export function ContactModal() {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Tên của bạn"
-                  // ⬇️ CẬP NHẬT: text-base (16px) thay vì text-sm (14px) —
-                  // chặn iOS Safari tự động zoom khi focus vào input
+                  placeholder="Họ và tên của bạn"
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                 />
               </div>
               <div>
-                <label htmlFor="contact-subject" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                <label htmlFor="contact-subject" className="mb-1.5 block text-base font-semibold text-neutral-700">
                   Tiêu đề
                 </label>
                 <input
@@ -184,7 +179,7 @@ export function ContactModal() {
             </div>
 
             <div>
-              <label htmlFor="contact-email" className="mb-1.5 block text-sm font-medium text-neutral-700">
+              <label htmlFor="contact-email" className="mb-1.5 block text-base font-semibold text-neutral-700">
                 Email
               </label>
               <input
@@ -199,7 +194,7 @@ export function ContactModal() {
             </div>
 
             <div>
-              <label htmlFor="contact-message" className="mb-1.5 block text-sm font-medium text-neutral-700">
+              <label htmlFor="contact-message" className="mb-1.5 block text-base font-semibold text-neutral-700">
                 Tin nhắn
               </label>
               <textarea
@@ -214,7 +209,7 @@ export function ContactModal() {
             </div>
 
             {status === "error" && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-base text-red-700">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                 </svg>
@@ -225,7 +220,7 @@ export function ContactModal() {
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#00ddff] px-4 py-3 text-sm font-semibold text-[#0b1432] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#00ddff] px-4 py-3 text-base font-semibold text-[#0b1432] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {status === "submitting" ? (
                 "Đang gửi..."
