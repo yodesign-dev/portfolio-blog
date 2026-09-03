@@ -5,21 +5,20 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, message } = await request.json();
+    const { name, email, subject, message } = await request.json();
 
-    if (!name || !email || !message) {
+    if (!name || !email || !subject || !message) {
       return NextResponse.json({ error: "Vui lòng điền đầy đủ thông tin" }, { status: 400 });
     }
 
     await resend.emails.send({
-      // Domain onboarding@resend.dev dùng được ngay không cần setup gì
-      // thêm — chỉ giới hạn gửi tới đúng email đã đăng ký tài khoản
-      // Resend, khớp đúng nhu cầu (gửi về nguyenbinhdesign@gmail.com).
       from: "YoBlogs Contact <onboarding@resend.dev>",
       to: "nguyenbinhdesign@gmail.com",
       replyTo: email,
-      subject: `Liên hệ mới từ ${name}`,
-      text: `Tên: ${name}\nEmail: ${email}\n\nTin nhắn:\n${message}`,
+      // ⬇️ CẬP NHẬT: dùng subject người dùng nhập làm tiêu đề email,
+      // thay vì cố định "Liên hệ mới từ {name}" như trước
+      subject: `[Get in Touch] ${subject}`,
+      text: `Tên: ${name}\nEmail: ${email}\nTiêu đề: ${subject}\n\nTin nhắn:\n${message}`,
     });
 
     return NextResponse.json({ success: true });
