@@ -42,7 +42,7 @@ export const SectionHero = () => (
             ngay bên dưới. Đặt file ảnh tại public/avatar.jpg (hoặc đổi
             đuôi .png/.webp và sửa lại đường dẫn src cho khớp). */}
         <div className="mb-6 flex justify-center md:justify-start">
-          <div className="h-20 w-20 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full shadow-lg ring-2 ring-white/20 md:h-24 md:w-24">
+          <div className="h-36 w-36 md:h-24 md:w-24 shrink-0 overflow-hidden rounded-full shadow-lg ring-2 ring-white/20 md:h-24 md:w-24">
             <Image
               src="/avatar.png"
               alt="Binh Nguyen"
