@@ -57,6 +57,9 @@ export function ContactModal() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | undefined>(undefined);
+  // MỚI: ref để auto-focus vào field đầu tiên khi modal mở — chuẩn UX
+  // cho modal/dialog, đặc biệt hữu ích cho người dùng bàn phím/screen reader
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -72,6 +75,25 @@ export function ContactModal() {
       document.body.style.overflow = "";
     };
   }, [isOpen]);
+
+  // MỚI: đóng modal bằng phím Escape — hành vi chuẩn của mọi modal/dialog
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, closeModal]);
+
+  // MỚI: tự động focus vào field "Họ và Tên" khi modal vừa mở — người
+  // dùng bàn phím có thể gõ ngay không cần click chuột vào field trước
+  useEffect(() => {
+    if (isOpen && status !== "success") {
+      const timer = setTimeout(() => nameInputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, status]);
 
   // MỚI: render widget Turnstile mỗi khi modal mở (và script đã tải
   // xong) — dùng explicit render API thay vì auto-render qua data
@@ -222,6 +244,7 @@ export function ContactModal() {
                   </label>
                   <input
                     id="contact-name"
+                    ref={nameInputRef}
                     type="text"
                     required
                     value={name}

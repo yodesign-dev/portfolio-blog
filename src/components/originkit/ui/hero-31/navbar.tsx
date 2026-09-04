@@ -2,12 +2,17 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
+  // MỚI: dùng usePathname để biết đang ở trang nào, làm nổi bật đúng
+  // mục trong menu — trước đây không có chỉ báo gì, người dùng khó biết
+  // mình đang xem trang nào.
+  const pathname = usePathname();
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -23,12 +28,25 @@ export const Navbar = () => {
     };
   }, [isMenuOpen]);
 
+  // MỚI: "/" chỉ active khi đúng trang chủ (không phải mọi path đều
+  // bắt đầu bằng "/"); các trang khác active khi pathname bắt đầu bằng
+  // href đó (để /blog/[slug] vẫn làm nổi bật mục "Blogs").
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname?.startsWith(href);
+
   const renderLink = (
     link: { href: string; label: string },
-    className: string,
+    baseClassName: string,
+    activeClassName: string,
     onClick?: () => void
   ) => (
-    <Link key={link.href} href={link.href} className={className} onClick={onClick}>
+    <Link
+      key={link.href}
+      href={link.href}
+      onClick={onClick}
+      aria-current={isActive(link.href) ? "page" : undefined}
+      className={isActive(link.href) ? `${baseClassName} ${activeClassName}` : baseClassName}
+    >
       {link.label}
     </Link>
   );
@@ -46,13 +64,12 @@ export const Navbar = () => {
           {navLinks.map((link) =>
             renderLink(
               link,
-              "text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition"
+              "text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition",
+              "text-neutral-900 underline underline-offset-4 decoration-2 decoration-[#00ddff]"
             )
           )}
         </div>
 
-        {/* ⬇️ CẬP NHẬT: thêm onClick mở ContactModal, trước đây nút này
-            không có chức năng gì */}
         <button
           type="button"
           onClick={() => openModal()}
@@ -91,11 +108,10 @@ export const Navbar = () => {
             renderLink(
               link,
               "border-b border-neutral-100 py-4 text-base font-semibold text-neutral-700 transition hover:text-neutral-900",
+              "text-neutral-900 bg-neutral-50",
               () => setIsMenuOpen(false)
             )
           )}
-          {/* ⬇️ CẬP NHẬT: nút Get In Touch trong menu mobile cũng mở modal,
-              đồng thời đóng menu mobile lại cho gọn */}
           <button
             type="button"
             onClick={() => {

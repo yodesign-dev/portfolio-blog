@@ -1,6 +1,8 @@
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
+import { useState } from "react";
+
 type ShareButtonsProps = {
   url: string;
   title: string;
@@ -8,6 +10,8 @@ type ShareButtonsProps = {
 
 export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
   const encodedUrl = encodeURIComponent(url);
+  // MỚI: state cho phản hồi "đã copy" tạm thời
+  const [copied, setCopied] = useState(false);
 
   const shareLinks = [
     {
@@ -34,6 +38,19 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
     window.open(href, "_blank", "noopener,noreferrer,width=600,height=500");
   };
 
+  // MỚI: copy link vào clipboard, hiện icon dấu tick 2 giây rồi trở lại
+  // icon copy — pattern chuẩn, luôn đi kèm nhóm nút share mạng xã hội
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Trình duyệt cũ/không hỗ trợ Clipboard API — im lặng bỏ qua,
+      // không ảnh hưởng 2 nút share chính vẫn hoạt động bình thường
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium text-neutral-500">Chia sẻ:</span>
@@ -48,6 +65,22 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
           {platform.icon}
         </button>
       ))}
+      <button
+        type="button"
+        onClick={handleCopyLink}
+        aria-label="Sao chép liên kết"
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
+      >
+        {copied ? (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 };

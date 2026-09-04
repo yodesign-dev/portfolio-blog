@@ -37,12 +37,12 @@ export const SectionHero = () => (
 
       <div className={`${STAGE} min-h-0 flex-1 px-[40px] md:px-[80px] z-10 flex flex-col justify-end pb-12`}>
 
-        {/* MỚI: avatar tròn — canh giữa trên mobile, canh trái từ md
-            trở lên, khớp đúng logic text-center/md:text-left của h1
-            ngay bên dưới. Đặt file ảnh tại public/avatar.jpg (hoặc đổi
-            đuôi .png/.webp và sửa lại đường dẫn src cho khớp). */}
+        {/* FIX: trước có cả md:h-36 md:w-36 LẪN md:h-24 md:w-24 trên cùng
+            1 thẻ — 2 class xung đột nhau, đây là lý do avatar "không đổi
+            size" dù đã sửa. Giờ chỉ còn đúng 1 kích thước 144px xuyên
+            suốt mọi breakpoint (khớp yêu cầu 144x144 ban đầu). */}
         <div className="mb-6 flex justify-center md:justify-start">
-          <div className="h-36 w-36 md:h-36 md:w-36 shrink-0 overflow-hidden rounded-full shadow-lg ring-2 ring-white/20 md:h-24 md:w-24">
+          <div className="h-36 w-36 shrink-0 overflow-hidden rounded-full shadow-lg ring-2 ring-white/20">
             <Image
               src="/avatar.png"
               alt="Binh Nguyen"
