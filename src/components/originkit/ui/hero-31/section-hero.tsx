@@ -46,8 +46,8 @@ export const SectionHero = () => (
             <Image
               src="/avatar.png"
               alt="Binh Nguyen"
-              width={96}
-              height={96}
+              width={144}
+              height={144}
               priority
               className="h-full w-full object-cover"
             />
