@@ -16,7 +16,6 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "bin designer",
-  description: "binvblogs",
 };
 
 export default function RootLayout({
