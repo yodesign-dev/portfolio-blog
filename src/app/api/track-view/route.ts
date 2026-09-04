@@ -1,33 +1,35 @@
-import {NextRequest, NextResponse} from 'next/server'
-import {revalidatePath} from 'next/cache'
-import {writeClient} from '@/sanity/lib/writeClient'
+import { NextRequest, NextResponse } from "next/server";
+import { writeClient } from "@/sanity/lib/writeClient";
 
 export async function POST(request: NextRequest) {
   try {
-    const {id, slug} = await request.json()
+    const { id } = await request.json();
 
-    if (!id || typeof id !== 'string') {
-      return NextResponse.json({error: 'Thiếu id bài viết'}, {status: 400})
+    if (!id || typeof id !== "string") {
+      return NextResponse.json({ error: "Thiếu id bài viết" }, { status: 400 });
+    }
+
+    // MỚI: xác nhận id thực sự thuộc về 1 document loại "post" đã tồn
+    // tại, trước khi cho phép ghi — chặn trường hợp ai đó gửi id tuỳ ý
+    // (vd: "resume", hoặc id của document khác) để ghi field viewCount
+    // vào những nơi không nên có field này.
+    const exists = await writeClient.fetch(
+      `defined(*[_type == "post" && _id == $id][0]._id)`,
+      { id }
+    );
+    if (!exists) {
+      return NextResponse.json({ error: "Không tìm thấy bài viết" }, { status: 404 });
     }
 
     await writeClient
       .patch(id)
-      .setIfMissing({viewCount: 0})
-      .inc({viewCount: 1})
-      .commit({autoGenerateArrayKeys: true})
+      .setIfMissing({ viewCount: 0 })
+      .inc({ viewCount: 1 })
+      .commit({ autoGenerateArrayKeys: true });
 
-    // MỚI: xoá cache ISR của đúng 2 trang liên quan ngay sau khi tăng
-    // viewCount — nếu không có bước này, trang chi tiết vẫn hiện số cũ
-    // cho tới khi hết chu kỳ revalidate = 60 tự nhiên, gây cảm giác
-    // "vào detail thấy 0 nhưng ra listing lại thấy 1" như đã gặp.
-    if (typeof slug === 'string' && slug) {
-      revalidatePath(`/blog/${slug}`)
-    }
-    revalidatePath('/blog')
-
-    return NextResponse.json({success: true})
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('track-view error:', error)
-    return NextResponse.json({error: 'Không thể cập nhật lượt xem'}, {status: 500})
+    console.error("track-view error:", error);
+    return NextResponse.json({ error: "Không thể cập nhật lượt xem" }, { status: 500 });
   }
 }
