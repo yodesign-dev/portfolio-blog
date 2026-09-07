@@ -2,6 +2,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {client} from '@/sanity/lib/client'
 import {urlFor} from '@/sanity/lib/image'
+import {getLocale} from '@/lib/get-locale'
+import {getDictionary, type Locale} from '@/lib/i18n'
 
 export const revalidate = 60
 
@@ -33,11 +35,6 @@ async function getPosts(tag?: string): Promise<Post[]> {
     excerpt,
     author
   }`
-  // Luôn truyền params cùng 1 shape cố định {tag: string}. Cast `as any`
-  // vì query được ghép động (${tagFilter}) nên Sanity Typegen không nhận
-  // diện được, mặc định ép kiểu params phải là undefined — dù giá trị
-  // lúc chạy hoàn toàn hợp lệ. Cast để bỏ qua ràng buộc kiểu quá chặt
-  // này ở đúng 1 chỗ, không ảnh hưởng nơi khác trong project.
   const params = {tag: tag ?? ''}
   return client.fetch<Post[]>(query, params as any, {next: {revalidate}})
 }
@@ -47,18 +44,18 @@ async function getAllTags(): Promise<string[]> {
   return client.fetch(query, {}, {next: {revalidate}})
 }
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('vi-VN', {
+function formatDate(dateString: string, locale: Locale) {
+  return new Date(dateString).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
   })
 }
 
-function formatViewCount(count?: number) {
+function formatViewCount(count: number | undefined, viewsSuffix: string) {
   const value = count ?? 0
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k lượt xem`
-  return `${value} lượt xem`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k ${viewsSuffix}`
+  return `${value} ${viewsSuffix}`
 }
 
 export default async function BlogPage({
@@ -67,19 +64,20 @@ export default async function BlogPage({
   searchParams: Promise<{tag?: string}>
 }) {
   const {tag} = await searchParams
-  const [posts, allTags] = await Promise.all([getPosts(tag), getAllTags()])
+  const [posts, allTags, locale] = await Promise.all([getPosts(tag), getAllTags(), getLocale()])
+  const t = getDictionary(locale)
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
           <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
-            ← Về trang chủ
+            {t.common.backHome}
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-            Blog
+            {t.blog.title}
           </h1>
-          <p className="mt-2 text-neutral-500">Ghi chép và chia sẻ trong quá trình học & làm việc.</p>
+          <p className="mt-2 text-neutral-500">{t.blog.subtitle}</p>
         </div>
       </header>
 
@@ -94,19 +92,19 @@ export default async function BlogPage({
                   : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
               }`}
             >
-              Tất cả
+              {t.common.all}
             </Link>
-            {allTags.map((t) => (
+            {allTags.map((tg) => (
               <Link
-                key={t}
-                href={`/blog?tag=${encodeURIComponent(t)}`}
+                key={tg}
+                href={`/blog?tag=${encodeURIComponent(tg)}`}
                 className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
-                  tag === t
+                  tag === tg
                     ? 'border-neutral-900 bg-neutral-900 text-white'
                     : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
                 }`}
               >
-                {t}
+                {tg}
               </Link>
             ))}
           </div>
@@ -114,16 +112,16 @@ export default async function BlogPage({
 
         {posts.length === 0 ? (
           <p className="text-center text-neutral-400">
-            {tag ? `Chưa có bài viết nào gắn tag "${tag}".` : 'Chưa có bài viết nào được đăng.'}
+            {tag ? t.blog.emptyTag(tag) : t.blog.empty}
           </p>
         ) : (
           <div>
-            <FeaturedPost post={posts[0]} />
+            <FeaturedPost post={posts[0]} locale={locale} viewsSuffix={t.common.viewsSuffix} />
 
             {posts.length > 1 && (
               <div className="mt-4 border-t border-neutral-200">
                 {posts.slice(1).map((post) => (
-                  <PostRow key={post._id} post={post} />
+                  <PostRow key={post._id} post={post} locale={locale} viewsSuffix={t.common.viewsSuffix} />
                 ))}
               </div>
             )}
@@ -134,7 +132,7 @@ export default async function BlogPage({
   )
 }
 
-function FeaturedPost({post}: {post: Post}) {
+function FeaturedPost({post, locale, viewsSuffix}: {post: Post; locale: Locale; viewsSuffix: string}) {
   const imageUrl = post.mainImage
     ? urlFor(post.mainImage)?.width(1200).height(800).fit('crop').url()
     : null
@@ -180,7 +178,7 @@ function FeaturedPost({post}: {post: Post}) {
           )}
 
           <p className="mt-4 text-sm text-neutral-400">
-            {[post.author, formatDate(post.publishedAt), formatViewCount(post.viewCount)]
+            {[post.author, formatDate(post.publishedAt, locale), formatViewCount(post.viewCount, viewsSuffix)]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -190,7 +188,7 @@ function FeaturedPost({post}: {post: Post}) {
   )
 }
 
-function PostRow({post}: {post: Post}) {
+function PostRow({post, locale, viewsSuffix}: {post: Post; locale: Locale; viewsSuffix: string}) {
   const imageUrl = post.mainImage
     ? urlFor(post.mainImage)?.width(240).height(240).fit('crop').url()
     : null
@@ -239,7 +237,7 @@ function PostRow({post}: {post: Post}) {
         )}
 
         <p className="mt-2 text-xs text-neutral-400">
-          {[post.author, formatDate(post.publishedAt), formatViewCount(post.viewCount)]
+          {[post.author, formatDate(post.publishedAt, locale), formatViewCount(post.viewCount, viewsSuffix)]
             .filter(Boolean)
             .join(' · ')}
         </p>

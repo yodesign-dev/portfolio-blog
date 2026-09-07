@@ -24,8 +24,7 @@ export const Navbar = () => {
   }, []);
   const t = getDictionary(locale).nav;
 
-  function toggleLocale() {
-    const next: Locale = locale === "vi" ? "en" : "vi";
+  function selectLocale(next: Locale) {
     setLocale(next);
     document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000`;
     // Re-render các Server Component (page.tsx) theo cookie mới.
@@ -101,7 +100,7 @@ export const Navbar = () => {
         </button>
 
         <div className="ml-4">
-          <LanguageToggle locale={locale} onToggle={toggleLocale} />
+          <LanguageToggle locale={locale} onSelect={selectLocale} />
         </div>
       </nav>
 
@@ -150,7 +149,7 @@ export const Navbar = () => {
           </button>
 
           <div className="mt-4 flex justify-center">
-            <LanguageToggle locale={locale} onToggle={toggleLocale} />
+            <LanguageToggle locale={locale} onSelect={selectLocale} />
           </div>
         </nav>
       </div>

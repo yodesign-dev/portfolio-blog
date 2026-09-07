@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import {client} from '@/sanity/lib/client'
 import {ToolsLibrary} from '@/components/ToolsLibrary'
+import {getLocale} from '@/lib/get-locale'
+import {getDictionary} from '@/lib/i18n'
 
 export const revalidate = 60
 
@@ -37,29 +39,28 @@ async function getTools(): Promise<Tool[]> {
 }
 
 export default async function ToolsPage() {
-  const tools = await getTools()
+  const [tools, locale] = await Promise.all([getTools(), getLocale()])
+  const t = getDictionary(locale)
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
           <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
-            ← Về trang chủ
+            {t.common.backHome}
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-            Tools
+            {t.tools.title}
           </h1>
-          <p className="mt-2 text-neutral-500">
-            Thư viện các công cụ mình đang dùng trong công việc hằng ngày.
-          </p>
+          <p className="mt-2 text-neutral-500">{t.tools.subtitle}</p>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
         {tools.length === 0 ? (
-          <p className="text-center text-neutral-400">Chưa có công cụ nào được thêm.</p>
+          <p className="text-center text-neutral-400">{t.tools.empty}</p>
         ) : (
-          <ToolsLibrary tools={tools} />
+          <ToolsLibrary tools={tools} locale={locale} />
         )}
       </main>
     </div>

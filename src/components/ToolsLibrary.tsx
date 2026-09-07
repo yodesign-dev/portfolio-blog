@@ -1,6 +1,7 @@
 'use client'
 
 import {useEffect, useMemo, useState} from 'react'
+import {getDictionary, type Locale} from '@/lib/i18n'
 
 type Tool = {
   _id: string
@@ -16,15 +17,7 @@ type Tool = {
 
 type ToolsLibraryProps = {
   tools: Tool[]
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  design: 'Design',
-  development: 'Development',
-  ai: 'AI',
-  productivity: 'Productivity',
-  marketing: 'Marketing',
-  other: 'Khác',
+  locale: Locale
 }
 
 const CATEGORY_STYLES: Record<string, string> = {
@@ -36,16 +29,7 @@ const CATEGORY_STYLES: Record<string, string> = {
   other: 'bg-neutral-100 text-neutral-600',
 }
 
-// Số dòng hiện mỗi lần bấm "Xem thêm".
 const PAGE_SIZE = 9
-
-const SORT_OPTIONS = [
-  {key: 'usage', label: 'Mức dùng'},
-  {key: 'rating', label: 'Đánh giá'},
-  {key: 'name', label: 'Tên A–Z'},
-] as const
-
-type SortKey = (typeof SORT_OPTIONS)[number]['key']
 
 function getFaviconUrl(url: string): string | null {
   try {
@@ -56,22 +40,17 @@ function getFaviconUrl(url: string): string | null {
   }
 }
 
-// Sinh số liệu giả lập nhưng ỔN ĐỊNH theo _id (không đổi giữa các lần
-// render/reload) — chỉ dùng làm fallback cho tool nào CHƯA nhập
-// usagePercent/rating trong Sanity Studio. Một khi bạn nhập đủ liệu thật
-// cho toàn bộ tool, có thể xoá hàm này và bỏ luôn logic fallback bên dưới.
 function getMockStats(id: string): {usage: number; rating: number; ratingCount: number} {
   let hash = 0
   for (let i = 0; i < id.length; i++) {
     hash = (hash * 31 + id.charCodeAt(i)) >>> 0
   }
-  const usage = 15 + (hash % 80) // 15–94
-  const rating = 3.6 + ((hash >> 3) % 14) / 10 // 3.6–4.9
-  const ratingCount = 8 + ((hash >> 6) % 220) // 8–227
+  const usage = 15 + (hash % 80)
+  const rating = 3.6 + ((hash >> 3) % 14) / 10
+  const ratingCount = 8 + ((hash >> 6) % 220)
   return {usage, rating: Math.round(rating * 10) / 10, ratingCount}
 }
 
-// Ưu tiên số liệu thật từ Sanity; field nào chưa nhập thì lấy từ mock.
 function getStats(tool: Tool): {usage: number; rating: number; ratingCount: number; isMock: boolean} {
   const mock = getMockStats(tool._id)
   const hasReal =
@@ -84,33 +63,40 @@ function getStats(tool: Tool): {usage: number; rating: number; ratingCount: numb
   }
 }
 
-export function ToolsLibrary({tools}: ToolsLibraryProps) {
+export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
+  const t = getDictionary(locale).common
+  const CATEGORY_LABELS = t.categories
+
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('usage')
+  const [sortKey, setSortKey] = useState<'usage' | 'rating' | 'name'>('usage')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
+  const SORT_OPTIONS = [
+    {key: 'usage' as const, label: t.sortUsage},
+    {key: 'rating' as const, label: t.sortRating},
+    {key: 'name' as const, label: t.sortName},
+  ]
+
   const categories = useMemo(() => {
-    const set = new Set(tools.map((t) => t.category))
+    const set = new Set(tools.map((tool) => tool.category))
     return Array.from(set)
   }, [tools])
 
-  // Số liệu (thật hoặc fallback mock) được tính một lần cho mỗi tool,
-  // giữ ổn định qua các lần sort/filter.
   const statsById = useMemo(() => {
     const map = new Map<string, ReturnType<typeof getStats>>()
-    tools.forEach((t) => map.set(t._id, getStats(t)))
+    tools.forEach((tool) => map.set(tool._id, getStats(tool)))
     return map
   }, [tools])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const result = tools.filter((t) => {
-      const matchesCategory = !category || t.category === category
+    const result = tools.filter((tool) => {
+      const matchesCategory = !category || tool.category === category
       const matchesQuery =
         !q ||
-        t.name.toLowerCase().includes(q) ||
-        (t.description ?? '').toLowerCase().includes(q)
+        tool.name.toLowerCase().includes(q) ||
+        (tool.description ?? '').toLowerCase().includes(q)
       return matchesCategory && matchesQuery
     })
 
@@ -122,7 +108,6 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
     })
   }, [tools, query, category, sortKey, statsById])
 
-  // Reset số lượng hiện khi search, filter hoặc sort đổi.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
   }, [query, category, sortKey])
@@ -145,17 +130,16 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm công cụ theo tên hoặc mô tả..."
+          placeholder={t.searchPlaceholder}
           className="w-full rounded-md border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none"
         />
       </div>
 
       <div className="flex flex-col gap-10 md:flex-row">
-        {/* Sidebar danh mục */}
         {categories.length > 0 && (
           <aside className="shrink-0 md:w-44">
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
-              Danh mục
+              {t.category}
             </p>
             <ul className="flex flex-row flex-wrap gap-1 md:flex-col md:flex-nowrap md:gap-0.5">
               <li>
@@ -168,7 +152,7 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
                       : 'border border-neutral-200 text-neutral-600 hover:border-neutral-400 md:border-0 md:border-l-2 md:border-transparent'
                   }`}
                 >
-                  <span>Tất cả</span>
+                  <span>{t.all}</span>
                   <span className="text-xs text-neutral-400">{tools.length}</span>
                 </button>
               </li>
@@ -183,9 +167,9 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
                         : 'border border-neutral-200 text-neutral-600 hover:border-neutral-400 md:border-0 md:border-l-2 md:border-transparent'
                     }`}
                   >
-                    <span>{CATEGORY_LABELS[c] ?? c}</span>
+                    <span>{CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] ?? c}</span>
                     <span className="text-xs text-neutral-400">
-                      {tools.filter((t) => t.category === c).length}
+                      {tools.filter((tool) => tool.category === c).length}
                     </span>
                   </button>
                 </li>
@@ -194,10 +178,11 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
           </aside>
         )}
 
-        {/* Danh sách chính */}
         <main className="min-w-0 flex-1">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-neutral-400">{filtered.length} công cụ</p>
+            <p className="text-sm text-neutral-400">
+              {filtered.length} {t.toolsCount}
+            </p>
             <div className="flex gap-1">
               {SORT_OPTIONS.map((s) => (
                 <button
@@ -217,7 +202,7 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
           </div>
 
           {filtered.length === 0 ? (
-            <p className="text-center text-neutral-400">Không tìm thấy công cụ nào phù hợp.</p>
+            <p className="text-center text-neutral-400">{t.noToolsFound}</p>
           ) : (
             <>
               <div className="border-t border-neutral-200">
@@ -249,13 +234,13 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
                           <h3 className="text-base font-semibold text-neutral-900">{tool.name}</h3>
                           {stats.usage === topUsage && (
                             <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white">
-                              dùng nhiều nhất
+                              {t.mostUsed}
                             </span>
                           )}
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryStyle}`}
                           >
-                            {CATEGORY_LABELS[tool.category] ?? tool.category}
+                            {CATEGORY_LABELS[tool.category as keyof typeof CATEGORY_LABELS] ?? tool.category}
                           </span>
                         </div>
 
@@ -292,7 +277,10 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
                             style={{width: `${stats.usage}%`}}
                           />
                         </div>
-                        <p className="mt-1 text-xs text-neutral-400">{stats.usage}% mức dùng</p>
+                        <p className="mt-1 text-xs text-neutral-400">
+                          {stats.usage}
+                          {t.usageSuffix}
+                        </p>
                       </div>
                     </a>
                   )
@@ -306,7 +294,7 @@ export function ToolsLibrary({tools}: ToolsLibraryProps) {
                     onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
                     className="rounded-md border border-neutral-300 px-6 py-2.5 text-sm font-semibold text-neutral-900 transition hover:border-neutral-900"
                   >
-                    Xem thêm ({filtered.length - visibleCount} công cụ nữa)
+                    {t.loadMore} ({filtered.length - visibleCount} {t.itemsSuffix})
                   </button>
                 </div>
               )}

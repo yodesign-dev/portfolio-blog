@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import {client} from '@/sanity/lib/client'
 import {TimelineExplorer} from '@/components/TimelineExplorer'
+import {getLocale} from '@/lib/get-locale'
+import {getDictionary} from '@/lib/i18n'
 
 export const revalidate = 60
 
@@ -35,29 +37,26 @@ async function getTimeline(): Promise<YearData[]> {
 }
 
 export default async function TimelinePage() {
-  const years = await getTimeline()
+  const [years, locale] = await Promise.all([getTimeline(), getLocale()])
+  const t = getDictionary(locale)
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
-      {/* CẬP NHẬT: max-w-4xl → max-w-6xl — layout rộng hơn, phù hợp
-          hơn cho trang có biểu đồ/data visualization */}
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
           <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
-            ← Về trang chủ
+            {t.common.backHome}
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-            Timeline
+            {t.timeline.title}
           </h1>
-          <p className="mt-2 text-neutral-500">
-            Công cụ thiết kế & AI được dùng nhiều qua từng năm.
-          </p>
+          <p className="mt-2 text-neutral-500">{t.timeline.subtitle}</p>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
         {years.length === 0 ? (
-          <p className="text-center text-neutral-400">Chưa có dữ liệu timeline nào.</p>
+          <p className="text-center text-neutral-400">{t.timeline.empty}</p>
         ) : (
           <TimelineExplorer years={years} />
         )}
