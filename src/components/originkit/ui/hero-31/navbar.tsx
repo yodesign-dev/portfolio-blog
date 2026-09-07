@@ -5,21 +5,31 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { DEFAULT_LOCALE, getDictionary, type Locale } from "@/lib/i18n";
+import { LANG_COOKIE } from "@/lib/get-locale";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
-  // MỚI: dùng usePathname để biết đang ở trang nào, làm nổi bật đúng
-  // mục trong menu — trước đây không có chỉ báo gì, người dùng khó biết
-  // mình đang xem trang nào.
   const pathname = usePathname();
 
+  // Đọc cookie ngôn ngữ ở client để dịch nhãn menu. Mặc định DEFAULT_LOCALE
+  // khi mới mount (khớp HTML server-render), đồng bộ lại ngay sau đó.
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+  useEffect(() => {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${LANG_COOKIE}=([^;]*)`));
+    const value = match?.[1];
+    if (value === "en" || value === "vi") setLocale(value);
+  }, []);
+  const t = getDictionary(locale).nav;
+
   const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/blog", label: "Blogs" },
-    { href: "/resume", label: "Resume" },
-    { href: "/tools", label: "Tools" },
-    { href: "/timeline", label: "Timeline" },
+    { href: "/", label: t.home },
+    { href: "/blog", label: t.blog },
+    { href: "/resume", label: t.resume },
+    { href: "/tools", label: t.tools },
+    { href: "/timeline", label: t.timeline },
   ];
 
   useEffect(() => {
@@ -79,8 +89,12 @@ export const Navbar = () => {
           onClick={() => openModal()}
           className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center"
         >
-          Get In Touch
+          {t.getInTouch}
         </button>
+
+        <div className="ml-4">
+          <LanguageToggle />
+        </div>
       </nav>
 
       <div className="flex md:hidden pr-6">
@@ -124,8 +138,12 @@ export const Navbar = () => {
             }}
             className="mt-4 w-full bg-[#50d3f2] px-6 py-4 font-sans text-sm font-bold text-neutral-900 transition hover:bg-[#3dbcdb]"
           >
-            Get In Touch
+            {t.getInTouch}
           </button>
+
+          <div className="mt-4 flex justify-center">
+            <LanguageToggle />
+          </div>
         </nav>
       </div>
     </header>
