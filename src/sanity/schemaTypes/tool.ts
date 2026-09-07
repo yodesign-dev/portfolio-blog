@@ -52,11 +52,42 @@ export default defineType({
       initialValue: 'Truy cập',
       description: 'Chữ hiển thị trên nút, ví dụ "Truy cập", "Dùng thử".',
     }),
+    // MỚI: số liệu hiển thị trên trang /tools (mức dùng + đánh giá).
+    // Cả 3 field đều để trống được — trang sẽ tự dùng số liệu tạm thời
+    // cho tool nào chưa nhập, nên có thể cập nhật dần dần.
+    defineField({
+      name: 'usagePercent',
+      title: 'Mức dùng (%)',
+      type: 'number',
+      description: 'Ước lượng % tần suất bạn dùng tool này, từ 0 đến 100.',
+      validation: (Rule) => Rule.min(0).max(100),
+    }),
+    defineField({
+      name: 'rating',
+      title: 'Đánh giá (0–5)',
+      type: 'number',
+      description: 'Điểm đánh giá của bạn cho tool này, ví dụ 4.5.',
+      validation: (Rule) => Rule.min(0).max(5),
+    }),
+    defineField({
+      name: 'ratingCount',
+      title: 'Số lượt đánh giá',
+      type: 'number',
+      description: 'Số liệu tham khảo hiển thị cạnh điểm đánh giá, vd. (120).',
+      validation: (Rule) => Rule.min(0).integer(),
+    }),
   ],
   preview: {
     select: {
       title: 'name',
-      subtitle: 'category',
+      category: 'category',
+      rating: 'rating',
+    },
+    prepare({title, category, rating}) {
+      return {
+        title,
+        subtitle: rating ? `${category} · ${rating}★` : category,
+      }
     },
   },
 })

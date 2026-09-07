@@ -14,7 +14,10 @@ const TOOLS_QUERY = `*[_type == "tool"] | order(name asc) {
   url,
   description,
   category,
-  ctaLabel
+  ctaLabel,
+  usagePercent,
+  rating,
+  ratingCount
 }`
 
 type Tool = {
@@ -24,6 +27,9 @@ type Tool = {
   description?: string
   category: string
   ctaLabel?: string
+  usagePercent?: number
+  rating?: number
+  ratingCount?: number
 }
 
 async function getTools(): Promise<Tool[]> {
