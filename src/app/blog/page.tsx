@@ -72,7 +72,7 @@ export default async function BlogPage({
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
-        <div className="mx-auto max-w-4xl px-6 py-6 sm:px-8">
+        <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
           <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
             ← Về trang chủ
           </Link>
@@ -83,7 +83,7 @@ export default async function BlogPage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
+      <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
         {allTags.length > 0 && (
           <div className="mb-10 flex flex-wrap gap-2">
             <Link

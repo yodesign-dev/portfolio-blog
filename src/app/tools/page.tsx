@@ -42,7 +42,7 @@ export default async function ToolsPage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
-        <div className="mx-auto max-w-5xl px-6 py-6 sm:px-8">
+        <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
           <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
             ← Về trang chủ
           </Link>
@@ -55,7 +55,7 @@ export default async function ToolsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-16 sm:px-8">
+      <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
         {tools.length === 0 ? (
           <p className="text-center text-neutral-400">Chưa có công cụ nào được thêm.</p>
         ) : (
