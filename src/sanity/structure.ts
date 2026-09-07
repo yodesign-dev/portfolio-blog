@@ -1,15 +1,14 @@
 import type {StructureResolver} from 'sanity/structure'
 
-// https://www.sanity.io/docs/structure-builder-cheat-sheet
 export const structure: StructureResolver = (S) =>
   S.list()
     .title('Content')
     .items([
       S.documentTypeListItem('post').title('Bài viết'),
-
-      // ⬇️ CẬP NHẬT: mục "Công cụ" — danh sách bình thường (không phải
-      // singleton như Resume), vì có thể có nhiều tool.
       S.documentTypeListItem('tool').title('Công cụ'),
+      // ⬇️ CẬP NHẬT: mục "Timeline" — danh sách bình thường (nhiều năm),
+      // không phải singleton
+      S.documentTypeListItem('timelineYear').title('Timeline'),
 
       S.listItem()
         .title('Resume')
@@ -21,6 +20,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear'].includes(listItem.getId() as string),
       ),
     ])

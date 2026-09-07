@@ -19,6 +19,7 @@ export const Navbar = () => {
     { href: "/blog", label: "Blogs" },
     { href: "/resume", label: "Resume" },
     { href: "/tools", label: "Tools" },
+    { href: "/timeline", label: "Timeline" },
   ];
 
   useEffect(() => {
