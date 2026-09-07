@@ -147,14 +147,18 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
             })}
           </svg>
 
-          {/* MỚI: tooltip hiện khi hover — tên năm + danh sách tool */}
+          {/* MỚI: tooltip hiện khi hover — tên năm + danh sách tool.
+              Hiện phía DƯỚI điểm (không phải phía trên) — điểm dữ liệu
+              thường nằm gần mép trên biểu đồ (giá trị cao), nếu tooltip
+              đẩy lên trên sẽ bị cắt mất do overflow-x-auto của khung
+              chứa vô tình ép overflow-y thành auto theo đặc tả CSS. */}
           {hoveredIndex !== null && (
             <div
-              className={`pointer-events-none absolute z-10 -translate-y-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg ${anchorClass}`}
+              className={`pointer-events-none absolute z-10 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg ${anchorClass}`}
               style={{
                 left: `${(pointFor(hoveredIndex, chartData[hoveredIndex].total).x / width) * 100}%`,
                 top: `${(pointFor(hoveredIndex, chartData[hoveredIndex].total).y / height) * 100}%`,
-                marginTop: '-8px',
+                marginTop: '12px',
               }}
             >
               <p className="font-semibold text-neutral-900">{years[hoveredIndex].year}</p>
