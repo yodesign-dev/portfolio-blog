@@ -16,6 +16,8 @@ type Post = {
   publishedAt: string
   tags?: string[]
   viewCount?: number
+  excerpt?: string
+  author?: string
 }
 
 async function getPosts(tag?: string): Promise<Post[]> {
@@ -27,7 +29,9 @@ async function getPosts(tag?: string): Promise<Post[]> {
     mainImage,
     publishedAt,
     tags,
-    viewCount
+    viewCount,
+    excerpt,
+    author
   }`
   // Luôn truyền params cùng 1 shape cố định {tag: string}. Cast `as any`
   // vì query được ghép động (${tagFilter}) nên Sanity Typegen không nhận
@@ -113,54 +117,133 @@ export default async function BlogPage({
             {tag ? `Chưa có bài viết nào gắn tag "${tag}".` : 'Chưa có bài viết nào được đăng.'}
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2">
-            {posts.map((post) => {
-              const imageUrl = post.mainImage
-                ? urlFor(post.mainImage)?.width(800).height(600).fit('crop').url()
-                : null
+          <div>
+            <FeaturedPost post={posts[0]} />
 
-              return (
-                <Link key={post._id} href={`/blog/${post.slug.current}`} className="group block">
-                  <div className="overflow-hidden rounded-lg bg-neutral-100">
-                    {imageUrl ? (
-                      <Image
-                        src={imageUrl}
-                        alt={post.mainImage?.alt || post.title}
-                        width={800}
-                        height={600}
-                        className="aspect-[4/3] w-full object-cover transition-all duration-300 ease-out group-hover:scale-105 group-hover:opacity-90"
-                      />
-                    ) : (
-                      <div className="aspect-[4/3] w-full bg-neutral-100" />
-                    )}
-                  </div>
-
-                  {post.tags && post.tags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {post.tags.map((t) => (
-                        <span
-                          key={t}
-                          className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <h2 className="mt-3 text-lg font-bold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
-                    {post.title}
-                  </h2>
-
-                  <p className="mt-2 text-sm text-neutral-400">
-                    {formatDate(post.publishedAt)} · {formatViewCount(post.viewCount)}
-                  </p>
-                </Link>
-              )
-            })}
+            {posts.length > 1 && (
+              <div className="mt-4 border-t border-neutral-200">
+                {posts.slice(1).map((post) => (
+                  <PostRow key={post._id} post={post} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
     </div>
+  )
+}
+
+function FeaturedPost({post}: {post: Post}) {
+  const imageUrl = post.mainImage
+    ? urlFor(post.mainImage)?.width(1200).height(800).fit('crop').url()
+    : null
+
+  return (
+    <Link href={`/blog/${post.slug.current}`} className="group block">
+      <div className="flex flex-col gap-6 md:flex-row md:items-center">
+        <div className="overflow-hidden rounded-lg bg-neutral-100 md:w-1/2">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={post.mainImage?.alt || post.title}
+              width={1200}
+              height={800}
+              priority
+              className="aspect-[4/3] w-full object-cover transition-all duration-300 ease-out group-hover:scale-105 group-hover:opacity-90"
+            />
+          ) : (
+            <div className="aspect-[4/3] w-full bg-neutral-100" />
+          )}
+        </div>
+
+        <div className="md:w-1/2">
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {post.tags.map((t) => (
+                <span
+                  key={t}
+                  className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <h2 className="mt-3 text-2xl font-bold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600 sm:text-3xl">
+            {post.title}
+          </h2>
+
+          {post.excerpt && (
+            <p className="mt-3 text-[15px] leading-relaxed text-neutral-600">{post.excerpt}</p>
+          )}
+
+          <p className="mt-4 text-sm text-neutral-400">
+            {[post.author, formatDate(post.publishedAt), formatViewCount(post.viewCount)]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function PostRow({post}: {post: Post}) {
+  const imageUrl = post.mainImage
+    ? urlFor(post.mainImage)?.width(240).height(240).fit('crop').url()
+    : null
+
+  return (
+    <Link
+      href={`/blog/${post.slug.current}`}
+      className="group flex items-start gap-5 border-b border-neutral-200 py-6 last:border-0"
+    >
+      <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-md bg-neutral-100 sm:block">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={post.mainImage?.alt || post.title}
+            width={240}
+            height={240}
+            className="h-full w-full object-cover transition-all duration-300 ease-out group-hover:scale-105 group-hover:opacity-90"
+          />
+        ) : (
+          <div className="h-full w-full bg-neutral-100" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        {post.tags && post.tags.length > 0 && (
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            {post.tags.map((t) => (
+              <span
+                key={t}
+                className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <h3 className="text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
+          {post.title}
+        </h3>
+
+        {post.excerpt && (
+          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-neutral-500">
+            {post.excerpt}
+          </p>
+        )}
+
+        <p className="mt-2 text-xs text-neutral-400">
+          {[post.author, formatDate(post.publishedAt), formatViewCount(post.viewCount)]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      </div>
+    </Link>
   )
 }

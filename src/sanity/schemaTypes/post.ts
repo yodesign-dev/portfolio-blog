@@ -58,6 +58,26 @@ export default defineType({
       type: 'datetime',
       initialValue: () => new Date().toISOString(),
     }),
+    // MỚI: excerpt — mô tả ngắn hiển thị dưới title ở trang danh sách blog,
+    // giúp người đọc biết bài viết nói về gì trước khi bấm vào.
+    defineField({
+      name: 'excerpt',
+      title: 'Mô tả ngắn',
+      type: 'text',
+      rows: 3,
+      description: 'Hiển thị dưới tiêu đề ở trang danh sách blog. Nên viết 1-2 câu.',
+      validation: (Rule) => Rule.max(200),
+    }),
+    // MỚI: author — tên tác giả, hiển thị cạnh ngày đăng. Để dạng string
+    // đơn giản thay vì reference sang document riêng vì hiện tại chỉ có
+    // một người viết; có thể nâng cấp thành type "author" riêng sau nếu
+    // có nhiều tác giả.
+    defineField({
+      name: 'author',
+      title: 'Tác giả',
+      type: 'string',
+      initialValue: 'Applebin',
+    }),
     // ⬇️ MỚI: tags — mảng chuỗi tự do, gõ Enter để thêm từng tag.
     // Studio sẽ hiện dạng ô nhập kiểu "pill" nhờ options.layout = 'tags'.
     defineField({
@@ -181,7 +201,16 @@ export default defineType({
     select: {
       title: 'title',
       media: 'mainImage',
-      subtitle: 'publishedAt',
+      author: 'author',
+      publishedAt: 'publishedAt',
+    },
+    prepare({title, media, author, publishedAt}) {
+      const date = publishedAt ? new Date(publishedAt).toLocaleDateString('vi-VN') : ''
+      return {
+        title,
+        media,
+        subtitle: [author, date].filter(Boolean).join(' · '),
+      }
     },
   },
 })
