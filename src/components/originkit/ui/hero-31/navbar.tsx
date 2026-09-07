@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -12,9 +12,10 @@ export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
   const pathname = usePathname();
+  const router = useRouter();
 
-  // Đọc cookie ngôn ngữ ở client để dịch nhãn menu. Mặc định DEFAULT_LOCALE
-  // khi mới mount (khớp HTML server-render), đồng bộ lại ngay sau đó.
+  // Duy nhất 1 nguồn state locale — LanguageToggle chỉ hiển thị theo
+  // giá trị này, không tự giữ state riêng nữa (tránh 2 state lệch nhau).
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   useEffect(() => {
     const match = document.cookie.match(new RegExp(`(?:^|; )${LANG_COOKIE}=([^;]*)`));
@@ -22,6 +23,14 @@ export const Navbar = () => {
     if (value === "en" || value === "vi") setLocale(value);
   }, []);
   const t = getDictionary(locale).nav;
+
+  function toggleLocale() {
+    const next: Locale = locale === "vi" ? "en" : "vi";
+    setLocale(next);
+    document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000`;
+    // Re-render các Server Component (page.tsx) theo cookie mới.
+    router.refresh();
+  }
 
   const navLinks = [
     { href: "/", label: t.home },
@@ -92,7 +101,7 @@ export const Navbar = () => {
         </button>
 
         <div className="ml-4">
-          <LanguageToggle />
+          <LanguageToggle locale={locale} onToggle={toggleLocale} />
         </div>
       </nav>
 
@@ -141,7 +150,7 @@ export const Navbar = () => {
           </button>
 
           <div className="mt-4 flex justify-center">
-            <LanguageToggle />
+            <LanguageToggle locale={locale} onToggle={toggleLocale} />
           </div>
         </nav>
       </div>
