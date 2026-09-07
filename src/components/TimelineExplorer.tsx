@@ -29,6 +29,10 @@ function getFaviconUrl(url: string): string | null {
 
 export function TimelineExplorer({years}: TimelineExplorerProps) {
   const [selectedIndex, setSelectedIndex] = useState(years.length - 1)
+  // MỚI: index đang hover trên biểu đồ — khác với selectedIndex (dùng
+  // cho thanh trượt), để hover không làm nhảy luôn danh sách tool phía
+  // dưới, chỉ hiện tooltip tạm thời
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
   const chartData = useMemo(
     () =>
@@ -72,39 +76,95 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
   const previousTools = selectedIndex > 0 ? years[selectedIndex - 1].tools : []
   const previousIds = new Set(previousTools.map((t) => t._id))
 
+  // MỚI: vị trí + hướng neo tooltip — điểm đầu neo trái, điểm cuối neo
+  // phải, các điểm giữa canh giữa, tránh tooltip bị tràn ra ngoài khung
+  const isFirst = hoveredIndex === 0
+  const isLast = hoveredIndex === chartData.length - 1
+  const anchorClass = isFirst
+    ? 'translate-x-0'
+    : isLast
+      ? '-translate-x-full'
+      : '-translate-x-1/2'
+
   return (
     <div>
-      {/* Biểu đồ: tổng số tool vs số tool AI qua từng năm — tính tự
-          động từ field category, không cần nhập tay điểm số nào */}
       <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-200 p-4">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[600px]">
-          <path d={totalPath} fill="none" stroke="#a3a3a3" strokeWidth={2} />
-          <path d={aiPath} fill="none" stroke="#7c3aed" strokeWidth={2} />
-          {chartData.map((d, i) => {
-            const total = pointFor(i, d.total)
-            const ai = pointFor(i, d.ai)
-            const isSelected = i === selectedIndex
-            return (
-              <g key={d.year}>
-                <circle
-                  cx={total.x}
-                  cy={total.y}
-                  r={isSelected ? 5 : 3}
-                  fill="#a3a3a3"
-                />
-                <circle cx={ai.x} cy={ai.y} r={isSelected ? 5 : 3} fill="#7c3aed" />
-                <text
-                  x={total.x}
-                  y={height - 4}
-                  textAnchor="middle"
-                  className="fill-neutral-400 text-[10px]"
-                >
-                  {d.year}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
+        <div className="relative">
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="w-full min-w-[600px]"
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            <path d={totalPath} fill="none" stroke="#a3a3a3" strokeWidth={2} />
+            <path d={aiPath} fill="none" stroke="#7c3aed" strokeWidth={2} />
+            {chartData.map((d, i) => {
+              const total = pointFor(i, d.total)
+              const ai = pointFor(i, d.ai)
+              const isSelected = i === selectedIndex
+              return (
+                <g key={d.year}>
+                  {/* MỚI: vùng hit-test vô hình, bán kính lớn hơn chấm
+                      thật để dễ hover trúng bằng chuột */}
+                  <circle
+                    cx={total.x}
+                    cy={total.y}
+                    r={14}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredIndex(i)}
+                    className="cursor-pointer"
+                  />
+                  <circle
+                    cx={ai.x}
+                    cy={ai.y}
+                    r={14}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredIndex(i)}
+                    className="cursor-pointer"
+                  />
+
+                  <circle
+                    cx={total.x}
+                    cy={total.y}
+                    r={isSelected || i === hoveredIndex ? 5 : 3}
+                    fill="#a3a3a3"
+                  />
+                  <circle
+                    cx={ai.x}
+                    cy={ai.y}
+                    r={isSelected || i === hoveredIndex ? 5 : 3}
+                    fill="#7c3aed"
+                  />
+                  <text
+                    x={total.x}
+                    y={height - 4}
+                    textAnchor="middle"
+                    className="fill-neutral-400 text-[10px]"
+                  >
+                    {d.year}
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+
+          {/* MỚI: tooltip hiện khi hover — tên năm + danh sách tool */}
+          {hoveredIndex !== null && (
+            <div
+              className={`pointer-events-none absolute z-10 -translate-y-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg ${anchorClass}`}
+              style={{
+                left: `${(pointFor(hoveredIndex, chartData[hoveredIndex].total).x / width) * 100}%`,
+                top: `${(pointFor(hoveredIndex, chartData[hoveredIndex].total).y / height) * 100}%`,
+                marginTop: '-8px',
+              }}
+            >
+              <p className="font-semibold text-neutral-900">{years[hoveredIndex].year}</p>
+              <p className="mt-1 max-w-[220px] whitespace-normal leading-relaxed text-neutral-600">
+                {years[hoveredIndex].tools.map((t) => t.name).join(', ') || 'Chưa có dữ liệu'}
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="mt-2 flex gap-4 text-xs text-neutral-500">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-neutral-400" /> Tổng số tool
@@ -115,7 +175,6 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
         </div>
       </div>
 
-      {/* Thanh trượt theo năm */}
       <div className="mb-10">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-sm font-medium text-neutral-500">Kéo để xem theo năm</span>
@@ -136,7 +195,6 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
         </div>
       </div>
 
-      {/* Danh sách tool của năm đang chọn */}
       {selected.tools.length === 0 ? (
         <p className="text-center text-neutral-400">Chưa có công cụ nào cho năm này.</p>
       ) : (
