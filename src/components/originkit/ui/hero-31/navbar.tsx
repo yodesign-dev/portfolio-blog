@@ -55,9 +55,12 @@ export const Navbar = () => {
   return (
     <header className="relative flex h-[80px] w-full items-center justify-between bg-white pl-[20px] md:pl-[56px] pr-0 text-[#1c1c1c] antialiased">
       <div className="flex items-center">
-        <span className="font-sans text-xl font-bold tracking-tight text-neutral-900">
+        <Link
+          href="/"
+          className="font-sans text-xl font-bold tracking-tight text-neutral-900 transition hover:text-neutral-600"
+        >
           YoBlogs
-        </span>
+        </Link>
       </div>
 
       <nav className="hidden md:flex items-center h-full">
