@@ -2,6 +2,11 @@ export type Locale = 'vi' | 'en'
 
 export const DEFAULT_LOCALE: Locale = 'vi'
 
+// Đặt ở đây (không phải get-locale.ts) vì file này KHÔNG import
+// 'next/headers' — client component (LanguageToggle) cần đọc được hằng số
+// này mà không kéo theo API chỉ dùng được ở Server Component.
+export const LANG_COOKIE = 'lang'
+
 export const dictionary = {
   vi: {
     nav: {

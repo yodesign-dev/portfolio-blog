@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { DEFAULT_LOCALE, getDictionary, type Locale } from "@/lib/i18n";
-import { LANG_COOKIE } from "@/lib/get-locale";
+import { DEFAULT_LOCALE, getDictionary, LANG_COOKIE, type Locale } from "@/lib/i18n";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

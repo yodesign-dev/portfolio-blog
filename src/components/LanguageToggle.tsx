@@ -2,8 +2,7 @@
 
 import {useRouter} from 'next/navigation'
 import {useEffect, useState} from 'react'
-import {DEFAULT_LOCALE, type Locale} from '@/lib/i18n'
-import {LANG_COOKIE} from '@/lib/get-locale'
+import {DEFAULT_LOCALE, LANG_COOKIE, type Locale} from '@/lib/i18n'
 
 function readCookieLocale(): Locale {
   if (typeof document === 'undefined') return DEFAULT_LOCALE

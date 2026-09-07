@@ -1,7 +1,5 @@
 import {cookies} from 'next/headers'
-import {DEFAULT_LOCALE, type Locale} from './i18n'
-
-export const LANG_COOKIE = 'lang'
+import {DEFAULT_LOCALE, LANG_COOKIE, type Locale} from './i18n'
 
 // Dùng trong Server Component (page.tsx) — đọc cookie ngôn ngữ do
 // LanguageToggle set, không cần đổi URL.
