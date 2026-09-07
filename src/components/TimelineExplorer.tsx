@@ -88,11 +88,11 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
 
   return (
     <div>
-      <div className="mb-8 overflow-x-auto rounded-lg border border-neutral-200 p-4">
+      <div className="mb-8 rounded-lg border border-neutral-200 p-4">
         <div className="relative">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="w-full min-w-[600px]"
+            className="w-full"
             onMouseLeave={() => setHoveredIndex(null)}
           >
             <path d={totalPath} fill="none" stroke="#a3a3a3" strokeWidth={2} />

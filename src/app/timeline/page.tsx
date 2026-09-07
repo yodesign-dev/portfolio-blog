@@ -39,8 +39,10 @@ export default async function TimelinePage() {
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
+      {/* CẬP NHẬT: max-w-4xl → max-w-6xl — layout rộng hơn, phù hợp
+          hơn cho trang có biểu đồ/data visualization */}
       <header className="border-b border-neutral-200">
-        <div className="mx-auto max-w-4xl px-6 py-6 sm:px-8">
+        <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
           <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
             ← Về trang chủ
           </Link>
@@ -53,7 +55,7 @@ export default async function TimelinePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
+      <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
         {years.length === 0 ? (
           <p className="text-center text-neutral-400">Chưa có dữ liệu timeline nào.</p>
         ) : (
