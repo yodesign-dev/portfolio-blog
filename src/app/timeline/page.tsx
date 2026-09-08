@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import {client} from '@/sanity/lib/client'
 import {TimelineExplorer} from '@/components/TimelineExplorer'
+import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary} from '@/lib/i18n'
 
@@ -33,7 +33,7 @@ type YearData = {
 }
 
 async function getTimeline(): Promise<YearData[]> {
-  return client.fetch(TIMELINE_QUERY, {}, {next: {revalidate}})
+  return sanityFetch<YearData[]>({query: TIMELINE_QUERY, revalidate})
 }
 
 export default async function TimelinePage() {

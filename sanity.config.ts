@@ -7,29 +7,35 @@
 import {visionTool} from '@sanity/vision'
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
-// ⬇️ CẬP NHẬT: import plugin table — bắt buộc phải "npm install @sanity/table" trước
-// (nếu chưa cài, Studio sẽ báo lỗi "Cannot find module '@sanity/table'" khi build)
+import {presentationTool} from 'sanity/presentation'
 import {table} from '@sanity/table'
 
-
-// Go to https://www.sanity.io/docs/api-versioning to learn how API versioning works
 import {apiVersion, dataset, projectId} from './src/sanity/env'
 import {schema} from './src/sanity/schemaTypes'
 import {structure} from './src/sanity/structure'
+import {resolve} from './src/sanity/presentation/resolve'
 
 export default defineConfig({
   basePath: '/studio',
   projectId,
   dataset,
-  // Add and edit the content schema in the './sanity/schemaTypes' folder
   schema,
   plugins: [
     structureTool({structure}),
-    // Vision is for querying with GROQ from inside the Studio
-    // https://www.sanity.io/docs/the-vision-plugin
     visionTool({defaultApiVersion: apiVersion}),
-    // ⬇️ CẬP NHẬT: đăng ký plugin table — cho phép field "body" trong post.ts
-    // (đã thêm { type: 'table' } vào mảng "of") render được UI tạo bảng trong Studio
     table(),
+    // MỚI: Presentation Tool — cho phép viết bài và xem preview live ngay
+    // trên giao diện thật của site, click vào text/ảnh để nhảy thẳng đến
+    // đúng field trong Studio. Không cần `previewUrl.origin` vì Studio
+    // đang chạy chung app với site (embedded), nên tự dùng đúng domain
+    // hiện tại (localhost lúc dev, applebin.me lúc production).
+    presentationTool({
+      resolve,
+      previewUrl: {
+        previewMode: {
+          enable: '/api/draft-mode/enable',
+        },
+      },
+    }),
   ],
 })

@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import {client} from '@/sanity/lib/client'
 import {ToolsLibrary} from '@/components/ToolsLibrary'
+import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary} from '@/lib/i18n'
 
@@ -35,7 +35,7 @@ type Tool = {
 }
 
 async function getTools(): Promise<Tool[]> {
-  return client.fetch(TOOLS_QUERY, {}, {next: {revalidate}})
+  return sanityFetch<Tool[]>({query: TOOLS_QUERY, revalidate})
 }
 
 export default async function ToolsPage() {

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import {client} from '@/sanity/lib/client'
 import {urlFor} from '@/sanity/lib/image'
+import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary, type Locale} from '@/lib/i18n'
 
@@ -36,12 +36,12 @@ async function getPosts(tag?: string): Promise<Post[]> {
     author
   }`
   const params = {tag: tag ?? ''}
-  return client.fetch<Post[]>(query, params as any, {next: {revalidate}})
+  return sanityFetch<Post[]>({query, params, revalidate})
 }
 
 async function getAllTags(): Promise<string[]> {
   const query = `array::unique(*[_type == "post" && defined(tags)].tags[])`
-  return client.fetch(query, {}, {next: {revalidate}})
+  return sanityFetch<string[]>({query, revalidate})
 }
 
 function formatDate(dateString: string, locale: Locale) {

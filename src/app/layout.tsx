@@ -2,15 +2,13 @@ import type { Metadata } from "next";
 import { Mulish, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
-// MỚI: Navbar + ContactModal giờ render ở đây — dùng chung cho MỌI
-// trang (Home, Blog, Resume, Tools...), thay vì chỉ có trên trang chủ
-// như trước. ContactModalProvider phải bọc quanh cả Navbar lẫn
-// {children}, vì Navbar cần gọi useContactModal() để mở modal.
+import { draftMode } from "next/headers";
+import { VisualEditing } from "next-sanity/visual-editing";
 import { Navbar } from "@/components/originkit/ui/hero-31/navbar";
 import { ContactModalProvider } from "@/components/originkit/ui/hero-31/contact-modal-context";
 import { ContactModal } from "@/components/originkit/ui/hero-31/contact-modal";
+import { DisableDraftMode } from "@/components/DisableDraftMode";
 
-// 1. Khởi tạo font Mulish (hỗ trợ Tiếng Việt) và gán vào biến --font-geist-sans để map trúng file globals.css cũ
 const mulish = Mulish({
   variable: "--font-geist-sans",
   subsets: ["latin", "vietnamese"],
@@ -25,11 +23,16 @@ export const metadata: Metadata = {
   title: "bin designer",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // MỚI: kiểm tra Draft Mode để biết có đang xem preview từ Presentation
+  // Tool hay không — chỉ hiện overlay click-to-edit khi đang preview,
+  // người xem bình thường (đọc bản đã publish) không thấy gì khác.
+  const isDraftMode = (await draftMode()).isEnabled;
+
   return (
     <html
       lang="vi"
@@ -42,6 +45,12 @@ export default function RootLayout({
           <ContactModal />
         </ContactModalProvider>
         <Analytics />
+        {isDraftMode && (
+          <>
+            <VisualEditing />
+            <DisableDraftMode />
+          </>
+        )}
       </body>
     </html>
   );
