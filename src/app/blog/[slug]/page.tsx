@@ -2,8 +2,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {notFound} from 'next/navigation'
 import {PortableText, type PortableTextComponents} from '@portabletext/react'
-import {client} from '@/sanity/lib/client'
 import {urlFor} from '@/sanity/lib/image'
+import {sanityFetch} from '@/sanity/lib/fetch'
 import {ShareButtons} from '@/components/originkit/ui/hero-31/share-buttons'
 import {ViewTracker} from '@/components/ViewTracker'
 
@@ -37,7 +37,10 @@ type Post = {
 }
 
 async function getPost(slug: string): Promise<Post | null> {
-  return client.fetch(POST_QUERY, {slug}, {next: {revalidate}})
+  // Đổi từ client.fetch sang sanityFetch — khi đang mở qua Presentation
+  // Tool (Draft Mode bật), hàm này tự đọc bản draft + bật stega, giúp
+  // overlay click-to-edit hoạt động trên trang chi tiết bài viết.
+  return sanityFetch<Post | null>({query: POST_QUERY, params: {slug}, revalidate})
 }
 
 function formatDate(dateString: string) {
@@ -196,8 +199,6 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
-      {/* MỚI: ViewTracker không render gì ra màn hình — chỉ tự gọi API
-          tăng viewCount 1 lần khi trình duyệt thật load xong trang. */}
       <ViewTracker postId={post._id} slug={post.slug.current} />
 
       <header className="border-b border-neutral-200">
@@ -210,7 +211,6 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
 
       <main className="mx-auto max-w-3xl px-6 py-12 sm:px-8 sm:py-16">
         <article>
-          {/* MỚI: hiện tags dưới dạng pill, bấm vào lọc theo tag ở /blog */}
           {post.tags && post.tags.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-1.5">
               {post.tags.map((t) => (
@@ -230,7 +230,6 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
           </h1>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            {/* MỚI: thêm view count cạnh ngày đăng */}
             <p className="text-sm text-neutral-400">
               {formatDate(post.publishedAt)} · {formatViewCount(post.viewCount)}
             </p>
