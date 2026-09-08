@@ -63,16 +63,37 @@ const portableTextComponents: PortableTextComponents = {
       const imageUrl = urlFor(value)?.width(1200).fit('max').url()
       if (!imageUrl) return null
       return (
-        <span className="my-8 block overflow-hidden rounded-lg">
-          <Image
-            src={imageUrl}
-            alt={value.alt || ''}
-            width={1200}
-            height={800}
-            className="h-auto w-full object-cover"
-          />
-        </span>
+        <figure className="my-8">
+          <div className="overflow-hidden rounded-lg">
+            <Image
+              src={imageUrl}
+              alt={value.alt || ''}
+              width={1200}
+              height={800}
+              className="h-auto w-full object-cover"
+            />
+          </div>
+          {/* MỚI: caption dưới ảnh — style giống Medium, in nghiêng, căn giữa */}
+          {value.caption && (
+            <figcaption className="mt-3 text-center text-sm italic text-neutral-500">
+              {value.caption}
+            </figcaption>
+          )}
+        </figure>
       )
+    },
+    // MỚI: renderer cho block "divider" — Sanity không có sẵn nên tự vẽ.
+    divider: ({value}) => {
+      if (value?.style === 'dots') {
+        return (
+          <div className="my-12 flex justify-center gap-3 text-neutral-300" aria-hidden="true">
+            <span className="text-lg">•</span>
+            <span className="text-lg">•</span>
+            <span className="text-lg">•</span>
+          </div>
+        )
+      }
+      return <hr className="my-12 border-t border-neutral-200" />
     },
     table: ({value}) => {
       if (!value?.rows?.length) return null
@@ -113,7 +134,7 @@ const portableTextComponents: PortableTextComponents = {
       <p className="mb-6 text-lg leading-relaxed text-gray-800">{children}</p>
     ),
     blockquote: ({children}) => (
-      <blockquote className="my-8 border-l-2 border-neutral-300 pl-6 text-lg italic leading-relaxed text-neutral-600">
+      <blockquote className="my-10 border-l-4 border-neutral-900 pl-6 text-xl italic leading-relaxed text-neutral-700 sm:text-2xl">
         {children}
       </blockquote>
     ),

@@ -189,10 +189,49 @@ export default defineType({
               title: 'Văn bản thay thế (Alt text)',
               type: 'string',
             }),
+            // MỚI: caption — chú thích nhỏ hiện dưới ảnh, giống style
+            // Medium ("Old design of doctranslate.io"). Trước đây phải
+            // giả bằng cách viết chữ in đậm phía TRÊN ảnh — giờ có field
+            // riêng, hiển thị đúng vị trí (dưới ảnh, in nghiêng, căn giữa).
+            defineField({
+              name: 'caption',
+              title: 'Chú thích ảnh',
+              type: 'string',
+              description: 'Hiện dưới ảnh, in nghiêng nhỏ — để trống nếu không cần.',
+            }),
           ],
         },
         {
           type: 'table',
+        },
+        // MỚI: divider — Sanity không có block "đường phân cách" mặc định,
+        // đây là block object tự định nghĩa để chèn dòng kẻ ngăn cách giữa
+        // các phần trong bài, giống nhiều blog editorial khác (không riêng Medium).
+        {
+          type: 'object',
+          name: 'divider',
+          title: 'Đường phân cách',
+          fields: [
+            defineField({
+              name: 'style',
+              title: 'Kiểu',
+              type: 'string',
+              options: {
+                list: [
+                  {title: 'Đường kẻ mảnh', value: 'line'},
+                  {title: 'Ba dấu chấm', value: 'dots'},
+                ],
+                layout: 'radio',
+              },
+              initialValue: 'line',
+            }),
+          ],
+          preview: {
+            select: {style: 'style'},
+            prepare({style}) {
+              return {title: style === 'dots' ? 'Đường phân cách (chấm)' : 'Đường phân cách (kẻ)'}
+            },
+          },
         },
       ],
     }),
