@@ -10,9 +10,6 @@ type Tool = {
   description?: string
   category: string
   ctaLabel?: string
-  usagePercent?: number
-  rating?: number
-  ratingCount?: number
 }
 
 type ToolsLibraryProps = {
@@ -40,88 +37,39 @@ function getFaviconUrl(url: string): string | null {
   }
 }
 
-function getMockStats(id: string): {usage: number; rating: number; ratingCount: number} {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0
-  }
-  const usage = 15 + (hash % 80)
-  const rating = 3.6 + ((hash >> 3) % 14) / 10
-  const ratingCount = 8 + ((hash >> 6) % 220)
-  return {usage, rating: Math.round(rating * 10) / 10, ratingCount}
-}
-
-function getStats(tool: Tool): {usage: number; rating: number; ratingCount: number; isMock: boolean} {
-  const mock = getMockStats(tool._id)
-  const hasReal =
-    tool.usagePercent !== undefined && tool.rating !== undefined && tool.ratingCount !== undefined
-  return {
-    usage: tool.usagePercent ?? mock.usage,
-    rating: tool.rating ?? mock.rating,
-    ratingCount: tool.ratingCount ?? mock.ratingCount,
-    isMock: !hasReal,
-  }
-}
-
 export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
   const t = getDictionary(locale).common
   const CATEGORY_LABELS = t.categories
 
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<'usage' | 'rating' | 'name'>('usage')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-
-  const SORT_OPTIONS = [
-    {key: 'usage' as const, label: t.sortUsage},
-    {key: 'rating' as const, label: t.sortRating},
-    {key: 'name' as const, label: t.sortName},
-  ]
 
   const categories = useMemo(() => {
     const set = new Set(tools.map((tool) => tool.category))
     return Array.from(set)
   }, [tools])
 
-  const statsById = useMemo(() => {
-    const map = new Map<string, ReturnType<typeof getStats>>()
-    tools.forEach((tool) => map.set(tool._id, getStats(tool)))
-    return map
-  }, [tools])
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const result = tools.filter((tool) => {
-      const matchesCategory = !category || tool.category === category
-      const matchesQuery =
-        !q ||
-        tool.name.toLowerCase().includes(q) ||
-        (tool.description ?? '').toLowerCase().includes(q)
-      return matchesCategory && matchesQuery
-    })
-
-    return result.sort((a, b) => {
-      if (sortKey === 'name') return a.name.localeCompare(b.name)
-      const statsA = statsById.get(a._id)!
-      const statsB = statsById.get(b._id)!
-      return sortKey === 'usage' ? statsB.usage - statsA.usage : statsB.rating - statsA.rating
-    })
-  }, [tools, query, category, sortKey, statsById])
+    return tools
+      .filter((tool) => {
+        const matchesCategory = !category || tool.category === category
+        const matchesQuery =
+          !q ||
+          tool.name.toLowerCase().includes(q) ||
+          (tool.description ?? '').toLowerCase().includes(q)
+        return matchesCategory && matchesQuery
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [tools, query, category])
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
-  }, [query, category, sortKey])
+  }, [query, category])
 
   const visibleTools = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
-
-  const topUsage = useMemo(() => {
-    let max = 0
-    statsById.forEach((s) => {
-      if (s.usage > max) max = s.usage
-    })
-    return max
-  }, [statsById])
 
   return (
     <div>
@@ -179,38 +127,21 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
         )}
 
         <main className="min-w-0 flex-1">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4">
             <p className="text-sm text-neutral-400">
               {filtered.length} {t.toolsCount}
             </p>
-            <div className="flex gap-1">
-              {SORT_OPTIONS.map((s) => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => setSortKey(s.key)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                    sortKey === s.key
-                      ? 'border-neutral-900 bg-neutral-900 text-white'
-                      : 'border-neutral-200 text-neutral-500 hover:border-neutral-400'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {filtered.length === 0 ? (
             <p className="text-center text-neutral-400">{t.noToolsFound}</p>
           ) : (
             <>
-              <div className="border-t border-neutral-200">
+              <div className="flex flex-col gap-3">
                 {visibleTools.map((tool) => {
                   const favicon = getFaviconUrl(tool.url)
                   const categoryStyle =
                     CATEGORY_STYLES[tool.category] ?? 'bg-neutral-100 text-neutral-600'
-                  const stats = statsById.get(tool._id)!
 
                   return (
                     <a
@@ -218,7 +149,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                       href={tool.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex items-start gap-4 border-b border-neutral-200 py-5 no-underline transition hover:bg-neutral-50"
+                      className="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 no-underline transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md"
                     >
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-50 p-1.5">
                         {favicon ? (
@@ -232,11 +163,6 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-semibold text-neutral-900">{tool.name}</h3>
-                          {stats.usage === topUsage && (
-                            <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-[10px] font-medium text-white">
-                              {t.mostUsed}
-                            </span>
-                          )}
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryStyle}`}
                           >
@@ -251,37 +177,15 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                         )}
                       </div>
 
-                      <div className="hidden w-32 shrink-0 text-right sm:block">
-                        <div className="mb-1 flex items-center justify-end gap-1">
-                          <svg
-                            className="h-3 w-3 text-amber-500"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M10 1.5l2.6 5.27 5.82.85-4.21 4.1 1 5.8L10 14.9l-5.21 2.74 1-5.8-4.21-4.1 5.82-.85L10 1.5z" />
-                          </svg>
-                          <span className="text-sm font-medium text-neutral-900">
-                            {stats.rating.toFixed(1)}
-                          </span>
-                          <span className="text-xs text-neutral-400">({stats.ratingCount})</span>
-                          {stats.isMock && (
-                            <span
-                              title="Số liệu tạm, chưa nhập trong Sanity"
-                              className="h-1.5 w-1.5 rounded-full bg-amber-400"
-                            />
-                          )}
-                        </div>
-                        <div className="ml-auto h-1.5 w-24 overflow-hidden rounded-full bg-neutral-100">
-                          <div
-                            className="h-full rounded-full bg-neutral-900"
-                            style={{width: `${stats.usage}%`}}
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-neutral-400">
-                          {stats.usage}
-                          {t.usageSuffix}
-                        </p>
-                      </div>
+                      <svg
+                        className="mt-1 h-4 w-4 shrink-0 -translate-x-1 text-neutral-300 opacity-0 transition-all duration-150 ease-out group-hover:translate-x-0 group-hover:text-neutral-500 group-hover:opacity-100"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path d="M4 10h12M11 5l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
                     </a>
                   )
                 })}
