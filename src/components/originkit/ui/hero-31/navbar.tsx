@@ -2,34 +2,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
-import { LanguageToggle } from "@/components/LanguageToggle";
-import { DEFAULT_LOCALE, getDictionary, LANG_COOKIE, type Locale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, getDictionary } from "@/lib/i18n";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
   const pathname = usePathname();
-  const router = useRouter();
 
-  // Duy nhất 1 nguồn state locale — LanguageToggle chỉ hiển thị theo
-  // giá trị này, không tự giữ state riêng nữa (tránh 2 state lệch nhau).
-  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
-  useEffect(() => {
-    const match = document.cookie.match(new RegExp(`(?:^|; )${LANG_COOKIE}=([^;]*)`));
-    const value = match?.[1];
-    if (value === "en" || value === "vi") setLocale(value);
-  }, []);
-  const t = getDictionary(locale).nav;
-
-  function selectLocale(next: Locale) {
-    setLocale(next);
-    document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000`;
-    // Re-render các Server Component (page.tsx) theo cookie mới.
-    router.refresh();
-  }
+  // TẮT tính năng chuyển ngôn ngữ — luôn dùng tiếng Việt mặc định.
+  // Phần dictionary vẫn giữ nguyên (không xoá lib/i18n.ts) để có thể bật
+  // lại dễ dàng sau này nếu cần, chỉ gỡ UI + logic đổi locale ở đây.
+  const t = getDictionary(DEFAULT_LOCALE).nav;
 
   const navLinks = [
     { href: "/", label: t.home },
@@ -98,10 +84,6 @@ export const Navbar = () => {
         >
           {t.getInTouch}
         </button>
-
-        <div className="ml-4">
-          <LanguageToggle locale={locale} onSelect={selectLocale} />
-        </div>
       </nav>
 
       <div className="flex md:hidden pr-6">
@@ -147,10 +129,6 @@ export const Navbar = () => {
           >
             {t.getInTouch}
           </button>
-
-          <div className="mt-4 flex justify-center">
-            <LanguageToggle locale={locale} onSelect={selectLocale} />
-          </div>
         </nav>
       </div>
     </header>
