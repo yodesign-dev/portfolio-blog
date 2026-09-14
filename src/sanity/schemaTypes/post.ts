@@ -20,17 +20,26 @@ export default defineType({
   name: 'post',
   title: 'Bài viết',
   type: 'document',
+  // MỚI: chia field thành tab, thay vì 1 danh sách dài phải cuộn hết mới
+  // tới "Nội dung bài viết". Tab "Nội dung" mở lên là viết được ngay.
+  groups: [
+    {name: 'content', title: 'Nội dung', default: true},
+    {name: 'meta', title: 'Hiển thị & SEO'},
+    {name: 'stats', title: 'Thống kê'},
+  ],
   fields: [
     defineField({
       name: 'title',
       title: 'Tiêu đề',
       type: 'string',
+      group: 'content',
       validation: (Rule) => Rule.required(),
     }),
     defineField({
       name: 'slug',
       title: 'Đường dẫn tĩnh',
       type: 'slug',
+      group: 'content',
       options: {
         source: 'title',
         maxLength: 96,
@@ -38,72 +47,10 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
-      name: 'mainImage',
-      title: 'Ảnh đại diện',
-      type: 'image',
-      options: {
-        hotspot: true,
-      },
-      fields: [
-        defineField({
-          name: 'alt',
-          title: 'Văn bản thay thế (Alt text)',
-          type: 'string',
-        }),
-      ],
-    }),
-    defineField({
-      name: 'publishedAt',
-      title: 'Ngày đăng',
-      type: 'datetime',
-      initialValue: () => new Date().toISOString(),
-    }),
-    // MỚI: excerpt — mô tả ngắn hiển thị dưới title ở trang danh sách blog,
-    // giúp người đọc biết bài viết nói về gì trước khi bấm vào.
-    defineField({
-      name: 'excerpt',
-      title: 'Mô tả ngắn',
-      type: 'text',
-      rows: 3,
-      description: 'Hiển thị dưới tiêu đề ở trang danh sách blog. Nên viết 1-2 câu.',
-      validation: (Rule) => Rule.max(200),
-    }),
-    // MỚI: author — tên tác giả, hiển thị cạnh ngày đăng. Để dạng string
-    // đơn giản thay vì reference sang document riêng vì hiện tại chỉ có
-    // một người viết; có thể nâng cấp thành type "author" riêng sau nếu
-    // có nhiều tác giả.
-    defineField({
-      name: 'author',
-      title: 'Tác giả',
-      type: 'string',
-      initialValue: 'Applebin',
-    }),
-    // ⬇️ MỚI: tags — mảng chuỗi tự do, gõ Enter để thêm từng tag.
-    // Studio sẽ hiện dạng ô nhập kiểu "pill" nhờ options.layout = 'tags'.
-    defineField({
-      name: 'tags',
-      title: 'Tags',
-      type: 'array',
-      of: [{type: 'string'}],
-      options: {
-        layout: 'tags',
-      },
-    }),
-    // ⬇️ MỚI: viewCount — số lượt xem, readOnly để tránh sửa tay nhầm.
-    // Được tăng tự động qua API route /api/track-view, không cập nhật
-    // qua Studio thủ công. initialValue 0 để bài mới không bị undefined.
-    defineField({
-      name: 'viewCount',
-      title: 'Lượt xem',
-      type: 'number',
-      initialValue: 0,
-      readOnly: true,
-      description: 'Tự động tăng khi có người xem bài viết — không chỉnh tay ở đây.',
-    }),
-    defineField({
       name: 'body',
       title: 'Nội dung bài viết',
       type: 'array',
+      group: 'content',
       of: [
         {
           type: 'block',
@@ -234,6 +181,75 @@ export default defineType({
           },
         },
       ],
+    }),
+    defineField({
+      name: 'mainImage',
+      title: 'Ảnh đại diện',
+      type: 'image',
+      group: 'meta',
+      options: {
+        hotspot: true,
+      },
+      fields: [
+        defineField({
+          name: 'alt',
+          title: 'Văn bản thay thế (Alt text)',
+          type: 'string',
+        }),
+      ],
+    }),
+    defineField({
+      name: 'publishedAt',
+      title: 'Ngày đăng',
+      type: 'datetime',
+      group: 'meta',
+      initialValue: () => new Date().toISOString(),
+    }),
+    // MỚI: excerpt — mô tả ngắn hiển thị dưới title ở trang danh sách blog,
+    // giúp người đọc biết bài viết nói về gì trước khi bấm vào.
+    defineField({
+      name: 'excerpt',
+      title: 'Mô tả ngắn',
+      type: 'text',
+      group: 'meta',
+      rows: 3,
+      description: 'Hiển thị dưới tiêu đề ở trang danh sách blog. Nên viết 1-2 câu.',
+      validation: (Rule) => Rule.max(200),
+    }),
+    // MỚI: author — tên tác giả, hiển thị cạnh ngày đăng. Để dạng string
+    // đơn giản thay vì reference sang document riêng vì hiện tại chỉ có
+    // một người viết; có thể nâng cấp thành type "author" riêng sau nếu
+    // có nhiều tác giả.
+    defineField({
+      name: 'author',
+      title: 'Tác giả',
+      type: 'string',
+      group: 'meta',
+      initialValue: 'Applebin',
+    }),
+    // ⬇️ MỚI: tags — mảng chuỗi tự do, gõ Enter để thêm từng tag.
+    // Studio sẽ hiện dạng ô nhập kiểu "pill" nhờ options.layout = 'tags'.
+    defineField({
+      name: 'tags',
+      title: 'Tags',
+      type: 'array',
+      group: 'meta',
+      of: [{type: 'string'}],
+      options: {
+        layout: 'tags',
+      },
+    }),
+    // ⬇️ MỚI: viewCount — số lượt xem, readOnly để tránh sửa tay nhầm.
+    // Được tăng tự động qua API route /api/track-view, không cập nhật
+    // qua Studio thủ công. initialValue 0 để bài mới không bị undefined.
+    defineField({
+      name: 'viewCount',
+      title: 'Lượt xem',
+      type: 'number',
+      group: 'stats',
+      initialValue: 0,
+      readOnly: true,
+      description: 'Tự động tăng khi có người xem bài viết — không chỉnh tay ở đây.',
     }),
   ],
   preview: {
