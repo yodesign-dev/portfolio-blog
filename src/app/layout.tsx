@@ -4,9 +4,7 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { draftMode } from "next/headers";
 import { VisualEditing } from "next-sanity/visual-editing";
-import { Navbar } from "@/components/originkit/ui/hero-31/navbar";
-import { ContactModalProvider } from "@/components/originkit/ui/hero-31/contact-modal-context";
-import { ContactModal } from "@/components/originkit/ui/hero-31/contact-modal";
+import { SiteChrome } from "@/components/SiteChrome";
 import { DisableDraftMode } from "@/components/DisableDraftMode";
 
 const mulish = Mulish({
@@ -39,11 +37,7 @@ export default async function RootLayout({
       className={`${mulish.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ContactModalProvider>
-          <Navbar />
-          {children}
-          <ContactModal />
-        </ContactModalProvider>
+        <SiteChrome>{children}</SiteChrome>
         <Analytics />
         {isDraftMode && (
           <>
