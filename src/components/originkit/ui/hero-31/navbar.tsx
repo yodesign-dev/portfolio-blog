@@ -5,24 +5,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
-import { DEFAULT_LOCALE, getDictionary } from "@/lib/i18n";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
   const pathname = usePathname();
 
-  // TẮT tính năng chuyển ngôn ngữ — luôn dùng tiếng Việt mặc định.
-  // Phần dictionary vẫn giữ nguyên (không xoá lib/i18n.ts) để có thể bật
-  // lại dễ dàng sau này nếu cần, chỉ gỡ UI + logic đổi locale ở đây.
-  const t = getDictionary(DEFAULT_LOCALE).nav;
-
   const navLinks = [
-    { href: "/", label: t.home },
-    { href: "/blog", label: t.blog },
-    { href: "/resume", label: t.resume },
-    { href: "/tools", label: t.tools },
-    { href: "/timeline", label: t.timeline },
+    { href: "/", label: "Home" },
+    { href: "/blog", label: "Blogs" },
+    { href: "/resume", label: "Resume" },
+    { href: "/tools", label: "Tools" },
+    { href: "/timeline", label: "Timeline" },
   ];
 
   useEffect(() => {
@@ -82,7 +76,7 @@ export const Navbar = () => {
           onClick={() => openModal()}
           className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center"
         >
-          {t.getInTouch}
+          Get In Touch
         </button>
       </nav>
 
@@ -127,7 +121,7 @@ export const Navbar = () => {
             }}
             className="mt-4 w-full bg-[#50d3f2] px-6 py-4 font-sans text-sm font-bold text-neutral-900 transition hover:bg-[#3dbcdb]"
           >
-            {t.getInTouch}
+            Get In Touch
           </button>
         </nav>
       </div>

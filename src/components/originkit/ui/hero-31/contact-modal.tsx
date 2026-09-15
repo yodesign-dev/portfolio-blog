@@ -176,12 +176,15 @@ export function ContactModal() {
 
       <div
         className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm sm:items-center"
-        onClick={closeModal}
+        onClick={(e) => {
+          // Chỉ đóng khi click ĐÚNG vào nền tối (không phải bất kỳ đâu bên
+          // trong modal). Không dùng stopPropagation ở div con nữa — cách
+          // đó chặn luôn click listener toàn cục của Cal.com (gắn ở
+          // document), khiến nút "Đặt lịch" không phản hồi khi bấm.
+          if (e.target === e.currentTarget) closeModal();
+        }}
       >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8"
-        >
+        <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight text-neutral-900">

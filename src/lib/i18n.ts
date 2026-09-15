@@ -1,6 +1,6 @@
 export type Locale = 'vi' | 'en'
 
-export const DEFAULT_LOCALE: Locale = 'vi'
+export const DEFAULT_LOCALE: Locale = 'en'
 
 // Đặt ở đây (không phải get-locale.ts) vì file này KHÔNG import
 // 'next/headers' — client component (LanguageToggle) cần đọc được hằng số
@@ -24,6 +24,11 @@ export const dictionary = {
       itemsSuffix: 'công cụ nữa',
       category: 'Danh mục',
       searchPlaceholder: 'Tìm công cụ theo tên hoặc mô tả...',
+      sortUsage: 'Mức dùng',
+      sortRating: 'Đánh giá',
+      sortName: 'Tên A–Z',
+      mostUsed: 'dùng nhiều nhất',
+      usageSuffix: '% mức dùng',
       toolsCount: 'công cụ',
       noToolsFound: 'Không tìm thấy công cụ nào phù hợp.',
       viewsSuffix: 'lượt xem',
@@ -69,6 +74,11 @@ export const dictionary = {
       itemsSuffix: 'more tools',
       category: 'Category',
       searchPlaceholder: 'Search tools by name or description...',
+      sortUsage: 'Usage',
+      sortRating: 'Rating',
+      sortName: 'Name A–Z',
+      mostUsed: 'most used',
+      usageSuffix: '% usage',
       toolsCount: 'tools',
       noToolsFound: 'No matching tools found.',
       viewsSuffix: 'views',
