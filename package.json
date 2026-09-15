@@ -11,6 +11,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@calcom/embed-react": "^1.5.3",
     "@portabletext/react": "^7.0.1",
     "@sanity/image-url": "^2.1.1",
     "@sanity/table": "^3.1.14",

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Script from "next/script";
+import { getCalApi } from "@calcom/embed-react";
 import { useContactModal } from "./contact-modal-context";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -121,6 +122,22 @@ export function ContactModal() {
     };
   }, [isOpen, scriptLoaded]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    // MỚI: khởi tạo Cal.com embed — chỉ cần gọi 1 lần, nút bên dưới có
+    // attribute data-cal-link sẽ tự động mở popup lịch khi bấm, không
+    // cần code thêm gì khác cho phần popup.
+    (async function initCal() {
+      const cal = await getCalApi();
+      cal("ui", {
+        theme: "light",
+        styles: {branding: {brandColor: "#00ddff"}},
+        hideEventTypeDetails: false,
+        layout: "month_view",
+      });
+    })();
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -187,7 +204,31 @@ export function ContactModal() {
           </div>
 
           {status !== "success" && (
-            <div className="mt-5 flex flex-col gap-4">
+            <>
+              {/* MỚI: CTA đặt lịch trực tiếp — bấm mở popup Cal.com, không
+                  cần chờ email qua lại xác nhận giờ giấc như form nhắn tin */}
+              <button
+                type="button"
+                data-cal-link="yoshark-bin/30min"
+                data-cal-config='{"layout":"month_view"}'
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-3 text-base font-semibold text-white transition hover:bg-neutral-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Đặt lịch gọi 30 phút
+              </button>
+
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-neutral-200" />
+                <span className="text-sm text-neutral-400">hoặc</span>
+                <div className="h-px flex-1 bg-neutral-200" />
+              </div>
+            </>
+          )}
+
+          {status !== "success" && (
+            <div className="flex flex-col gap-4">
               {QUICK_LINKS.map((link) => (
                 <a
                   key={link.label}
