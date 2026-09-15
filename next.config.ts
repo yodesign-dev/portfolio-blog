@@ -3,13 +3,21 @@ import type { NextConfig } from "next";
 // Content-Security-Policy — whitelist cdn.sanity.io vì ảnh bài viết load từ Sanity CMS.
 // Nếu sau này bạn gọi trực tiếp Sanity API từ client (client-side fetch), nhớ thêm
 // domain API tương ứng (vd: https://<project-id>.api.sanity.io) vào connect-src.
+//
+// MỚI: thêm domain cho 2 tích hợp mới —
+// - Cloudflare Turnstile (captcha trong form liên hệ): challenges.cloudflare.com
+// - Cal.com (nút "Book a 30-min call"): app.cal.com + *.cal.com cho API kiểm tra lịch
+// - fonts.googleapis.com / fonts.gstatic.com: 1 trong 2 script trên tự chèn thêm
+//   stylesheet Google Fonts riêng, không phải do next/font (next/font tự host font
+//   nội bộ nên bình thường không cần dòng này).
 const cspHeader = `
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval';
-  style-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://app.cal.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   img-src 'self' blob: data: https://cdn.sanity.io;
-  font-src 'self';
-  connect-src 'self' https://*.api.sanity.io;
+  font-src 'self' https://fonts.gstatic.com;
+  connect-src 'self' https://*.api.sanity.io https://challenges.cloudflare.com https://*.cal.com;
+  frame-src https://challenges.cloudflare.com https://app.cal.com;
   frame-ancestors 'self';
   form-action 'self';
   base-uri 'self';
