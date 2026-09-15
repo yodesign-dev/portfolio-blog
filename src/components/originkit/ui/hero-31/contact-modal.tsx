@@ -22,7 +22,7 @@ declare global {
 
 const QUICK_LINKS = [
   {
-    label: "Gửi email trực tiếp",
+    label: "Send an email",
     href: "mailto:nguyenbinhdesign@gmail.com",
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -31,7 +31,7 @@ const QUICK_LINKS = [
     ),
   },
   {
-    label: "Nhắn tin qua LinkedIn",
+    label: "Message on LinkedIn",
     href: "https://linkedin.com/in/binhnguyen1985",
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
@@ -87,7 +87,7 @@ export function ContactModal() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, closeModal]);
 
-  // MỚI: tự động focus vào field "Họ và Tên" khi modal vừa mở — người
+  // MỚI: tự động focus vào field "Full Name" khi modal vừa mở — người
   // dùng bàn phím có thể gõ ngay không cần click chuột vào field trước
   useEffect(() => {
     if (isOpen && status !== "success") {
@@ -191,13 +191,13 @@ export function ContactModal() {
                 Get in touch
               </h2>
               <p className="mt-2 max-w-sm text-base leading-relaxed text-neutral-500">
-                Mình luôn sẵn sàng lắng nghe về dự án, cơ hội hợp tác, hoặc chỉ đơn giản là một lời chào.
+                I'm always happy to hear about projects, collaboration opportunities, or just a friendly hello.
               </p>
             </div>
             <button
               type="button"
               onClick={closeModal}
-              aria-label="Đóng"
+              aria-label="Close"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -219,12 +219,12 @@ export function ContactModal() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Đặt lịch gọi 30 phút
+                Book a 30-min call
               </button>
 
               <div className="my-5 flex items-center gap-3">
                 <div className="h-px flex-1 bg-neutral-200" />
-                <span className="text-sm text-neutral-400">hoặc</span>
+                <span className="text-sm text-neutral-400">or</span>
                 <div className="h-px flex-1 bg-neutral-200" />
               </div>
             </>
@@ -254,16 +254,16 @@ export function ContactModal() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="mt-4 text-base font-medium text-neutral-900">Đã gửi thành công!</p>
+              <p className="mt-4 text-base font-medium text-neutral-900">Sent successfully!</p>
               <p className="mt-1 text-base text-neutral-500">
-                Mình sẽ phản hồi qua email sớm nhất có thể.
+                I'll get back to you via email as soon as possible.
               </p>
               <button
                 type="button"
                 onClick={closeModal}
                 className="mt-6 w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-base font-semibold text-white transition hover:bg-neutral-700"
               >
-                Đóng
+                Close
               </button>
             </div>
           ) : (
@@ -284,7 +284,7 @@ export function ContactModal() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="contact-name" className="mb-1.5 block text-base font-semibold text-neutral-700">
-                    Họ và Tên
+                    Full Name
                   </label>
                   <input
                     id="contact-name"
@@ -293,13 +293,13 @@ export function ContactModal() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Họ và tên của bạn"
+                    placeholder="Your full name"
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                   />
                 </div>
                 <div>
                   <label htmlFor="contact-subject" className="mb-1.5 block text-base font-semibold text-neutral-700">
-                    Tiêu đề
+                    Subject
                   </label>
                   <input
                     id="contact-subject"
@@ -307,7 +307,7 @@ export function ContactModal() {
                     required
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Hợp tác dự án"
+                    placeholder="Project collaboration"
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                   />
                 </div>
@@ -323,14 +323,14 @@ export function ContactModal() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ban@email.com"
+                  placeholder="you@email.com"
                   className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                 />
               </div>
 
               <div>
                 <label htmlFor="contact-message" className="mb-1.5 block text-base font-semibold text-neutral-700">
-                  Tin nhắn
+                  Message
                 </label>
                 <textarea
                   id="contact-message"
@@ -338,7 +338,7 @@ export function ContactModal() {
                   rows={4}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Bạn muốn nhắn gì?"
+                  placeholder="What would you like to say?"
                   className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
                 />
               </div>
@@ -352,7 +352,7 @@ export function ContactModal() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                   </svg>
-                  Gửi thất bại, bạn thử lại nhé.
+                  Failed to send, please try again.
                 </div>
               )}
 
@@ -362,10 +362,10 @@ export function ContactModal() {
                 className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#00ddff] px-4 py-3 text-base font-semibold text-[#0b1432] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === "submitting" ? (
-                  "Đang gửi..."
+                  "Sending..."
                 ) : (
                   <>
-                    Gửi tin nhắn
+                    Send message
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
