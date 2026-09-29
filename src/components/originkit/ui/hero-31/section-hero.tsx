@@ -8,6 +8,7 @@ import { WaveField } from "@/components/originkit/ui/hero-31/wave-field";
 import { STAGE } from "@/components/originkit/ui/hero-31/stage";
 import { useContactModal } from "@/components/originkit/ui/hero-31/contact-modal-context";
 import { SITE_NAME, SITE_ROLE } from "@/lib/site";
+import { trackEvent } from "@/lib/analytics";
 
 const FADE_FILL =
   "linear-gradient(to top, #002fff 0, #002fff var(--fade-solid), transparent 100%)";
@@ -72,13 +73,14 @@ export const SectionHero = () => {
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
             href="/work"
+            onClick={() => trackEvent({ name: "CTA Click", props: { cta: "hero_view_work" } })}
             className="flex min-h-12 items-center justify-center bg-white px-6 text-base font-semibold text-brand transition hover:bg-white/90"
           >
             View my work
           </Link>
           <button
             type="button"
-            onClick={() => openModal()}
+            onClick={() => openModal(undefined, "hero_book_call")}
             className="flex min-h-12 cursor-pointer items-center justify-center border border-white/60 px-6 text-base font-semibold text-white transition hover:border-white hover:bg-white/10"
           >
             Book a call

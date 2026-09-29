@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Script from "next/script";
 import { getCalApi } from "@calcom/embed-react";
 import { useContactModal } from "./contact-modal-context";
+import { trackEvent } from "@/lib/analytics";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -154,6 +155,7 @@ export function ContactModal() {
       if (!response.ok) throw new Error("failed");
 
       setStatus("success");
+      trackEvent({ name: "Contact Submit" });
       setName("");
       setEmail("");
       setSubject("");
@@ -213,6 +215,7 @@ export function ContactModal() {
               <button
                 type="button"
                 data-cal-link="yoshark-bin/30min"
+                onClick={() => trackEvent({ name: "Book Call Click" })}
                 data-cal-config='{"layout":"month_view"}'
                 className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-3 text-base font-semibold text-white transition hover:bg-neutral-700"
               >

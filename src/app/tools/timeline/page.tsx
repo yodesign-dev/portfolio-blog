@@ -2,12 +2,15 @@ import {TimelineExplorer} from '@/components/TimelineExplorer'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary} from '@/lib/i18n'
+import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Timeline · Toolkit',
-}
+  description: 'How Bin Nguyen\'s design and AI tool stack has changed year by year.',
+  path: '/tools/timeline',
+})
 
 const TIMELINE_QUERY = `*[_type == "timelineYear"] | order(year asc) {
   year,

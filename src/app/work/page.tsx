@@ -1,11 +1,13 @@
 import {CaseStudyCard, getCaseStudies} from '@/components/CaseStudyCard'
+import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Work',
-  description: 'Selected product design case studies — the problem, the process and the impact.',
-}
+  description: 'Selected product design case studies by Bin Nguyen — the problem, the process and the impact.',
+  path: '/work',
+})
 
 export default async function WorkPage() {
   const studies = await getCaseStudies(revalidate)

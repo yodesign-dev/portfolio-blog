@@ -2,12 +2,15 @@ import {ToolsLibrary} from '@/components/ToolsLibrary'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary} from '@/lib/i18n'
+import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Toolkit',
-}
+  description: 'The design, AI and productivity tools Bin Nguyen actually uses day to day.',
+  path: '/tools',
+})
 
 const TOOLS_QUERY = `*[_type == "tool"] | order(name asc) {
   _id,

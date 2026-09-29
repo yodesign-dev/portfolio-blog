@@ -16,7 +16,7 @@ export const EmailCapture = ({ fullWidth = false }: EmailCaptureProps) => {
   // gõ lại email lần 2 trong modal.
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    openModal(email);
+    openModal(email, "email_capture");
   };
 
   return (

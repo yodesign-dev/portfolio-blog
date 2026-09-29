@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import {useContactModal} from '@/components/originkit/ui/hero-31/contact-modal-context'
 import {NAV_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
+import {trackEvent} from '@/lib/analytics'
 
 export function SiteFooter({showResume}: {showResume: boolean}) {
   const {openModal} = useContactModal()
@@ -20,7 +21,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
           </p>
           <button
             type="button"
-            onClick={() => openModal()}
+            onClick={() => openModal(undefined, 'footer')}
             className="mt-6 flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-sm font-bold text-ink transition hover:bg-accent-hover"
           >
             Get In Touch
@@ -50,6 +51,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackEvent({name: 'Social Click', props: {network: link.label}})}
                     className="text-white/80 transition hover:text-white"
                   >
                     {link.label} ↗

@@ -6,13 +6,12 @@ import {getImageDimensions, urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {ShareButtons} from '@/components/originkit/ui/hero-31/share-buttons'
 import {ViewTracker} from '@/components/ViewTracker'
+import {SITE_NAME, SITE_URL, ogImageUrl} from '@/lib/site'
 import {ImpactStats, type ImpactMetric} from '@/components/ImpactStats'
 
 // Dùng chung cho trang chi tiết Writing (/blog/[slug]) và Work
 // (/work/[slug]) — cùng 1 schema post, case study chỉ thêm khối
 // Role/Company/Year + Impact phía trên ảnh đại diện.
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://binblogs.vercel.app'
 
 const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
   _id,
@@ -79,26 +78,30 @@ export function postPath(post: {slug: {current: string}; isCaseStudy?: boolean})
 export function buildPostMetadata(post: Post | null): Metadata {
   if (!post) return {title: 'Post not found'}
 
-  const postUrl = `${SITE_URL}${postPath(post)}`
-  const ogImageUrl = post.mainImage
-    ? urlFor(post.mainImage)?.width(1200).height(630).fit('crop').url()
-    : undefined
+  const path = postPath(post)
+  // Ảnh đại diện nếu có, không thì ảnh OG tạo động theo tiêu đề bài.
+  const image = post.mainImage
+    ? {url: urlFor(post.mainImage).width(1200).height(630).fit('crop').url(), width: 1200, height: 630}
+    : {url: ogImageUrl(post.title, post.isCaseStudy ? 'Case study' : 'Writing'), width: 1200, height: 630}
 
   return {
     title: post.title,
     description: post.excerpt,
+    alternates: {canonical: path},
     openGraph: {
       title: post.title,
       description: post.excerpt,
-      url: postUrl,
+      url: path,
+      siteName: SITE_NAME,
       type: 'article',
       publishedTime: post.publishedAt,
-      images: ogImageUrl ? [{url: ogImageUrl, width: 1200, height: 630}] : undefined,
+      images: [image],
     },
     twitter: {
       card: 'summary_large_image',
       title: post.title,
-      images: ogImageUrl ? [ogImageUrl] : undefined,
+      description: post.excerpt,
+      images: [image.url],
     },
   }
 }

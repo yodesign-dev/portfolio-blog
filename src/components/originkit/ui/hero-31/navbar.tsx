@@ -68,7 +68,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
 
         <button
           type="button"
-          onClick={() => openModal()}
+          onClick={() => openModal(undefined, "nav")}
           className="h-full px-10 font-sans text-sm font-bold bg-brand text-white transition hover:bg-brand-hover flex items-center justify-center"
         >
           Get In Touch
@@ -112,7 +112,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
             type="button"
             onClick={() => {
               setIsMenuOpen(false);
-              openModal();
+              openModal(undefined, "nav_mobile");
             }}
             className="mt-4 w-full bg-brand px-6 py-4 font-sans text-sm font-bold text-white transition hover:bg-brand-hover"
           >

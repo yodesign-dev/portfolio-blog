@@ -1,11 +1,12 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 type ContactModalContextValue = {
   isOpen: boolean;
   prefillEmail: string;
-  openModal: (prefillEmail?: string) => void;
+  openModal: (prefillEmail?: string, source?: string) => void;
   closeModal: () => void;
 };
 
@@ -18,7 +19,10 @@ export function ContactModalProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [prefillEmail, setPrefillEmail] = useState("");
 
-  const openModal = (email?: string) => {
+  // source: nơi người dùng bấm mở form (nav, hero, footer…) — để biết
+  // CTA nào thực sự dẫn tới liên hệ.
+  const openModal = (email?: string, source = "unknown") => {
+    trackEvent({ name: "Contact Open", props: { source } });
     setPrefillEmail(email ?? "");
     setIsOpen(true);
   };

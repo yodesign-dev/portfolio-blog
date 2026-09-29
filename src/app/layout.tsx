@@ -7,7 +7,7 @@ import { VisualEditing } from "next-sanity/visual-editing";
 import { SiteChrome } from "@/components/SiteChrome";
 import { DisableDraftMode } from "@/components/DisableDraftMode";
 import { client } from "@/sanity/lib/client";
-import { SITE_NAME, SITE_ROLE } from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_ROLE, SITE_URL, ogImageUrl } from "@/lib/site";
 
 const mulish = Mulish({
   variable: "--font-mulish",
@@ -28,12 +28,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: `${SITE_NAME} — ${SITE_ROLE}`,
     template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "Bin Nguyen is a product designer with 10+ years of end-to-end experience, using AI to move from research to high-fidelity work faster. Case studies, writing and toolkit.",
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_ROLE}`,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    images: [{ url: ogImageUrl(), width: 1200, height: 630 }],
+  },
+  twitter: { card: "summary_large_image", images: [ogImageUrl()] },
 };
 
 export default async function RootLayout({

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 type ShareButtonsProps = {
   url: string;
@@ -34,7 +35,8 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
     },
   ];
 
-  const handleShare = (href: string) => {
+  const handleShare = (href: string, platform: string) => {
+    trackEvent({ name: "Share", props: { platform } });
     window.open(href, "_blank", "noopener,noreferrer,width=600,height=500");
   };
 
@@ -43,6 +45,7 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(url);
+      trackEvent({ name: "Share", props: { platform: "Copy link" } });
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -58,7 +61,7 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
         <button
           key={platform.name}
           type="button"
-          onClick={() => handleShare(platform.href)}
+          onClick={() => handleShare(platform.href, platform.name)}
           aria-label={`Share "${title}" on ${platform.name}`}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
         >

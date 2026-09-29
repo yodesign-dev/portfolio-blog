@@ -1,11 +1,14 @@
 import React from 'react'
 import {client} from '@/sanity/lib/client'
+import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Resume',
-}
+  description: 'Resume of Bin Nguyen, product designer with 10+ years of end-to-end experience.',
+  path: '/resume',
+})
 
 const RESUME_QUERY = `*[_type == "resume"][0]{
   isPublic,

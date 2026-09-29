@@ -4,12 +4,15 @@ import {urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary, type Locale} from '@/lib/i18n'
+import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: 'Writing',
-}
+  description: 'Notes on product design, UX and working with AI — things Bin Nguyen learns along the way.',
+  path: '/blog',
+})
 
 type Post = {
   _id: string
