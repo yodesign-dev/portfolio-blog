@@ -148,6 +148,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
 
   useEffect(() => {
     scenePausedRef.current = scenePaused
+    sceneRef.current?.setPaused(scenePaused)
   }, [scenePaused])
 
   useEffect(() => {

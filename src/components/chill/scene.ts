@@ -6,11 +6,17 @@
 // Mọi thứ chuyển động vẫn vẽ bằng canvas ở lưới 320×180 (mỗi "pixel" = 2px
 // thật trên canvas 640×360), rồi CSS phóng to bằng `image-rendering: pixelated`.
 //
+// Xe cộ, người đi bộ, chó ngoài phố là sprite AI (public/chill/sprites.png,
+// xem sprites.ts). Nhân vật trong quán là video loop AI (Kling) — gõ phím rồi
+// thỉnh thoảng cầm ly cà phê uống; nền xanh ô kính được cắt trên từng khung.
+//
 // Thứ tự lớp (xa → gần):
-//   ảnh phố → chim → người đi bộ → xe máy → mưa/sương → kính cửa
-//   → ảnh nội thất (đã tô màu theo giờ) → hơi cà phê, nốt nhạc → ánh đèn
+//   ảnh phố → chim → người/chó trên vỉa hè → xe làn xa → xe làn gần → mưa/sương
+//   → kính cửa → nội thất (video hoặc ảnh tĩnh, tô màu theo giờ) → hơi cà phê,
+//   nốt nhạc → ánh đèn
 
 import {DESTINATIONS, type Destination} from './destinations'
+import {SPRITES, SPRITE_SRC, type SpriteName} from './sprites'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
 export type Weather = 'clear' | 'rain' | 'mist'
@@ -33,10 +39,15 @@ const NEAR_LANE = 124 // làn gần (bị bậu cửa che mép dưới)
 const PHIN = {x: 127, y: 113}
 const LAMP = {x: 63, y: 42}
 const LAPTOP = {x: 235, y: 119}
-const HEADPHONES = {x: 256, y: 94}
+const HEADPHONES = {x: 262, y: 90}
 
 const FADE_SECONDS = 1.2
 const INTERIOR_SRC = '/chill/scenes/interior.webp'
+const INTERIOR_VIDEO_SRC = '/chill/scenes/interior-loop.mp4'
+// Mốc trong video (giây): 0–0.75 và 6.8–hết là gõ phím, giữa là cầm ly uống.
+// Khung đầu = khung cuối nên video tự loop liền mạch.
+const SIP_START = 0.75
+const SIP_END = 6.8
 
 // Màu nhân cho sprite ngoài phố để hợp ánh sáng của ảnh nền
 const SPRITE_TINT: Record<TimeOfDay, string | null> = {
@@ -68,12 +79,6 @@ function rgb(hex: string): [number, number, number] {
 const toHex = (r: number, g: number, b: number) =>
   '#' + [r, g, b].map((c) => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, '0')).join('')
 
-function mix(a: string, b: string, k: number) {
-  const [r1, g1, b1] = rgb(a)
-  const [r2, g2, b2] = rgb(b)
-  return toHex(r1 + (r2 - r1) * k, g1 + (g2 - g1) * k, b1 + (b2 - b1) * k)
-}
-
 function multiply(hex: string, tint: string | null) {
   if (!tint) return hex
   const [r1, g1, b1] = rgb(hex)
@@ -101,37 +106,28 @@ const ready = (img: HTMLImageElement | null): img is HTMLImageElement => !!img &
 
 // ---------- Nhân vật chuyển động ----------
 
-type Bike = {
-  x: number
+type Mover = {
+  sprite: SpriteName | 'dog'
+  road: boolean // true: chạy dưới lòng đường, false: đi trên vỉa hè
+  x: number // tâm theo chiều ngang (lưới 320)
   dir: 1 | -1
+  cruise: number // tốc độ mong muốn (px/giây)
   speed: number
   lane: number
-  color: string
-  shirt: string
-  helmet: string
-  passenger: {shirt: string; helmet: string} | null
-  cargo: 'none' | 'flowers' | 'boxes'
   phase: number
-}
-
-type Walker = {
-  x: number
-  dir: 1 | -1
-  speed: number
-  shirt: string
-  pants: string
-  hat: boolean
-  baskets: boolean
+  rest: number // chó dừng lại ngó nghiêng (giây còn lại)
 }
 
 type Drop = {x: number; y: number; len: number; speed: number}
 type GlassDrop = {x: number; y: number; r: number; v: number}
 type Note = {x: number; y: number; age: number; drift: number}
 
-const BIKE_COLORS = ['#c7362f', '#2f5fa8', '#e8e4dc', '#1f1f24', '#6f8f3a', '#d98a2b']
-const SHIRTS = ['#f2f0ea', '#2f5fa8', '#d9534f', '#e6b03a', '#3f7d5a', '#7a5ca8', '#5a6470']
-const HELMETS = ['#f2c230', '#e8e4dc', '#c7362f', '#2f5fa8', '#1f1f24', '#e87aa0']
-const PONCHOS = ['#3b82c4', '#e8c33a', '#d9534f', '#58a55c', '#8a5cc4']
+const BIKES: SpriteName[] = ['bike-cub', 'bike-vespa', 'bike-flowers', 'bike-boxes', 'bike-duo']
+const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
+const spriteSize = (name: SpriteName) => {
+  const [, , w, h] = SPRITES[name]
+  return {w: w / SCALE, h: h / SCALE}
+}
 
 export class ChillScene {
   private ctx: CanvasRenderingContext2D
@@ -149,16 +145,25 @@ export class ChillScene {
   private fade = 1
   private interior: HTMLImageElement
   private interiorLayer: HTMLCanvasElement
+  private atlas: HTMLImageElement
+  private atlasTinted: HTMLCanvasElement
+  private video: HTMLVideoElement | null = null
+  private videoLayer: HTMLCanvasElement
+  private videoFrameTime = -1
+  private videoReady = false
+  private sipping = false
+  private idleLoops = 0
+  private nextSip = 2 // lần uống đầu tiên đến sớm để người xem thấy
+  private paused = false
   private dirty = true
 
   private rng = Math.random
-  private bikes: Bike[] = []
-  private walkers: Walker[] = []
+  private movers: Mover[] = []
   private rain: Drop[] = []
   private glass: GlassDrop[] = []
   private notes: Note[] = []
   private birds: {x: number; y: number; p: number} | null = null
-  private nextBike = 0.5
+  private nextVehicle = 0.5
   private nextWalker = 2
   private nextBirds = 6
   private nextNote = 0
@@ -173,9 +178,11 @@ export class ChillScene {
 
     this.street = this.image(this.destination.streets[this.time])
     this.interior = loadImage(INTERIOR_SRC, () => (this.dirty = true))
-    this.interiorLayer = document.createElement('canvas')
-    this.interiorLayer.width = SCENE_W * SCALE
-    this.interiorLayer.height = SCENE_H * SCALE
+    this.interiorLayer = this.makeLayer()
+    this.videoLayer = this.makeLayer()
+    this.atlas = loadImage(SPRITE_SRC, () => (this.dirty = true))
+    this.atlasTinted = document.createElement('canvas')
+    this.setupVideo()
 
     for (let i = 0; i < 140; i++) {
       this.rain.push({
@@ -187,7 +194,7 @@ export class ChillScene {
     }
     for (let i = 0; i < 36; i++) this.glass.push(this.randomGlassDrop())
     // Mở trang ra đã có sẵn vài chiếc xe trên đường, không phải chờ
-    for (let i = 0; i < 3; i++) this.spawnBike(50 + i * 90)
+    for (let i = 0; i < 3; i++) this.spawnVehicle(50 + i * 90)
     this.spawnWalker(140)
   }
 
@@ -230,6 +237,37 @@ export class ChillScene {
     this.musicOn = on
   }
 
+  // Tạm dừng cảnh (nút pause / giảm chuyển động): dừng luôn video nhân vật
+  setPaused(paused: boolean) {
+    this.paused = paused
+    if (!this.video) return
+    if (paused) this.video.pause()
+    else void this.video.play().catch(() => {})
+  }
+
+  private makeLayer() {
+    const c = document.createElement('canvas')
+    c.width = SCENE_W * SCALE
+    c.height = SCENE_H * SCALE
+    return c
+  }
+
+  private setupVideo() {
+    const v = document.createElement('video')
+    v.src = INTERIOR_VIDEO_SRC
+    v.muted = true
+    v.loop = true
+    v.playsInline = true
+    v.preload = 'auto'
+    v.addEventListener('loadeddata', () => {
+      this.videoReady = true
+      if (!this.paused) void v.play().catch(() => {})
+    })
+    // Lỗi tải / trình duyệt không hỗ trợ → giữ ảnh tĩnh
+    v.addEventListener('error', () => (this.video = null))
+    this.video = v
+  }
+
   // Gọi mỗi frame từ requestAnimationFrame
   frame(now: number) {
     const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0
@@ -245,6 +283,23 @@ export class ChillScene {
   private rebuild() {
     this.dirty = false
     this.tint = combine(SPRITE_TINT[this.time], this.weather === 'rain' ? '#aab3be' : null)
+
+    // Atlas sprite tô sẵn màu theo giờ/thời tiết (nhân màu rồi giữ lại alpha gốc)
+    if (ready(this.atlas)) {
+      const a = this.atlasTinted
+      a.width = this.atlas.naturalWidth
+      a.height = this.atlas.naturalHeight
+      const ac = a.getContext('2d')!
+      ac.drawImage(this.atlas, 0, 0)
+      if (this.tint) {
+        ac.globalCompositeOperation = 'multiply'
+        ac.fillStyle = this.tint
+        ac.fillRect(0, 0, a.width, a.height)
+        ac.globalCompositeOperation = 'destination-in'
+        ac.drawImage(this.atlas, 0, 0)
+        ac.globalCompositeOperation = 'source-over'
+      }
+    }
 
     // Lớp nội thất tô sẵn màu theo giờ/thời tiết, chỉ vẽ lại khi đổi
     const ctx = this.interiorLayer.getContext('2d')!
@@ -282,22 +337,38 @@ export class ChillScene {
       if (this.fade === 1) this.prevStreet = null
     }
 
-    this.nextBike -= dt
-    if (this.nextBike <= 0) {
-      this.spawnBike()
-      const busy = this.time === 'night' ? 2.2 : 1
-      this.nextBike = (1.2 + this.rng() * 2.8) * busy * (rainy ? 1.6 : 1)
+    this.nextVehicle -= dt
+    if (this.nextVehicle <= 0) {
+      this.spawnVehicle()
+      const busy = this.time === 'night' ? 2 : 1
+      this.nextVehicle = (1.3 + this.rng() * 2.6) * busy * (rainy ? 1.5 : 1)
     }
-    for (const b of this.bikes) b.x += b.dir * b.speed * dt
-    this.bikes = this.bikes.filter((b) => b.x > -30 && b.x < SCENE_W + 30)
-
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
-      this.nextWalker = 7 + this.rng() * 9
+      this.nextWalker = 6 + this.rng() * 8
     }
-    for (const w of this.walkers) w.x += w.dir * w.speed * dt
-    this.walkers = this.walkers.filter((w) => w.x > -20 && w.x < SCENE_W + 20)
+
+    for (const m of this.movers) {
+      if (m.road) {
+        // Xe phía trước chậm hơn thì bám theo, không chạy xuyên qua nhau
+        const size = m.sprite === 'dog' ? {w: 10} : spriteSize(m.sprite)
+        let speed = m.cruise
+        for (const o of this.movers) {
+          if (o === m || !o.road || o.lane !== m.lane) continue
+          const gap = (o.x - m.x) * m.dir
+          const other = o.sprite === 'dog' ? {w: 10} : spriteSize(o.sprite)
+          if (gap > 0 && gap < (size.w + other.w) / 2 + 6) speed = Math.min(speed, o.speed)
+        }
+        m.speed = speed
+      } else if (m.sprite === 'dog') {
+        if (m.rest > 0) m.rest -= dt
+        else if (this.rng() < dt * 0.12) m.rest = 0.8 + this.rng() * 1.2
+        m.speed = m.rest > 0 ? 0 : m.cruise
+      }
+      m.x += m.dir * m.speed * dt
+    }
+    this.movers = this.movers.filter((m) => m.x > -60 && m.x < SCENE_W + 60)
 
     this.nextBirds -= dt
     if (this.nextBirds <= 0 && !this.birds && this.time !== 'night' && !rainy) {
@@ -323,6 +394,8 @@ export class ChillScene {
     }
     this.notes = this.notes.filter((n) => n.age < 3)
 
+    this.updateVideo()
+
     if (rainy) {
       for (const d of this.rain) {
         d.y += d.speed * dt
@@ -343,38 +416,72 @@ export class ChillScene {
     }
   }
 
-  private spawnBike(x?: number) {
+  // Lặp đoạn gõ phím; cứ vài vòng mới cho phát đoạn cầm ly uống (SIP_START → SIP_END)
+  private updateVideo() {
+    const v = this.video
+    if (!v || !this.videoReady || this.paused) return
+    const t = v.currentTime
+    if (this.sipping) {
+      if (t >= SIP_END) this.sipping = false
+    } else if (t >= SIP_START && t < SIP_END) {
+      if (this.idleLoops >= this.nextSip) {
+        this.sipping = true
+        this.idleLoops = 0
+        this.nextSip = 5 + Math.floor(this.rng() * 4) // ~20–35s giữa 2 lần uống
+      } else {
+        v.currentTime = SIP_END
+        this.idleLoops++
+      }
+    }
+  }
+
+  private spawnVehicle(x?: number) {
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
+    const lane = dir > 0 ? NEAR_LANE : FAR_LANE
     const rainy = this.weather === 'rain'
-    const cargoRoll = r()
-    this.bikes.push({
-      x: x ?? (dir > 0 ? -20 : SCENE_W + 20),
-      dir,
-      speed: 24 + r() * 20,
-      lane: dir > 0 ? NEAR_LANE : FAR_LANE,
-      color: pick(r, BIKE_COLORS),
-      shirt: rainy ? pick(r, PONCHOS) : pick(r, SHIRTS),
-      helmet: pick(r, HELMETS),
-      passenger: r() < 0.3 ? {shirt: pick(r, SHIRTS), helmet: pick(r, HELMETS)} : null,
-      cargo: cargoRoll < 0.12 ? 'flowers' : cargoRoll < 0.2 ? 'boxes' : 'none',
-      phase: r(),
-    })
-    this.bikes.sort((a, b) => a.lane - b.lane)
+    const roll = r()
+    let sprite: SpriteName
+    let cruise: number
+    if (roll < 0.6) {
+      sprite = rainy && r() < 0.7 ? 'bike-poncho' : pick(r, BIKES)
+      cruise = 26 + r() * 18
+    } else if (roll < 0.8) {
+      sprite = r() < 0.55 ? 'car-taxi' : 'car-hatch'
+      cruise = 32 + r() * 14
+    } else if (roll < 0.87) {
+      sprite = 'bus'
+      cruise = 22 + r() * 6
+    } else if (roll < 0.93 && !rainy) {
+      sprite = 'cyclo'
+      cruise = 9 + r() * 3
+    } else {
+      sprite = rainy ? 'bike-poncho' : 'cyclist'
+      cruise = rainy ? 28 : 12 + r() * 4
+    }
+    const {w} = spriteSize(sprite)
+    const startX = x ?? (dir > 0 ? -w / 2 - 2 : SCENE_W + w / 2 + 2)
+    // Không sinh xe chồng lên xe khác vừa vào cùng làn
+    if (x === undefined && this.movers.some((m) => m.road && m.lane === lane && Math.abs(m.x - startX) < w + 8)) return
+    this.movers.push({sprite, road: true, x: startX, dir, cruise, speed: cruise, lane, phase: r(), rest: 0})
   }
 
   private spawnWalker(x?: number) {
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
-    const vendor = r() < 0.55
-    this.walkers.push({
+    const roll = r()
+    const sprite: SpriteName | 'dog' = roll < 0.35 ? 'dog' : roll < 0.65 ? 'vendor' : 'walker'
+    const cruise = sprite === 'dog' ? 20 + r() * 8 : sprite === 'vendor' ? 5 + r() * 2 : 8 + r() * 3
+    this.movers.push({
+      sprite,
+      road: false,
       x: x ?? (dir > 0 ? -14 : SCENE_W + 14),
       dir,
-      speed: vendor ? 5 + r() * 2 : 8 + r() * 4,
-      shirt: pick(r, SHIRTS),
-      pants: pick(r, ['#2d2d38', '#3f4a5c', '#5a4636']),
-      hat: vendor || r() < 0.3,
-      baskets: vendor,
+      cruise,
+      speed: cruise,
+      lane: SIDEWALK_Y,
+      phase: r(),
+      rest: 0,
     })
   }
 
@@ -416,8 +523,9 @@ export class ChillScene {
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)
-    for (const w of this.walkers) this.drawWalker(w, t)
-    for (const b of this.bikes) this.drawBike(b, t)
+    // Vỉa hè → làn xa → làn gần (gần hơn vẽ sau, đè lên trên)
+    const order = (m: Mover) => (m.road ? m.lane : 0)
+    for (const m of [...this.movers].sort((a, b) => order(a) - order(b))) this.drawMover(m, t)
 
     if (this.weather === 'rain') {
       ctx.globalCompositeOperation = 'multiply'
@@ -458,7 +566,7 @@ export class ChillScene {
     }
     ctx.restore()
 
-    ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W, SCENE_H)
+    ctx.drawImage(this.interiorFrame(), 0, 0, SCENE_W, SCENE_H)
     this.drawSteam(t)
     this.drawNotes()
     this.drawLights()
@@ -479,97 +587,119 @@ export class ChillScene {
     }
   }
 
-  private drawBike(b: Bike, t: number) {
-    const ctx = this.ctx
-    const o = this.o
-    const W = 14
-    const x0 = Math.round(b.x)
-    const bump = (t * 2 + b.phase) % 1 < 0.12 ? 1 : 0
-    const top = this.groundY(b.lane, b.x + W / 2, this.laneShift) - 14 - bump
-    const px = (dx: number, w: number) => (b.dir > 0 ? x0 + dx : x0 + (W - dx - w))
-    const r = (dx: number, dy: number, w: number, h: number, c: string) => this.rect(px(dx, w), top + dy, w, h, c)
-    const rainy = this.weather === 'rain'
-
-    r(1, 11 + bump, 3, 3, o('#1c1c20'))
-    r(10, 11 + bump, 3, 3, o('#1c1c20'))
-    r(2, 12 + bump, 1, 1, o('#8a8a90'))
-    r(11, 12 + bump, 1, 1, o('#8a8a90'))
-    r(3, 9, 8, 3, o(b.color))
-    r(9, 8, 2, 2, o(b.color))
-    r(11, 6, 1, 5, o('#333338'))
-    r(3, 8, 5, 1, o('#2b2b2b'))
-
-    if (b.cargo === 'flowers') {
-      r(-2, 5, 5, 4, o('#9a6a3a'))
-      for (let i = 0; i < 5; i++) r(-2 + i, 3 + (i % 2), 1, 2, o(['#f07aa0', '#f2d24a', '#ffffff', '#f07aa0', '#e05a5a'][i]))
-    } else if (b.cargo === 'boxes') {
-      r(-2, 2, 5, 7, o('#c9a36a'))
-      r(-2, 5, 5, 1, o('#a8844e'))
+  // Nội thất: khung video hiện tại (đã cắt nền xanh + tô màu), chưa có video thì ảnh tĩnh
+  private interiorFrame(): HTMLCanvasElement {
+    const v = this.video
+    if (!v || !this.videoReady || v.readyState < 2) return this.interiorLayer
+    if (v.currentTime !== this.videoFrameTime) {
+      this.videoFrameTime = v.currentTime
+      this.keyVideoFrame(v)
     }
-
-    if (b.passenger) {
-      r(3, 4, 3, 5, o(rainy ? b.shirt : b.passenger.shirt))
-      r(3, 1, 3, 3, o(b.passenger.helmet))
-    }
-    if (rainy) {
-      // Áo mưa cánh dơi trùm cả xe
-      r(4, 3, 8, 7, o(b.shirt))
-      r(3, 9, 10, 1, o(mix(b.shirt, '#000000', 0.2)))
-    } else {
-      r(6, 3, 3, 6, o(b.shirt))
-      r(8, 5, 3, 1, o(b.shirt))
-      r(7, 8, 2, 2, o('#3a3a4a'))
-    }
-    r(6, 0, 3, 3, o(b.helmet))
-    r(8, 2, 1, 1, o('#c9946f'))
-
-    if (this.time === 'night' || rainy) {
-      r(12, 7, 1, 1, '#fff2b0')
-      r(0, 9, 1, 1, '#ff4a3a')
-      ctx.fillStyle = 'rgba(255,240,180,0.16)'
-      const hx = px(13, 1)
-      ctx.beginPath()
-      ctx.moveTo(hx, top + 7)
-      ctx.lineTo(hx + b.dir * 16, top + 3)
-      ctx.lineTo(hx + b.dir * 16, top + 14)
-      ctx.fill()
-    }
+    return this.videoLayer
   }
 
-  private drawWalker(w: Walker, t: number) {
-    const o = this.o
-    const W = 13
-    const x0 = Math.round(w.x)
-    const top = this.groundY(SIDEWALK_Y, w.x + W / 2) - 12
-    const step = Math.floor(t * 4 + x0) % 2
-    const px = (dx: number, rw: number) => (w.dir > 0 ? x0 + dx : x0 + (W - dx - rw))
-    const r = (dx: number, dy: number, rw: number, rh: number, c: string) => this.rect(px(dx, rw), top + dy, rw, rh, c)
+  private keyVideoFrame(v: HTMLVideoElement) {
+    const c = this.videoLayer.getContext('2d', {willReadFrequently: true})!
+    const {width: W, height: H} = this.videoLayer
+    c.globalCompositeOperation = 'source-over'
+    c.drawImage(v, 0, 0, W, H)
+    const img = c.getImageData(0, 0, W, H)
+    const d = img.data
+    const keyed = new Uint8Array(W * H)
+    for (let i = 0, p = 0; p < keyed.length; i += 4, p++) {
+      const r = d[i]
+      const g = d[i + 1]
+      const b = d[i + 2]
+      if (g > 150 && r < 140 && b < 140 && g > r * 1.4 && g > b * 1.4) {
+        keyed[p] = 1
+        d[i + 3] = 0
+      }
+    }
+    // Viền ám xanh do nén video (2 lượt):
+    // 1) pixel hơi xanh sát vùng đã cắt → bỏ luôn
+    // 2) pixel còn lại cách vùng cắt ≤ 2px mà vẫn ngả xanh → kéo kênh G về mức R/B
+    const near = (p: number, m: Uint8Array) => m[p - 1] || m[p + 1] || m[p - W] || m[p + W]
+    const edge = keyed.slice()
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const p = y * W + x
+        if (keyed[p] || !near(p, keyed)) continue
+        const i = p * 4
+        const r = d[i]
+        const g = d[i + 1]
+        const b = d[i + 2]
+        if (g > 100 && g > Math.max(r, b) * 1.2) {
+          edge[p] = 1
+          d[i + 3] = 0
+        }
+      }
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      const grown = edge.slice()
+      for (let y = 1; y < H - 1; y++) {
+        for (let x = 1; x < W - 1; x++) {
+          const p = y * W + x
+          if (edge[p] || !near(p, edge)) continue
+          const i = p * 4
+          const m = Math.max(d[i], d[i + 2])
+          if (d[i + 1] > m) d[i + 1] = m
+          grown[p] = 1
+        }
+      }
+      edge.set(grown)
+    }
+    c.putImageData(img, 0, 0)
+    c.globalCompositeOperation = 'source-atop'
+    const wash = INTERIOR_WASH[this.time]
+    if (wash) {
+      c.fillStyle = wash
+      c.fillRect(0, 0, W, H)
+    }
+    if (this.weather === 'rain') {
+      c.fillStyle = 'rgba(40,52,72,0.18)'
+      c.fillRect(0, 0, W, H)
+    }
+    c.globalCompositeOperation = 'source-over'
+  }
 
-    if (w.hat) {
-      r(5, 0, 3, 1, o('#e8d9a8'))
-      r(4, 1, 5, 1, o('#e8d9a8'))
-      r(3, 2, 7, 1, o('#d9c590'))
-    } else {
-      r(5, 1, 3, 2, o('#2b1d18'))
+  private drawMover(m: Mover, t: number) {
+    if (!this.atlasTinted.width) return
+    const ctx = this.ctx
+    const name: SpriteName =
+      m.sprite === 'dog' ? (`dog-${m.speed > 0 ? Math.floor(t * 10 + m.phase * 4) % 4 : 0}` as SpriteName) : m.sprite
+    const [sx, sy, sw, sh] = SPRITES[name]
+    const w = sw / SCALE
+    const h = sh / SCALE
+    const base = m.road ? this.groundY(m.lane, m.x, this.laneShift) : this.groundY(m.lane, m.x)
+    // Xe nhún theo mặt đường, người nhún theo bước chân
+    const bob = m.sprite === 'dog' ? 0 : (t * (m.road ? 2 : 3) + m.phase) % 1 < (m.road ? 0.12 : 0.5) ? 0.5 : 0
+    const x = Math.round((m.x - w / 2) * 2) / 2
+    const y = Math.round((base - h - bob) * 2) / 2
+
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'
+    ctx.fillRect(x + w * 0.1, base - 0.5, w * 0.8, 1)
+
+    ctx.save()
+    if (m.dir < 0) {
+      ctx.translate(x * 2 + w, 0)
+      ctx.scale(-1, 1)
     }
-    r(5, 3, 3, 2, o('#c9946f'))
-    r(5, 5, 3, 4, o(w.shirt))
-    if (step) {
-      r(5, 9, 1, 3, o(w.pants))
-      r(7, 9, 1, 3, o(w.pants))
-    } else {
-      r(4, 9, 1, 3, o(w.pants))
-      r(8, 9, 1, 3, o(w.pants))
-    }
-    if (w.baskets) {
-      // Đòn gánh + 2 thúng hoa quả
-      r(0, 5, 13, 1, o('#8a6a45'))
-      r(0, 6, 1, 2, o('#8a6a45'))
-      r(12, 6, 1, 2, o('#8a6a45'))
-      r(-1, 8 + step, 3, 3, o('#a07040'))
-      r(11, 8 + (1 - step), 3, 3, o('#a07040'))
-      r(-1, 7 + step, 3, 1, o('#e6b03a'))
-      r(11, 7 + (1 - step), 3, 1, o('#6aa84f'))
+    ctx.drawImage(this.atlasTinted, sx, sy, sw, sh, x, y, w, h)
+    ctx.restore()
+
+    const lightsOn = m.road && !LIGHTS_OFF.has(m.sprite) && (this.time === 'night' || this.weather === 'rain')
+    if (lightsOn) {
+      const front = m.dir > 0 ? x + w - 1 : x
+      const back = m.dir > 0 ? x : x + w - 1
+      const ly = base - Math.max(3, h * 0.35)
+      this.rect(front, ly, 1, 1, '#fff2b0')
+      this.rect(back, ly, 1, 1, '#ff4a3a')
+      ctx.fillStyle = 'rgba(255,240,180,0.16)'
+      ctx.beginPath()
+      ctx.moveTo(front + (m.dir > 0 ? 1 : 0), ly)
+      ctx.lineTo(front + m.dir * 18, ly - 4)
+      ctx.lineTo(front + m.dir * 18, ly + 6)
+      ctx.fill()
     }
   }
 
