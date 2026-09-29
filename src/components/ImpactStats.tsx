@@ -25,7 +25,7 @@ export function ImpactStats({
           className="border-l border-neutral-200 pl-4 first:border-l-0 first:pl-0 sm:[&:nth-child(3)]:border-l sm:[&:nth-child(3)]:pl-4 [&:nth-child(3)]:border-l-0 [&:nth-child(3)]:pl-0"
         >
           <p
-            className={`font-semibold leading-none tracking-tight text-[#002fff] tabular-nums ${
+            className={`font-semibold leading-none tracking-tight text-brand tabular-nums ${
               size === 'lg' ? 'text-4xl' : 'text-[28px] sm:text-[32px]'
             }`}
           >

@@ -28,7 +28,12 @@ const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
   role,
   company,
   year,
-  impact[]{_key, value, label}
+  impact[]{_key, value, label},
+  "more": *[
+    _type == "post" &&
+    _id != ^._id &&
+    coalesce(isCaseStudy, false) == coalesce(^.isCaseStudy, false)
+  ] | order(publishedAt desc)[0...2]{_id, title, slug, isCaseStudy, excerpt, publishedAt}
 }`
 
 export type Post = {
@@ -50,6 +55,14 @@ export type Post = {
   company?: string
   year?: string
   impact?: ImpactMetric[]
+  more?: {
+    _id: string
+    title: string
+    slug: {current: string}
+    isCaseStudy?: boolean
+    excerpt?: string
+    publishedAt: string
+  }[]
 }
 
 export async function getPost(slug: string, revalidate: number): Promise<Post | null> {
@@ -96,6 +109,19 @@ function formatDate(dateString: string) {
     month: 'long',
     year: 'numeric',
   })
+}
+
+// Ước lượng thời gian đọc từ text của Portable Text (~200 từ/phút).
+function readingMinutes(body: unknown): number {
+  if (!Array.isArray(body)) return 1
+  const words = body
+    .filter((block) => block?._type === 'block')
+    .flatMap((block) => block.children ?? [])
+    .map((child: {text?: string}) => child.text ?? '')
+    .join(' ')
+    .split(/\s+/)
+    .filter(Boolean).length
+  return Math.max(1, Math.round(words / 200))
 }
 
 function formatViewCount(count?: number) {
@@ -288,7 +314,7 @@ export function PostArticle({post}: {post: Post}) {
       <main className="mx-auto max-w-3xl px-6 py-12 sm:px-8 sm:py-16">
         <article>
           {post.isCaseStudy ? (
-            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-[#002fff]">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-brand">
               Case study
             </p>
           ) : (
@@ -320,7 +346,8 @@ export function PostArticle({post}: {post: Post}) {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-neutral-400">
-              {formatDate(post.publishedAt)} · {formatViewCount(post.viewCount)}
+              {formatDate(post.publishedAt)} · {readingMinutes(post.body)} min read ·{' '}
+              {formatViewCount(post.viewCount)}
             </p>
             <ShareButtons url={postUrl} title={post.title} />
           </div>
@@ -347,6 +374,33 @@ export function PostArticle({post}: {post: Post}) {
             <ShareButtons url={postUrl} title={post.title} />
           </div>
         </article>
+
+        {post.more && post.more.length > 0 && (
+          <aside className="mt-16 border-t border-neutral-200 pt-10">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
+              {post.isCaseStudy ? 'More case studies' : 'Keep reading'}
+            </h2>
+            <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {post.more.map((item) => (
+                <li key={item._id}>
+                  <Link
+                    href={postPath(item)}
+                    className="group block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-400"
+                  >
+                    <p className="font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
+                      {item.title}
+                    </p>
+                    {item.excerpt && (
+                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-neutral-500">
+                        {item.excerpt}
+                      </p>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
       </main>
     </div>
   )

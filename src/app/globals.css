@@ -1,30 +1,37 @@
-@import url("https://googleapis.com");
-@import url("https://googleapis.com");
 @import "tailwindcss";
-
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/*
+ * Design tokens — dùng thay cho mã màu hex viết tay trong className
+ * (bg-brand, text-ink, bg-accent…). Đổi màu ở đây là đổi toàn site.
+ *
+ * Typography: 2 font duy nhất —
+ * - Display (Inter, weight nhẹ): headline lớn ở hero
+ * - Text (Mulish): mọi thứ còn lại
+ * Cả 2 tải qua next/font trong layout.tsx (tự host, không gọi Google Fonts).
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'Mulish', var(--font-geist-sans); /* Đưa Mulish làm font mặc định của Tailwind luôn */
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand: #002fff;
+  --color-brand-hover: #0026cc;
+  --color-accent: #00ddff;
+  --color-accent-hover: #00c4e3;
+  --color-ink: #0b1432;
+
+  --font-sans: var(--font-mulish), Helvetica, sans-serif;
+  --font-display: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Mulish, Helvetica, sans-serif;
-  letter-spacing:-0.5px
+  font-family: var(--font-sans);
+  letter-spacing: -0.5px;
 }

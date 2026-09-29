@@ -61,7 +61,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
             renderLink(
               link,
               "text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition",
-              "text-neutral-900 underline underline-offset-4 decoration-2 decoration-[#00ddff]"
+              "text-neutral-900 underline underline-offset-4 decoration-2 decoration-brand"
             )
           )}
         </div>
@@ -69,7 +69,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
         <button
           type="button"
           onClick={() => openModal()}
-          className="h-full px-10 font-sans text-sm font-bold bg-[#50d3f2] text-neutral-900 transition hover:bg-[#3dbcdb] flex items-center justify-center"
+          className="h-full px-10 font-sans text-sm font-bold bg-brand text-white transition hover:bg-brand-hover flex items-center justify-center"
         >
           Get In Touch
         </button>
@@ -114,7 +114,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
               setIsMenuOpen(false);
               openModal();
             }}
-            className="mt-4 w-full bg-[#50d3f2] px-6 py-4 font-sans text-sm font-bold text-neutral-900 transition hover:bg-[#3dbcdb]"
+            className="mt-4 w-full bg-brand px-6 py-4 font-sans text-sm font-bold text-white transition hover:bg-brand-hover"
           >
             Get In Touch
           </button>

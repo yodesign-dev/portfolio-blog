@@ -238,7 +238,7 @@ export function ContactModal() {
                   href={link.href}
                   target={link.href.startsWith("http") ? "_blank" : undefined}
                   rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                  className="flex items-center gap-2 text-base font-medium text-[#0b1432] transition hover:opacity-70"
+                  className="flex items-center gap-2 text-base font-medium text-ink transition hover:opacity-70"
                 >
                   {link.icon}
                   {link.label}
@@ -294,7 +294,7 @@ export function ContactModal() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your full name"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                   />
                 </div>
                 <div>
@@ -308,7 +308,7 @@ export function ContactModal() {
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     placeholder="Project collaboration"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                   />
                 </div>
               </div>
@@ -324,7 +324,7 @@ export function ContactModal() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@email.com"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
               </div>
 
@@ -339,7 +339,7 @@ export function ContactModal() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="What would you like to say?"
-                  className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-[#00ddff] focus:outline-none focus:ring-2 focus:ring-[#00ddff]/30"
+                  className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
               </div>
 
@@ -359,7 +359,7 @@ export function ContactModal() {
               <button
                 type="submit"
                 disabled={status === "submitting" || !captchaToken}
-                className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-[#00ddff] px-4 py-3 text-base font-semibold text-[#0b1432] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-ink transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === "submitting" ? (
                   "Sending..."

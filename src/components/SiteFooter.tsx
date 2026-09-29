@@ -10,7 +10,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
   const socialLinks = SOCIAL_LINKS.filter((link) => link.href)
 
   return (
-    <footer className="mt-auto bg-[#0b1432] text-white antialiased">
+    <footer className="mt-auto bg-ink text-white antialiased">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr]">
         <div>
           <p className="text-xl font-bold tracking-tight">{SITE_NAME}</p>
@@ -21,7 +21,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
           <button
             type="button"
             onClick={() => openModal()}
-            className="mt-6 flex min-h-12 cursor-pointer items-center justify-center bg-[#50d3f2] px-6 text-sm font-bold text-neutral-900 transition hover:bg-[#3dbcdb]"
+            className="mt-6 flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-sm font-bold text-ink transition hover:bg-accent-hover"
           >
             Get In Touch
           </button>

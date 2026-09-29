@@ -19,7 +19,7 @@ export const SectionHero = () => {
   const { openModal } = useContactModal();
 
   return (
-  <main className="animate-hero-reveal relative isolate flex min-h-[calc(100dvh-80px)] w-full flex-col overflow-hidden bg-[#002fff]">
+  <main className="animate-hero-reveal relative isolate flex min-h-[calc(100dvh-80px)] w-full flex-col overflow-hidden bg-brand">
     <WaveField />
 
     <div
@@ -56,10 +56,12 @@ export const SectionHero = () => {
         {SITE_NAME} · {SITE_ROLE}
       </p>
 
-      <h1 className="mb-8 text-center md:text-left font-sans font-normal text-[clamp(44px,7.5vw,80px)] lg:text-[100px] leading-[1.05] tracking-[-0.04em] text-white antialiased" style={{ fontFamily: 'Inter, "Helvetica Neue", Arial, sans-serif', fontWeight: 300 }}>
-        Learn by Sharing
-        <br />
-        Share by Learning
+      {/* Mỗi vế slogan giữ trên 1 dòng: cỡ chữ mobile theo 8.5vw (vừa khung
+          ~300px ở màn 375px) thay vì 44px cố định khiến "Share by Learning"
+          bị gãy thành 2 dòng. */}
+      <h1 className="mb-8 text-center font-display text-[clamp(30px,8.5vw,80px)] font-light leading-[1.05] tracking-[-0.04em] text-white antialiased md:text-left lg:text-[100px]">
+        <span className="block whitespace-nowrap">Learn by Sharing</span>
+        <span className="block whitespace-nowrap">Share by Learning</span>
       </h1>
 
       <div className="mb-16 flex flex-col items-center gap-8 md:items-start lg:mb-20">
@@ -70,7 +72,7 @@ export const SectionHero = () => {
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
             href="/work"
-            className="flex min-h-12 items-center justify-center bg-white px-6 text-base font-semibold text-[#002fff] transition hover:bg-white/90"
+            className="flex min-h-12 items-center justify-center bg-white px-6 text-base font-semibold text-brand transition hover:bg-white/90"
           >
             View my work
           </Link>

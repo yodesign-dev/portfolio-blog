@@ -183,7 +183,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
           step={1}
           value={selectedIndex}
           onChange={(e) => setSelectedIndex(Number(e.target.value))}
-          className="w-full accent-[#00ddff]"
+          className="w-full accent-accent"
         />
         <div className="mt-1 flex justify-between text-xs text-neutral-400">
           <span>{years[0].year}</span>

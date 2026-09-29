@@ -83,7 +83,9 @@ export default async function BlogPage({
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
-        {allTags.length > 0 && (
+        {/* Bộ lọc chỉ có ích khi có đủ bài để lọc — 1-2 bài mà hiện 4 chip
+            tag thì chỉ thêm nhiễu. Đang lọc theo tag thì luôn hiện để quay lại. */}
+        {allTags.length >= 2 && (tag || posts.length >= 3) && (
           <div className="mb-10 flex flex-wrap gap-2">
             <Link
               href="/blog"

@@ -64,7 +64,7 @@ export function CaseStudyCard({study, priority = false}: {study: CaseStudy; prio
         <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-neutral-400">{meta}</p>
       )}
 
-      <h3 className="mt-2 text-xl font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-[#002fff] sm:text-2xl">
+      <h3 className="mt-2 text-xl font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand sm:text-2xl">
         {study.title}
       </h3>
 

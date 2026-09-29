@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Mulish, Geist_Mono } from "next/font/google";
+import { Inter, Mulish, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { draftMode } from "next/headers";
@@ -10,8 +10,16 @@ import { client } from "@/sanity/lib/client";
 import { SITE_NAME, SITE_ROLE } from "@/lib/site";
 
 const mulish = Mulish({
-  variable: "--font-geist-sans",
+  variable: "--font-mulish",
   subsets: ["latin", "vietnamese"],
+});
+
+// Font display cho headline lớn ở hero — trước đây khai báo "Inter" trong
+// style nhưng không tải, nên Mac hiện Helvetica Neue, Windows hiện Arial.
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin", "vietnamese"],
+  weight: ["300"],
 });
 
 const geistMono = Geist_Mono({
@@ -51,7 +59,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${mulish.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${mulish.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SiteChrome showResume={hasPublicResume}>{children}</SiteChrome>
