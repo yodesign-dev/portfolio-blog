@@ -2,7 +2,7 @@
 //
 // Mỗi bài là 1 trong 2 loại:
 // - `src`: file nhạc thật trong public/chill/music/ (AAC .m4a 128kbps).
-//   5 bài hiện tại tạo bằng CassetteAI qua Figma Weave (bản tạm giai đoạn 1b).
+//   Tạo bằng CassetteAI / MiniMax Music qua Figma Weave.
 // - `synth`: bài lo-fi tạo ngay trên trình duyệt bằng Web Audio — không cần
 //   file, dùng khi muốn thêm bài mà chưa có nhạc (xem audio.ts).
 
@@ -38,5 +38,12 @@ export const TRACKS: Track[] = [
     src: '/chill/music/scooter-traffic.m4a',
   },
   {id: 'rain-awning', title: 'Rain on the Awning', mood: 'Jazzy · Soft', duration: 180, src: '/chill/music/rain-awning.m4a'},
+  {
+    id: 'rainy-morning-beats',
+    title: 'Rainy Morning Beats',
+    mood: 'Lo-fi chill · MiniMax',
+    duration: 75,
+    src: '/chill/music/rainy-morning-beats.m4a',
+  },
   {id: 'deep-work', title: 'Deep Work Loop', mood: 'Steady · Minimal', duration: 180, src: '/chill/music/deep-work.m4a'},
 ]

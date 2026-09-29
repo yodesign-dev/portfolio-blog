@@ -1,13 +1,16 @@
 // Cảnh pixel của trang /chill: góc quán cà phê nhìn qua cửa sổ ra phố Hà Nội.
 //
 // Art tĩnh là ảnh AI (public/chill/scenes/, tạo bằng Nano Banana 2 qua Figma
-// Weave): 3 bản phố sáng/chiều/đêm + 1 lớp nội thất đã cắt trong suốt ô kính.
+// Weave): mỗi điểm đến 3 bản phố sáng/chiều/đêm + 1 lớp nội thất dùng chung
+// đã cắt trong suốt ô kính. Đổi điểm đến / giờ thì ảnh phố mờ dần sang ảnh mới.
 // Mọi thứ chuyển động vẫn vẽ bằng canvas ở lưới 320×180 (mỗi "pixel" = 2px
 // thật trên canvas 640×360), rồi CSS phóng to bằng `image-rendering: pixelated`.
 //
 // Thứ tự lớp (xa → gần):
 //   ảnh phố → chim → người đi bộ → xe máy → mưa/sương → kính cửa
 //   → ảnh nội thất (đã tô màu theo giờ) → hơi cà phê, nốt nhạc → ánh đèn
+
+import {DESTINATIONS, streetSrc} from './destinations'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
 export type Weather = 'clear' | 'rain' | 'mist'
@@ -32,11 +35,7 @@ const LAMP = {x: 63, y: 42}
 const LAPTOP = {x: 235, y: 119}
 const HEADPHONES = {x: 256, y: 94}
 
-const STREET_SRC: Record<TimeOfDay, string> = {
-  morning: '/chill/scenes/street-morning.webp',
-  afternoon: '/chill/scenes/street-afternoon.webp',
-  night: '/chill/scenes/street-night.webp',
-}
+const FADE_SECONDS = 1.2
 const INTERIOR_SRC = '/chill/scenes/interior.webp'
 
 // Màu nhân cho sprite ngoài phố để hợp ánh sáng của ảnh nền
@@ -98,6 +97,8 @@ function loadImage(src: string, onLoad: () => void) {
   return img
 }
 
+const ready = (img: HTMLImageElement | null): img is HTMLImageElement => !!img && img.complete && img.naturalWidth > 0
+
 // ---------- Nhân vật chuyển động ----------
 
 type Bike = {
@@ -136,10 +137,16 @@ export class ChillScene {
   private ctx: CanvasRenderingContext2D
   private time: TimeOfDay = 'morning'
   private weather: Weather = 'clear'
+  private destination = 'hanoi'
+  private tilt = 0
+  private laneShift = 0
   private musicOn = false
   private tint: string | null = null
 
-  private streets: Record<TimeOfDay, HTMLImageElement>
+  private images = new Map<string, HTMLImageElement>()
+  private street: HTMLImageElement
+  private prevStreet: HTMLImageElement | null = null
+  private fade = 1
   private interior: HTMLImageElement
   private interiorLayer: HTMLCanvasElement
   private dirty = true
@@ -164,13 +171,8 @@ export class ChillScene {
     this.ctx = canvas.getContext('2d')!
     this.ctx.imageSmoothingEnabled = false
 
-    const invalidate = () => (this.dirty = true)
-    this.streets = {
-      morning: loadImage(STREET_SRC.morning, invalidate),
-      afternoon: loadImage(STREET_SRC.afternoon, invalidate),
-      night: loadImage(STREET_SRC.night, invalidate),
-    }
-    this.interior = loadImage(INTERIOR_SRC, invalidate)
+    this.street = this.image(streetSrc(this.destination, this.time))
+    this.interior = loadImage(INTERIOR_SRC, () => (this.dirty = true))
     this.interiorLayer = document.createElement('canvas')
     this.interiorLayer.width = SCENE_W * SCALE
     this.interiorLayer.height = SCENE_H * SCALE
@@ -189,11 +191,40 @@ export class ChillScene {
     this.spawnWalker(140)
   }
 
-  setAtmosphere(time: TimeOfDay, weather: Weather) {
-    if (time === this.time && weather === this.weather && !this.dirty) return
+  setAtmosphere(time: TimeOfDay, weather: Weather, destination = this.destination) {
+    if (time === this.time && weather === this.weather && destination === this.destination && !this.dirty) return
+    const next = this.image(streetSrc(destination, time))
+    if (next !== this.street) {
+      this.prevStreet = ready(this.street) ? this.street : this.prevStreet
+      this.street = next
+      this.fade = 0
+    }
     this.time = time
     this.weather = weather
+    this.destination = destination
+    const d = DESTINATIONS.find((x) => x.id === destination)
+    this.tilt = d?.tilt ?? 0
+    this.laneShift = d?.laneShift ?? 0
     this.dirty = true
+  }
+
+  // Cao độ mặt đường tại x (cảnh phố dốc thì làn xe nghiêng theo)
+  private groundY(base: number, x: number, shift = 0) {
+    return Math.round(base + shift + this.tilt * (x - SCENE_W / 2))
+  }
+
+  // Tải trước ảnh của 1 điểm đến (vd điểm kế tiếp) để lúc chuyển không bị trống
+  preload(destination: string) {
+    for (const t of ['morning', 'afternoon', 'night']) this.image(streetSrc(destination, t))
+  }
+
+  private image(src: string) {
+    let img = this.images.get(src)
+    if (!img) {
+      img = loadImage(src, () => {})
+      this.images.set(src, img)
+    }
+    return img
   }
 
   setMusic(on: boolean) {
@@ -246,6 +277,11 @@ export class ChillScene {
 
   private update(dt: number) {
     const rainy = this.weather === 'rain'
+    // Chỉ bắt đầu mờ dần khi ảnh mới đã tải xong
+    if (this.fade < 1 && ready(this.street)) {
+      this.fade = Math.min(1, this.fade + dt / FADE_SECONDS)
+      if (this.fade === 1) this.prevStreet = null
+    }
 
     this.nextBike -= dt
     if (this.nextBike <= 0) {
@@ -372,9 +408,13 @@ export class ChillScene {
     ctx.rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h)
     ctx.clip()
 
-    const street = this.streets[this.time]
-    if (street.complete && street.naturalWidth) {
-      ctx.drawImage(street, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+    if (ready(this.prevStreet) && this.fade < 1) {
+      ctx.drawImage(this.prevStreet, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+    }
+    if (ready(this.street)) {
+      ctx.globalAlpha = this.prevStreet ? this.fade : 1
+      ctx.drawImage(this.street, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+      ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)
     for (const w of this.walkers) this.drawWalker(w, t)
@@ -446,7 +486,7 @@ export class ChillScene {
     const W = 14
     const x0 = Math.round(b.x)
     const bump = (t * 2 + b.phase) % 1 < 0.12 ? 1 : 0
-    const top = b.lane - 14 - bump
+    const top = this.groundY(b.lane, b.x + W / 2, this.laneShift) - 14 - bump
     const px = (dx: number, w: number) => (b.dir > 0 ? x0 + dx : x0 + (W - dx - w))
     const r = (dx: number, dy: number, w: number, h: number, c: string) => this.rect(px(dx, w), top + dy, w, h, c)
     const rainy = this.weather === 'rain'
@@ -501,7 +541,7 @@ export class ChillScene {
     const o = this.o
     const W = 13
     const x0 = Math.round(w.x)
-    const top = SIDEWALK_Y - 12
+    const top = this.groundY(SIDEWALK_Y, w.x + W / 2) - 12
     const step = Math.floor(t * 4 + x0) % 2
     const px = (dx: number, rw: number) => (w.dir > 0 ? x0 + dx : x0 + (W - dx - rw))
     const r = (dx: number, dy: number, rw: number, rh: number, c: string) => this.rect(px(dx, rw), top + dy, rw, rh, c)

@@ -3,6 +3,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, type TimeOfDay, type Weather} from './scene'
+import {DESTINATIONS} from './destinations'
 import {TRACKS} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 
@@ -15,7 +16,17 @@ type Prefs = {
   time: TimeOfDay
   weather: Weather
   shuffle: boolean
+  destination: string
+  travel: number
 }
+
+// Tự chuyển điểm đến sau N phút (0 = tắt)
+const TRAVEL_OPTIONS = [
+  {value: 0, label: 'Off'},
+  {value: 3, label: '3 min'},
+  {value: 5, label: '5 min'},
+  {value: 10, label: '10 min'},
+]
 
 const TIMES: {value: TimeOfDay; label: string; icon: React.ReactNode}[] = [
   {value: 'morning', label: 'Morning', icon: <SunriseIcon />},
@@ -68,8 +79,13 @@ export function ChillRoom() {
   const [duration, setDuration] = useState(TRACKS[0].duration)
   const [scenePaused, setScenePaused] = useState(false)
   const [clock, setClock] = useState('')
+  const [destIndex, setDestIndex] = useState(0)
+  const [travel, setTravel] = useState(5)
+  const [travelElapsed, setTravelElapsed] = useState(0)
 
   const track = TRACKS[index]
+  const dest = DESTINATIONS[destIndex]
+  const nextDest = DESTINATIONS[(destIndex + 1) % DESTINATIONS.length]
 
   // Khôi phục lựa chọn lần trước (chạy sau hydrate để HTML server/client khớp nhau)
   useEffect(() => {
@@ -85,6 +101,9 @@ export function ChillRoom() {
     if (prefs.time && ['morning', 'afternoon', 'night'].includes(prefs.time)) setTime(prefs.time)
     if (prefs.weather && ['clear', 'rain', 'mist'].includes(prefs.weather)) setWeather(prefs.weather)
     if (typeof prefs.shuffle === 'boolean') setShuffle(prefs.shuffle)
+    const savedDest = DESTINATIONS.findIndex((d) => d.id === prefs.destination)
+    if (savedDest >= 0) setDestIndex(savedDest)
+    if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
     setLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -92,13 +111,22 @@ export function ChillRoom() {
 
   useEffect(() => {
     if (!loaded) return
-    const prefs: Prefs = {trackId: track.id, volume, ambience, time, weather, shuffle}
+    const prefs: Prefs = {
+      trackId: track.id,
+      volume,
+      ambience,
+      time,
+      weather,
+      shuffle,
+      destination: dest.id,
+      travel,
+    }
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle])
+  }, [loaded, track.id, volume, ambience, time, weather, shuffle, dest.id, travel])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -124,10 +152,35 @@ export function ChillRoom() {
   useEffect(() => {
     const scene = sceneRef.current
     if (!scene) return
-    scene.setAtmosphere(time, weather)
+    scene.setAtmosphere(time, weather, dest.id)
+    scene.preload(nextDest.id)
     // Vẽ ngay 1 frame — không chờ rAF (bị dừng khi tab chạy nền / cảnh đang pause)
     scene.frame(performance.now())
-  }, [time, weather])
+  }, [time, weather, dest.id, nextDest.id])
+
+  // ---------- Điểm đến ----------
+
+  const travelRef = useRef(0)
+
+  const goTo = useCallback((i: number) => {
+    setDestIndex((i + DESTINATIONS.length) % DESTINATIONS.length)
+    travelRef.current = 0
+    setTravelElapsed(0)
+  }, [])
+
+  // Tự chuyển ga: đếm từng giây, đủ N phút thì sang điểm đến tiếp theo
+  useEffect(() => {
+    if (!travel) return
+    const id = setInterval(() => {
+      travelRef.current += 1
+      if (travelRef.current >= travel * 60) {
+        travelRef.current = 0
+        setDestIndex((d) => (d + 1) % DESTINATIONS.length)
+      }
+      setTravelElapsed(travelRef.current)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [travel])
 
   useEffect(() => {
     sceneRef.current?.setMusic(playing)
@@ -147,15 +200,19 @@ export function ChillRoom() {
     audioRef.current?.setAmbience(ambience, AMBIENCE_FOR[weather].kind)
   }, [ambience, weather])
 
-  // Giờ Hà Nội
+  // Giờ địa phương của điểm đến
   useEffect(() => {
     const format = () =>
-      new Intl.DateTimeFormat('en-GB', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'}).format(new Date())
+      new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: dest.timeZone,
+      }).format(new Date())
     const tick = () => setClock(format())
     tick()
     const id = setInterval(tick, 15000)
     return () => clearInterval(id)
-  }, [])
+  }, [dest.timeZone])
 
   // ---------- Điều khiển nhạc ----------
 
@@ -227,7 +284,11 @@ export function ChillRoom() {
   // Phím media trên bàn phím / màn hình khoá điều khiển được nhạc
   useEffect(() => {
     if (!('mediaSession' in navigator) || !started) return
-    navigator.mediaSession.metadata = new MediaMetadata({title: track.title, artist: 'Chill for work', album: track.mood})
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: 'Chill for work',
+      album: track.mood,
+    })
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
     navigator.mediaSession.setActionHandler('play', togglePlay)
     navigator.mediaSession.setActionHandler('pause', togglePlay)
@@ -269,12 +330,12 @@ export function ChillRoom() {
             <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">Slow morning, strong coffee.</h1>
             <p className="mt-3 max-w-xl text-[#a79e94]">
-              A pixel café by a window in Hanoi. Put on a track, pick the weather, get to work.
+              A pixel café by the window, somewhere in Vietnam. Put on a track, pick the weather, get to work.
             </p>
           </div>
           <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-[#a79e94]">
             <span className="h-2 w-2 rounded-full bg-[#e8b27d]" aria-hidden />
-            Hà Nội, Việt Nam
+            {dest.name}, {dest.region}
             <span className="text-white/25">/</span>
             <span className="min-w-[3rem] tabular-nums text-[#ede6dd]">{clock}</span>
           </p>
@@ -288,10 +349,10 @@ export function ChillRoom() {
             ref={canvasRef}
             className="absolute inset-0 h-full w-full [image-rendering:pixelated]"
             role="img"
-            aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, Hanoi street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
+            aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
           />
           <div className="pointer-events-none absolute left-3 top-3 flex gap-2 sm:left-5 sm:top-5">
-            {[weatherLabel, timeLabel].map((label) => (
+            {[dest.name, weatherLabel, timeLabel].map((label) => (
               <span
                 key={label}
                 className="rounded-md bg-black/45 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:px-3 sm:py-1.5 sm:text-[11px]"
@@ -311,35 +372,93 @@ export function ChillRoom() {
         </div>
 
         <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-            <SectionTitle index="01" title="Atmosphere" />
-            <div className="mt-5 space-y-4">
-              <Field label="Time">
-                <Segmented options={TIMES} value={time} onChange={setTime} />
-              </Field>
-              <Field label="Weather">
-                <Segmented options={WEATHERS} value={weather} onChange={setWeather} />
-              </Field>
-              <Field label="Ambience">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={ambience}
-                    onChange={(e) => changeAmbience(Number(e.target.value))}
-                    aria-label={`Ambience volume: ${AMBIENCE_FOR[weather].label}`}
-                    className="w-full accent-[#e8b27d]"
-                  />
-                  <span className="w-32 shrink-0 text-right text-xs text-[#a79e94]">{AMBIENCE_FOR[weather].label}</span>
-                </div>
-              </Field>
-            </div>
-          </section>
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+              <SectionTitle index="01" title="Destination" />
+              <div className="mt-5 flex items-center gap-2">
+                <RoundButton label="Previous destination" onClick={() => goTo(destIndex - 1)}>
+                  <ArrowIcon dir="left" />
+                </RoundButton>
+                <select
+                  value={destIndex}
+                  onChange={(e) => goTo(Number(e.target.value))}
+                  aria-label="Destination"
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#1e1a22] px-3 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                >
+                  {DESTINATIONS.map((d, i) => (
+                    <option key={d.id} value={i}>
+                      {String(i + 1).padStart(2, '0')} · {d.name}
+                    </option>
+                  ))}
+                </select>
+                <RoundButton label="Next destination" onClick={() => goTo(destIndex + 1)}>
+                  <ArrowIcon dir="right" />
+                </RoundButton>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <label htmlFor="chill-travel" className="text-sm text-[#a79e94]">
+                  Auto travel
+                </label>
+                <select
+                  id="chill-travel"
+                  value={travel}
+                  onChange={(e) => {
+                    setTravel(Number(e.target.value))
+                    travelRef.current = 0
+                    setTravelElapsed(0)
+                  }}
+                  className="h-9 rounded-lg border border-white/10 bg-[#1e1a22] px-2 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                >
+                  {TRAVEL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[#e8b27d] transition-[width] duration-1000 ease-linear"
+                  style={{
+                    width: travel ? `${Math.min(100, (travelElapsed / (travel * 60)) * 100)}%` : '0%',
+                  }}
+                />
+              </div>
+              <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
+                {String(destIndex + 1).padStart(2, '0')} / {String(DESTINATIONS.length).padStart(2, '0')} · Next: {nextDest.name}
+              </p>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+              <SectionTitle index="02" title="Atmosphere" />
+              <div className="mt-5 space-y-4">
+                <Field label="Time">
+                  <Segmented options={TIMES} value={time} onChange={setTime} />
+                </Field>
+                <Field label="Weather">
+                  <Segmented options={WEATHERS} value={weather} onChange={setWeather} />
+                </Field>
+                <Field label="Ambience">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={ambience}
+                      onChange={(e) => changeAmbience(Number(e.target.value))}
+                      aria-label={`Ambience volume: ${AMBIENCE_FOR[weather].label}`}
+                      className="w-full accent-[#e8b27d]"
+                    />
+                    <span className="w-32 shrink-0 text-right text-xs text-[#a79e94]">{AMBIENCE_FOR[weather].label}</span>
+                  </div>
+                </Field>
+              </div>
+            </section>
+          </div>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-            <SectionTitle index="02" title="Music" />
+            <SectionTitle index="03" title="Music" />
 
             <div className="mt-5 flex items-center gap-4">
               <div className="flex shrink-0 items-center gap-2">
@@ -380,10 +499,7 @@ export function ChillRoom() {
                 className="group relative h-4 cursor-pointer"
               >
                 <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
-                <div
-                  className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]"
-                  style={{width: `${progress * 100}%`}}
-                />
+                <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]" style={{width: `${progress * 100}%`}} />
               </div>
               <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-[#a79e94]">
                 <span>{formatTime(position)}</span>
@@ -446,9 +562,7 @@ export function ChillRoom() {
           </section>
         </div>
 
-        <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">
-          No rush. Just coffee. · Art &amp; music made with AI.
-        </p>
+        <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">No rush. Just coffee. · Art &amp; music made with AI.</p>
       </div>
     </div>
   )
@@ -610,6 +724,14 @@ function NextIcon() {
     <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M5 5v14l10-7L5 5Z" />
       <rect x="16.5" y="5" width="2.5" height="14" rx="1" />
+    </svg>
+  )
+}
+
+function ArrowIcon({dir}: {dir: 'left' | 'right'}) {
+  return (
+    <svg {...iconProps}>
+      <path d={dir === 'left' ? 'M19 12H5M11 6l-6 6 6 6' : 'M5 12h14M13 6l6 6-6 6'} />
     </svg>
   )
 }
