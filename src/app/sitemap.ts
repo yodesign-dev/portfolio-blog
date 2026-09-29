@@ -15,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     )
     .catch(() => [])
 
-  const staticRoutes = ['', '/work', '/blog', '/tools', '/tools/timeline'].map((path) => ({
+  const staticRoutes = ['', '/work', '/blog', '/tools', '/tools/timeline', '/chill'].map((path) => ({
     url: `${SITE_URL}${path}`,
   }))
 

@@ -53,6 +53,7 @@ export const NAV_LINKS = [
   {href: '/work', label: 'Work'},
   {href: '/blog', label: 'Writing'},
   {href: '/tools', label: 'Toolkit'},
+  {href: '/chill', label: 'Chill'},
   {href: '/resume', label: 'Resume'},
 ]
 

@@ -10,6 +10,7 @@ export type AnalyticsEvent =
   | {name: 'CTA Click'; props: {cta: string}}
   | {name: 'Social Click'; props: {network: string}}
   | {name: 'Share'; props: {platform: string}}
+  | {name: 'Chill Play'; props: {track: string}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {
