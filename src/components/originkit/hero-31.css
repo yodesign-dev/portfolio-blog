@@ -3,3 +3,80 @@
 @theme {
   --font-helvetica: Helvetica, Arial, ui-sans-serif, sans-serif;
 }
+
+/*
+ * Process canvas (process-canvas.tsx) — 1 vòng 14s, bắt đầu sau 1s để người
+ * xem đọc tiêu đề trước:
+ *   0–32%  AI lướt qua các sticky note ở Research (note sáng lên lần lượt)
+ *  32–56%  Bin phác Wireframe (khối wireframe hiện rõ dần)
+ *  56–88%  Hai con trỏ cùng tới Hi-fi, frame Hi-fi sáng viền
+ *  88–100% Quay về vị trí đầu, lặp lại
+ * Vị trí con trỏ là left/top theo % khung canvas.
+ */
+.pc-cursor-ai {
+  animation: pc-ai 14s ease-in-out 1s infinite both;
+}
+.pc-cursor-bin {
+  animation: pc-bin 14s ease-in-out 1s infinite both;
+}
+.pc-note {
+  /* Mỗi note sáng lên đúng lúc con trỏ AI đi qua (cách nhau 6% = 0.84s) */
+  animation: pc-note 14s ease-in-out infinite both;
+  animation-delay: calc(1s + var(--pc-i, 0) * 0.84s);
+}
+.pc-wire {
+  animation: pc-wire 14s ease-in-out 1s infinite both;
+}
+.pc-hifi {
+  animation: pc-hifi 14s ease-in-out 1s infinite both;
+}
+
+[data-paused="true"] .pc-anim {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-anim {
+    animation: none !important;
+  }
+}
+
+@keyframes pc-ai {
+  0%   { left: 40%; top: 46%; }
+  6%   { left: 9%;  top: 18%; }
+  12%  { left: 20%; top: 18%; }
+  18%  { left: 31%; top: 18%; }
+  24%  { left: 20%; top: 30%; }
+  32%  { left: 40%; top: 46%; }
+  52%  { left: 40%; top: 46%; }
+  64%  { left: 80%; top: 44%; }
+  88%  { left: 80%; top: 44%; }
+  100% { left: 40%; top: 46%; }
+}
+
+@keyframes pc-bin {
+  0%   { left: 2%;  top: 90%; }
+  32%  { left: 2%;  top: 90%; }
+  40%  { left: 12%; top: 66%; }
+  46%  { left: 34%; top: 72%; }
+  52%  { left: 18%; top: 84%; }
+  64%  { left: 62%; top: 36%; }
+  88%  { left: 62%; top: 36%; }
+  100% { left: 2%;  top: 90%; }
+}
+
+@keyframes pc-note {
+  0%, 1%, 9%, 100% { transform: scale(1);    background-color: #fef3c7; }
+  4%               { transform: scale(1.12); background-color: #fcd34d; }
+}
+
+@keyframes pc-wire {
+  0%, 34%   { opacity: 0.35; }
+  54%, 90%  { opacity: 1; }
+  100%      { opacity: 0.35; }
+}
+
+@keyframes pc-hifi {
+  0%, 58%, 96%, 100% { outline-color: transparent; }
+  66%, 88%           { outline-color: rgb(255 255 255 / 0.85); }
+}

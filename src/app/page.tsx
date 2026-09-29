@@ -57,10 +57,21 @@ export default async function HomePage() {
   const [studies, posts] = await Promise.all([getCaseStudies(revalidate), getPosts()])
   const featuredStudies = studies.slice(0, 4)
 
+  // Case study mới nhất có ảnh → hiện ở frame "Hi-fi" của canvas trên hero
+  const latest = studies.find((study) => study.mainImage)
+  const heroStudy = latest
+    ? {
+        title: latest.company || latest.title,
+        href: `/work/${latest.slug.current}`,
+        imageUrl: urlFor(latest.mainImage!).width(1200).height(900).fit('crop').url(),
+        imageAlt: latest.mainImage?.alt || latest.title,
+      }
+    : null
+
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
-      <Hero31 />
+      <Hero31 study={heroStudy} />
 
       {featuredStudies.length > 0 && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
