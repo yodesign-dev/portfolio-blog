@@ -29,7 +29,7 @@ export const InfoBand = () => {
            About Me
           </span>
           <p className="text-lg font-medium leading-relaxed max-w-md text-white/90">
-            10+ years designing end-to-end product experiences, grounded in user research and UI/UX thinking. This past year, Bin's been using AI to move faster from research to high-fidelity work.
+            10+ years designing end-to-end product experiences, grounded in user research and UI/UX thinking. This past year, Bin&apos;s been using AI to move faster from research to high-fidelity work.
           </p>
         </div>
 

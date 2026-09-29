@@ -63,13 +63,19 @@ export function ContactModal() {
   // cho modal/dialog, đặc biệt hữu ích cho người dùng bàn phím/screen reader
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      setEmail(prefillEmail);
+  // Mỗi lần modal mở (hoặc email điền sẵn đổi khi đang mở) thì reset form.
+  // Làm ngay trong lúc render theo mẫu "adjust state on prop change" của React,
+  // thay cho useEffect — tránh 1 lượt render thừa với dữ liệu cũ.
+  const openKey = isOpen ? prefillEmail : null;
+  const [prevOpenKey, setPrevOpenKey] = useState<string | null>(null);
+  if (openKey !== prevOpenKey) {
+    setPrevOpenKey(openKey);
+    if (openKey !== null) {
+      setEmail(openKey);
       setStatus("idle");
       setCaptchaToken(null);
     }
-  }, [isOpen, prefillEmail]);
+  }
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -193,7 +199,7 @@ export function ContactModal() {
                 Get in touch
               </h2>
               <p className="mt-2 max-w-sm text-base leading-relaxed text-neutral-500">
-                I'm always happy to hear about projects, collaboration opportunities, or just a friendly hello.
+                I&apos;m always happy to hear about projects, collaboration opportunities, or just a friendly hello.
               </p>
             </div>
             <button
@@ -259,7 +265,7 @@ export function ContactModal() {
               </div>
               <p className="mt-4 text-base font-medium text-neutral-900">Sent successfully!</p>
               <p className="mt-1 text-base text-neutral-500">
-                I'll get back to you via email as soon as possible.
+                I&apos;ll get back to you via email as soon as possible.
               </p>
               <button
                 type="button"
