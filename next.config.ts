@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 // Content-Security-Policy — whitelist cdn.sanity.io vì ảnh bài viết load từ Sanity CMS,
 // và www.google.com + *.gstatic.com cho favicon của Tools/Timeline (Google S2
 // favicon service redirect sang tN.gstatic.com).
+// media-src cdn.sanity.io: file nhạc của trang /chill upload trong Sanity Studio.
 // Nếu sau này bạn gọi trực tiếp Sanity API từ client (client-side fetch), nhớ thêm
 // domain API tương ứng (vd: https://<project-id>.api.sanity.io) vào connect-src.
 //
@@ -18,6 +19,7 @@ const cspHeader = `
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   img-src 'self' blob: data: https://cdn.sanity.io https://www.google.com https://*.gstatic.com;
   font-src 'self' https://fonts.gstatic.com;
+  media-src 'self' https://cdn.sanity.io;
   connect-src 'self' https://*.api.sanity.io https://challenges.cloudflare.com https://*.cal.com;
   frame-src https://challenges.cloudflare.com https://app.cal.com;
   frame-ancestors 'self';

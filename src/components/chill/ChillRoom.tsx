@@ -3,8 +3,8 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, type TimeOfDay, type Weather} from './scene'
-import {DESTINATIONS} from './destinations'
-import {TRACKS} from './tracks'
+import {DESTINATIONS, type Destination} from './destinations'
+import {TRACKS, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 
 const PREFS_KEY = 'chill:prefs'
@@ -59,7 +59,8 @@ function readPrefs(): Partial<Prefs> {
   }
 }
 
-export function ChillRoom() {
+// Mặc định dùng bộ có sẵn trong code; page.tsx truyền thêm nội dung từ Sanity
+export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {tracks?: Track[]; destinations?: Destination[]}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<ChillScene | null>(null)
@@ -76,38 +77,38 @@ export function ChillRoom() {
   const [ambience, setAmbience] = useState(0.35)
   const [shuffle, setShuffle] = useState(false)
   const [position, setPosition] = useState(0)
-  const [duration, setDuration] = useState(TRACKS[0].duration)
+  const [duration, setDuration] = useState(tracks[0].duration)
   const [scenePaused, setScenePaused] = useState(false)
   const [clock, setClock] = useState('')
   const [destIndex, setDestIndex] = useState(0)
   const [travel, setTravel] = useState(5)
   const [travelElapsed, setTravelElapsed] = useState(0)
 
-  const track = TRACKS[index]
-  const dest = DESTINATIONS[destIndex]
-  const nextDest = DESTINATIONS[(destIndex + 1) % DESTINATIONS.length]
+  const track = tracks[index]
+  const dest = destinations[destIndex]
+  const nextDest = destinations[(destIndex + 1) % destinations.length]
 
   // Khôi phục lựa chọn lần trước (chạy sau hydrate để HTML server/client khớp nhau)
   useEffect(() => {
     const prefs = readPrefs()
-    const saved = TRACKS.findIndex((t) => t.id === prefs.trackId)
+    const saved = tracks.findIndex((t) => t.id === prefs.trackId)
     /* eslint-disable react-hooks/set-state-in-effect */
     if (saved >= 0) {
       setIndex(saved)
-      setDuration(TRACKS[saved].duration)
+      setDuration(tracks[saved].duration)
     }
     if (typeof prefs.volume === 'number') setVolume(prefs.volume)
     if (typeof prefs.ambience === 'number') setAmbience(prefs.ambience)
     if (prefs.time && ['morning', 'afternoon', 'night'].includes(prefs.time)) setTime(prefs.time)
     if (prefs.weather && ['clear', 'rain', 'mist'].includes(prefs.weather)) setWeather(prefs.weather)
     if (typeof prefs.shuffle === 'boolean') setShuffle(prefs.shuffle)
-    const savedDest = DESTINATIONS.findIndex((d) => d.id === prefs.destination)
+    const savedDest = destinations.findIndex((d) => d.id === prefs.destination)
     if (savedDest >= 0) setDestIndex(savedDest)
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
     setLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [])
+  }, [tracks, destinations])
 
   useEffect(() => {
     if (!loaded) return
@@ -152,21 +153,21 @@ export function ChillRoom() {
   useEffect(() => {
     const scene = sceneRef.current
     if (!scene) return
-    scene.setAtmosphere(time, weather, dest.id)
-    scene.preload(nextDest.id)
+    scene.setAtmosphere(time, weather, dest)
+    scene.preload(nextDest)
     // Vẽ ngay 1 frame — không chờ rAF (bị dừng khi tab chạy nền / cảnh đang pause)
     scene.frame(performance.now())
-  }, [time, weather, dest.id, nextDest.id])
+  }, [time, weather, dest, nextDest])
 
   // ---------- Điểm đến ----------
 
   const travelRef = useRef(0)
 
   const goTo = useCallback((i: number) => {
-    setDestIndex((i + DESTINATIONS.length) % DESTINATIONS.length)
+    setDestIndex((i + destinations.length) % destinations.length)
     travelRef.current = 0
     setTravelElapsed(0)
-  }, [])
+  }, [destinations.length])
 
   // Tự chuyển ga: đếm từng giây, đủ N phút thì sang điểm đến tiếp theo
   useEffect(() => {
@@ -175,12 +176,12 @@ export function ChillRoom() {
       travelRef.current += 1
       if (travelRef.current >= travel * 60) {
         travelRef.current = 0
-        setDestIndex((d) => (d + 1) % DESTINATIONS.length)
+        setDestIndex((d) => (d + 1) % destinations.length)
       }
       setTravelElapsed(travelRef.current)
     }, 1000)
     return () => clearInterval(id)
-  }, [travel])
+  }, [travel, destinations.length])
 
   useEffect(() => {
     sceneRef.current?.setMusic(playing)
@@ -219,7 +220,7 @@ export function ChillRoom() {
   const playAt = useCallback((i: number) => {
     const audio = audioRef.current
     if (!audio) return
-    const next = TRACKS[i]
+    const next = tracks[i]
     audio.play(next)
     setIndex(i)
     setStarted(true)
@@ -227,16 +228,16 @@ export function ChillRoom() {
     setPosition(0)
     setDuration(next.duration)
     trackEvent({name: 'Chill Play', props: {track: next.id}})
-  }, [])
+  }, [tracks])
 
   const nextIndex = useCallback(
     (from: number) => {
-      if (!shuffle || TRACKS.length < 2) return (from + 1) % TRACKS.length
+      if (!shuffle || tracks.length < 2) return (from + 1) % tracks.length
       let i = from
-      while (i === from) i = Math.floor(Math.random() * TRACKS.length)
+      while (i === from) i = Math.floor(Math.random() * tracks.length)
       return i
     },
-    [shuffle]
+    [shuffle, tracks.length]
   )
 
   const next = useCallback(() => playAt(nextIndex(index)), [index, nextIndex, playAt])
@@ -248,8 +249,8 @@ export function ChillRoom() {
       setPosition(0)
       return
     }
-    playAt((index - 1 + TRACKS.length) % TRACKS.length)
-  }, [index, playAt, started])
+    playAt((index - 1 + tracks.length) % tracks.length)
+  }, [index, playAt, started, tracks.length])
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
@@ -385,7 +386,7 @@ export function ChillRoom() {
                   aria-label="Destination"
                   className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#1e1a22] px-3 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
                 >
-                  {DESTINATIONS.map((d, i) => (
+                  {destinations.map((d, i) => (
                     <option key={d.id} value={i}>
                       {String(i + 1).padStart(2, '0')} · {d.name}
                     </option>
@@ -425,7 +426,7 @@ export function ChillRoom() {
                 />
               </div>
               <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
-                {String(destIndex + 1).padStart(2, '0')} / {String(DESTINATIONS.length).padStart(2, '0')} · Next: {nextDest.name}
+                {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · Next: {nextDest.name}
               </p>
             </section>
 
@@ -479,7 +480,7 @@ export function ChillRoom() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
-                  Now playing · {index + 1}/{TRACKS.length}
+                  Now playing · {index + 1}/{tracks.length}
                 </p>
                 <p className="mt-1 truncate text-lg font-semibold">{track.title}</p>
                 <p className="truncate text-sm text-[#a79e94]">{track.mood}</p>
@@ -534,7 +535,7 @@ export function ChillRoom() {
             </div>
 
             <ol className="mt-5 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-              {TRACKS.map((t, i) => {
+              {tracks.map((t, i) => {
                 const active = i === index
                 return (
                   <li key={t.id}>
@@ -553,7 +554,7 @@ export function ChillRoom() {
                         <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{t.title}</span>
                         <span className="block truncate text-xs text-[#a79e94]">{t.mood}</span>
                       </span>
-                      <span className="font-mono text-xs tabular-nums text-[#a79e94]">{formatTime(t.duration)}</span>
+                      <span className="font-mono text-xs tabular-nums text-[#a79e94]">{t.duration ? formatTime(t.duration) : '–:––'}</span>
                     </button>
                   </li>
                 )

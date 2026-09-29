@@ -201,7 +201,9 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
 export function ProcessCanvasCompact({ study }: { study: HeroStudy | null }) {
   return (
     <div className="relative">
-      <HiFiFrame study={study} className="aspect-[16/10] w-full" sizes="100vw" />
+      {/* Chỉ hiện dưới 768px, trừ padding 40px mỗi bên của hero; màn lớn bị ẩn
+          nên xin ảnh nhỏ nhất (1px) để không tải thừa bản full màn hình */}
+      <HiFiFrame study={study} className="aspect-[16/10] w-full" sizes="(min-width: 768px) 1px, calc(100vw - 80px)" />
       <Cursor label="AI" tone="ai" style={{ right: "18%", bottom: "-6px" }} />
     </div>
   );

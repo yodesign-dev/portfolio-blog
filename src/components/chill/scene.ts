@@ -10,7 +10,7 @@
 //   ảnh phố → chim → người đi bộ → xe máy → mưa/sương → kính cửa
 //   → ảnh nội thất (đã tô màu theo giờ) → hơi cà phê, nốt nhạc → ánh đèn
 
-import {DESTINATIONS, streetSrc} from './destinations'
+import {DESTINATIONS, type Destination} from './destinations'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
 export type Weather = 'clear' | 'rain' | 'mist'
@@ -137,7 +137,7 @@ export class ChillScene {
   private ctx: CanvasRenderingContext2D
   private time: TimeOfDay = 'morning'
   private weather: Weather = 'clear'
-  private destination = 'hanoi'
+  private destination: Destination = DESTINATIONS[0]
   private tilt = 0
   private laneShift = 0
   private musicOn = false
@@ -171,7 +171,7 @@ export class ChillScene {
     this.ctx = canvas.getContext('2d')!
     this.ctx.imageSmoothingEnabled = false
 
-    this.street = this.image(streetSrc(this.destination, this.time))
+    this.street = this.image(this.destination.streets[this.time])
     this.interior = loadImage(INTERIOR_SRC, () => (this.dirty = true))
     this.interiorLayer = document.createElement('canvas')
     this.interiorLayer.width = SCENE_W * SCALE
@@ -192,8 +192,8 @@ export class ChillScene {
   }
 
   setAtmosphere(time: TimeOfDay, weather: Weather, destination = this.destination) {
-    if (time === this.time && weather === this.weather && destination === this.destination && !this.dirty) return
-    const next = this.image(streetSrc(destination, time))
+    if (time === this.time && weather === this.weather && destination.id === this.destination.id && !this.dirty) return
+    const next = this.image(destination.streets[time])
     if (next !== this.street) {
       this.prevStreet = ready(this.street) ? this.street : this.prevStreet
       this.street = next
@@ -202,9 +202,8 @@ export class ChillScene {
     this.time = time
     this.weather = weather
     this.destination = destination
-    const d = DESTINATIONS.find((x) => x.id === destination)
-    this.tilt = d?.tilt ?? 0
-    this.laneShift = d?.laneShift ?? 0
+    this.tilt = destination.tilt ?? 0
+    this.laneShift = destination.laneShift ?? 0
     this.dirty = true
   }
 
@@ -214,8 +213,8 @@ export class ChillScene {
   }
 
   // Tải trước ảnh của 1 điểm đến (vd điểm kế tiếp) để lúc chuyển không bị trống
-  preload(destination: string) {
-    for (const t of ['morning', 'afternoon', 'night']) this.image(streetSrc(destination, t))
+  preload(destination: Destination) {
+    for (const src of Object.values(destination.streets)) this.image(src)
   }
 
   private image(src: string) {

@@ -1,5 +1,5 @@
 import React from 'react'
-import {defineField, defineType} from 'sanity'
+import {defineField, defineType, type BlockAnnotationProps} from 'sanity'
 
 const TEXT_COLORS = [
   {title: 'Mặc định', value: ''},
@@ -88,10 +88,10 @@ export default defineType({
                   }),
                 ],
                 components: {
-                  annotation: (props: any) =>
+                  annotation: (props: BlockAnnotationProps) =>
                     React.createElement(
                       'span',
-                      {style: {color: props.value?.color || undefined}},
+                      {style: {color: (props.value as {color?: string})?.color || undefined}},
                       props.children
                     ),
                 },
@@ -109,10 +109,10 @@ export default defineType({
                   }),
                 ],
                 components: {
-                  annotation: (props: any) =>
+                  annotation: (props: BlockAnnotationProps) =>
                     React.createElement(
                       'span',
-                      {style: {fontFamily: props.value?.font || undefined}},
+                      {style: {fontFamily: (props.value as {font?: string})?.font || undefined}},
                       props.children
                     ),
                 },
