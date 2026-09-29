@@ -62,7 +62,7 @@ function FrameLabel({ children }: { children: React.ReactNode }) {
 // thời lượng phát thật là PLAYBACK_SECONDS (hiện 15s, nhanh hơn ~1.2 lần):
 //   0–4.5s    AI lướt các sticky note ở Research
 //   4.5–7.3s  Bin phác Wireframe
-//   8.4–9.6s  Bin gõ prompt "Make a mobile version" rồi Enter
+//   8.4–9.6s  Bin gõ prompt "Make it mobile" rồi Enter
 //   9.8–11.8s AI "Generating…", dựng bản mobile từng khối (loé cyan)
 //   12.2–13s  AI ghim nhận xét "Contrast 3.1:1" lên nút New của bản web
 //   13.8s     Bin bấm Accept → nút đổi sang màu brand, nhận xét thành "✓ Fixed"
@@ -95,13 +95,13 @@ const STORY_KEYFRAMES = [
     [3.36, at(20, 30)],
     [4.48, at(40, 46)],
     [7.28, at(40, 46)],
-    [8.4, at(91, 28)],
-    [9.8, at(91, 28)],
-    [10.0, at(90, 30)],
-    [10.4, at(91, 38)],
-    [10.8, at(89, 46)],
-    [11.2, at(91, 50)],
-    [11.6, at(90, 62)],
+    [8.4, at(91, 32)],
+    [9.8, at(91, 32)],
+    [10.0, at(90, 37)],
+    [10.4, at(91, 43)],
+    [10.8, at(89, 48)],
+    [11.2, at(91, 52)],
+    [11.6, at(90, 60)],
     [12.2, at(50, 26)],
     [12.8, at(50, 26)],
     [13.4, at(55, 32)],
@@ -114,10 +114,10 @@ const STORY_KEYFRAMES = [
     [5.6, at(12, 66)],
     [6.44, at(34, 72)],
     [7.28, at(18, 84)],
-    [8.4, at(56, 66)],
-    [9.4, at(74, 66)],
-    [9.6, at(82, 65)],
-    [9.9, at(82, 65)],
+    [8.4, at(54, 66)],
+    [9.4, at(62, 66)],
+    [9.6, at(67, 65.5)],
+    [9.9, at(67, 65.5)],
     [10.5, at(66, 50)],
     [13.2, at(66, 50)],
     [13.8, at(80.5, 26.5)],
@@ -272,7 +272,8 @@ function SkeletonScreens({ animated }: { animated: boolean }) {
       </div>
 
       {/* Mobile — AI dựng theo prompt */}
-      <div className="absolute right-[1%] top-[16%] flex h-[84%] w-[23%] flex-col gap-[5%] rounded-[10px] border-2 border-ink bg-white px-[4%] pb-[6%] pt-[5%]">
+      {/* Giữ đúng tỉ lệ điện thoại (9:19) theo chiều cao, không kéo giãn theo khung */}
+      <div className="absolute bottom-[2%] right-[1%] flex aspect-[9/19] h-[74%] flex-col gap-[4%] rounded-[12%/6%] border-2 border-ink bg-white px-[9%] pb-[10%] pt-[8%]">
         <span className="mx-auto h-[2.5%] w-[35%] shrink-0 rounded-full bg-ink" />
         <Bit className={`h-[7%] shrink-0 !rounded-full ${step}`} style={anim(animated, "pc-m-0")} />
         <Bit className={`h-[26%] shrink-0 ${step}`} style={anim(animated, "pc-m-1")} />
@@ -300,7 +301,7 @@ function SkeletonScreens({ animated }: { animated: boolean }) {
           >
             <span aria-hidden="true">✦</span>
             <span className={`whitespace-nowrap ${step}`} style={anim(true, "pc-typing")}>
-              Make a mobile version
+              Make it mobile
             </span>
             <span className={`rounded px-1 py-0.5 text-white ${step}`} style={anim(true, "pc-enter")}>
               ↵
