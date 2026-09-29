@@ -63,13 +63,17 @@ export function ContactModal() {
   // cho modal/dialog, đặc biệt hữu ích cho người dùng bàn phím/screen reader
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  // Reset form mỗi lần modal mở (hoặc prefillEmail đổi khi đang mở) —
+  // điều chỉnh state ngay trong render thay vì dùng effect, tránh render thừa.
+  const [prevOpen, setPrevOpen] = useState({ isOpen: false, prefillEmail: "" });
+  if (prevOpen.isOpen !== isOpen || prevOpen.prefillEmail !== prefillEmail) {
+    setPrevOpen({ isOpen, prefillEmail });
     if (isOpen) {
       setEmail(prefillEmail);
       setStatus("idle");
       setCaptchaToken(null);
     }
-  }, [isOpen, prefillEmail]);
+  }
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -193,7 +197,7 @@ export function ContactModal() {
                 Get in touch
               </h2>
               <p className="mt-2 max-w-sm text-base leading-relaxed text-neutral-500">
-                I'm always happy to hear about projects, collaboration opportunities, or just a friendly hello.
+                I&apos;m always happy to hear about projects, collaboration opportunities, or just a friendly hello.
               </p>
             </div>
             <button
@@ -259,7 +263,7 @@ export function ContactModal() {
               </div>
               <p className="mt-4 text-base font-medium text-neutral-900">Sent successfully!</p>
               <p className="mt-1 text-base text-neutral-500">
-                I'll get back to you via email as soon as possible.
+                I&apos;ll get back to you via email as soon as possible.
               </p>
               <button
                 type="button"

@@ -1,6 +1,6 @@
 'use client'
 
-import {useEffect, useMemo, useState} from 'react'
+import {useMemo, useState} from 'react'
 import {ToolIcon} from '@/components/ToolIcon'
 import {getDictionary, type Locale} from '@/lib/i18n'
 
@@ -56,9 +56,15 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [tools, query, category])
 
-  useEffect(() => {
+  // Reset phân trang ngay khi đổi bộ lọc (thay cho effect)
+  const updateQuery = (value: string) => {
+    setQuery(value)
     setVisibleCount(PAGE_SIZE)
-  }, [query, category])
+  }
+  const updateCategory = (value: string | null) => {
+    setCategory(value)
+    setVisibleCount(PAGE_SIZE)
+  }
 
   const visibleTools = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
@@ -69,7 +75,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => updateQuery(e.target.value)}
           placeholder={t.searchPlaceholder}
           className="w-full rounded-md border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none"
         />
@@ -85,7 +91,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
               <li>
                 <button
                   type="button"
-                  onClick={() => setCategory(null)}
+                  onClick={() => updateCategory(null)}
                   className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium transition md:rounded-none md:border-l-2 md:pl-3 ${
                     !category
                       ? 'bg-neutral-900 text-white md:border-neutral-900 md:bg-neutral-50 md:text-neutral-900'
@@ -100,7 +106,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                 <li key={c}>
                   <button
                     type="button"
-                    onClick={() => setCategory(c)}
+                    onClick={() => updateCategory(c)}
                     className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium transition md:rounded-none md:border-l-2 md:pl-3 ${
                       category === c
                         ? 'bg-neutral-900 text-white md:border-neutral-900 md:bg-neutral-50 md:text-neutral-900'

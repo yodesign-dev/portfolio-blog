@@ -182,7 +182,7 @@ const portableTextComponents: PortableTextComponents = {
         <div className="my-8 overflow-x-auto">
           <table className="w-full border-collapse border border-neutral-200 text-left text-base">
             <tbody>
-              {value.rows.map((row: any, rowIndex: number) => (
+              {value.rows.map((row: {_key?: string; cells?: string[]}, rowIndex: number) => (
                 <tr key={row._key ?? rowIndex}>
                   {row.cells?.map((cell: string, cellIndex: number) => (
                     <td key={cellIndex} className="border border-neutral-200 px-4 py-2 text-gray-800">

@@ -194,7 +194,7 @@ interface Props {
     pointer?: Pointer
 }
 
-function __OriginkitBase_OrbConverge(props: Props) {
+function OriginkitBaseOrbConverge(props: Props) {
     const {
         style,
         dotColor = "#94FD00",
@@ -213,22 +213,25 @@ function __OriginkitBase_OrbConverge(props: Props) {
 
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const sizeRef = useRef({ w: 0, h: 0 })
-    sizeRef.current = { w: num(width, 0), h: num(height, 0) }
 
     const vRef = useRef<Record<string, number | string>>({})
-    vRef.current = {
-        dot: dotColor,
-        acc: dotColor,
-        speed: clampN(num(speed, 50), -100, 100) / 50,
-        density: clampN(num(density, 100), 20, 300) / 100,
-        dotSize: clampN(num(dotSize, 100), 20, 300) / 100,
-        spinTurns: Math.round(clampN(num(spinTurns, 1), -3, 3)),
-        drag: clampN(num(pointer_.drag, 100), 0, 300) / 100,
-        damping: clampN(num(pointer_.damping, 20), 1, 100),
-        spread: clampN(num(ball_.spread, 100), 40, 180) / 100,
-        turn: (clampN(num(ball_.turn, 0), -180, 180) * Math.PI) / 180,
-        tilt: (clampN(num(ball_.tilt, 0), -90, 90) * Math.PI) / 180,
-    }
+    // Đồng bộ props vào ref sau mỗi render (vòng rAF đọc giá trị mới nhất)
+    useEffect(() => {
+        sizeRef.current = { w: num(width, 0), h: num(height, 0) }
+        vRef.current = {
+            dot: dotColor,
+            acc: dotColor,
+            speed: clampN(num(speed, 50), -100, 100) / 50,
+            density: clampN(num(density, 100), 20, 300) / 100,
+            dotSize: clampN(num(dotSize, 100), 20, 300) / 100,
+            spinTurns: Math.round(clampN(num(spinTurns, 1), -3, 3)),
+            drag: clampN(num(pointer_.drag, 100), 0, 300) / 100,
+            damping: clampN(num(pointer_.damping, 20), 1, 100),
+            spread: clampN(num(ball_.spread, 100), 40, 180) / 100,
+            turn: (clampN(num(ball_.turn, 0), -180, 180) * Math.PI) / 180,
+            tilt: (clampN(num(ball_.tilt, 0), -90, 90) * Math.PI) / 180,
+        }
+    })
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -334,7 +337,7 @@ function __OriginkitBase_OrbConverge(props: Props) {
             drag.vy = 0
             try {
                 canvas.setPointerCapture(e.pointerId)
-            } catch (err) {}
+            } catch {}
         }
         const onMove = (e: PointerEvent) => {
             if (!drag.active) return
@@ -411,5 +414,5 @@ const __originkitPresetProps = {
 };
 
 export default function OrbConverge(props: Record<string, unknown>) {
-  return <__OriginkitBase_OrbConverge {...(__originkitPresetProps as Record<string, unknown>)} {...props} />;
+  return <OriginkitBaseOrbConverge {...(__originkitPresetProps as Record<string, unknown>)} {...props} />;
 }
