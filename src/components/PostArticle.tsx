@@ -6,6 +6,7 @@ import {getImageDimensions, urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {ShareButtons} from '@/components/originkit/ui/hero-31/share-buttons'
 import {ViewTracker} from '@/components/ViewTracker'
+import {ImpactStats, type ImpactMetric} from '@/components/ImpactStats'
 
 // Dùng chung cho trang chi tiết Writing (/blog/[slug]) và Work
 // (/work/[slug]) — cùng 1 schema post, case study chỉ thêm khối
@@ -48,7 +49,7 @@ export type Post = {
   role?: string
   company?: string
   year?: string
-  impact?: {_key: string; value: string; label: string}[]
+  impact?: ImpactMetric[]
 }
 
 export async function getPost(slug: string, revalidate: number): Promise<Post | null> {
@@ -213,7 +214,7 @@ const portableTextComponents: PortableTextComponents = {
         href={value?.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-neutral-900 underline decoration-neutral-300 underline-offset-4 transition-colors hover:decoration-neutral-900"
+        className="text-neutral-900 underline decoration-neutral-300 underline-offset-4 [overflow-wrap:anywhere] transition-colors hover:decoration-neutral-900"
       >
         {children}
       </a>
@@ -253,16 +254,11 @@ function CaseStudyMeta({post}: {post: Post}) {
         </dl>
       )}
 
-      {impact.length > 0 && (
-        <ul className={`grid grid-cols-1 gap-6 sm:grid-cols-3 ${facts.length > 0 ? 'mt-6 border-t border-neutral-100 pt-6' : ''}`}>
-          {impact.map((metric) => (
-            <li key={metric._key}>
-              <p className="text-3xl font-semibold tracking-tight text-[#002fff]">{metric.value}</p>
-              <p className="mt-1 text-sm leading-snug text-neutral-600">{metric.label}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ImpactStats
+        metrics={impact}
+        size="lg"
+        className={facts.length > 0 ? 'mt-6 border-t border-neutral-100 pt-6' : ''}
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
+import {ImpactStats, type ImpactMetric} from '@/components/ImpactStats'
 
 export type CaseStudy = {
   _id: string
@@ -15,7 +16,7 @@ export type CaseStudy = {
   role?: string
   company?: string
   year?: string
-  impact?: {_key: string; value: string; label: string}[]
+  impact?: ImpactMetric[]
 }
 
 const CASE_STUDIES_QUERY = `*[_type == "post" && isCaseStudy == true] | order(publishedAt desc) {
@@ -71,17 +72,9 @@ export function CaseStudyCard({study, priority = false}: {study: CaseStudy; prio
         <p className="mt-2 line-clamp-2 text-[15px] leading-relaxed text-neutral-600">{study.excerpt}</p>
       )}
 
-      {impact.length > 0 && (
-        <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
-          {impact.map((metric) => (
-            <li key={metric._key} className="text-sm text-neutral-600">
-              <span className="font-semibold text-neutral-900">{metric.value}</span> {metric.label}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ImpactStats metrics={impact} className="mt-6" />
 
-      <p className="mt-4 text-sm font-semibold text-neutral-900">
+      <p className="mt-6 text-sm font-semibold text-neutral-900">
         Read case study{' '}
         <span aria-hidden="true" className="inline-block transition-transform group-hover:translate-x-1">
           →
