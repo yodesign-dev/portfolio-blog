@@ -8,7 +8,7 @@ export async function generateMetadata({params}: {params: Promise<{slug: string}
   return buildPostMetadata(await getPost(slug, revalidate))
 }
 
-export default async function PostPage({params}: {params: Promise<{slug: string}>}) {
+export default async function CaseStudyPage({params}: {params: Promise<{slug: string}>}) {
   const {slug} = await params
   const post = await getPost(slug, revalidate)
 
@@ -16,12 +16,9 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
     notFound()
   }
 
-  // Case study sống ở /work — giữ link /blog/... cũ (đã chia sẻ trước khi
-  // bài được bật "Là case study") bằng cách chuyển hướng sang đó. Dùng
-  // redirect tạm (307), không phải 308: nếu sau này tắt "Là case study",
-  // trình duyệt không bị kẹt cache chuyển hướng cũ.
-  if (post.isCaseStudy) {
-    redirect(`/work/${post.slug.current}`)
+  // Bài thường (chưa bật "Là case study") thuộc về Writing.
+  if (!post.isCaseStudy) {
+    redirect(`/blog/${post.slug.current}`)
   }
 
   return <PostArticle post={post} />

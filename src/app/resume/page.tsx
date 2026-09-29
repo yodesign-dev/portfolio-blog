@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import React from 'react'
 import {client} from '@/sanity/lib/client'
 
@@ -70,14 +69,8 @@ export default async function ResumePage() {
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
-        <div className="mx-auto max-w-4xl px-6 py-6 sm:px-8">
-          <Link
-            href="/"
-            className="text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-          >
-            ← Back to home
-          </Link>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+        <div className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
             Resume
           </h1>
         </div>

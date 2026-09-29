@@ -25,6 +25,7 @@ export default defineType({
   groups: [
     {name: 'content', title: 'Nội dung', default: true},
     {name: 'meta', title: 'Hiển thị & SEO'},
+    {name: 'caseStudy', title: 'Case study'},
     {name: 'stats', title: 'Thống kê'},
   ],
   fields: [
@@ -239,6 +240,73 @@ export default defineType({
         layout: 'tags',
       },
     }),
+    // MỚI: Case study — bật lên thì bài viết hiện ở trang Work (/work)
+    // thay vì Writing (/blog), kèm thông tin Role/Company/Year và các con số
+    // Impact. Dùng chung schema post để không phải nhập lại nội dung.
+    defineField({
+      name: 'isCaseStudy',
+      title: 'Là case study',
+      type: 'boolean',
+      group: 'caseStudy',
+      initialValue: false,
+      description: 'Bật để bài này hiện ở mục Work (portfolio) thay vì Writing.',
+    }),
+    defineField({
+      name: 'role',
+      title: 'Vai trò',
+      type: 'string',
+      group: 'caseStudy',
+      description: 'VD: Lead Product Designer',
+      hidden: ({document}) => !document?.isCaseStudy,
+    }),
+    defineField({
+      name: 'company',
+      title: 'Công ty / Khách hàng',
+      type: 'string',
+      group: 'caseStudy',
+      description: 'VD: docTranslate.io',
+      hidden: ({document}) => !document?.isCaseStudy,
+    }),
+    defineField({
+      name: 'year',
+      title: 'Thời gian',
+      type: 'string',
+      group: 'caseStudy',
+      description: 'VD: 2025 hoặc 2024 – 2025',
+      hidden: ({document}) => !document?.isCaseStudy,
+    }),
+    defineField({
+      name: 'impact',
+      title: 'Kết quả (Impact)',
+      type: 'array',
+      group: 'caseStudy',
+      description: 'Tối đa 3 con số nổi bật, VD: "40%" — "faster time-to-translate".',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(3),
+      of: [
+        {
+          type: 'object',
+          name: 'metric',
+          fields: [
+            defineField({
+              name: 'value',
+              title: 'Con số',
+              type: 'string',
+              validation: (Rule) => Rule.required(),
+            }),
+            defineField({
+              name: 'label',
+              title: 'Mô tả',
+              type: 'string',
+              validation: (Rule) => Rule.required(),
+            }),
+          ],
+          preview: {
+            select: {title: 'value', subtitle: 'label'},
+          },
+        },
+      ],
+    }),
     // ⬇️ MỚI: viewCount — số lượt xem, readOnly để tránh sửa tay nhầm.
     // Được tăng tự động qua API route /api/track-view, không cập nhật
     // qua Studio thủ công. initialValue 0 để bài mới không bị undefined.
@@ -258,13 +326,14 @@ export default defineType({
       media: 'mainImage',
       author: 'author',
       publishedAt: 'publishedAt',
+      isCaseStudy: 'isCaseStudy',
     },
-    prepare({title, media, author, publishedAt}) {
+    prepare({title, media, author, publishedAt, isCaseStudy}) {
       const date = publishedAt ? new Date(publishedAt).toLocaleDateString('vi-VN') : ''
       return {
         title,
         media,
-        subtitle: [author, date].filter(Boolean).join(' · '),
+        subtitle: [isCaseStudy ? '💼 Case study' : null, author, date].filter(Boolean).join(' · '),
       }
     },
   },

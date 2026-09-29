@@ -7,6 +7,10 @@ import {getDictionary, type Locale} from '@/lib/i18n'
 
 export const revalidate = 60
 
+export const metadata = {
+  title: 'Writing',
+}
+
 type Post = {
   _id: string
   title: string
@@ -24,7 +28,7 @@ type Post = {
 
 async function getPosts(tag?: string): Promise<Post[]> {
   const tagFilter = tag ? ' && $tag in tags' : ''
-  const query = `*[_type == "post"${tagFilter}] | order(publishedAt desc) {
+  const query = `*[_type == "post" && isCaseStudy != true${tagFilter}] | order(publishedAt desc) {
     _id,
     title,
     slug,
@@ -40,7 +44,7 @@ async function getPosts(tag?: string): Promise<Post[]> {
 }
 
 async function getAllTags(): Promise<string[]> {
-  const query = `array::unique(*[_type == "post" && defined(tags)].tags[])`
+  const query = `array::unique(*[_type == "post" && isCaseStudy != true && defined(tags)].tags[])`
   return sanityFetch<string[]>({query, revalidate})
 }
 
@@ -70,11 +74,8 @@ export default async function BlogPage({
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
-        <div className="mx-auto max-w-6xl px-6 py-6 sm:px-8">
-          <Link href="/" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
-            {t.common.backHome}
-          </Link>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+        <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
             {t.blog.title}
           </h1>
           <p className="mt-2 text-neutral-500">{t.blog.subtitle}</p>

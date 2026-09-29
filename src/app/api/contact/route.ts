@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     await resend.emails.send({
-      from: "YoBlogs Contact <onboarding@resend.dev>",
+      from: "Bin Nguyen Contact <onboarding@resend.dev>",
       to: "nguyenbinhdesign@gmail.com",
       replyTo: email,
       subject: `[Get in Touch] ${subject}`,

@@ -4,6 +4,7 @@ import {usePathname} from 'next/navigation'
 import {Navbar} from '@/components/originkit/ui/hero-31/navbar'
 import {ContactModalProvider} from '@/components/originkit/ui/hero-31/contact-modal-context'
 import {ContactModal} from '@/components/originkit/ui/hero-31/contact-modal'
+import {SiteFooter} from '@/components/SiteFooter'
 
 // MỚI: Sanity Studio (route /studio) cần chiếm TRỌN viewport — nó tự quản
 // lý layout riêng (sidebar, thanh Publish cố định dưới cùng...). Nếu vẫn
@@ -28,6 +29,7 @@ export function SiteChrome({
     <ContactModalProvider>
       <Navbar showResume={showResume} />
       {children}
+      <SiteFooter showResume={showResume} />
       <ContactModal />
     </ContactModalProvider>
   )

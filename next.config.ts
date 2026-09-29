@@ -44,6 +44,12 @@ const nextConfig: NextConfig = {
         destination: "/blog/ai-impact-on-translation-industry",
         permanent: true,
       },
+      // Timeline đã gộp vào Toolkit thành 1 tab.
+      {
+        source: "/timeline",
+        destination: "/tools/timeline",
+        permanent: true,
+      },
     ];
   },
   // MỚI: security headers cơ bản, áp dụng cho mọi route

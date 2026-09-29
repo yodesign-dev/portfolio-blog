@@ -5,12 +5,17 @@ import type {PresentationPluginOptions} from 'sanity/presentation'
 export const resolve: PresentationPluginOptions['resolve'] = {
   locations: {
     post: {
-      select: {title: 'title', slug: 'slug.current'},
+      select: {title: 'title', slug: 'slug.current', isCaseStudy: 'isCaseStudy'},
       resolve: (doc) => ({
-        locations: [
-          {title: doc?.title || 'Bài viết chưa đặt tên', href: `/blog/${doc?.slug}`},
-          {title: 'Trang Blog', href: '/blog'},
-        ],
+        locations: doc?.isCaseStudy
+          ? [
+              {title: doc?.title || 'Bài viết chưa đặt tên', href: `/work/${doc?.slug}`},
+              {title: 'Trang Work', href: '/work'},
+            ]
+          : [
+              {title: doc?.title || 'Bài viết chưa đặt tên', href: `/blog/${doc?.slug}`},
+              {title: 'Trang Writing', href: '/blog'},
+            ],
       }),
     },
     tool: {
@@ -25,7 +30,7 @@ export const resolve: PresentationPluginOptions['resolve'] = {
       select: {year: 'year'},
       resolve: (doc) => ({
         locations: [
-          {title: doc?.year ? String(doc.year) : 'Năm chưa đặt', href: '/timeline'},
+          {title: doc?.year ? String(doc.year) : 'Năm chưa đặt', href: '/tools/timeline'},
         ],
       }),
     },

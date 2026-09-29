@@ -7,6 +7,7 @@ import { VisualEditing } from "next-sanity/visual-editing";
 import { SiteChrome } from "@/components/SiteChrome";
 import { DisableDraftMode } from "@/components/DisableDraftMode";
 import { client } from "@/sanity/lib/client";
+import { SITE_NAME, SITE_ROLE } from "@/lib/site";
 
 const mulish = Mulish({
   variable: "--font-geist-sans",
@@ -19,7 +20,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "bin designer",
+  title: {
+    default: `${SITE_NAME} — ${SITE_ROLE}`,
+    template: `%s · ${SITE_NAME}`,
+  },
+  description:
+    "Bin Nguyen is a product designer with 10+ years of end-to-end experience, using AI to move from research to high-fidelity work faster. Case studies, writing and toolkit.",
 };
 
 export default async function RootLayout({

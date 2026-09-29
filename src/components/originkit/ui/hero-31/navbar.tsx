@@ -5,19 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
+import { NAV_LINKS, SITE_NAME } from "@/lib/site";
 
 export const Navbar = ({ showResume }: { showResume: boolean }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
   const pathname = usePathname();
 
-  const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/blog", label: "Blogs" },
-    { href: "/resume", label: "Resume" },
-    { href: "/tools", label: "Tools" },
-    { href: "/timeline", label: "Timeline" },
-  ].filter((link) => showResume || link.href !== "/resume");
+  const navLinks = NAV_LINKS.filter((link) => showResume || link.href !== "/resume");
 
   useEffect(() => {
     document.body.style.overflow = isMenuOpen ? "hidden" : "";
@@ -56,7 +51,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
           href="/"
           className="font-sans text-xl font-bold tracking-tight text-neutral-900 transition hover:text-neutral-600"
         >
-          YoBlogs
+          {SITE_NAME}
         </Link>
       </div>
 

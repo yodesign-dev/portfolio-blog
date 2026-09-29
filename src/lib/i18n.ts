@@ -92,14 +92,14 @@ export const dictionary = {
       },
     },
     blog: {
-      title: 'Blog',
+      title: 'Writing',
       subtitle: 'Notes and things I learn along the way.',
       empty: 'No posts published yet.',
       emptyTag: (tag: string) => `No posts tagged "${tag}" yet.`,
     },
     tools: {
-      title: 'Tools',
-      subtitle: 'The tools I actually use in my day-to-day work.',
+      title: 'Toolkit',
+      subtitle: 'The tools I actually use in my day-to-day work — and how that stack has changed.',
       empty: 'No tools added yet.',
     },
     timeline: {
