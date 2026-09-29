@@ -124,6 +124,8 @@ type Note = {x: number; y: number; age: number; drift: number}
 
 const BIKES: SpriteName[] = ['bike-cub', 'bike-vespa', 'bike-flowers', 'bike-boxes', 'bike-duo']
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
+// Sprite AI vẽ hướng sang TRÁI (còn lại đều hướng sang phải) — lật ngược lại khi vẽ
+const FACES_LEFT = new Set<string>(['vendor'])
 const spriteSize = (name: SpriteName) => {
   const [, , w, h] = SPRITES[name]
   return {w: w / SCALE, h: h / SCALE}
@@ -680,7 +682,8 @@ export class ChillScene {
     ctx.fillRect(x + w * 0.1, base - 0.5, w * 0.8, 1)
 
     ctx.save()
-    if (m.dir < 0) {
+    const facesRight = !FACES_LEFT.has(name)
+    if ((m.dir < 0) === facesRight) {
       ctx.translate(x * 2 + w, 0)
       ctx.scale(-1, 1)
     }

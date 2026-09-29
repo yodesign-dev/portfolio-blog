@@ -1,6 +1,7 @@
 // Toạ độ sprite trong public/chill/sprites.png (px thật, 1 ô lưới canvas = 2px).
-// Sprite AI (Nano Banana qua Figma Weave), nhìn ngang, hướng sang PHẢI, đáy căn
-// sát mép dưới khung — đi ngược chiều thì lật bằng code.
+// Sprite AI (Nano Banana qua Figma Weave), nhìn ngang, đáy căn sát mép dưới khung.
+// Hầu hết hướng sang PHẢI; ngoại lệ hướng sang trái khai báo ở FACES_LEFT
+// (scene.ts). Đi ngược chiều thì lật bằng code.
 
 export const SPRITE_SRC = '/chill/sprites.png'
 
