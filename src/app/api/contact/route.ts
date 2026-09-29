@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // Gọi API xác minh của Cloudflare — bắt buộc phải verify ở SERVER, verify
 // ở client chỉ là UI, bot hoàn toàn có thể bỏ qua giao diện và gọi thẳng
 // /api/contact nếu server không tự kiểm tra lại token.
@@ -49,6 +47,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Xác minh captcha thất bại, thử lại nhé" }, { status: 400 });
     }
 
+    // Khởi tạo Resend trong handler (không ở top-level) — nếu thiếu
+    // RESEND_API_KEY lúc build thì module vẫn load được, chỉ request lỗi 500.
+    const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
       from: "Bin Nguyen Contact <onboarding@resend.dev>",
       to: "nguyenbinhdesign@gmail.com",
