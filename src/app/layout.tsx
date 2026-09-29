@@ -6,6 +6,7 @@ import { draftMode } from "next/headers";
 import { VisualEditing } from "next-sanity/visual-editing";
 import { SiteChrome } from "@/components/SiteChrome";
 import { DisableDraftMode } from "@/components/DisableDraftMode";
+import { client } from "@/sanity/lib/client";
 
 const mulish = Mulish({
   variable: "--font-geist-sans",
@@ -31,13 +32,23 @@ export default async function RootLayout({
   // người xem bình thường (đọc bản đã publish) không thấy gì khác.
   const isDraftMode = (await draftMode()).isEnabled;
 
+  // Chỉ hiện "Resume" trên menu khi resume đã bật Công khai + có file —
+  // tránh dẫn người xem (nhất là recruiter) tới một trang trống.
+  const hasPublicResume = await client
+    .fetch<boolean>(
+      `defined(*[_type == "resume" && isPublic == true && defined(file.asset)][0]._id)`,
+      {},
+      { next: { revalidate: 60 } }
+    )
+    .catch(() => false);
+
   return (
     <html
-      lang="vi"
+      lang="en"
       className={`${mulish.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome showResume={hasPublicResume}>{children}</SiteChrome>
         <Analytics />
         {isDraftMode && (
           <>

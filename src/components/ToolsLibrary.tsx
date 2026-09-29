@@ -1,6 +1,7 @@
 'use client'
 
 import {useEffect, useMemo, useState} from 'react'
+import {ToolIcon} from '@/components/ToolIcon'
 import {getDictionary, type Locale} from '@/lib/i18n'
 
 type Tool = {
@@ -27,15 +28,6 @@ const CATEGORY_STYLES: Record<string, string> = {
 }
 
 const PAGE_SIZE = 9
-
-function getFaviconUrl(url: string): string | null {
-  try {
-    const {hostname} = new URL(url)
-    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`
-  } catch {
-    return null
-  }
-}
 
 export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
   const t = getDictionary(locale).common
@@ -139,7 +131,6 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
             <>
               <div className="flex flex-col gap-3">
                 {visibleTools.map((tool) => {
-                  const favicon = getFaviconUrl(tool.url)
                   const categoryStyle =
                     CATEGORY_STYLES[tool.category] ?? 'bg-neutral-100 text-neutral-600'
 
@@ -152,12 +143,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                       className="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 no-underline transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md"
                     >
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-50 p-1.5">
-                        {favicon ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={favicon} alt="" width={24} height={24} className="h-6 w-6" />
-                        ) : (
-                          <div className="h-6 w-6 rounded bg-neutral-200" />
-                        )}
+                        <ToolIcon name={tool.name} url={tool.url} size={24} />
                       </div>
 
                       <div className="min-w-0 flex-1">

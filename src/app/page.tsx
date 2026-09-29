@@ -30,7 +30,7 @@ async function getPosts(): Promise<Post[]> {
 }
 
 function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('vi-VN', {
+  return new Date(dateString).toLocaleDateString('en-US', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
@@ -47,11 +47,11 @@ export default async function BlogPage() {
 
       <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
         <h2 className="text-2xl font-bold tracking-tight text-neutral-900 mb-8 sm:text-3xl">
-          Bài viết mới nhất
+          Latest posts
         </h2>
 
         {posts.length === 0 ? (
-          <p className="text-center text-neutral-400">Chưa có bài viết nào được đăng.</p>
+          <p className="text-center text-neutral-400">No posts published yet.</p>
         ) : (
           <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2">
             {posts.map((post) => {

@@ -1,6 +1,7 @@
 'use client'
 
 import {useMemo, useState} from 'react'
+import {ToolIcon} from '@/components/ToolIcon'
 
 type Tool = {
   _id: string
@@ -16,15 +17,6 @@ type YearData = {
 
 type TimelineExplorerProps = {
   years: YearData[]
-}
-
-function getFaviconUrl(url: string): string | null {
-  try {
-    const {hostname} = new URL(url)
-    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`
-  } catch {
-    return null
-  }
 }
 
 export function TimelineExplorer({years}: TimelineExplorerProps) {
@@ -163,7 +155,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
             >
               <p className="font-semibold text-neutral-900">{years[hoveredIndex].year}</p>
               <p className="mt-1 max-w-[220px] whitespace-normal leading-relaxed text-neutral-600">
-                {years[hoveredIndex].tools.map((t) => t.name).join(', ') || 'Chưa có dữ liệu'}
+                {years[hoveredIndex].tools.map((t) => t.name).join(', ') || 'No data yet'}
               </p>
             </div>
           )}
@@ -171,17 +163,17 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
 
         <div className="mt-2 flex gap-4 text-xs text-neutral-500">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-neutral-400" /> Tổng số tool
+            <span className="h-2 w-2 rounded-full bg-neutral-400" /> Total tools
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-violet-600" /> Tool AI
+            <span className="h-2 w-2 rounded-full bg-violet-600" /> AI tools
           </span>
         </div>
       </div>
 
       <div className="mb-10">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-neutral-500">Kéo để xem theo năm</span>
+          <span className="text-sm font-medium text-neutral-500">Drag to browse by year</span>
           <span className="text-2xl font-bold text-neutral-900">{selected.year}</span>
         </div>
         <input
@@ -200,11 +192,10 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
       </div>
 
       {selected.tools.length === 0 ? (
-        <p className="text-center text-neutral-400">Chưa có công cụ nào cho năm này.</p>
+        <p className="text-center text-neutral-400">No tools for this year yet.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {selected.tools.map((tool) => {
-            const favicon = getFaviconUrl(tool.url)
             const isNew = selectedIndex > 0 && !previousIds.has(tool._id)
             return (
               <a
@@ -216,16 +207,11 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
               >
                 {isNew && (
                   <span className="absolute -top-2 -right-2 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    Mới
+                    New
                   </span>
                 )}
                 <div className="flex h-10 w-10 items-center justify-center rounded-md bg-neutral-50 p-1.5">
-                  {favicon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={favicon} alt="" width={28} height={28} className="h-7 w-7" />
-                  ) : (
-                    <div className="h-7 w-7 rounded bg-neutral-200" />
-                  )}
+                  <ToolIcon name={tool.name} url={tool.url} size={28} />
                 </div>
                 <span className="text-sm font-medium text-neutral-900">{tool.name}</span>
               </a>

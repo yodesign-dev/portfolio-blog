@@ -10,7 +10,13 @@ import {ContactModal} from '@/components/originkit/ui/hero-31/contact-modal'
 // hiện Navbar của site phía trên, Studio bị đẩy xuống và thanh Publish bị
 // đẩy ra ngoài màn hình. Component này kiểm tra pathname, bỏ qua Navbar +
 // ContactModal khi đang ở /studio.
-export function SiteChrome({children}: {children: React.ReactNode}) {
+export function SiteChrome({
+  children,
+  showResume,
+}: {
+  children: React.ReactNode
+  showResume: boolean
+}) {
   const pathname = usePathname()
   const isStudio = pathname?.startsWith('/studio')
 
@@ -20,7 +26,7 @@ export function SiteChrome({children}: {children: React.ReactNode}) {
 
   return (
     <ContactModalProvider>
-      <Navbar />
+      <Navbar showResume={showResume} />
       {children}
       <ContactModal />
     </ContactModalProvider>

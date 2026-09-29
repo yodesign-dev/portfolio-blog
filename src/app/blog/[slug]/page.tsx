@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {notFound} from 'next/navigation'
 import {PortableText, type PortableTextComponents} from '@portabletext/react'
-import {urlFor} from '@/sanity/lib/image'
+import {getImageDimensions, urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {ShareButtons} from '@/components/originkit/ui/hero-31/share-buttons'
 import {ViewTracker} from '@/components/ViewTracker'
@@ -44,7 +44,7 @@ async function getPost(slug: string): Promise<Post | null> {
 }
 
 function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('vi-VN', {
+  return new Date(dateString).toLocaleDateString('en-US', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
@@ -53,8 +53,8 @@ function formatDate(dateString: string) {
 
 function formatViewCount(count?: number) {
   const value = count ?? 0
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k lượt xem`
-  return `${value} lượt xem`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k views`
+  return `${value} views`
 }
 
 const portableTextComponents: PortableTextComponents = {
@@ -62,15 +62,20 @@ const portableTextComponents: PortableTextComponents = {
     image: ({value}) => {
       const imageUrl = urlFor(value)?.width(1200).fit('max').url()
       if (!imageUrl) return null
+      // Kích thước thật của ảnh (thay cho 1200x800 cố định) — trình duyệt
+      // giữ chỗ đúng tỉ lệ trong lúc lazy-load, nền xám làm placeholder
+      // thay vì để trống trắng như trước.
+      const dims = getImageDimensions(value) ?? {width: 1200, height: 800}
       return (
         <figure className="my-8">
-          <div className="overflow-hidden rounded-lg">
+          <div className="overflow-hidden rounded-lg bg-neutral-100">
             <Image
               src={imageUrl}
               alt={value.alt || ''}
-              width={1200}
-              height={800}
-              className="h-auto w-full object-cover"
+              width={dims.width}
+              height={dims.height}
+              sizes="(min-width: 768px) 704px, 100vw"
+              className="h-auto w-full"
             />
           </div>
           {/* MỚI: caption dưới ảnh — style giống Medium, in nghiêng, căn giữa */}
@@ -180,7 +185,7 @@ export async function generateMetadata({params}: {params: Promise<{slug: string}
   const {slug} = await params
   const post = await getPost(slug)
 
-  if (!post) return {title: 'Không tìm thấy bài viết'}
+  if (!post) return {title: 'Post not found'}
 
   const postUrl = `${SITE_URL}/blog/${post.slug.current}`
   const ogImageUrl = post.mainImage
@@ -225,7 +230,7 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-3xl px-6 py-6 sm:px-8">
           <Link href="/blog" className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
-            ← Quay lại Blog
+            ← Back to Blog
           </Link>
         </div>
       </header>
@@ -258,12 +263,13 @@ export default async function PostPage({params}: {params: Promise<{slug: string}
           </div>
 
           {mainImageUrl && (
-            <div className="mt-8 overflow-hidden rounded-lg">
+            <div className="mt-8 overflow-hidden rounded-lg bg-neutral-100">
               <Image
                 src={mainImageUrl}
                 alt={post.mainImage?.alt || post.title}
                 width={1600}
                 height={900}
+                sizes="(min-width: 768px) 704px, 100vw"
                 priority
                 className="aspect-video w-full object-cover"
               />

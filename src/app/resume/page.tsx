@@ -50,7 +50,7 @@ export default async function ResumePage() {
           className:
             'flex-1 rounded-md bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700',
         },
-        'Mở PDF'
+        'Open PDF'
       )
     : null
 
@@ -63,7 +63,7 @@ export default async function ResumePage() {
           className:
             'flex-1 rounded-md border border-neutral-300 px-6 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50',
         },
-        'Tải xuống'
+        'Download'
       )
     : null
 
@@ -75,7 +75,7 @@ export default async function ResumePage() {
             href="/"
             className="text-sm text-neutral-500 transition-colors hover:text-neutral-900"
           >
-            ← Về trang chủ
+            ← Back to home
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
             Resume
@@ -85,9 +85,13 @@ export default async function ResumePage() {
 
       {!isAvailable ? (
         <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8">
-          <p className="text-center text-neutral-400">
-            Resume hiện chưa được công khai, quay lại sau nhé.
-          </p>
+          <div className="flex flex-col items-center gap-2 text-center">
+            <p className="text-neutral-600">My resume isn&apos;t public yet.</p>
+            <p className="text-neutral-400">
+              Want a copy? Use <span className="font-medium text-neutral-600">Get In Touch</span>{' '}
+              at the top and I&apos;ll send it over.
+            </p>
+          </div>
         </main>
       ) : (
         <>
@@ -110,8 +114,8 @@ export default async function ResumePage() {
           <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8 md:hidden">
             <div className="flex flex-col items-center gap-4 rounded-lg border border-neutral-200 p-8 text-center">
               <p className="text-neutral-600">
-                Để có trải nghiệm đọc tốt nhất trên điện thoại, mở resume bằng
-                trình xem PDF của máy thay vì xem trực tiếp trên trang.
+                For the best reading experience on your phone, open the resume
+                in your device&apos;s PDF viewer.
               </p>
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
                 {openButton}

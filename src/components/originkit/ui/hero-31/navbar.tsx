@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useContactModal } from "./contact-modal-context";
 
-export const Navbar = () => {
+export const Navbar = ({ showResume }: { showResume: boolean }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { openModal } = useContactModal();
   const pathname = usePathname();
@@ -17,7 +17,7 @@ export const Navbar = () => {
     { href: "/resume", label: "Resume" },
     { href: "/tools", label: "Tools" },
     { href: "/timeline", label: "Timeline" },
-  ];
+  ].filter((link) => showResume || link.href !== "/resume");
 
   useEffect(() => {
     document.body.style.overflow = isMenuOpen ? "hidden" : "";

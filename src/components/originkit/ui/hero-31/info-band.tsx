@@ -42,9 +42,17 @@ export const InfoBand = () => {
            do với cột trái.
         */}
         <div className="flex flex-col items-center justify-start gap-6 py-6 pl-0 text-center md:items-start md:pl-12 md:text-left">
-          <p className="text-lg font-semibold text-white">
-            Get in Touch
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="text-lg font-semibold text-white">
+              Get in Touch
+            </p>
+            {/* Nói rõ đây là form liên hệ (mở ContactModal), không phải
+                đăng ký newsletter — trước đó chỉ có ô email + "Submit"
+                nên người xem không biết để lại email thì chuyện gì xảy ra. */}
+            <p className="max-w-md text-base leading-relaxed text-white/75">
+              Have a project, a role, or a question? Leave your email to start a conversation.
+            </p>
+          </div>
 
           {/* FIX: thêm lại prop fullWidth — thiếu prop này khiến form
               email bị giới hạn max-w-[527.5px] gốc (dành cho lúc đứng

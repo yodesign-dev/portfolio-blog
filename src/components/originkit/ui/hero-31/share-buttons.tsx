@@ -53,13 +53,13 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm font-medium text-neutral-500">Chia sẻ:</span>
+      <span className="text-sm font-medium text-neutral-500">Share:</span>
       {shareLinks.map((platform) => (
         <button
           key={platform.name}
           type="button"
           onClick={() => handleShare(platform.href)}
-          aria-label={`Chia sẻ "${title}" lên ${platform.name}`}
+          aria-label={`Share "${title}" on ${platform.name}`}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
         >
           {platform.icon}
@@ -68,7 +68,7 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
       <button
         type="button"
         onClick={handleCopyLink}
-        aria-label="Sao chép liên kết"
+        aria-label={copied ? "Link copied" : "Copy link"}
         className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
       >
         {copied ? (
