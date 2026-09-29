@@ -447,7 +447,7 @@ export function ChillRoom() {
         </div>
 
         <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">
-          No rush. Just coffee. · Tracks are generated live in your browser.
+          No rush. Just coffee. · Art &amp; music made with AI.
         </p>
       </div>
     </div>
