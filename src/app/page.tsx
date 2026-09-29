@@ -57,14 +57,13 @@ export default async function HomePage() {
   const [studies, posts] = await Promise.all([getCaseStudies(revalidate), getPosts()])
   const featuredStudies = studies.slice(0, 4)
 
-  // Case study mới nhất có ảnh → hiện ở frame "Hi-fi" của canvas trên hero
-  const latest = studies.find((study) => study.mainImage)
+  // Case study mới nhất → tên + link của frame "Hi-fi" trên hero (frame vẽ
+  // skeleton UI web/mobile bằng code, không dùng ảnh)
+  const latest = studies[0]
   const heroStudy = latest
     ? {
         title: latest.company || latest.title,
         href: `/work/${latest.slug.current}`,
-        imageUrl: urlFor(latest.mainImage!).width(1200).height(900).fit('crop').url(),
-        imageAlt: latest.mainImage?.alt || latest.title,
       }
     : null
 

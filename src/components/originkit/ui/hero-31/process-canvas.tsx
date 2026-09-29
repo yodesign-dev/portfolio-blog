@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 // Canvas "người × AI" ở hero: 3 frame Research → Wireframe → Hi-fi kiểu
-// Figma, 2 con trỏ "Bin" và "AI" cùng làm việc rồi gặp nhau ở Hi-fi.
+// Figma, 2 con trỏ "Bin" và "AI" cùng làm việc rồi gặp nhau ở Hi-fi, nơi
+// Bin dựng skeleton bản web còn AI dựng bản mobile.
 // Keyframes nằm trong hero-31.css (pc-*). Vị trí trong style={{left,top}}
 // của con trỏ là vị trí CUỐI (cạnh Hi-fi) — cũng là khung tĩnh khi người
 // dùng bật prefers-reduced-motion (animation bị tắt, còn lại style này).
@@ -13,8 +13,6 @@ import { useEffect, useRef, useState } from "react";
 export type HeroStudy = {
   title: string;
   href: string;
-  imageUrl: string;
-  imageAlt: string;
 };
 
 const NOTES = [
@@ -58,53 +56,132 @@ function FrameLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-1.5 text-[11px] font-medium tracking-wide text-white/70">{children}</p>;
 }
 
-function HiFiBody({ study, sizes, priority }: { study: HeroStudy | null; sizes: string; priority?: boolean }) {
-  if (!study) {
-    // Chưa có case study nào: khung UI trừu tượng thay cho ảnh thật
-    return (
-      <div className="flex h-full flex-col gap-2 bg-white p-3">
-        <div className="h-3 w-1/2 rounded bg-brand/80" />
-        <div className="h-2 w-3/4 rounded bg-neutral-200" />
-        <div className="mt-1 grid flex-1 grid-cols-3 gap-2">
-          <div className="rounded bg-neutral-100" />
-          <div className="rounded bg-neutral-100" />
-          <div className="rounded bg-neutral-100" />
+// Skeleton UI web + mobile của khung Hi-fi. Khi `animated`, từng khối được
+// "dựng" lần lượt trong lúc 2 con trỏ làm việc ở Hi-fi: Bin dựng bản web,
+// AI dựng bản mobile song song — khối nào vừa dựng loé màu của người dựng.
+// Mốc thời gian (t) là % của vòng 14s, khớp với pc-bin / pc-ai trong hero-31.css.
+const BIN = "#c7d2ff";
+const AI = "#a5f3fc";
+const SKELETON = "#e9ecf2";
+
+const BUILD_TIMES = [61, 63, 64, 66, 67, 69, 70, 71, 73, 74, 76, 77, 78, 80];
+const BUILD_KEYFRAMES = BUILD_TIMES.map(
+  (t) =>
+    `@keyframes pc-b-${t}{0%,${t}%{opacity:.14;transform:scale(.94);background-color:var(--pc-base)}` +
+    `${t + 1.5}%{opacity:1;transform:scale(1.04);background-color:var(--pc-flash)}` +
+    `${t + 5}%,93%{opacity:1;transform:scale(1);background-color:var(--pc-base)}` +
+    `98%,100%{opacity:.14;transform:scale(.94);background-color:var(--pc-base)}}`
+).join("");
+
+function Bit({
+  t,
+  by,
+  animated,
+  base = SKELETON,
+  className = "",
+}: {
+  t: number;
+  by: "bin" | "ai";
+  animated: boolean;
+  base?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[2px] ${animated ? "pc-anim pc-build" : ""} ${className}`}
+      style={
+        {
+          backgroundColor: base,
+          "--pc-base": base,
+          "--pc-flash": by === "bin" ? BIN : AI,
+          animationName: animated ? `pc-b-${t}` : undefined,
+        } as React.CSSProperties
+      }
+    />
+  );
+}
+
+function SkeletonScreens({ animated }: { animated: boolean }) {
+  return (
+    <div className="relative h-full">
+      {/* Web — Bin dựng */}
+      <div className="absolute left-0 top-0 flex h-[88%] w-[80%] flex-col overflow-hidden rounded-md bg-white">
+        <div className="flex h-[13%] items-center gap-[3%] border-b border-neutral-100 px-[3%]">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff6159]" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffbd2e]" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#28c941]" />
+          <Bit t={61} by="bin" animated={animated} className="ml-[4%] h-[45%] flex-1 !rounded-full" />
+          <Bit t={61} by="bin" animated={animated} className="aspect-square h-[55%] !rounded-full" />
+        </div>
+        <div className="flex min-h-0 flex-1">
+          <div className="flex w-[22%] flex-col gap-[8%] border-r border-neutral-100 p-[4%]">
+            <Bit t={64} by="bin" animated={animated} base="#dfe7ff" className="h-[12%] w-[75%] !rounded-full" />
+            <Bit t={64} by="bin" animated={animated} className="h-[6%]" />
+            <Bit t={64} by="bin" animated={animated} className="h-[6%] w-[80%]" />
+            <Bit t={64} by="bin" animated={animated} className="h-[6%] w-[65%]" />
+            <Bit t={64} by="bin" animated={animated} className="h-[6%] w-[75%]" />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-[5%] p-[4%]">
+            <Bit t={67} by="bin" animated={animated} className="h-[5%] w-[28%]" />
+            <div className="grid h-[34%] grid-cols-3 gap-[4%]">
+              {[67, 69, 71].map((t) => (
+                <div key={t} className="flex flex-col gap-[10%] rounded-[3px] border border-neutral-100 p-[6%]">
+                  <Bit t={t} by="bin" animated={animated} className="flex-1" />
+                  <Bit t={t} by="bin" animated={animated} className="h-[12%] w-[70%]" />
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-1 flex-col justify-between">
+              {[
+                { t: 74, dot: "#e24b4a" },
+                { t: 76, dot: "#ef9f27" },
+                { t: 78, dot: "#1d9e75" },
+                { t: 80, dot: "#7f77dd" },
+              ].map((row) => (
+                <div key={row.t} className="flex h-[16%] items-center gap-[3%]">
+                  <Bit t={row.t} by="bin" animated={animated} base={row.dot} className="aspect-[5/4] h-full" />
+                  <Bit t={row.t} by="bin" animated={animated} className="h-[70%] flex-1" />
+                  <Bit t={row.t} by="bin" animated={animated} className="h-[70%] w-[20%]" />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-    );
-  }
-  return (
-    <Image
-      src={study.imageUrl}
-      alt={study.imageAlt}
-      fill
-      sizes={sizes}
-      priority={priority}
-      className="object-cover object-top"
-    />
+
+      {/* Mobile — AI dựng */}
+      <div className="absolute right-[1%] top-[16%] flex h-[84%] w-[23%] flex-col gap-[5%] rounded-[10px] border-2 border-ink bg-white px-[4%] pb-[6%] pt-[5%]">
+        <span className="mx-auto h-[2.5%] w-[35%] shrink-0 rounded-full bg-ink" />
+        <Bit t={63} by="ai" animated={animated} className="h-[7%] shrink-0 !rounded-full" />
+        <Bit t={66} by="ai" animated={animated} className="h-[26%] shrink-0" />
+        <Bit t={70} by="ai" animated={animated} className="h-[4%] w-[85%] shrink-0" />
+        <Bit t={70} by="ai" animated={animated} className="h-[4%] w-[60%] shrink-0" />
+        <Bit t={73} by="ai" animated={animated} className="h-[4%] w-[75%] shrink-0" />
+        <Bit t={73} by="ai" animated={animated} className="h-[4%] w-[50%] shrink-0" />
+        <Bit t={77} by="ai" animated={animated} base="#bfcbff" className="mt-auto h-[9%] shrink-0 !rounded-full" />
+      </div>
+    </div>
   );
 }
 
 function HiFiFrame({
   study,
   className = "",
-  sizes,
   animated = false,
 }: {
   study: HeroStudy | null;
   className?: string;
-  sizes: string;
   animated?: boolean;
 }) {
   const body = (
     <div
-      className={`relative h-full overflow-hidden rounded-md bg-white outline-2 outline-offset-4 outline-transparent transition-transform duration-300 ease-out ${
+      className={`relative h-full rounded-md outline-2 outline-offset-4 outline-transparent transition-transform duration-300 ease-out ${
         animated ? "pc-anim pc-hifi" : ""
       } ${study ? "group-hover:-translate-y-1" : ""}`}
     >
-      <HiFiBody study={study} sizes={sizes} priority />
+      <SkeletonScreens animated={animated} />
       {study && (
-        <span className="absolute bottom-2 right-2 rounded bg-ink/85 px-2 py-1 text-[11px] font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="absolute bottom-2 left-2 rounded bg-ink/85 px-2 py-1 text-[11px] font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
           View case study →
         </span>
       )}
@@ -184,15 +261,11 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
       </div>
 
       {/* Hi-fi — link thật tới case study mới nhất */}
-      <HiFiFrame
-        study={study}
-        animated
-        className="absolute left-[46%] top-[8%] h-[62%] w-[52%]"
-        sizes="(min-width: 1024px) 30vw, 50vw"
-      />
+      <HiFiFrame study={study} animated className="absolute left-[46%] top-[8%] h-[62%] w-[52%]" />
+      <style>{BUILD_KEYFRAMES}</style>
 
-      <Cursor label="Bin" tone="bin" className="pc-anim pc-cursor-bin" style={{ left: "62%", top: "36%" }} />
-      <Cursor label="AI" tone="ai" className="pc-anim pc-cursor-ai" style={{ left: "80%", top: "44%" }} />
+      <Cursor label="Bin" tone="bin" className="pc-anim pc-cursor-bin" style={{ left: "62%", top: "56%" }} />
+      <Cursor label="AI" tone="ai" className="pc-anim pc-cursor-ai" style={{ left: "88%", top: "60%" }} />
     </div>
   );
 }
@@ -201,9 +274,7 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
 export function ProcessCanvasCompact({ study }: { study: HeroStudy | null }) {
   return (
     <div className="relative">
-      {/* Chỉ hiện dưới 768px, trừ padding 40px mỗi bên của hero; màn lớn bị ẩn
-          nên xin ảnh nhỏ nhất (1px) để không tải thừa bản full màn hình */}
-      <HiFiFrame study={study} className="aspect-[16/10] w-full" sizes="(min-width: 768px) 1px, calc(100vw - 80px)" />
+      <HiFiFrame study={study} className="aspect-[16/10] w-full" />
       <Cursor label="AI" tone="ai" style={{ right: "18%", bottom: "-6px" }} />
     </div>
   );
