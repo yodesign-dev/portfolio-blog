@@ -1,33 +1,35 @@
 // Mèo mướp nằm trên bậu cửa trang /chill.
 //
-// Sprite AI (Nano Banana 2 qua Figma Weave), gom chung 1 atlas public/chill/cat.png.
-// Toạ độ theo px thật trên canvas đệm 640×360: [x, y, rộng, cao, ax] — ax là
+// Sprite AI (Nano Banana 2 qua Figma Weave), gom chung 1 atlas public/chill/cat.webp.
+// Toạ độ theo px của atlas (×2 so với px gốc 640×360): [x, y, rộng, cao, ax] — ax là
 // khoảng từ mép trái khung tới chân sau (mốc cố định trên bậu cửa), nên khung
 // nào cũng đặt đúng chỗ dù rộng hẹp khác nhau. Khung ngồi (paw-*) căn giữa thân.
 
-export const CAT_SRC = '/chill/cat.png'
+export const CAT_SRC = '/chill/cat.webp'
+// Atlas vẽ ×2 so với px gốc (canvas 640×360) → nét gấp đôi trên canvas đệm 1280×720
+const ATLAS_SCALE = 2
 
 const FRAMES = {
-  sleep: [0, 38, 85, 47, 8],
-  stir: [87, 27, 83, 58, 8],
-  tail: [172, 36, 90, 49, 19],
-  look: [264, 27, 83, 58, 8],
-  'stretch-0': [349, 34, 92, 51, 26],
-  'stretch-1': [443, 0, 85, 85, 6],
-  'stretch-2': [530, 0, 80, 85, 6],
-  'stretch-3': [612, 21, 87, 64, 21],
-  'groom-0': [701, 27, 73, 58, 8],
-  'groom-1': [776, 25, 68, 60, 7],
-  'groom-2': [846, 28, 67, 57, 8],
-  'groom-3': [915, 25, 69, 60, 6],
-  'groom-4': [986, 28, 64, 57, 8],
-  'groom-5': [1052, 28, 75, 57, 8],
-  'paw-0': [1129, 8, 56, 77, -16],
-  'paw-1': [1187, 8, 61, 77, -19],
-  'paw-2': [1250, 6, 67, 79, -18],
-  'paw-3': [1319, 9, 60, 76, -17],
-  'paw-4': [1381, 2, 67, 83, -18],
-  'paw-5': [1450, 8, 56, 77, -16],
+  sleep: [0, 76, 168, 92, 13],
+  stir: [172, 54, 165, 114, 9],
+  tail: [341, 72, 178, 96, 28],
+  look: [523, 54, 164, 114, 9],
+  'stretch-0': [691, 67, 183, 101, 50],
+  'stretch-1': [878, 0, 168, 168, 8],
+  'stretch-2': [1050, 0, 158, 168, 8],
+  'stretch-3': [1212, 43, 172, 125, 41],
+  'groom-0': [1388, 54, 145, 114, 8],
+  'groom-1': [1537, 51, 134, 117, 9],
+  'groom-2': [1675, 56, 133, 112, 8],
+  'groom-3': [1812, 50, 136, 118, 8],
+  'groom-4': [1952, 56, 127, 112, 9],
+  'groom-5': [2083, 56, 148, 112, 9],
+  'paw-0': [2235, 15, 111, 153, -32],
+  'paw-1': [2350, 15, 122, 153, -37],
+  'paw-2': [2476, 12, 131, 156, -37],
+  'paw-3': [2611, 17, 117, 151, -35],
+  'paw-4': [2732, 3, 133, 165, -37],
+  'paw-5': [2869, 15, 111, 153, -32],
 } satisfies Record<string, [number, number, number, number, number]>
 
 type Frame = keyof typeof FRAMES
@@ -181,11 +183,13 @@ export class Cat {
     return this.pets % 2 ? 'meow' : 'purr'
   }
 
-  // Vẽ theo px thật trên canvas đệm (ctx không scale)
+  // Vẽ theo px gốc 640×360 (ctx đã scale RES)
   draw(ctx: CanvasRenderingContext2D, atlas: HTMLCanvasElement) {
     if (!atlas.width) return
-    const [sx, sy, w, h, ax] = FRAMES[this.frame]
-    const x = REAR.x - ax
+    const [sx, sy, sw, sh, ax] = FRAMES[this.frame]
+    const w = sw / ATLAS_SCALE
+    const h = sh / ATLAS_SCALE
+    const x = REAR.x - ax / ATLAS_SCALE
     const sitting = this.frame.startsWith('paw') || this.frame === 'stretch-3'
     // Bóng mềm dưới thân
     ctx.fillStyle = 'rgba(40,20,10,0.22)'
@@ -194,8 +198,8 @@ export class Cat {
     ctx.fillRect(bx, REAR.y - 2, bw, 2)
     ctx.fillRect(bx + 6, REAR.y, bw - 12, 2)
     // Thở: lưng phồng lên 1px rồi xẹp xuống (~3.5s/nhịp) khi đang nằm ngủ
-    const inhale = this.frame === 'sleep' && this.breath % 3.5 < 1.6 ? 1 : 0
-    ctx.drawImage(atlas, sx, sy, w, h, x, REAR.y - h - inhale, w, h + inhale)
+    const inhale = this.frame === 'sleep' && this.breath % 3.5 < 1.6 ? 0.5 : 0
+    ctx.drawImage(atlas, sx, sy, sw, sh, x, REAR.y - h - inhale, w, h + inhale)
     this.drawHearts(ctx)
   }
 

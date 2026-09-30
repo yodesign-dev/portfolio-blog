@@ -25,7 +25,7 @@ import {Cat, CAT_HIT, CAT_PAW_TIP, CAT_SRC} from './cat'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
-import {SPRITES, SPRITE_SRC, type SpriteName} from './sprites'
+import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
 import type {StreetSound} from './audio'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
@@ -33,7 +33,11 @@ export type Weather = 'clear' | 'rain' | 'mist'
 
 export const SCENE_W = 320
 export const SCENE_H = 180
+// Lưới 320×180 → "px gốc" 640×360 (mọi toạ độ px trong code, ảnh nội thất) →
+// canvas đệm thật 1280×720 (RES = 2) để sprite / nhân vật / mèo ở độ chi tiết ×2
+// không bị nhoè. Ảnh nền vẫn 640 rộng, phóng nearest ×2 nên trông y như cũ.
 const SCALE = 2
+const RES = 2
 
 // Vị trí đo từ ảnh nội thất (lưới 320×180)
 const PANES = [
@@ -59,9 +63,15 @@ const INTERIOR_SRC = '/chill/scenes/interior.webp'
 // Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
 // thật, đặt tại (429, 116) trên ảnh nội thất 640×360. Ô cuối (121) là mặt nạ:
 // vùng khoét khỏi ảnh tĩnh để khung chuyển động thay vào.
-const CHAR = {src: '/chill/scenes/interior-loop.webp', x: 429, y: 116, w: 211, h: 220, cols: 12, frames: 121, fps: 12}
-const CHAR_MASK = CHAR.frames
-const CHAR_DURATION = CHAR.frames / CHAR.fps
+// Bản ×2 (upscale Topaz, 8fps cho nhẹ bộ nhớ) cho màn rộng; điện thoại dùng bản thường.
+// Kích thước ô trong sheet = CHAR.w/h × scale. Ô cuối mỗi sheet là mặt nạ.
+const CHAR = {x: 429, y: 116, w: 211, h: 220}
+type CharSheet = {src: string; scale: number; cols: number; frames: number; fps: number}
+const CHAR_SHEETS: {hi: CharSheet; lo: CharSheet} = {
+  hi: {src: '/chill/scenes/interior-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+  lo: {src: '/chill/scenes/interior-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+}
+const CHAR_DURATION = 121 / 12
 // Mốc (giây): 0–0.75 và 6.8–hết là gõ phím, giữa là cầm ly uống.
 // Khung đầu = khung cuối nên loop liền mạch.
 const SIP_START = 0.75
@@ -154,14 +164,12 @@ const WINDOWS: Record<string, [number, number, number, number]> = {
   'car-hatch': [0.25, 0.1, 0.47, 0.3],
   bus: [0.06, 0.14, 0.76, 0.32],
 }
-const NEAR_SCALE = 1.08 // làn gần hơi to hơn làn xa → có chiều sâu
 const DOG_POSES: SpriteName[] = ['dog-stand', 'dog-wag', 'dog-sniff', 'dog-sit']
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
-// Sprite AI vẽ hướng sang TRÁI (còn lại đều hướng sang phải) — lật ngược lại khi vẽ
-const FACES_LEFT = new Set<string>(['cyclo'])
+// Kích thước sprite theo lưới 320×180 (atlas vẽ SPRITE_SCALE px cho mỗi px gốc)
 const spriteSize = (name: SpriteName) => {
   const [, , w, h] = SPRITES[name]
-  return {w: w / SCALE, h: h / SCALE}
+  return {w: w / SCALE / SPRITE_SCALE, h: h / SCALE / SPRITE_SCALE}
 }
 
 export class ChillScene {
@@ -186,7 +194,10 @@ export class ChillScene {
   private display: HTMLCanvasElement
   private displayCtx: CanvasRenderingContext2D
   private charSheet: HTMLImageElement
-  private charTinted: HTMLCanvasElement
+  private charSpec: CharSheet
+  // Khung người ngồi hiện tại đã tô màu theo giờ (vẽ lại khi đổi khung)
+  private charFrame: HTMLCanvasElement
+  private charFrameKey = ''
   private charTime = 0
   private sipping = false
   private idleLoops = 0
@@ -220,15 +231,18 @@ export class ChillScene {
     this.buffer = this.makeLayer()
     this.ctx = this.buffer.getContext('2d')!
     this.ctx.imageSmoothingEnabled = false
-    this.resize(SCENE_W * SCALE, SCENE_H * SCALE)
+    this.resize(this.buffer.width, this.buffer.height)
 
     this.street = this.image(this.destination.streets[this.time])
     this.interior = loadImage(INTERIOR_SRC, () => (this.dirty = true))
     this.interiorLayer = this.makeLayer()
     this.atlas = loadImage(SPRITE_SRC, () => (this.dirty = true))
     this.atlasTinted = document.createElement('canvas')
-    this.charSheet = loadImage(CHAR.src, () => (this.dirty = true))
-    this.charTinted = document.createElement('canvas')
+    this.charSpec = window.matchMedia('(min-width: 1024px)').matches ? CHAR_SHEETS.hi : CHAR_SHEETS.lo
+    this.charSheet = loadImage(this.charSpec.src, () => (this.dirty = true))
+    this.charFrame = document.createElement('canvas')
+    this.charFrame.width = CHAR.w * this.charSpec.scale
+    this.charFrame.height = CHAR.h * this.charSpec.scale
     this.catSheet = loadImage(CAT_SRC, () => (this.dirty = true))
     this.catTinted = document.createElement('canvas')
 
@@ -311,8 +325,8 @@ export class ChillScene {
 
   private makeLayer() {
     const c = document.createElement('canvas')
-    c.width = SCENE_W * SCALE
-    c.height = SCENE_H * SCALE
+    c.width = SCENE_W * SCALE * RES
+    c.height = SCENE_H * SCALE * RES
     return c
   }
 
@@ -350,21 +364,24 @@ export class ChillScene {
       }
     }
 
-    // Sheet người ngồi + mèo: tô sẵn cùng màu với nội thất
-    this.washed(this.charSheet, this.charTinted)
+    // Mèo: tô sẵn cùng màu với nội thất. Người ngồi tô theo từng khung lúc vẽ
+    // (sheet ×2 rất lớn — không giữ thêm 1 bản tô màu cả sheet trong bộ nhớ)
     this.washed(this.catSheet, this.catTinted)
+    this.charFrameKey = ''
 
     // Lớp nội thất tô sẵn màu theo giờ/thời tiết, chỉ vẽ lại khi đổi
     const ctx = this.interiorLayer.getContext('2d')!
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.globalCompositeOperation = 'source-over'
     ctx.clearRect(0, 0, this.interiorLayer.width, this.interiorLayer.height)
     if (!ready(this.interior)) return
+    ctx.imageSmoothingEnabled = false
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
     // Sheet người ngồi đã tải → khoét vùng người khỏi ảnh tĩnh, khung động thay vào
     if (ready(this.charSheet)) {
-      const [sx, sy] = this.charCell(CHAR_MASK)
+      const [sx, sy, sw, sh] = this.charCell(this.charSpec.frames)
       ctx.globalCompositeOperation = 'destination-out'
-      ctx.drawImage(this.charSheet, sx, sy, CHAR.w, CHAR.h, CHAR.x, CHAR.y, CHAR.w, CHAR.h)
+      ctx.drawImage(this.charSheet, sx, sy, sw, sh, CHAR.x * RES, CHAR.y * RES, CHAR.w * RES, CHAR.h * RES)
     }
     this.wash(ctx, this.interiorLayer.width, this.interiorLayer.height)
   }
@@ -393,8 +410,29 @@ export class ChillScene {
     this.wash(c, out.width, out.height)
   }
 
-  private charCell(i: number): [number, number] {
-    return [(i % CHAR.cols) * CHAR.w, Math.floor(i / CHAR.cols) * CHAR.h]
+  // Ô thứ i trong sheet người ngồi (px của sheet)
+  private charCell(i: number): [number, number, number, number] {
+    const {cols, scale} = this.charSpec
+    const w = CHAR.w * scale
+    const h = CHAR.h * scale
+    return [(i % cols) * w, Math.floor(i / cols) * h, w, h]
+  }
+
+  // Khung người ngồi ở thời điểm hiện tại, đã tô màu theo giờ/thời tiết
+  private charFrameCanvas() {
+    const {frames, fps} = this.charSpec
+    const i = Math.min(frames - 1, Math.floor(this.charTime * fps))
+    const key = `${i}`
+    if (key !== this.charFrameKey) {
+      this.charFrameKey = key
+      const c = this.charFrame.getContext('2d')!
+      c.globalCompositeOperation = 'source-over'
+      c.clearRect(0, 0, this.charFrame.width, this.charFrame.height)
+      const [sx, sy, sw, sh] = this.charCell(i)
+      c.drawImage(this.charSheet, sx, sy, sw, sh, 0, 0, sw, sh)
+      this.wash(c, this.charFrame.width, this.charFrame.height)
+    }
+    return this.charFrame
   }
 
   private update(dt: number) {
@@ -660,7 +698,7 @@ export class ChillScene {
 
   private draw(t: number) {
     const ctx = this.ctx
-    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0)
+    ctx.setTransform(SCALE * RES, 0, 0, SCALE * RES, 0, 0)
     ctx.imageSmoothingEnabled = false
     ctx.fillStyle = '#1a1520'
     ctx.fillRect(0, 0, SCENE_W, SCENE_H)
@@ -701,7 +739,7 @@ export class ChillScene {
         ctx.restore()
       }
       ctx.save()
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.setTransform(RES, 0, 0, RES, 0, 0)
       this.rain.drawOutside(ctx, this.time === 'night')
       ctx.restore()
     } else if (this.weather === 'mist') {
@@ -721,7 +759,7 @@ export class ChillScene {
     }
     if (this.weather === 'rain') {
       ctx.save()
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.setTransform(RES, 0, 0, RES, 0, 0)
       this.rain.drawGlass(ctx, this.buffer, this.time === 'night')
       ctx.restore()
     }
@@ -729,15 +767,15 @@ export class ChillScene {
 
     ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W, SCENE_H)
     ctx.save()
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    // Lớp vẽ theo px gốc 640×360
+    ctx.setTransform(RES, 0, 0, RES, 0, 0)
     // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
-    if (this.charTinted.width && ready(this.interior)) {
+    if (ready(this.charSheet) && ready(this.interior)) {
       drawScreen(ctx, t, this.time === 'night')
-      const [sx, sy] = this.charCell(Math.min(CHAR.frames - 1, Math.floor(this.charTime * CHAR.fps)))
-      ctx.drawImage(this.charTinted, sx, sy, CHAR.w, CHAR.h, CHAR.x, CHAR.y, CHAR.w, CHAR.h)
+      ctx.drawImage(this.charFrameCanvas(), CHAR.x, CHAR.y, CHAR.w, CHAR.h)
     }
     this.cat.draw(ctx, this.catTinted)
-    if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, this.buffer.width, this.buffer.height)
+    if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
     ctx.restore()
     this.drawSteam(t)
     this.drawNotes()
@@ -791,12 +829,12 @@ export class ChillScene {
     const ctx = this.ctx
     const name = this.frameOf(m, t)
     const [sx, sy, sw, sh] = SPRITES[name]
-    const scale = m.road && m.lane === NEAR_LANE ? NEAR_SCALE : 1
-    const w = (sw / SCALE) * scale
-    const h = (sh / SCALE) * scale
+    const {w, h} = spriteSize(name)
     const base = m.road ? this.groundY(m.lane, m.x, this.laneShift) : this.groundY(m.lane, m.x)
-    const x = Math.round((m.x - w / 2) * 2) / 2
-    const y = Math.round((base - h - this.bobOf(m, t)) * 2) / 2
+    // Bám lưới pixel của atlas → sprite không bị lệch nửa pixel, nét đều
+    const snap = SCALE * SPRITE_SCALE
+    const x = Math.round((m.x - w / 2) * snap) / snap
+    const y = Math.round((base - h - this.bobOf(m, t)) * snap) / snap
     const night = this.time === 'night'
     const rainy = this.weather === 'rain'
 
@@ -811,8 +849,8 @@ export class ChillScene {
     ctx.fill()
 
     ctx.save()
-    const facesRight = !FACES_LEFT.has(name)
-    if ((m.dir < 0) === facesRight) {
+    // Mọi sprite đều vẽ hướng sang phải → đi sang trái thì lật
+    if (m.dir < 0) {
       ctx.translate(x * 2 + w, 0)
       ctx.scale(-1, 1)
     }

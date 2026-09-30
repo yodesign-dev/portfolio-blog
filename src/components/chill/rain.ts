@@ -47,8 +47,8 @@ export class Rain {
     })
     const {top, bottom} = road
     this.layers = [
-      L(190, [5, 8], [250, 300], [top - 4, top + 8], 0.26, 1, 0.25),
-      L(100, [10, 16], [380, 450], [top + 6, bottom - 1], 0.4, 1, 0.6),
+      L(190, [5, 8], [250, 300], [top - 4, top + 8], 0.3, 0.5, 0.25),
+      L(100, [10, 16], [380, 450], [top + 6, bottom - 1], 0.45, 0.75, 0.6),
       L(24, [24, 36], [620, 720], null, 0.28, 2, 0),
     ]
     this.drips = [0.18, 0.5, 0.83].flatMap((k) => panes.map((p) => ({x: Math.round(p.x + p.w * k), grow: rand(0, 1), y: -1, vy: 0})))
@@ -272,6 +272,8 @@ export class Rain {
       snap.height = source.height
     }
     snap.getContext('2d')!.drawImage(source, 0, 0)
+    // Canvas đệm có thể lớn hơn hệ toạ độ 640×360 đang vẽ (RES) → quy đổi toạ độ lấy mẫu
+    const k = source.width / 640
 
     for (const b of this.beads) {
       const r = b.r
@@ -291,7 +293,7 @@ export class Rain {
       const span = r * 6
       ctx.translate(x, y)
       ctx.scale(1, -1)
-      ctx.drawImage(snap, x - span / 2, y - span * 0.65, span, span, -r, -r * 1.08, r * 2, r * 2.16)
+      ctx.drawImage(snap, (x - span / 2) * k, (y - span * 0.65) * k, span * k, span * k, -r, -r * 1.08, r * 2, r * 2.16)
       ctx.restore()
       ctx.fillStyle = 'rgba(10,14,24,0.28)'
       ctx.fillRect(x - Math.round(r * 0.6), y + Math.round(r) - 1, Math.max(1, Math.round(r * 1.2)), 1)
