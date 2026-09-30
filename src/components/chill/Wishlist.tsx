@@ -50,6 +50,8 @@ const AVATAR_BG = ['#f6d2bd', '#f7e2a0', '#fbf1d2', '#d5e8d4', '#d7dcf5', '#f4c7
 const HEARTS_KEY = 'chill:wish-hearts'
 const MINE_KEY = 'chill:my-wishes'
 const SEEN_KEY = 'chill:wish-seen'
+// Đã mở mục donate 1 lần → nút Support thôi nhúc nhích trên máy đó
+const DONATE_SEEN_KEY = 'chill:donate-seen'
 const MAX = 300
 
 function load<T>(key: string, fallback: T): T {
@@ -106,10 +108,15 @@ export function Wishlist({
   const [seen, setSeen] = useState(true)
   const [tab, setTab] = useState<Tab>('hot')
   const [view, setView] = useState<'wishes' | 'donate'>('wishes')
+  const [donateSeen, setDonateSeen] = useState(true)
   const donate = hasDonate()
   const showDonate = () => {
     setView('donate')
     trackEvent({name: 'Chill Donate Open'})
+    if (!donateSeen) {
+      setDonateSeen(true)
+      save(DONATE_SEEN_KEY, true)
+    }
   }
 
   const refresh = useCallback(() => {
@@ -118,6 +125,22 @@ export function Wishlist({
       .then((d: {wishes?: Wish[]}) => setWishes(d.wishes ?? []))
       .catch(() => {})
       .finally(() => setLoaded(true))
+    // Góp ý mình gửi mà Bin đã ẩn / xoá thì bỏ bản "Awaiting review" trên máy mình
+    const local = load<Wish[]>(MINE_KEY, [])
+    if (!local.length) return
+    fetch(`/api/chill-wish?mine=${local.map((w) => w.id).join(',')}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: {statuses?: Record<string, string>} | null) => {
+        if (!d?.statuses) return
+        const keep = local.filter((w) => {
+          const status = d.statuses![w.id]
+          return status !== 'hidden' && status !== 'deleted'
+        })
+        if (keep.length === local.length) return
+        setMine(keep)
+        save(MINE_KEY, keep)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -125,6 +148,7 @@ export function Wishlist({
     setMine(load<Wish[]>(MINE_KEY, []))
     setHearted(load<string[]>(HEARTS_KEY, []))
     setSeen(load<boolean>(SEEN_KEY, false))
+    setDonateSeen(load<boolean>(DONATE_SEEN_KEY, false))
     /* eslint-enable react-hooks/set-state-in-effect */
     refresh()
   }, [refresh])
@@ -252,9 +276,10 @@ export function Wishlist({
               type="button"
               onClick={showDonate}
               title="Buy Bin a coffee"
-              className="ml-auto flex h-9 items-center gap-1.5 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2.5 text-sm font-semibold text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              className="relative ml-auto flex h-9 items-center gap-1.5 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2.5 text-sm font-semibold text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
             >
-              <span aria-hidden>☕</span> Support
+              <SteamingCup lively={!donateSeen} /> Support
+              {!donateSeen && <Sparkles />}
             </button>
           )}
           <button
@@ -305,11 +330,9 @@ export function Wishlist({
               <button
                 type="button"
                 onClick={showDonate}
-                className="mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-[#e8b27d]/25 bg-gradient-to-r from-[#e8b27d]/12 to-transparent px-4 py-2.5 text-left transition hover:border-[#e8b27d]/50"
+                className="relative mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-[#e8b27d]/25 bg-gradient-to-r from-[#e8b27d]/12 to-transparent px-4 py-2.5 text-left transition hover:border-[#e8b27d]/50"
               >
-                <span aria-hidden className="text-xl">
-                  ☕
-                </span>
+                <SteamingCup lively={!donateSeen} className="text-xl" />
                 <span className="min-w-0 flex-1 text-sm text-[#ede6dd]">
                   Enjoying the café? <span className="font-semibold text-[#f3cfa8]">Buy Bin a coffee</span>
                 </span>
@@ -323,6 +346,37 @@ export function Wishlist({
           </>
         )}
       </section>
+    </>
+  )
+}
+
+// Tách cà phê: lúc chưa mở mục donate thì bốc hơi + thỉnh thoảng nghiêng
+function SteamingCup({lively, className = ''}: {lively: boolean; className?: string}) {
+  return (
+    <span aria-hidden className={`relative inline-flex ${className}`}>
+      <span className={lively ? 'chill-cup' : ''}>☕</span>
+      {lively &&
+        [0, 0.7, 1.4].map((delay, i) => (
+          <span
+            key={delay}
+            className="chill-steam absolute bottom-[80%] h-[0.45em] w-[2px] rounded-full bg-[#f3cfa8]"
+            style={{left: `${28 + i * 16}%`, animationDelay: `${delay}s`}}
+          />
+        ))}
+    </span>
+  )
+}
+
+// 2 ngôi sao nhỏ lấp lánh thay phiên ở góc nút
+function Sparkles() {
+  return (
+    <>
+      <span aria-hidden className="chill-twinkle pointer-events-none absolute -left-1 -top-2 text-[11px] text-[#ffe3b8]" style={{animationDelay: '0.3s'}}>
+        ✦
+      </span>
+      <span aria-hidden className="chill-twinkle pointer-events-none absolute -bottom-2 right-3 text-[10px] text-[#ffe3b8]" style={{animationDelay: '1.5s'}}>
+        ✦
+      </span>
     </>
   )
 }

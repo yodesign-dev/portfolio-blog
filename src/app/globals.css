@@ -42,6 +42,31 @@ body {
   50% { transform: translate(-50%, -4px); }
 }
 
+/* Nút "Support" (Buy Bin a coffee) trang /chill: cốc thỉnh thoảng nghiêng,
+   hơi bốc lên, 2 ngôi sao lấp lánh thay phiên. Tắt khi giảm chuyển động. */
+@keyframes chill-cup-tilt {
+  0%, 70%, 100% { transform: rotate(0); }
+  76% { transform: rotate(-12deg); }
+  84% { transform: rotate(9deg); }
+  92% { transform: rotate(-4deg); }
+}
+@keyframes chill-steam {
+  0% { opacity: 0; transform: translateY(2px); }
+  30% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-9px) scaleY(1.3); }
+}
+@keyframes chill-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0); }
+  40% { opacity: 1; transform: scale(1) rotate(45deg); }
+  70% { opacity: 0; transform: scale(0.5) rotate(90deg); }
+}
+.chill-cup { display: inline-block; animation: chill-cup-tilt 4s ease-in-out infinite; transform-origin: 50% 80%; }
+.chill-steam { animation: chill-steam 2.2s ease-out infinite; opacity: 0; }
+.chill-twinkle { animation: chill-twinkle 2.4s ease-in-out infinite; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .chill-cup, .chill-steam, .chill-twinkle { animation: none; }
+}
+
 /* Thanh equalizer nhỏ cạnh bài đang phát ở trang /chill */
 @keyframes chill-eq {
   0%, 100% { height: 25%; }

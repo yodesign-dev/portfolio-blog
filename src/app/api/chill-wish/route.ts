@@ -5,6 +5,8 @@ import {writeClient} from "@/sanity/lib/writeClient";
 
 // Wishlist của trang /chill.
 // GET  → danh sách góp ý đã duyệt (không bao giờ trả email / ipHash).
+// GET ?mine=id,id → chỉ trạng thái các góp ý người xem từng gửi (máy họ còn lưu
+//        bản "Awaiting review"), để bỏ bản đó khi góp ý đã bị ẩn hoặc xoá.
 // POST → {action: "submit", ...} gửi góp ý mới (chờ duyệt) · {action: "heart", id, on} thả/bỏ ❤️.
 //
 // Document có ID dạng `chillWish.<uuid>` — dấu chấm khiến dataset public
@@ -32,7 +34,9 @@ const LIST_QUERY = `*[_type == "chillWish" && status in $statuses] | order(_crea
   "createdAt": _createdAt, "hearts": coalesce(hearts, 0), status, reply
 }`;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const mine = request.nextUrl.searchParams.get("mine");
+  if (mine !== null) return mineStatuses(mine);
   try {
     const wishes = await writeClient.fetch<Wish[]>(LIST_QUERY, {statuses: PUBLIC});
     after(notifyShipped);
@@ -56,6 +60,20 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("chill-wish error:", error);
     return NextResponse.json({error: "Something went wrong, please try again."}, {status: 500});
+  }
+}
+
+async function mineStatuses(param: string) {
+  const ids = param.split(",").filter((id) => ID_RE.test(id)).slice(0, 20);
+  if (!ids.length) return NextResponse.json({statuses: {}});
+  try {
+    const found = await writeClient.fetch<{_id: string; status: string}[]>(`*[_id in $ids]{_id, status}`, {ids});
+    // Không có trong kết quả = đã bị xoá
+    const statuses = Object.fromEntries(ids.map((id) => [id, found.find((f) => f._id === id)?.status ?? "deleted"]));
+    return NextResponse.json({statuses}, {headers: {"Cache-Control": "private, no-store"}});
+  } catch (error) {
+    console.error("chill-wish mine error:", error);
+    return NextResponse.json({statuses: {}}, {status: 500});
   }
 }
 
