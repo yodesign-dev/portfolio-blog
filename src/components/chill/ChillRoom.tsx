@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, type TimeOfDay, type Weather} from './scene'
@@ -8,6 +9,8 @@ import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 
 const PREFS_KEY = 'chill:prefs'
+// Không đụng chuột/phím bao lâu thì giấu giao diện
+const IDLE_MS = 3500
 
 type Prefs = {
   trackId: string
@@ -63,7 +66,6 @@ function readPrefs(): Partial<Prefs> {
 // Mặc định dùng bộ có sẵn trong code; page.tsx truyền thêm nội dung từ Sanity
 export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {tracks?: Track[]; destinations?: Destination[]}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<ChillScene | null>(null)
   const audioRef = useRef<ChillAudio | null>(null)
   const scenePausedRef = useRef(false)
@@ -358,157 +360,283 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     audioRef.current?.setAmbience(value, AMBIENCE_FOR[weather].kind, true)
   }
 
-  const toggleFullscreen = () => {
-    const stage = stageRef.current
-    if (!stage) return
+  const toggleFullscreen = useCallback(() => {
+    // Cả trang (không chỉ canvas) vào fullscreen để dock + bảng cài đặt vẫn dùng được
     if (document.fullscreenElement) void document.exitFullscreen()
-    else void stage.requestFullscreen?.()
-  }
+    else void document.documentElement.requestFullscreen?.().catch(() => {})
+  }, [])
+
+  // ---------- Chế độ tập trung ----------
+
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [idle, setIdle] = useState(false)
+  const [hovering, setHovering] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [canFullscreen, setCanFullscreen] = useState(false)
+  const idleTimer = useRef<number | undefined>(undefined)
+
+  // Không đụng chuột/phím một lúc → giấu dock, thanh trên và con trỏ (như YouTube)
+  useEffect(() => {
+    const wake = () => {
+      setIdle(false)
+      window.clearTimeout(idleTimer.current)
+      idleTimer.current = window.setTimeout(() => setIdle(true), IDLE_MS)
+    }
+    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const
+    events.forEach((e) => window.addEventListener(e, wake, {passive: true}))
+    wake()
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, wake))
+      window.clearTimeout(idleTimer.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    // iOS Safari không cho fullscreen phần tử thường → ẩn nút luôn
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setCanFullscreen(Boolean(document.fullscreenEnabled))
+    const sync = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
+
+  // Phím tắt: Space phát/dừng · N/P chuyển bài · F fullscreen · S cài đặt · Esc đóng
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const el = e.target as HTMLElement
+      if (el.closest('input, select, textarea, [contenteditable="true"]')) return
+      switch (e.key) {
+        case ' ':
+          // Space trên nút đang focus đã tự bấm nút đó rồi
+          if (el.closest('button, a')) return
+          e.preventDefault()
+          togglePlay()
+          break
+        case 'n':
+        case 'N':
+          next()
+          break
+        case 'p':
+        case 'P':
+          prev()
+          break
+        case 'f':
+        case 'F':
+          if (document.fullscreenEnabled) toggleFullscreen()
+          break
+        case 's':
+        case 'S':
+          setPanelOpen((o) => !o)
+          break
+        case 'Escape':
+          setPanelOpen(false)
+          break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [togglePlay, next, prev, toggleFullscreen])
+
+  // Đang phát nhạc thì giữ màn hình không tự tắt (trình duyệt tự nhả khi tab ẩn)
+  useEffect(() => {
+    if (!playing || !('wakeLock' in navigator)) return
+    let lock: WakeLockSentinel | null = null
+    let cancelled = false
+    const acquire = () => {
+      if (document.visibilityState !== 'visible') return
+      navigator.wakeLock
+        .request('screen')
+        .then((l) => {
+          if (cancelled) void l.release()
+          else lock = l
+        })
+        .catch(() => {})
+    }
+    acquire()
+    document.addEventListener('visibilitychange', acquire)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', acquire)
+      void lock?.release()
+    }
+  }, [playing])
+
+  // Tên bài lên tiêu đề tab — làm việc ở tab khác vẫn biết đang nghe gì
+  const baseTitle = useRef('')
+  useEffect(() => {
+    if (!baseTitle.current) baseTitle.current = document.title
+    if (started) document.title = `${playing ? '▶' : '❚❚'} ${track.title} · Chill`
+  }, [started, playing, track.title])
+  useEffect(() => () => void (document.title = baseTitle.current || document.title), [])
 
   const timeLabel = TIMES.find((t) => t.value === time)!.label
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
+  const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
+  const hideUi = idle && started && !panelOpen && !hovering
+  const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
+  const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
-    <div className="bg-[#16131a] text-[#ede6dd]">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-8 sm:py-14">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">Slow morning, strong coffee.</h1>
-            <p className="mt-3 max-w-xl text-[#a79e94]">
-              A pixel café by the window, somewhere in Vietnam. Put on a track, pick the weather, get to work.
-            </p>
-          </div>
-          <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-[#a79e94]">
-            <span className="h-2 w-2 rounded-full bg-[#e8b27d]" aria-hidden />
-            {dest.name}, {dest.region}
-            <span className="text-white/25">/</span>
-            <span className="min-w-[3rem] tabular-nums text-[#ede6dd]">{clock}</span>
-          </p>
-        </header>
+    <div className={`relative h-dvh w-full select-none overflow-hidden bg-[#16131a] text-[#ede6dd] ${hideUi ? 'cursor-none' : ''}`}>
+      <h1 className="sr-only">Chill for work — slow morning, strong coffee</h1>
 
+      {/* Ngang: cảnh phủ kín màn hình · Dọc (điện thoại): giữ nguyên khung, không cắt mất người ngồi */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full object-cover [image-rendering:pixelated] portrait:object-contain"
+        role="img"
+        aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
+      />
+
+      {/* Thanh trên: về trang chủ + điểm đến, giờ + nút cảnh */}
+      <div
+        {...hoverProps}
+        className={`absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/55 to-transparent p-3 pb-10 sm:p-5 sm:pb-14 ${fade}`}
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 rounded-md bg-black/45 px-2.5 py-1.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+          >
+            <ArrowIcon dir="left" />
+            Bin Nguyen
+          </Link>
+          {[dest.name, weatherLabel, timeLabel].map((label, i) => (
+            <span
+              key={label}
+              className={`${i > 0 ? 'hidden sm:inline' : ''} pointer-events-none rounded-md bg-black/45 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:text-[11px]`}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="pointer-events-none rounded-md bg-black/45 px-2.5 py-1.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
+            {clock}
+          </span>
+          <StageButton label={scenePaused ? 'Resume scene' : 'Pause scene'} onClick={() => setScenePaused((p) => !p)}>
+            {scenePaused ? <PlayIcon small /> : <PauseIcon small />}
+          </StageButton>
+          {canFullscreen && (
+            <StageButton label={fullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'} onClick={toggleFullscreen}>
+              {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+            </StageButton>
+          )}
+        </div>
+      </div>
+
+      {/* Bấm ra ngoài để đóng bảng cài đặt */}
+      {panelOpen && (
+        <button type="button" aria-label="Close settings" onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
+      )}
+
+      {/* Dock nhạc nổi phía dưới */}
+      <div
+        className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
+          panelOpen ? 'sm:pr-[436px]' : ''
+        } ${fade}`}
+      >
         <div
-          ref={stageRef}
-          className="relative mt-8 aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"
+          {...hoverProps}
+          className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
         >
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 h-full w-full [image-rendering:pixelated]"
-            role="img"
-            aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
-          />
-          <div className="pointer-events-none absolute left-3 top-3 flex gap-2 sm:left-5 sm:top-5">
-            {[dest.name, weatherLabel, timeLabel].map((label) => (
-              <span
-                key={label}
-                className="rounded-md bg-black/45 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:px-3 sm:py-1.5 sm:text-[11px]"
+          <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <RoundButton label="Previous track (P)" onClick={prev}>
+                <PrevIcon />
+              </RoundButton>
+              <button
+                type="button"
+                onClick={togglePlay}
+                aria-label={playing ? 'Pause' : 'Play'}
+                title={`${playing ? 'Pause' : 'Play'} (Space)`}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
               >
-                {label}
-              </span>
-            ))}
+                {playing ? <PauseIcon /> : <PlayIcon />}
+              </button>
+              <RoundButton label="Next track (N)" onClick={next}>
+                <NextIcon />
+              </RoundButton>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
+                {stationLabel} · {stationPos + 1}/{stationList.length}
+              </p>
+              <p className="truncate font-semibold">{track.title}</p>
+            </div>
+            <Visualizer audioRef={audioRef} playing={playing} />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              aria-label="Volume"
+              className="hidden w-24 accent-[#e8b27d] md:block"
+            />
+            <button
+              type="button"
+              onClick={() => setPanelOpen((o) => !o)}
+              aria-label="Settings"
+              aria-expanded={panelOpen}
+              aria-controls="chill-panel"
+              title="Settings (S)"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition ${
+                panelOpen ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
+              }`}
+            >
+              <SlidersIcon />
+            </button>
           </div>
-          <div className="absolute bottom-3 right-3 flex gap-2 sm:bottom-5 sm:right-5">
-            <StageButton label={scenePaused ? 'Resume scene' : 'Pause scene'} onClick={() => setScenePaused((p) => !p)}>
-              {scenePaused ? <PlayIcon small /> : <PauseIcon small />}
-            </StageButton>
-            <StageButton label="Fullscreen" onClick={toggleFullscreen}>
-              <FullscreenIcon />
-            </StageButton>
+          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tabular-nums text-[#a79e94]">
+            <span className="w-8">{formatTime(position)}</span>
+            <div
+              role="slider"
+              tabIndex={-1}
+              aria-label="Seek"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(duration)}
+              aria-valuenow={Math.round(position)}
+              onClick={seek}
+              className="relative h-3 flex-1 cursor-pointer"
+            >
+              <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
+              <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]" style={{width: `${progress * 100}%`}} />
+            </div>
+            <span className="w-8 text-right">{formatTime(duration)}</span>
           </div>
         </div>
+      </div>
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-          <div className="space-y-6">
-            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-              <SectionTitle index="01" title="Destination" />
-              <div className="mt-5 flex items-center gap-2">
-                <RoundButton label="Previous destination" onClick={() => goTo(destIndex - 1)}>
-                  <ArrowIcon dir="left" />
-                </RoundButton>
-                <select
-                  value={destIndex}
-                  onChange={(e) => goTo(Number(e.target.value))}
-                  aria-label="Destination"
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#1e1a22] px-3 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
-                >
-                  {destinations.map((d, i) => (
-                    <option key={d.id} value={i}>
-                      {String(i + 1).padStart(2, '0')} · {d.name}
-                    </option>
-                  ))}
-                </select>
-                <RoundButton label="Next destination" onClick={() => goTo(destIndex + 1)}>
-                  <ArrowIcon dir="right" />
-                </RoundButton>
-              </div>
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <label htmlFor="chill-travel" className="text-sm text-[#a79e94]">
-                  Auto travel
-                </label>
-                <select
-                  id="chill-travel"
-                  value={travel}
-                  onChange={(e) => {
-                    setTravel(Number(e.target.value))
-                    travelRef.current = 0
-                    setTravelElapsed(0)
-                  }}
-                  className="h-9 rounded-lg border border-white/10 bg-[#1e1a22] px-2 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
-                >
-                  {TRAVEL_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[#e8b27d] transition-[width] duration-1000 ease-linear"
-                  style={{
-                    width: travel ? `${Math.min(100, (travelElapsed / (travel * 60)) * 100)}%` : '0%',
-                  }}
-                />
-              </div>
-              <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
-                {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · Next: {nextDest.name}
-              </p>
-            </section>
-
-            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-              <SectionTitle index="02" title="Atmosphere" />
-              <div className="mt-5 space-y-4">
-                <Field label="Time">
-                  <Segmented options={TIMES} value={time} onChange={setTime} />
-                </Field>
-                <Field label="Weather">
-                  <Segmented options={WEATHERS} value={weather} onChange={setWeather} />
-                </Field>
-                <Field label="Ambience">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={ambience}
-                      onChange={(e) => changeAmbience(Number(e.target.value))}
-                      aria-label={`Ambience volume: ${AMBIENCE_FOR[weather].label}`}
-                      className="w-full accent-[#e8b27d]"
-                    />
-                    <span className="w-32 shrink-0 text-right text-xs text-[#a79e94]">{AMBIENCE_FOR[weather].label}</span>
-                  </div>
-                </Field>
-              </div>
-            </section>
+      {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}
+      <aside
+        id="chill-panel"
+        aria-label="Chill settings"
+        inert={!panelOpen}
+        className={`absolute inset-x-0 bottom-0 z-30 flex max-h-[85dvh] flex-col rounded-t-2xl border-t border-white/10 bg-[#16131a]/95 backdrop-blur-md transition-transform duration-300 ease-out sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:w-[420px] sm:rounded-none sm:border-l sm:border-t-0 ${
+          panelOpen ? 'translate-x-0 translate-y-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] p-5">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
+            <p className="mt-2 text-xl font-semibold tracking-tight">Slow morning, strong coffee.</p>
+            <p className="mt-1 text-sm text-[#a79e94]">A pixel café by the window, somewhere in Vietnam.</p>
           </div>
+          <RoundButton label="Close settings (Esc)" onClick={() => setPanelOpen(false)}>
+            <CloseIcon />
+          </RoundButton>
+        </div>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-            <SectionTitle index="03" title="Music" />
+        <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <section>
+            <SectionTitle index="01" title="Music" />
 
             {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
-            <div className="mt-5 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
+            <div className="mt-4 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
               {STATIONS.map((st) => {
                 const count = tracks.filter((t) => stationOf(t) === st.id).length
                 const on = st.id === station
@@ -524,61 +652,13 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
                       on ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
                     }`}
                   >
-                    <span className="hidden sm:inline">{st.label}</span>
-                    <span className="sm:hidden">{st.short}</span>
+                    {st.short}
                   </button>
                 )
               })}
             </div>
 
-            <div className="mt-5 flex items-center gap-4">
-              <div className="flex shrink-0 items-center gap-2">
-                <RoundButton label="Previous track" onClick={prev}>
-                  <PrevIcon />
-                </RoundButton>
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  aria-label={playing ? 'Pause' : 'Play'}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
-                >
-                  {playing ? <PauseIcon /> : <PlayIcon />}
-                </button>
-                <RoundButton label="Next track" onClick={next}>
-                  <NextIcon />
-                </RoundButton>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
-                  Now playing · {stationPos + 1}/{stationList.length}
-                </p>
-                <p className="mt-1 truncate text-lg font-semibold">{track.title}</p>
-                <p className="truncate text-sm text-[#a79e94]">{track.mood}</p>
-              </div>
-              <Visualizer audioRef={audioRef} playing={playing} />
-            </div>
-
-            <div className="mt-5">
-              <div
-                role="slider"
-                tabIndex={-1}
-                aria-label="Seek"
-                aria-valuemin={0}
-                aria-valuemax={Math.round(duration)}
-                aria-valuenow={Math.round(position)}
-                onClick={seek}
-                className="group relative h-4 cursor-pointer"
-              >
-                <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
-                <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]" style={{width: `${progress * 100}%`}} />
-              </div>
-              <div className="mt-1 flex justify-between font-mono text-[11px] tabular-nums text-[#a79e94]">
-                <span>{formatTime(position)}</span>
-                <span>{formatTime(duration)}</span>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="mt-4 flex items-center gap-4">
               <label className="flex flex-1 items-center gap-3 text-sm text-[#a79e94]">
                 Volume
                 <input
@@ -588,7 +668,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
                   step={0.01}
                   value={volume}
                   onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-full max-w-48 accent-[#e8b27d]"
+                  className="w-full accent-[#e8b27d]"
                 />
               </label>
               <button
@@ -604,7 +684,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
               </button>
             </div>
 
-            <ol className="mt-5 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+            <ol className="mt-4 divide-y divide-white/[0.06] border-t border-white/[0.06]">
               {stationList.map(({t, i}, pos) => {
                 const active = i === index
                 return (
@@ -631,10 +711,106 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
               })}
             </ol>
           </section>
-        </div>
 
-        <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">No rush. Just coffee. · Art &amp; music made with AI.</p>
-      </div>
+          <section>
+            <SectionTitle index="02" title="Destination" />
+            <div className="mt-4 flex items-center gap-2">
+              <RoundButton label="Previous destination" onClick={() => goTo(destIndex - 1)}>
+                <ArrowIcon dir="left" />
+              </RoundButton>
+              <select
+                value={destIndex}
+                onChange={(e) => goTo(Number(e.target.value))}
+                aria-label="Destination"
+                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#1e1a22] px-3 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                {destinations.map((d, i) => (
+                  <option key={d.id} value={i}>
+                    {String(i + 1).padStart(2, '0')} · {d.name}
+                  </option>
+                ))}
+              </select>
+              <RoundButton label="Next destination" onClick={() => goTo(destIndex + 1)}>
+                <ArrowIcon dir="right" />
+              </RoundButton>
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <label htmlFor="chill-travel" className="text-sm text-[#a79e94]">
+                Auto travel
+              </label>
+              <select
+                id="chill-travel"
+                value={travel}
+                onChange={(e) => {
+                  setTravel(Number(e.target.value))
+                  travelRef.current = 0
+                  setTravelElapsed(0)
+                }}
+                className="h-9 rounded-lg border border-white/10 bg-[#1e1a22] px-2 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                {TRAVEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-[#e8b27d] transition-[width] duration-1000 ease-linear"
+                style={{
+                  width: travel ? `${Math.min(100, (travelElapsed / (travel * 60)) * 100)}%` : '0%',
+                }}
+              />
+            </div>
+            <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
+              {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · Next: {nextDest.name}
+            </p>
+          </section>
+
+          <section>
+            <SectionTitle index="03" title="Atmosphere" />
+            <div className="mt-4 space-y-4">
+              <Field label="Time">
+                <Segmented options={TIMES} value={time} onChange={setTime} />
+              </Field>
+              <Field label="Weather">
+                <Segmented options={WEATHERS} value={weather} onChange={setWeather} />
+              </Field>
+              <Field label="Ambience">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={ambience}
+                    onChange={(e) => changeAmbience(Number(e.target.value))}
+                    aria-label={`Ambience volume: ${AMBIENCE_FOR[weather].label}`}
+                    className="w-full accent-[#e8b27d]"
+                  />
+                  <span className="w-28 shrink-0 text-right text-xs text-[#a79e94]">{AMBIENCE_FOR[weather].label}</span>
+                </div>
+              </Field>
+            </div>
+          </section>
+
+          <div className="hidden flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] text-[#a79e94] sm:flex">
+            {[
+              ['Space', 'Play'],
+              ['N / P', 'Next / prev'],
+              ['F', 'Fullscreen'],
+              ['S', 'Settings'],
+            ].map(([key, label]) => (
+              <span key={key}>
+                <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
+              </span>
+            ))}
+          </div>
+
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">No rush. Just coffee. · Art &amp; music made with AI.</p>
+        </div>
+      </aside>
     </div>
   )
 }
@@ -819,6 +995,33 @@ function FullscreenIcon() {
   return (
     <svg {...iconProps} width={14} height={14}>
       <path d="M8 3H3v5M21 8V3h-5M16 21h5v-5M3 16v5h5" />
+    </svg>
+  )
+}
+
+function ExitFullscreenIcon() {
+  return (
+    <svg {...iconProps} width={14} height={14}>
+      <path d="M3 8h5V3M16 3v5h5M21 16h-5v5M8 21v-5H3" />
+    </svg>
+  )
+}
+
+function SlidersIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="18" cy="18" r="2" />
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   )
 }

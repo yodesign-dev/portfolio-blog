@@ -20,8 +20,11 @@ export function SiteChrome({
 }) {
   const pathname = usePathname()
   const isStudio = pathname?.startsWith('/studio')
+  // /chill là màn hình tập trung: cảnh phủ trọn viewport, có nút riêng để
+  // quay về trang chủ nên cũng bỏ Navbar + Footer
+  const isChill = pathname === '/chill'
 
-  if (isStudio) {
+  if (isStudio || isChill) {
     return <>{children}</>
   }
 
