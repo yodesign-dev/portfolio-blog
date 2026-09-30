@@ -2,9 +2,13 @@ import {createHash, randomInt, randomUUID} from "node:crypto";
 import {after, NextRequest, NextResponse} from "next/server";
 import {Resend} from "resend";
 import {writeClient} from "@/sanity/lib/writeClient";
+import {drinkFor} from "@/components/chill/donate-config";
 
 // Người ủng hộ ở mục "Buy Bin a coffee" trang /chill (Studio: "Chill · Supporters").
 //
+// GET → lọ tip + bảng cảm ơn trong cảnh: số ly đã nhận (Bin tick "Đã nhận tiền")
+//   và danh sách người đồng ý hiện tên. Chỉ trả tên, lời nhắn, đồ uống, ngày —
+//   không bao giờ trả số tiền, mã đối chiếu, ipHash.
 // POST {action: "intent", name, message, amount, method, context}
 //   Bước 1 — người xem để lại tên / lời nhắn TRƯỚC khi chuyển → tạo bản ghi
 //   "Chờ đối chiếu" + mã riêng (vd. K7Q2) để gắn vào nội dung chuyển khoản.
@@ -12,7 +16,7 @@ import {writeClient} from "@/sanity/lib/writeClient";
 // POST {action: "sent", id?, method, amount, name, note, context}
 //   Bấm "I've sent it" → "Đã báo chuyển" + mail báo Bin. Không có id (người bỏ qua
 //   bước 1) thì tạo bản ghi mới.
-// POST {action: "update", id, name, message}
+// POST {action: "update", id, name, message, board}
 //   Người bỏ qua bước 1 bổ sung tên / lời nhắn ở màn cảm ơn.
 //
 // ID dạng `chillSupporter.<uuid>` → dataset public không đọc được khi không có token.
@@ -31,6 +35,40 @@ type Body = Record<string, unknown>;
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 const money = (v: unknown) => Math.max(0, Math.min(100_000_000, Math.round(Number(v) || 0)));
 const hasLink = (s: string) => /https?:\/\/|www\./i.test(s);
+
+const BOARD_QUERY = `{
+  "cups": count(*[_type == "chillSupporter" && received == true]),
+  "supporters": *[_type == "chillSupporter" && received == true && showOnBoard == true
+    && (defined(name) || defined(message))] | order(coalesce(sentAt, _createdAt) desc)[0...60] {
+    "id": _id, name, message, amount, "at": coalesce(sentAt, _createdAt)
+  }
+}`;
+
+type BoardRow = {id: string; name?: string; message?: string; amount?: number; at: string};
+
+export async function GET() {
+  try {
+    const {cups, supporters} = await writeClient.fetch<{cups: number; supporters: BoardRow[]}>(BOARD_QUERY);
+    return NextResponse.json(
+      {
+        cups,
+        supporters: supporters.map(({id, name, message, amount, at}) => ({
+          // ID gốc là khoá bí mật cho "update" → chỉ gửi bản băm để làm key
+          id: createHash("sha256").update(id).digest("hex").slice(0, 12),
+          name: name ?? "",
+          message: message ?? "",
+          drink: drinkFor(amount),
+          at,
+        })),
+      },
+      // CDN giữ 30s, hết hạn thì trả bản cũ trong lúc lấy bản mới
+      {headers: {"Cache-Control": "public, s-maxage=30, stale-while-revalidate=300"}},
+    );
+  } catch (error) {
+    console.error("chill-support board error:", error);
+    return NextResponse.json({cups: 0, supporters: []}, {status: 500});
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,6 +104,7 @@ async function intent(request: NextRequest, body: Body) {
     message: message || undefined,
     amount: money(body.amount) || undefined,
     method: body.method === "momo" ? "momo" : "vcb",
+    showOnBoard: body.board === true,
     context: clean(body.context, 200) || undefined,
     ipHash,
   });
@@ -88,7 +127,14 @@ async function sent(request: NextRequest, body: Body) {
   if (id) {
     await writeClient
       .patch(id)
-      .set({status: "sent", sentAt: now, method, ...(amount ? {amount} : {}), ...(note ? {note} : {})})
+      .set({
+        status: "sent",
+        sentAt: now,
+        method,
+        ...(amount ? {amount} : {}),
+        ...(note ? {note} : {}),
+        ...(typeof body.board === "boolean" ? {showOnBoard: body.board} : {}),
+      })
       .commit();
   } else {
     // Bỏ qua bước 1 → bản ghi mới, chưa có tên
@@ -105,6 +151,7 @@ async function sent(request: NextRequest, body: Body) {
       name: name || undefined,
       note: note || undefined,
       amount: amount || undefined,
+      showOnBoard: body.board === true,
       context: clean(body.context, 200) || undefined,
       ipHash,
     });
@@ -142,7 +189,7 @@ async function update(body: Body) {
   }
   await writeClient
     .patch(id)
-    .set({...(name ? {name} : {}), ...(message ? {message} : {})})
+    .set({...(name ? {name} : {}), ...(message ? {message} : {}), ...(typeof body.board === "boolean" ? {showOnBoard: body.board} : {})})
     .commit();
   after(() => notify(`[Chill ☕] ${name || "A supporter"} left you a note`, [`Tên: ${name || "Khách"}`, "", message || "(không có lời nhắn)"]));
   return NextResponse.json({success: true});

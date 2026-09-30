@@ -2,11 +2,12 @@
 // xe cộ bên ngoài, chỉ khác chỗ người xem ngồi.
 //
 // Toạ độ: `view`, `panes`, `lamp`, `laptop`, `headphones`, `steam` theo lưới 320×180;
-// `cat`, `notebook`, `character.at` theo px gốc 640×360.
+// `cat`, `notebook`, `tipJar`, `character.at` theo px gốc 640×360.
 //
 // - café: ảnh nội thất 640×360 + người ngồi là sprite sheet cắt từ video (scene.ts).
-// - balcony / desk: ảnh AI 1280×720 (Nano Banana 2) đã có sẵn người ngồi; khung
-//   hoạt hình là vài vùng cắt từ các bản biến thể của chính ảnh đó (gõ phím, uống).
+// - desk: ảnh AI 1280×720 (Nano Banana 2) + người ngồi là video loop Kling như quán.
+// - balcony: ảnh AI 1280×720 đã có sẵn người ngồi; tư thế uống cắt từ bản biến thể
+//   của chính ảnh đó, gõ phím / thở làm bằng code.
 
 export type ThemeId = 'cafe' | 'balcony' | 'desk'
 
@@ -16,7 +17,24 @@ type Pt = {x: number; y: number}
 // Người ngồi ở theme ảnh tĩnh: vùng `at` (px gốc) được khoét khỏi ảnh nội thất
 // theo ô `mask`, rồi vẽ tư thế hiện tại vào đó (ngồi yên / gõ phím / uống) — như
 // cách quán cà phê làm với video, nên đổi tư thế không để lại bóng ma.
+export type SheetSpec = {src: string; scale: number; cols: number; frames: number; fps: number}
+
+// Người ngồi là sprite sheet cắt từ 1 video loop (Kling): vùng `at` (px gốc) được
+// khoét khỏi ảnh nội thất theo ô mặt nạ (ô cuối sheet), khung video vẽ vào đó.
+// Bản `hi` (×2) cho màn rộng, `lo` cho điện thoại.
+export type CharacterVideo = {
+  kind: 'video'
+  at: Rect
+  hi: SheetSpec
+  lo: SheetSpec
+  duration: number
+  // Đoạn cầm ly uống trong video (giây); ngoài đoạn này là gõ phím, lặp nhiều vòng
+  // rồi mới phát đoạn uống
+  sip: [number, number]
+}
+
 export type CharacterFrames = {
+  kind: 'frames'
   src: string
   at: Rect
   // Góc trái trên của từng ô trong atlas (px atlas = px gốc × 2)
@@ -43,10 +61,13 @@ export type Theme = {
   // Dời cả con phố (ảnh + làn xe) xuống — ban công tầng 2 nhìn xuống phố
   streetDy: number
   // Café: người ngồi là sprite sheet từ video + màn hình laptop vẽ bằng code
-  character: 'video' | CharacterFrames
+  character: CharacterVideo | CharacterFrames
   screen: boolean
   cat: Pt
   notebook: Rect | null
+  // Lọ tip (đáy, giữa lọ) — bấm vào mở bảng cảm ơn. Ly cà phê của người vừa mời
+  // đặt cạnh lọ, lệch `cupDx`. Tránh vùng mèo (cat.x - 6 … cat.x + 90)
+  tipJar: Pt & {cupDx: number}
   steam: Pt | null
   lamp: Pt
   // Đèn luôn sáng (đèn bàn, đèn lồng) hay chỉ bật khi chiều/tối/mưa (đèn thả của quán)
@@ -69,10 +90,18 @@ export const THEMES: Theme[] = [
       {x: 219, w: 76},
     ],
     streetDy: 0,
-    character: 'video',
+    character: {
+      kind: 'video',
+      at: {x: 429, y: 116, w: 211, h: 220},
+      hi: {src: '/chill/scenes/interior-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+      lo: {src: '/chill/scenes/interior-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+      duration: 121 / 12,
+      sip: [0.75, 6.8],
+    },
     screen: true,
     cat: {x: 112, y: 296},
     notebook: {x: 324, y: 264, w: 102, h: 44},
+    tipJar: {x: 290, y: 292, cupDx: 22},
     steam: {x: 127, y: 113},
     lamp: {x: 63, y: 42},
     lampAlways: false,
@@ -90,6 +119,7 @@ export const THEMES: Theme[] = [
     panes: [],
     streetDy: 18,
     character: {
+      kind: 'frames',
       src: '/chill/scenes/room-balcony-pose.webp',
       at: {x: 371, y: 118, w: 269, h: 239},
       cells: {base: [0, 0], typing: [538, 0], sip: [1076, 0], mask: [1614, 0]},
@@ -99,6 +129,8 @@ export const THEMES: Theme[] = [
     screen: false,
     cat: {x: 60, y: 197},
     notebook: null,
+    // Trên mặt lan can (ghế đỏ dưới sàn bị dock nhạc che)
+    tipJar: {x: 352, y: 197, cupDx: -22},
     steam: null,
     lamp: {x: 44, y: 28},
     lampAlways: false,
@@ -118,16 +150,19 @@ export const THEMES: Theme[] = [
       {x: 216, w: 86},
     ],
     streetDy: 0,
+    // Video loop Kling (O1 Pro, 10s): gõ phím, thở, cầm ly cà phê đá uống rồi đặt lại
     character: {
-      src: '/chill/scenes/room-desk-pose.webp',
-      at: {x: 442, y: 139, w: 194, h: 205},
-      cells: {base: [0, 0], typing: [388, 0], sip: [776, 0], mask: [1164, 0]},
-      hands: {x: 452, y: 270, w: 30, h: 16},
-      shoulders: 0.55,
+      kind: 'video',
+      at: {x: 437, y: 136, w: 203, h: 202},
+      hi: {src: '/chill/scenes/room-desk-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+      lo: {src: '/chill/scenes/room-desk-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+      duration: 121 / 12,
+      sip: [1.62, 8.3],
     },
     screen: false,
     cat: {x: 270, y: 283},
     notebook: {x: 118, y: 258, w: 92, h: 28},
+    tipJar: {x: 392, y: 296, cupDx: 22},
     steam: {x: 124, y: 126},
     lamp: {x: 33, y: 106},
     lampAlways: true,

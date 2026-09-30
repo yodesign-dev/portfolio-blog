@@ -85,6 +85,7 @@ export function Wishlist({
   hidden,
   context,
   onThanks,
+  donateRequest,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -96,6 +97,8 @@ export function Wishlist({
   context: string
   // Người xem bấm "đã chuyển" ở màn donate → cảnh ăn mừng (mèo gừ gừ, tim bay)
   onThanks: () => void
+  // Tăng lên mỗi lần nơi khác (bảng cảm ơn) muốn mở thẳng màn "mời Bin 1 ly"
+  donateRequest: number
 }) {
   const [wishes, setWishes] = useState<Wish[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -109,6 +112,13 @@ export function Wishlist({
     setView('donate')
     trackEvent({name: 'Chill Donate Open'})
   }
+
+  useEffect(() => {
+    if (!donateRequest || !hasDonate()) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setView('donate')
+    trackEvent({name: 'Chill Donate Open', props: {from: 'board'}})
+  }, [donateRequest])
 
   // Đang ủng hộ dở (đã sang app ngân hàng, trang tải lại) → mở lại đúng bước QR
   const reopen = useRef(onOpenChange)
@@ -261,7 +271,7 @@ export function Wishlist({
                   <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Buy Bin a coffee ☕</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Mời Bin 1 ly cà phê ☕</h2>
             </>
           ) : (
             <>

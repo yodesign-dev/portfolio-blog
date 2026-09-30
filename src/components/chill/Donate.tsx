@@ -9,12 +9,15 @@
 //   2. Quét QR: Vietcombank (VietQR, điền sẵn số tiền + nội dung có mã) hoặc MoMo
 //      (QR tĩnh, copy nội dung dán vào lời nhắn). Quay lại tab từ app ngân hàng →
 //      nhắc bấm "I've sent it".
-//   3. Cảm ơn: mèo gừ gừ, tim bay. Ai bỏ qua bước 1 có thể để lại tên ở đây.
+//   3. Cảm ơn: mèo gừ gừ, tim bay, ly cà phê của người mời hiện trên bàn cạnh lọ
+//      tip. Ai bỏ qua bước 1 có thể để lại tên ở đây.
+// Người mời chọn có hiện tên + lời nhắn trên bảng cảm ơn trong quán hay không —
+// bảng chỉ cập nhật sau khi Bin đối chiếu và tick "Đã nhận tiền" trong Studio.
 // Trang không biết tiền có về thật hay không (tài khoản cá nhân) — Bin tự đối chiếu.
 
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
-import {DONATE, DONATE_TIERS, hasMomo, hasVcb, loadIntent, saveIntent, vietQrUrl, type DonateIntent} from './donate-config'
+import {DONATE, DONATE_TIERS, hasMomo, hasVcb, loadIntent, saveCup, saveIntent, shortVnd, vietQrUrl, type DonateIntent} from './donate-config'
 
 type Method = 'vcb' | 'momo'
 type Step = 'note' | 'pay' | 'thanks'
@@ -81,6 +84,7 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
         onSent={(id) => {
           setIntent({...intent, id})
           saveIntent(null)
+          saveCup()
           setStep('thanks')
           onThanks()
         }}
@@ -98,14 +102,16 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
   const [otherOpen, setOtherOpen] = useState(Boolean(custom))
   const [name, setName] = useState(initial?.name ?? '')
   const [message, setMessage] = useState(initial?.message ?? '')
+  const [board, setBoard] = useState(initial?.board ?? true)
   const [company, setCompany] = useState('')
   const [busy, setBusy] = useState(false)
   const otherRef = useRef<HTMLInputElement>(null)
 
   const amount = otherOpen ? Number(custom || 0) * 1000 : tier
+  const invite = otherOpen ? (amount ? `Mời Bin ${shortVnd(amount)}` : '') : (DONATE_TIERS.find((t) => t.amount === tier)?.invite ?? '')
 
   const next = async (withNote: boolean) => {
-    const base = {name: withNote ? name.trim() : '', message: withNote ? message.trim() : '', amount, at: Date.now()}
+    const base = {name: withNote ? name.trim() : '', message: withNote ? message.trim() : '', amount, board: withNote && board, at: Date.now()}
     // Không để lại gì → khỏi tạo bản ghi, sang QR luôn
     if (!base.name && !base.message) return onNext({...base, id: initial?.id, code: initial?.code})
     // Đã có bản ghi từ lần trước (quay lại sửa) → giữ mã cũ
@@ -124,9 +130,9 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
-      <p className="text-[15px] leading-relaxed text-[#ede6dd]">Enjoying the café? Buy Bin a coffee — every cup keeps the music playing and new features brewing.</p>
+      <p className="text-[15px] leading-relaxed text-[#ede6dd]">Enjoying the café? Mời Bin một ly — every cup keeps the music playing and new features brewing. Scan with any Vietnamese bank app or MoMo, no card needed.</p>
 
-      <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">Step 1 of 2 · A cup of</p>
+      <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">Step 1 of 2 · Mời Bin 1 ly</p>
       <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Amount">
         {DONATE_TIERS.map((t) => {
           const on = !otherOpen && tier === t.amount
@@ -143,7 +149,7 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
               className={`rounded-full border px-3 py-1.5 text-sm transition ${on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#c9c0b6] hover:text-[#ede6dd]'}`}
             >
               {t.icon} {t.label}
-              {t.amount ? ` · ${vnd(t.amount)}` : ''}
+              {t.amount ? ` · ${shortVnd(t.amount)}` : ''}
             </button>
           )
         })}
@@ -177,7 +183,7 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
       </div>
 
       <p className="mt-5 text-sm font-semibold text-[#f3ece4]">Leave Bin a note?</p>
-      <p className="mt-0.5 text-[11px] leading-relaxed text-[#8d857c]">Optional. Your name goes into the transfer note so Bin knows who to thank — only he sees it.</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[#8d857c]">Optional. Your name goes into the transfer note so Bin knows who to thank.</p>
       <div className="mt-2 space-y-2">
         <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder="Your name" aria-label="Your name (optional)" className={field} />
         <textarea
@@ -188,12 +194,13 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
           aria-label="Message (optional)"
           className={`${field} resize-none`}
         />
+        {(name.trim() || message.trim()) && <BoardCheck checked={board} onChange={setBoard} />}
         {/* Honeypot: người thật không thấy field này */}
         <input tabIndex={-1} autoComplete="off" aria-hidden value={company} onChange={(e) => setCompany(e.target.value)} className="absolute -left-[9999px] h-0 w-0 opacity-0" />
       </div>
 
       <button type="button" onClick={() => next(true)} disabled={busy} className={`mt-4 ${primary}`}>
-        {busy ? 'One sec…' : 'Show the QR →'}
+        {busy ? 'One sec…' : invite ? `${invite} →` : 'Show the QR →'}
       </button>
       {(name || message) && (
         <button type="button" onClick={() => next(false)} className="mt-2 w-full text-center text-xs text-[#8d857c] underline-offset-4 hover:underline">
@@ -252,7 +259,7 @@ function PayStep({
     trackEvent({name: 'Chill Donate Thanks', props: {method}})
     let id = intent.id
     try {
-      ;({id} = await post({action: 'sent', id: intent.id, method, amount: intent.amount, name: intent.name, note, context}))
+      ;({id} = await post({action: 'sent', id: intent.id, method, amount: intent.amount, name: intent.name, board: intent.board, note, context}))
     } catch {
       // Ghi nhận lỗi cũng không chặn lời cảm ơn
     }
@@ -346,6 +353,7 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
   const askName = !intent.name && Boolean(intent.id)
   const [name, setName] = useState('')
   const [message, setMessage] = useState('')
+  const [board, setBoard] = useState(true)
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle')
   const [error, setError] = useState('')
 
@@ -354,7 +362,7 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
     setState('sending')
     setError('')
     try {
-      await post({action: 'update', id: intent.id, name, message})
+      await post({action: 'update', id: intent.id, name, message, board})
       setState('done')
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send, please try again.")
@@ -369,6 +377,10 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
       </p>
       <p className="mt-3 text-xl font-semibold tracking-tight text-[#f3ece4]">Cảm ơn {intent.name || 'bạn'} nhiều!</p>
       <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">Your coffee keeps the lights on and new things brewing at the café. The cat says thanks too 🐾</p>
+      <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">
+        Your cup is on the table next to the tip jar ☕{' '}
+        {intent.board && intent.name ? 'Your name goes up on the thank-you board once Bin checks the transfer.' : ''}
+      </p>
 
       {askName && state !== 'done' && (
         <form onSubmit={submit} className="mt-6 space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left">
@@ -382,6 +394,7 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
             aria-label="Message (optional)"
             className={`${field} resize-none`}
           />
+          <BoardCheck checked={board} onChange={setBoard} />
           {error && (
             <p role="alert" className="text-sm text-rose-300">
               {error}
@@ -418,5 +431,18 @@ function Row({label, value, onCopy, copied, mono}: {label: string; value: string
         )}
       </dd>
     </div>
+  )
+}
+
+// Đồng ý hiện tên + lời nhắn trên bảng cảm ơn (tấm bảng gỗ cạnh lọ tip trong quán)
+function BoardCheck({checked, onChange}: {checked: boolean; onChange: (v: boolean) => void}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2 pt-1 text-left text-xs leading-relaxed text-[#c9c0b6]">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#e8b27d]" />
+      <span>
+        Pin my name &amp; note on the café&apos;s thank-you board
+        <span className="block text-[11px] text-[#8d857c]">Goes up after Bin confirms the transfer. The amount is never shown.</span>
+      </span>
+    </label>
   )
 }

@@ -8,6 +8,8 @@ import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
+import {SupporterBoard, type Board} from './SupporterBoard'
+import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
 
 const PREFS_KEY = 'chill:prefs'
@@ -104,7 +106,13 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
   const [catBox, setCatBox] = useState<Box | null>(null)
   const [bookBox, setBookBox] = useState<Box | null>(null)
+  const [jarBox, setJarBox] = useState<Box | null>(null)
   const [wishOpen, setWishOpen] = useState(false)
+  // Lọ tip + bảng cảm ơn: số ly Bin đã xác nhận, người đồng ý hiện tên
+  const [board, setBoard] = useState<Board | null>(null)
+  const [boardOpen, setBoardOpen] = useState(false)
+  const [myCup, setMyCup] = useState(false)
+  const [donateRequest, setDonateRequest] = useState(0)
   const [catPetted, setCatPetted] = useState(true)
   const [catHint, setCatHint] = useState(false)
   // Bong bóng lời nói của mèo: chờ hiện (khung donate đang che mèo trên điện thoại) → hiện → mờ dần
@@ -215,6 +223,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       setCatBox(toBox(scene.catHitBox))
       const book = scene.notebookHitBox
       setBookBox(book ? toBox(book) : null)
+      setJarBox(hasDonate() ? toBox(scene.tipJarHitBox) : null)
     }
     fitRef.current = fit
     const ro = new ResizeObserver(fit)
@@ -248,6 +257,37 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     // Vẽ ngay 1 frame — không chờ rAF (bị dừng khi tab chạy nền / cảnh đang pause)
     scene.frame(performance.now())
   }, [time, weather, dest, nextDest])
+
+  // ---------- Lọ tip + bảng cảm ơn ----------
+
+  const loadBoard = useCallback(() => {
+    fetch('/api/chill-support')
+      .then((r) => r.json())
+      .then((d: Board) => setBoard({cups: d.cups ?? 0, supporters: d.supporters ?? []}))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!hasDonate()) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMyCup(loadCup())
+    loadBoard()
+  }, [loadBoard])
+
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setTipJar(board?.cups ?? 0, myCup)
+    scene.frame(performance.now())
+  }, [board, myCup])
+
+  const openBoard = () => {
+    setPanelOpen(false)
+    setWishOpen(false)
+    setBoardOpen(true)
+    loadBoard()
+    trackEvent({name: 'Chill Board Open'})
+  }
 
   // ---------- Mèo ----------
 
@@ -289,6 +329,9 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   // Người xem báo đã mời cafe → mèo ngẩng lên, kêu, tim bay + nói cảm ơn.
   // Màn nhỏ: khung donate là bottom sheet che mèo → để dành câu nói tới lúc đóng khung.
   const thankCat = useCallback(() => {
+    // Đồng xu rơi vào lọ, ly cà phê của người mời hiện trên bàn
+    sceneRef.current?.dropCoin()
+    setMyCup(true)
     petCat()
     if (window.matchMedia('(min-width: 1024px)').matches) sayCat(CAT_THANKS)
     else catSayQueued.current = CAT_THANKS
@@ -550,15 +593,18 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         case 's':
         case 'S':
           setWishOpen(false)
+          setBoardOpen(false)
           setPanelOpen((o) => !o)
           break
         case 'w':
         case 'W':
           setPanelOpen(false)
+          setBoardOpen(false)
           setWishOpen((o) => !o)
           break
         case 'Escape':
           setPanelOpen(false)
+          setBoardOpen(false)
           break
       }
     }
@@ -602,7 +648,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !wishOpen && !hovering
+  const hideUi = idle && started && !panelOpen && !wishOpen && !boardOpen && !hovering
   const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -673,6 +719,26 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         </button>
       )}
 
+      {/* Lọ tip trên bàn: mở bảng cảm ơn (tên người đã mời Bin cà phê) */}
+      {jarBox && (
+        <button
+          type="button"
+          aria-label={`Tip jar — thank-you board${board?.cups ? `, ${board.cups} coffees` : ''}`}
+          aria-expanded={boardOpen}
+          aria-controls="chill-board"
+          onClick={openBoard}
+          className="group absolute cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          style={jarBox}
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
+          >
+            🫙 Thank-you board{board?.cups ? ` · ${board.cups}` : ''}
+          </span>
+        </button>
+      )}
+
       {/* Thanh trên: về trang chủ + điểm đến, giờ + nút cảnh */}
       <div
         {...hoverProps}
@@ -718,7 +784,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       {/* Dock nhạc nổi phía dưới */}
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
-          panelOpen ? 'sm:pr-[436px]' : wishOpen ? 'lg:pr-[450px]' : ''
+          panelOpen ? 'sm:pr-[436px]' : wishOpen ? 'lg:pr-[450px]' : boardOpen ? 'lg:pl-[420px]' : ''
         } ${fade}`}
       >
         <div
@@ -800,13 +866,29 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       <Wishlist
         open={wishOpen}
         onOpenChange={(o) => {
-          if (o) setPanelOpen(false)
+          if (o) {
+            setPanelOpen(false)
+            setBoardOpen(false)
+          }
           setWishOpen(o)
         }}
         dimmed={hideUi}
         hidden={panelOpen}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
+        donateRequest={donateRequest}
+      />
+
+      <SupporterBoard
+        open={boardOpen}
+        onClose={() => setBoardOpen(false)}
+        board={board}
+        myCup={myCup}
+        onDonate={() => {
+          setBoardOpen(false)
+          setWishOpen(true)
+          setDonateRequest((n) => n + 1)
+        }}
       />
 
       {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}

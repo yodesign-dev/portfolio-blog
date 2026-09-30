@@ -9,6 +9,8 @@ import {defineField, defineType} from 'sanity'
 //   2. Bấm "I've sent it" → "Đã báo chuyển" (kể cả người bỏ qua bước 1).
 //   Trang không biết tiền có về thật hay không: Bin đối chiếu với app ngân hàng /
 //   MoMo rồi tick "Đã nhận tiền".
+//   3. Đã nhận tiền → cộng 1 ly vào lọ tip trong cảnh. Người xem có tick "Hiện
+//      trên bảng" → tên + lời nhắn lên bảng cảm ơn (GET /api/chill-support).
 //
 // Tạo qua /api/chill-support với ID dạng `chillSupporter.<uuid>` → không đọc được
 // bằng request không có token (dataset public), thông tin chỉ hiện trong Studio.
@@ -28,6 +30,14 @@ export default defineType({
       type: 'boolean',
       initialValue: false,
       description: 'Tick sau khi thấy giao dịch có mã bên dưới trong app ngân hàng / MoMo.',
+    }),
+    defineField({
+      name: 'showOnBoard',
+      title: 'Hiện trên bảng cảm ơn',
+      type: 'boolean',
+      initialValue: false,
+      description:
+        'Người ủng hộ tự chọn lúc gửi. Chỉ hiện khi đã tick "Đã nhận tiền". Bỏ tick để ẩn tên + lời nhắn (vẫn tính vào lọ tip).',
     }),
     defineField({
       name: 'code',
@@ -59,9 +69,9 @@ export default defineType({
   ],
   orderings: [{title: 'Mới nhất', name: 'newest', by: [{field: '_createdAt', direction: 'desc'}]}],
   preview: {
-    select: {name: 'name', amount: 'amount', method: 'method', received: 'received', status: 'status', code: 'code', message: 'message'},
-    prepare: ({name, amount, method, received, status, code, message}) => ({
-      title: `${received ? '✅' : status === 'sent' ? '💛' : '⏳'} ${name || 'Khách'}${amount ? ` · ${Number(amount).toLocaleString('vi-VN')}đ` : ''}`,
+    select: {name: 'name', amount: 'amount', method: 'method', received: 'received', status: 'status', code: 'code', message: 'message', board: 'showOnBoard'},
+    prepare: ({name, amount, method, received, status, code, message, board}) => ({
+      title: `${received ? '✅' : status === 'sent' ? '💛' : '⏳'}${board ? ' 📌' : ''} ${name || 'Khách'}${amount ? ` · ${Number(amount).toLocaleString('vi-VN')}đ` : ''}`,
       subtitle: [code, method === 'momo' ? 'MoMo' : method === 'vcb' ? 'Vietcombank' : '', message].filter(Boolean).join(' · '),
     }),
   },

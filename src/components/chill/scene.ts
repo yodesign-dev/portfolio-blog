@@ -19,14 +19,16 @@
 // Thứ tự lớp (xa → gần):
 //   ảnh phố → chim → người/chó trên vỉa hè → xe làn xa → xe làn gần → mưa/sương
 //   → kính cửa (giọt nước, hơi nước) → nội thất (ảnh tĩnh, tô màu theo giờ) →
-//   màn hình laptop → người ngồi → mèo → hơi cà phê, nốt nhạc → ánh đèn
+//   màn hình laptop → người ngồi → lọ tip (+ ly của người vừa mời) → mèo → hơi
+//   cà phê, nốt nhạc → ánh đèn
 
 import {Cat, CAT_SRC} from './cat'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
-import {themeById, type Theme, type ThemeId} from './themes'
+import {themeById, type CharacterVideo, type SheetSpec, type Theme, type ThemeId} from './themes'
 import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
+import {drawCoinDrop, drawIcedCoffee, drawTipJar, jarHitBox} from './tipjar'
 import type {StreetSound} from './audio'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
@@ -51,19 +53,7 @@ const FADE_SECONDS = 1.2
 // Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
 // thật, đặt tại (429, 116) trên ảnh nội thất 640×360. Ô cuối (121) là mặt nạ:
 // vùng khoét khỏi ảnh tĩnh để khung chuyển động thay vào.
-// Bản ×2 (upscale Topaz, 8fps cho nhẹ bộ nhớ) cho màn rộng; điện thoại dùng bản thường.
-// Kích thước ô trong sheet = CHAR.w/h × scale. Ô cuối mỗi sheet là mặt nạ.
-const CHAR = {x: 429, y: 116, w: 211, h: 220}
-type CharSheet = {src: string; scale: number; cols: number; frames: number; fps: number}
-const CHAR_SHEETS: {hi: CharSheet; lo: CharSheet} = {
-  hi: {src: '/chill/scenes/interior-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
-  lo: {src: '/chill/scenes/interior-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
-}
-const CHAR_DURATION = 121 / 12
-// Mốc (giây): 0–0.75 và 6.8–hết là gõ phím, giữa là cầm ly uống.
-// Khung đầu = khung cuối nên loop liền mạch.
-const SIP_START = 0.75
-const SIP_END = 6.8
+// Người ngồi dạng video (quán, …): cấu hình trong themes.ts (CharacterVideo)
 
 // Màu nhân cho sprite ngoài phố để hợp ánh sáng của ảnh nền
 const SPRITE_TINT: Record<TimeOfDay, string | null> = {
@@ -182,7 +172,8 @@ export class ChillScene {
   private display: HTMLCanvasElement
   private displayCtx: CanvasRenderingContext2D
   private charSheet: HTMLImageElement
-  private charSpec: CharSheet
+  private charCfg: CharacterVideo | null = null
+  private charSpec: SheetSpec | null = null
   // Khung người ngồi hiện tại đã tô màu theo giờ (vẽ lại khi đổi khung)
   private charFrame: HTMLCanvasElement
   private charFrameKey = ''
@@ -207,6 +198,12 @@ export class ChillScene {
   private sipFor = 3
   private nextPoseSip = 15
   private cat = new Cat()
+  // Lọ tip: số ly Bin đã xác nhận + ly của chính người xem (vừa mời trên máy này).
+  // Vẽ vào lớp riêng, chỉ vẽ lại khi đổi → tô màu theo giờ giống nội thất
+  private tip = {cups: 0, cup: false}
+  private propsLayer: HTMLCanvasElement
+  private propsKey = ''
+  private coinAt = -1
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
   private rng = Math.random
@@ -236,13 +233,12 @@ export class ChillScene {
     this.street = this.image(this.destination.streets[this.time])
     this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
     this.interiorLayer = this.makeLayer()
+    this.propsLayer = this.makeLayer()
     this.atlas = loadImage(SPRITE_SRC, () => (this.dirty = true))
     this.atlasTinted = document.createElement('canvas')
-    this.charSpec = window.matchMedia('(min-width: 1024px)').matches ? CHAR_SHEETS.hi : CHAR_SHEETS.lo
-    this.charSheet = loadImage(this.charSpec.src, () => (this.dirty = true))
+    this.charSheet = new Image()
     this.charFrame = document.createElement('canvas')
-    this.charFrame.width = CHAR.w * this.charSpec.scale
-    this.charFrame.height = CHAR.h * this.charSpec.scale
+    this.loadCharacter()
     this.catSheet = loadImage(CAT_SRC, () => (this.dirty = true))
     this.catTinted = document.createElement('canvas')
 
@@ -250,6 +246,26 @@ export class ChillScene {
     // Mở trang ra đã có sẵn vài chiếc xe trên đường, không phải chờ
     for (let i = 0; i < 3; i++) this.spawnVehicle(50 + i * 90)
     this.spawnWalker(140)
+  }
+
+  // Người ngồi của theme hiện tại: sheet video (bản ×2 cho màn rộng) hoặc atlas tư thế
+  private loadCharacter() {
+    const c = this.theme.character
+    this.charFrameKey = ''
+    if (c.kind === 'video') {
+      this.charCfg = c
+      this.charSpec = window.matchMedia('(min-width: 1024px)').matches ? c.hi : c.lo
+      this.charSheet = loadImage(this.charSpec.src, () => (this.dirty = true))
+      this.charFrame.width = c.at.w * this.charSpec.scale
+      this.charFrame.height = c.at.h * this.charSpec.scale
+      this.charTime = 0
+      this.sipping = false
+      this.poseSheet = null
+    } else {
+      this.charCfg = null
+      this.charSpec = null
+      this.poseSheet = loadImage(c.src, () => (this.dirty = true))
+    }
   }
 
   private makeRain() {
@@ -269,8 +285,7 @@ export class ChillScene {
     if (id === this.theme.id) return
     this.theme = themeById(id)
     this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
-    const c = this.theme.character
-    this.poseSheet = c === 'video' ? null : loadImage(c.src, () => (this.dirty = true))
+    this.loadCharacter()
     this.sipT = -1
     this.cat.setRear(this.theme.cat)
     this.pawTarget = null
@@ -388,6 +403,7 @@ export class ChillScene {
     // (sheet ×2 rất lớn — không giữ thêm 1 bản tô màu cả sheet trong bộ nhớ)
     this.washed(this.catSheet, this.catTinted)
     this.charFrameKey = ''
+    this.propsKey = ''
 
     // Lớp nội thất tô sẵn màu theo giờ/thời tiết, chỉ vẽ lại khi đổi
     const ctx = this.interiorLayer.getContext('2d')!
@@ -399,7 +415,7 @@ export class ChillScene {
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
     // Theme ảnh tĩnh: khoét vùng người ngồi theo ô mặt nạ, tư thế vẽ vào lúc draw
     const frames = this.theme.character
-    if (frames !== 'video' && ready(this.poseSheet)) {
+    if (frames.kind === 'frames' && ready(this.poseSheet)) {
       const [mx, my] = frames.cells.mask
       const {at} = frames
       ctx.globalCompositeOperation = 'destination-out'
@@ -407,10 +423,11 @@ export class ChillScene {
       ctx.globalCompositeOperation = 'source-over'
     }
     // Quán: sheet người ngồi đã tải → khoét vùng người khỏi ảnh tĩnh, khung động thay vào
-    if (frames === 'video' && ready(this.charSheet)) {
+    if (frames.kind === 'video' && this.charSpec && ready(this.charSheet)) {
       const [sx, sy, sw, sh] = this.charCell(this.charSpec.frames)
+      const at = frames.at
       ctx.globalCompositeOperation = 'destination-out'
-      ctx.drawImage(this.charSheet, sx, sy, sw, sh, CHAR.x * RES, CHAR.y * RES, CHAR.w * RES, CHAR.h * RES)
+      ctx.drawImage(this.charSheet, sx, sy, sw, sh, at.x * RES, at.y * RES, at.w * RES, at.h * RES)
     }
     this.wash(ctx, this.interiorLayer.width, this.interiorLayer.height)
   }
@@ -441,15 +458,15 @@ export class ChillScene {
 
   // Ô thứ i trong sheet người ngồi (px của sheet)
   private charCell(i: number): [number, number, number, number] {
-    const {cols, scale} = this.charSpec
-    const w = CHAR.w * scale
-    const h = CHAR.h * scale
+    const {cols, scale} = this.charSpec!
+    const w = this.charCfg!.at.w * scale
+    const h = this.charCfg!.at.h * scale
     return [(i % cols) * w, Math.floor(i / cols) * h, w, h]
   }
 
   // Khung người ngồi ở thời điểm hiện tại, đã tô màu theo giờ/thời tiết
   private charFrameCanvas() {
-    const {frames, fps} = this.charSpec
+    const {frames, fps} = this.charSpec!
     const i = Math.min(frames - 1, Math.floor(this.charTime * fps))
     const key = `${i}`
     if (key !== this.charFrameKey) {
@@ -533,7 +550,7 @@ export class ChillScene {
     }
     this.notes = this.notes.filter((n) => n.age < 3)
 
-    if (this.theme.character === 'video') this.updateCharacter(dt)
+    if (this.theme.character.kind === 'video') this.updateCharacter(dt)
     else this.updatePose(dt)
     this.updateCat(dt)
 
@@ -642,10 +659,12 @@ export class ChillScene {
     return Math.min(1, this.sipT / fade, (this.sipFor - this.sipT) / fade)
   }
 
-  // Lặp đoạn gõ phím; cứ vài vòng mới cho phát đoạn cầm ly uống (SIP_START → SIP_END)
+  // Lặp đoạn gõ phím; cứ vài vòng mới cho phát đoạn cầm ly uống (charCfg.sip)
   private updateCharacter(dt: number) {
     if (this.paused) return
-    let t = (this.charTime + dt) % CHAR_DURATION
+    if (!this.charCfg) return
+    const [SIP_START, SIP_END] = this.charCfg.sip
+    let t = (this.charTime + dt) % this.charCfg.duration
     if (this.sipping) {
       if (t >= SIP_END) this.sipping = false
     } else if (t >= SIP_START && t < SIP_END) {
@@ -688,6 +707,23 @@ export class ChillScene {
   // Vùng bấm vào mèo, theo lưới canvas đệm (px thật 640×360)
   get catHitBox() {
     return this.cat.hitBox
+  }
+
+  // Số ly trong lọ tip (GET /api/chill-support) + ly của người vừa mời trên máy này
+  setTipJar(cups: number, cup: boolean) {
+    this.tip = {cups, cup}
+  }
+
+  // Người xem vừa bấm "I've sent it" → đồng xu rơi vào lọ, ly của họ hiện trên bàn
+  dropCoin() {
+    this.coinAt = this.clock
+    this.tip = {...this.tip, cup: true}
+  }
+
+  // Lọ tip → mở bảng cảm ơn, theo px gốc 640×360 (như cuốn sổ)
+  get tipJarHitBox() {
+    const {x, y} = this.theme.tipJar
+    return jarHitBox(x, y)
   }
 
   // Cuốn sổ mở trên bàn → mở Wishlist (theme không có sổ → null)
@@ -841,21 +877,43 @@ export class ChillScene {
     // Lớp vẽ theo px gốc 640×360
     ctx.setTransform(RES, 0, 0, RES, 0, 0)
     const character = this.theme.character
-    if (character === 'video') {
+    if (character.kind === 'video') {
       // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
       if (ready(this.charSheet) && ready(this.interior)) {
         if (this.theme.screen) drawScreen(ctx, t, this.time === 'night')
-        ctx.drawImage(this.charFrameCanvas(), CHAR.x, CHAR.y, CHAR.w, CHAR.h)
+        const {at} = character
+        ctx.drawImage(this.charFrameCanvas(), at.x, at.y, at.w, at.h)
       }
     } else if (ready(this.poseSheet) && ready(this.interior)) {
       this.drawPose(character)
     }
+    if (ready(this.interior)) this.drawTip(ctx, t)
     this.cat.draw(ctx, this.catTinted)
     if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
     ctx.restore()
     this.drawSteam(t)
     this.drawNotes()
     this.drawLights()
+  }
+
+  // Lọ tip + ly cà phê (lớp tô sẵn màu) + đồng xu đang rơi. ctx đang ở px gốc 640×360
+  private drawTip(ctx: CanvasRenderingContext2D, t: number) {
+    const jar = this.theme.tipJar
+    const key = `${this.theme.id}:${this.tip.cups}:${this.tip.cup}`
+    if (key !== this.propsKey) {
+      this.propsKey = key
+      const layer = this.propsLayer
+      const c = layer.getContext('2d')!
+      c.setTransform(1, 0, 0, 1, 0, 0)
+      c.clearRect(0, 0, layer.width, layer.height)
+      c.setTransform(RES, 0, 0, RES, 0, 0)
+      drawTipJar(c, jar.x, jar.y, this.tip.cups)
+      if (this.tip.cup) drawIcedCoffee(c, jar.x + jar.cupDx, jar.y)
+      c.setTransform(1, 0, 0, 1, 0, 0)
+      this.wash(c, layer.width, layer.height)
+    }
+    ctx.drawImage(this.propsLayer, 0, 0, SCENE_W * SCALE, SCENE_H * SCALE)
+    if (this.coinAt >= 0 && !drawCoinDrop(ctx, jar.x, jar.y, t - this.coinAt)) this.coinAt = -1
   }
 
   // Ảnh phố + kéo dài hàng pixel trên cùng (trời) / dưới cùng (mặt đường) khi vùng
@@ -875,7 +933,7 @@ export class ChillScene {
   // Người ngồi ở theme ảnh tĩnh (vẽ theo px gốc, ctx đã scale RES).
   // Ngồi: tư thế gốc + thở (nửa trên nhô 1px) + tay nhún khi gõ. Uống: chuyển mờ
   // sang ô `sip` (hai tư thế vẽ cùng độ mờ bù nhau → không lộ bóng ma khi đã uống hẳn)
-  private drawPose(c: Exclude<Theme['character'], 'video'>) {
+  private drawPose(c: Extract<Theme['character'], {kind: 'frames'}>) {
     const ctx = this.ctx
     const {at, hands} = c
     const base = this.poseCanvas(c, 'base')
@@ -903,7 +961,7 @@ export class ChillScene {
 
   // Ô tư thế trong atlas, đã tô màu theo giờ/thời tiết (giữ lại tới khi đổi)
   private poseCanvases = new Map<string, HTMLCanvasElement>()
-  private poseCanvas(c: Exclude<Theme['character'], 'video'>, pose: 'base' | 'sip') {
+  private poseCanvas(c: Extract<Theme['character'], {kind: 'frames'}>, pose: 'base' | 'sip') {
     const key = `${this.theme.id}:${pose}:${this.time}:${this.weather}`
     let canvas = this.poseCanvases.get(key)
     if (!canvas && this.poseSheet) {
