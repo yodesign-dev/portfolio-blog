@@ -8,6 +8,7 @@ import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
+import {THEMES, type ThemeId} from './themes'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -31,6 +32,7 @@ type Prefs = {
   station: StationId
   destination: string
   travel: number
+  theme: ThemeId
 }
 
 // Tự chuyển điểm đến sau N phút (0 = tắt)
@@ -78,6 +80,8 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const sceneRef = useRef<ChillScene | null>(null)
   const audioRef = useRef<ChillAudio | null>(null)
   const scenePausedRef = useRef(false)
+  // Tính lại vùng bấm (mèo, cuốn sổ) — gán trong effect dựng cảnh
+  const fitRef = useRef<() => void>(() => {})
 
   const [loaded, setLoaded] = useState(false)
   const [time, setTime] = useState<TimeOfDay>('morning')
@@ -95,6 +99,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [clock, setClock] = useState('')
   const [destIndex, setDestIndex] = useState(0)
   const [travel, setTravel] = useState(5)
+  const [theme, setTheme] = useState<ThemeId>('cafe')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
   const [catBox, setCatBox] = useState<Box | null>(null)
@@ -142,6 +147,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     const savedDest = destinations.findIndex((d) => d.id === prefs.destination)
     if (savedDest >= 0) setDestIndex(savedDest)
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
+    if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
     try {
       setCatPetted(localStorage.getItem(CAT_PETTED_KEY) === '1')
@@ -164,13 +170,14 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       station,
       destination: dest.id,
       travel,
+      theme,
     }
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel])
+  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -206,8 +213,10 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
       }
       setCatBox(toBox(scene.catHitBox))
-      setBookBox(toBox(scene.notebookHitBox))
+      const book = scene.notebookHitBox
+      setBookBox(book ? toBox(book) : null)
     }
+    fitRef.current = fit
     const ro = new ResizeObserver(fit)
     ro.observe(canvas)
     fit()
@@ -216,6 +225,15 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       ro.disconnect()
     }
   }, [])
+
+  // Đổi căn phòng → mèo / cuốn sổ ở chỗ khác, tính lại vùng bấm
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setTheme(theme)
+    fitRef.current()
+    scene.frame(performance.now())
+  }, [theme])
 
   useEffect(() => {
     scenePausedRef.current = scenePaused
@@ -812,8 +830,39 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         </div>
 
         <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          {/* Căn phòng người xem ngồi — phố, giờ, thời tiết bên ngoài giữ nguyên */}
           <section>
-            <SectionTitle index="01" title="Music" />
+            <SectionTitle index="01" title="Room" />
+            <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Room">
+              {THEMES.map((t) => {
+                const active = t.id === theme
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setTheme(t.id)}
+                    className={`group overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                      active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
+                    <img
+                      src={t.thumb}
+                      alt=""
+                      loading="lazy"
+                      className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
+                    />
+                    <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          <section>
+            <SectionTitle index="02" title="Music" />
 
             {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
             <div className="mt-4 grid grid-cols-5 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
@@ -893,7 +942,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           </section>
 
           <section>
-            <SectionTitle index="02" title="Destination" />
+            <SectionTitle index="03" title="Destination" />
             {/* Chọn điểm đến bằng thẻ có ảnh phố (đúng giờ đang chọn) thay cho <select> gốc */}
             <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Destination">
               {destinations.map((d, i) => {
@@ -966,7 +1015,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           </section>
 
           <section>
-            <SectionTitle index="03" title="Atmosphere" />
+            <SectionTitle index="04" title="Atmosphere" />
             <div className="mt-4 space-y-4">
               <Field label="Time">
                 <Segmented options={TIMES} value={time} onChange={setTime} />

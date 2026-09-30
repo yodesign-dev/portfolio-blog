@@ -21,10 +21,11 @@
 //   → kính cửa (giọt nước, hơi nước) → nội thất (ảnh tĩnh, tô màu theo giờ) →
 //   màn hình laptop → người ngồi → mèo → hơi cà phê, nốt nhạc → ánh đèn
 
-import {Cat, CAT_HIT, CAT_PAW_TIP, CAT_SRC} from './cat'
+import {Cat, CAT_SRC} from './cat'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
+import {themeById, type Theme, type ThemeId} from './themes'
 import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
 import type {StreetSound} from './audio'
 
@@ -39,27 +40,14 @@ export const SCENE_H = 180
 const SCALE = 2
 const RES = 2
 
-// Vị trí đo từ ảnh nội thất (lưới 320×180)
-const PANES = [
-  {x: 25, w: 76},
-  {x: 122, w: 77},
-  {x: 219, w: 76},
-]
-const GLASS = {x: 24, y: 15, w: 272, h: 109}
+// Con phố (ảnh + làn xe) theo lưới 320×180 — giống nhau ở mọi theme, chỉ dời
+// xuống `theme.streetDy` (ban công nhìn xuống phố)
 const STREET_IMG = {x: 20, y: 6, w: 280, h: 119}
 const SIDEWALK_Y = 113 // chân người đi bộ
 const FAR_LANE = 119 // đáy bánh xe làn xa
-const NEAR_LANE = 124 // làn gần (bị bậu cửa che mép dưới)
-const PHIN = {x: 127, y: 113}
-const LAMP = {x: 63, y: 42}
-const LAPTOP = {x: 235, y: 119}
-const HEADPHONES = {x: 262, y: 90}
-
-// Cuốn sổ trên bàn (px thật trên canvas đệm 640×360)
-const NOTEBOOK_HIT = {x: 324, y: 264, w: 102, h: 44}
+const NEAR_LANE = 124 // làn gần
 
 const FADE_SECONDS = 1.2
-const INTERIOR_SRC = '/chill/scenes/interior.webp'
 // Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
 // thật, đặt tại (429, 116) trên ảnh nội thất 640×360. Ô cuối (121) là mặt nạ:
 // vùng khoét khỏi ảnh tĩnh để khung chuyển động thay vào.
@@ -206,6 +194,12 @@ export class ChillScene {
   private dirty = true
   private catSheet: HTMLImageElement
   private catTinted: HTMLCanvasElement
+  private theme: Theme = themeById('cafe')
+  // Theme ảnh tĩnh: atlas các vùng biến thể của người ngồi (gõ phím, uống)
+  private poseSheet: HTMLImageElement | null = null
+  private pose: 'base' | 'typing' | 'sip' = 'base'
+  private poseHold = 0
+  private nextPoseSip = 12
   private cat = new Cat()
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
@@ -234,7 +228,7 @@ export class ChillScene {
     this.resize(this.buffer.width, this.buffer.height)
 
     this.street = this.image(this.destination.streets[this.time])
-    this.interior = loadImage(INTERIOR_SRC, () => (this.dirty = true))
+    this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
     this.interiorLayer = this.makeLayer()
     this.atlas = loadImage(SPRITE_SRC, () => (this.dirty = true))
     this.atlasTinted = document.createElement('canvas')
@@ -246,16 +240,36 @@ export class ChillScene {
     this.catSheet = loadImage(CAT_SRC, () => (this.dirty = true))
     this.catTinted = document.createElement('canvas')
 
-    const px = (v: number) => v * SCALE
-    this.rain = new Rain(
-      {x: px(GLASS.x), y: px(GLASS.y), w: px(GLASS.w), h: px(GLASS.h)},
-      PANES.map((p) => ({x: px(p.x), w: px(p.w)})),
-      {top: px(SIDEWALK_Y), bottom: px(GLASS.y + GLASS.h)},
-    )
-    this.rain.onThunder = () => this.onSound?.('thunder', 0, 1)
+    this.rain = this.makeRain()
     // Mở trang ra đã có sẵn vài chiếc xe trên đường, không phải chờ
     for (let i = 0; i < 3; i++) this.spawnVehicle(50 + i * 90)
     this.spawnWalker(140)
+  }
+
+  private makeRain() {
+    const {view, panes, streetDy} = this.theme
+    const px = (v: number) => v * SCALE
+    const rain = new Rain(
+      {x: px(view.x), y: px(view.y), w: px(view.w), h: px(view.h)},
+      panes.map((p) => ({x: px(p.x), w: px(p.w)})),
+      {top: px(SIDEWALK_Y + streetDy), bottom: px(Math.min(view.y + view.h, NEAR_LANE + streetDy + 1))},
+    )
+    rain.onThunder = () => this.onSound?.('thunder', 0, 1)
+    return rain
+  }
+
+  // Đổi "căn phòng" (quán cà phê / ban công / góc học đêm) — phố bên ngoài giữ nguyên
+  setTheme(id: ThemeId) {
+    if (id === this.theme.id) return
+    this.theme = themeById(id)
+    this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
+    const c = this.theme.character
+    this.poseSheet = c === 'video' ? null : loadImage(c.src, () => (this.dirty = true))
+    this.pose = 'base'
+    this.cat.setRear(this.theme.cat)
+    this.pawTarget = null
+    this.rain = this.makeRain()
+    this.dirty = true
   }
 
   setAtmosphere(time: TimeOfDay, weather: Weather, destination = this.destination) {
@@ -276,7 +290,7 @@ export class ChillScene {
 
   // Cao độ mặt đường tại x (cảnh phố dốc thì làn xe nghiêng theo)
   private groundY(base: number, x: number, shift = 0) {
-    return Math.round(base + shift + this.tilt * (x - SCENE_W / 2))
+    return Math.round(base + shift + this.theme.streetDy + this.tilt * (x - SCENE_W / 2))
   }
 
   // Tải trước ảnh của 1 điểm đến (vd điểm kế tiếp) để lúc chuyển không bị trống
@@ -377,8 +391,17 @@ export class ChillScene {
     if (!ready(this.interior)) return
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
-    // Sheet người ngồi đã tải → khoét vùng người khỏi ảnh tĩnh, khung động thay vào
-    if (ready(this.charSheet)) {
+    // Theme ảnh tĩnh: khoét vùng người ngồi theo ô mặt nạ, tư thế vẽ vào lúc draw
+    const frames = this.theme.character
+    if (frames !== 'video' && ready(this.poseSheet)) {
+      const [mx, my] = frames.cells.mask
+      const {at} = frames
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.drawImage(this.poseSheet, mx, my, at.w * 2, at.h * 2, at.x * RES, at.y * RES, at.w * RES, at.h * RES)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+    // Quán: sheet người ngồi đã tải → khoét vùng người khỏi ảnh tĩnh, khung động thay vào
+    if (frames === 'video' && ready(this.charSheet)) {
       const [sx, sy, sw, sh] = this.charCell(this.charSpec.frames)
       ctx.globalCompositeOperation = 'destination-out'
       ctx.drawImage(this.charSheet, sx, sy, sw, sh, CHAR.x * RES, CHAR.y * RES, CHAR.w * RES, CHAR.h * RES)
@@ -482,19 +505,19 @@ export class ChillScene {
 
     this.nextBirds -= dt
     if (this.nextBirds <= 0 && !this.birds && this.time !== 'night' && !rainy) {
-      this.birds = {x: GLASS.x - 10, y: 20 + this.rng() * 10, p: 0}
+      this.birds = {x: this.theme.view.x - 10, y: this.theme.view.y + 5 + this.rng() * 10, p: 0}
       this.nextBirds = 14 + this.rng() * 20
     }
     if (this.birds) {
       this.birds.x += dt * 16
       this.birds.p += dt
-      if (this.birds.x > GLASS.x + GLASS.w + 10) this.birds = null
+      if (this.birds.x > this.theme.view.x + this.theme.view.w + 10) this.birds = null
     }
 
     // Nốt nhạc bay lên từ tai nghe khi đang phát nhạc
     this.nextNote -= dt
     if (this.musicOn && this.nextNote <= 0) {
-      this.notes.push({x: HEADPHONES.x, y: HEADPHONES.y, age: 0, drift: this.rng() < 0.5 ? -1 : 1})
+      this.notes.push({x: this.theme.headphones.x, y: this.theme.headphones.y, age: 0, drift: this.rng() < 0.5 ? -1 : 1})
       this.nextNote = 1.6 + this.rng() * 1.4
     }
     for (const n of this.notes) {
@@ -504,7 +527,8 @@ export class ChillScene {
     }
     this.notes = this.notes.filter((n) => n.age < 3)
 
-    this.updateCharacter(dt)
+    if (this.theme.character === 'video') this.updateCharacter(dt)
+    else this.updatePose(dt)
     this.updateCat(dt)
 
     if (rainy) this.rain.update(dt)
@@ -574,6 +598,24 @@ export class ChillScene {
     return spriteSize(m.sprite)
   }
 
+  // Theme ảnh tĩnh: gõ phím = đổi qua lại 2 tư thế tay; thỉnh thoảng cầm ly uống
+  private updatePose(dt: number) {
+    if (this.paused) return
+    this.poseHold -= dt
+    this.nextPoseSip -= dt
+    if (this.poseHold > 0) return
+    if (this.nextPoseSip <= 0) {
+      this.pose = 'sip'
+      this.poseHold = 2.4 + this.rng()
+      this.nextPoseSip = 20 + this.rng() * 15
+      return
+    }
+    // Gõ phím: nhịp không đều như người thật, thỉnh thoảng dừng tay
+    const pause = this.rng() < 0.12
+    this.pose = pause || this.pose === 'typing' ? 'base' : 'typing'
+    this.poseHold = pause ? 0.8 + this.rng() * 1.2 : 0.18 + this.rng() * 0.22
+  }
+
   // Lặp đoạn gõ phím; cứ vài vòng mới cho phát đoạn cầm ly uống (SIP_START → SIP_END)
   private updateCharacter(dt: number) {
     if (this.paused) return
@@ -602,7 +644,9 @@ export class ChillScene {
       this.pawTarget = null
       return
     }
-    this.pawTarget ??= this.rain.plant(CAT_PAW_TIP.x, CAT_PAW_TIP.y)
+    // Chỉ khều được khi có kính (ban công không có kính)
+    if (!this.theme.panes.length) return
+    this.pawTarget ??= this.rain.plant(this.cat.pawTip.x, this.cat.pawTip.y)
     if (this.cat.pawing && !this.pawTarget.slide) this.rain.poke(this.pawTarget)
   }
 
@@ -617,12 +661,12 @@ export class ChillScene {
 
   // Vùng bấm vào mèo, theo lưới canvas đệm (px thật 640×360)
   get catHitBox() {
-    return CAT_HIT
+    return this.cat.hitBox
   }
 
-  // Cuốn sổ mở trên bàn → mở Wishlist
+  // Cuốn sổ mở trên bàn → mở Wishlist (theme không có sổ → null)
   get notebookHitBox() {
-    return NOTEBOOK_HIT
+    return this.theme.notebook
   }
 
   private spawnVehicle(x?: number) {
@@ -703,17 +747,17 @@ export class ChillScene {
     ctx.fillStyle = '#1a1520'
     ctx.fillRect(0, 0, SCENE_W, SCENE_H)
 
+    const {view, panes, streetDy} = this.theme
+    const street = {...STREET_IMG, y: STREET_IMG.y + streetDy}
     ctx.save()
     ctx.beginPath()
-    ctx.rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h)
+    ctx.rect(view.x, view.y, view.w, view.h)
     ctx.clip()
 
-    if (ready(this.prevStreet) && this.fade < 1) {
-      ctx.drawImage(this.prevStreet, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
-    }
+    if (ready(this.prevStreet) && this.fade < 1) this.drawStreet(this.prevStreet, street, view)
     if (ready(this.street)) {
       ctx.globalAlpha = this.prevStreet ? this.fade : 1
-      ctx.drawImage(this.street, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+      this.drawStreet(this.street, street, view)
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)
@@ -724,18 +768,19 @@ export class ChillScene {
     if (this.weather === 'rain') {
       ctx.globalCompositeOperation = 'multiply'
       ctx.fillStyle = this.time === 'night' ? '#8a90a8' : '#9ea6b2'
-      ctx.fillRect(GLASS.x, GLASS.y, GLASS.w, GLASS.h)
+      ctx.fillRect(view.x, view.y, view.w, view.h)
       ctx.globalCompositeOperation = 'source-over'
       // Mặt đường ướt phản chiếu mờ dãy nhà (lật ngược quanh mép vỉa hè)
       if (ready(this.street)) {
+        const edge = SIDEWALK_Y + streetDy + 1
         ctx.save()
         ctx.beginPath()
-        ctx.rect(GLASS.x, SIDEWALK_Y + 1, GLASS.w, GLASS.y + GLASS.h - SIDEWALK_Y - 1)
+        ctx.rect(view.x, edge, view.w, Math.max(0, street.y + street.h - edge))
         ctx.clip()
         ctx.globalAlpha = 0.16
-        ctx.translate(0, (SIDEWALK_Y + 1) * 2)
+        ctx.translate(0, edge * 2)
         ctx.scale(1, -1)
-        ctx.drawImage(this.street, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+        ctx.drawImage(this.street, street.x, street.y, street.w, street.h)
         ctx.restore()
       }
       ctx.save()
@@ -744,20 +789,20 @@ export class ChillScene {
       ctx.restore()
     } else if (this.weather === 'mist') {
       ctx.fillStyle = this.time === 'night' ? 'rgba(150,160,190,0.35)' : 'rgba(236,238,240,0.5)'
-      ctx.fillRect(GLASS.x, GLASS.y, GLASS.w, GLASS.h)
+      ctx.fillRect(view.x, view.y, view.w, view.h)
     }
 
-    // Kính cửa: vệt phản chiếu chéo + giọt nước khi mưa
+    // Kính cửa: vệt phản chiếu chéo + giọt nước khi mưa (ban công không có kính)
     ctx.fillStyle = 'rgba(255,255,255,0.05)'
-    for (const pane of PANES) {
+    for (const pane of panes) {
       ctx.beginPath()
-      ctx.moveTo(pane.x + 20, GLASS.y)
-      ctx.lineTo(pane.x + 34, GLASS.y)
-      ctx.lineTo(pane.x + 4, GLASS.y + GLASS.h)
-      ctx.lineTo(pane.x - 10, GLASS.y + GLASS.h)
+      ctx.moveTo(pane.x + 20, view.y)
+      ctx.lineTo(pane.x + 34, view.y)
+      ctx.lineTo(pane.x + 4, view.y + view.h)
+      ctx.lineTo(pane.x - 10, view.y + view.h)
       ctx.fill()
     }
-    if (this.weather === 'rain') {
+    if (this.weather === 'rain' && panes.length) {
       ctx.save()
       ctx.setTransform(RES, 0, 0, RES, 0, 0)
       this.rain.drawGlass(ctx, this.buffer, this.time === 'night')
@@ -769,10 +814,16 @@ export class ChillScene {
     ctx.save()
     // Lớp vẽ theo px gốc 640×360
     ctx.setTransform(RES, 0, 0, RES, 0, 0)
-    // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
-    if (ready(this.charSheet) && ready(this.interior)) {
-      drawScreen(ctx, t, this.time === 'night')
-      ctx.drawImage(this.charFrameCanvas(), CHAR.x, CHAR.y, CHAR.w, CHAR.h)
+    const character = this.theme.character
+    if (character === 'video') {
+      // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
+      if (ready(this.charSheet) && ready(this.interior)) {
+        if (this.theme.screen) drawScreen(ctx, t, this.time === 'night')
+        ctx.drawImage(this.charFrameCanvas(), CHAR.x, CHAR.y, CHAR.w, CHAR.h)
+      }
+    } else if (ready(this.poseSheet) && ready(this.interior)) {
+      const {at} = character
+      ctx.drawImage(this.poseFrameCanvas(character), at.x, at.y, at.w, at.h)
     }
     this.cat.draw(ctx, this.catTinted)
     if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
@@ -780,6 +831,40 @@ export class ChillScene {
     this.drawSteam(t)
     this.drawNotes()
     this.drawLights()
+  }
+
+  // Ảnh phố + kéo dài hàng pixel trên cùng (trời) / dưới cùng (mặt đường) khi vùng
+  // nhìn cao hơn ảnh (ban công)
+  private drawStreet(img: HTMLImageElement, r: {x: number; y: number; w: number; h: number}, view: {y: number; h: number}) {
+    const ctx = this.ctx
+    // 1 hàng pixel của ảnh
+    const sy = img.naturalHeight / r.h
+    ctx.drawImage(img, r.x, r.y, r.w, r.h)
+    if (view.y < r.y) ctx.drawImage(img, 0, 0, img.naturalWidth, sy, r.x, view.y, r.w, r.y - view.y)
+    const bottom = r.y + r.h
+    if (view.y + view.h > bottom) {
+      ctx.drawImage(img, 0, img.naturalHeight - sy, img.naturalWidth, sy, r.x, bottom, r.w, view.y + view.h - bottom)
+    }
+  }
+
+  // Tư thế hiện tại của người ngồi (theme ảnh tĩnh), đã tô màu theo giờ/thời tiết
+  private poseFrame = document.createElement('canvas')
+  private poseFrameKey = ''
+  private poseFrameCanvas(c: Exclude<Theme['character'], 'video'>) {
+    const key = `${this.theme.id}:${this.pose}:${this.time}:${this.weather}`
+    if (key !== this.poseFrameKey && this.poseSheet) {
+      this.poseFrameKey = key
+      const [sx, sy] = c.cells[this.pose]
+      const w = c.at.w * 2
+      const h = c.at.h * 2
+      this.poseFrame.width = w
+      this.poseFrame.height = h
+      const g = this.poseFrame.getContext('2d')!
+      g.clearRect(0, 0, w, h)
+      g.drawImage(this.poseSheet, sx, sy, w, h, 0, 0, w, h)
+      this.wash(g, w, h)
+    }
+    return this.poseFrame
   }
 
   private drawBirds(b: {x: number; y: number; p: number}) {
@@ -936,13 +1021,15 @@ export class ChillScene {
     this.rect(back, ly, 1, 1, m.braking ? '#ff5a44' : '#e0382a')
   }
 
-  // Hơi nước bốc lên từ nắp phin
+  // Hơi nước bốc lên từ nắp phin / cốc cà phê (theme không có đồ nóng thì thôi)
   private drawSteam(t: number) {
+    const at = this.theme.steam
+    if (!at) return
     const cold = this.weather !== 'clear' || this.time === 'morning'
     for (let i = 0; i < 3; i++) {
       for (let s = 0; s < 12; s++) {
-        const y = PHIN.y - s * 2 - Math.floor((t * 5 + i * 1.3) % 2)
-        const x = PHIN.x + (i - 1) * 2 + Math.round(Math.sin(s * 0.55 + t * 1.4 + i * 2.1) * 2)
+        const y = at.y - s * 2 - Math.floor((t * 5 + i * 1.3) % 2)
+        const x = at.x + (i - 1) * 2 + Math.round(Math.sin(s * 0.55 + t * 1.4 + i * 2.1) * 2)
         const a = (1 - s / 12) * (cold ? 0.4 : 0.25)
         this.rect(x, y, 1, 1, `rgba(255,255,255,${a.toFixed(2)})`)
       }
@@ -984,21 +1071,23 @@ export class ChillScene {
       }
     }
 
-    const lampOn = this.time !== 'morning' || this.weather === 'rain'
+    const {lamp, lampAlways, laptop} = this.theme
+    const lampOn = lampAlways || this.time !== 'morning' || this.weather === 'rain'
     if (lampOn) {
-      const g = ctx.createRadialGradient(LAMP.x, LAMP.y, 1, LAMP.x, LAMP.y, 110)
+      const g = ctx.createRadialGradient(lamp.x, lamp.y, 1, lamp.x, lamp.y, 110)
       g.addColorStop(0, 'rgba(255,190,110,0.38)')
       g.addColorStop(1, 'rgba(255,190,110,0)')
       ctx.fillStyle = g
       ctx.fillRect(0, 0, SCENE_W, SCENE_H)
-      this.rect(LAMP.x - 3, LAMP.y - 1, 7, 2, 'rgba(255,231,168,0.9)')
+      // Bóng đèn thả của quán
+      if (this.theme.id === 'cafe') this.rect(lamp.x - 3, lamp.y - 1, 7, 2, 'rgba(255,231,168,0.9)')
     }
     const screen = this.time === 'night' ? 0.28 : 0.1
-    const g = ctx.createRadialGradient(LAPTOP.x, LAPTOP.y, 1, LAPTOP.x, LAPTOP.y, 40)
+    const g = ctx.createRadialGradient(laptop.x, laptop.y, 1, laptop.x, laptop.y, 40)
     g.addColorStop(0, `rgba(130,175,255,${screen})`)
     g.addColorStop(1, 'rgba(130,175,255,0)')
     ctx.fillStyle = g
-    ctx.fillRect(LAPTOP.x - 40, LAPTOP.y - 40, 80, 80)
+    ctx.fillRect(laptop.x - 40, laptop.y - 40, 80, 80)
     ctx.restore()
 
     const v = ctx.createRadialGradient(SCENE_W / 2, SCENE_H / 2, 90, SCENE_W / 2, SCENE_H / 2, 200)

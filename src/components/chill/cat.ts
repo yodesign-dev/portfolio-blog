@@ -35,12 +35,8 @@ const FRAMES = {
 type Frame = keyof typeof FRAMES
 type Step = [Frame, number] // khung, số giây
 
-// Chân sau của mèo trên bậu cửa (px thật trên canvas đệm)
-const REAR = {x: 112, y: 296}
-// Vùng bấm được (px thật) — phủ cả tư thế nằm lẫn ngồi
-export const CAT_HIT = {x: REAR.x - 6, y: REAR.y - 70, w: 96, h: 74}
-// Đầu ngón chân khi khều (khung paw-2 / paw-4) → chỗ đặt giọt mưa trên kính
-export const CAT_PAW_TIP = {x: REAR.x + 62, y: REAR.y - 77}
+// Chân sau của mèo (px gốc 640×360) — mỗi theme đặt mèo một chỗ (xem themes.ts)
+type Pt = {x: number; y: number}
 
 export type CatAction = 'tail' | 'stir' | 'look' | 'stretch' | 'groom' | 'paw' | 'pet'
 
@@ -107,6 +103,22 @@ export class Cat {
   private hearts: Heart[] = []
   private pets = 0
   action: CatAction | null = null
+  private rear: Pt = {x: 112, y: 296}
+
+  setRear(p: Pt) {
+    this.rear = p
+    this.hearts = []
+  }
+
+  // Vùng bấm được (px gốc) — phủ cả tư thế nằm lẫn ngồi
+  get hitBox() {
+    return {x: this.rear.x - 6, y: this.rear.y - 70, w: 96, h: 74}
+  }
+
+  // Đầu ngón chân khi khều (khung paw-2 / paw-4) → chỗ đặt giọt mưa trên kính
+  get pawTip() {
+    return {x: this.rear.x + 62, y: this.rear.y - 77}
+  }
   // Đang giơ chân khều (để cảnh đặt giọt mưa đúng chỗ)
   get pawing() {
     return this.frame === 'paw-2' || this.frame === 'paw-4'
@@ -178,7 +190,7 @@ export class Cat {
     this.play(stretch ? 'stretch' : 'pet')
     this.next = 6
     for (let i = 0; i < 3; i++) {
-      this.hearts.push({x: REAR.x + 52 + (i - 1) * 12, y: REAR.y - 66 - i * 6, age: -i * 0.18, drift: i * 2})
+      this.hearts.push({x: this.rear.x + 52 + (i - 1) * 12, y: this.rear.y - 66 - i * 6, age: -i * 0.18, drift: i * 2})
     }
     return this.pets % 2 ? 'meow' : 'purr'
   }
@@ -189,17 +201,17 @@ export class Cat {
     const [sx, sy, sw, sh, ax] = FRAMES[this.frame]
     const w = sw / ATLAS_SCALE
     const h = sh / ATLAS_SCALE
-    const x = REAR.x - ax / ATLAS_SCALE
+    const x = this.rear.x - ax / ATLAS_SCALE
     const sitting = this.frame.startsWith('paw') || this.frame === 'stretch-3'
     // Bóng mềm dưới thân
     ctx.fillStyle = 'rgba(40,20,10,0.22)'
-    const bx = sitting ? x + 8 : REAR.x - 2
+    const bx = sitting ? x + 8 : this.rear.x - 2
     const bw = sitting ? w - 16 : 76
-    ctx.fillRect(bx, REAR.y - 2, bw, 2)
-    ctx.fillRect(bx + 6, REAR.y, bw - 12, 2)
+    ctx.fillRect(bx, this.rear.y - 2, bw, 2)
+    ctx.fillRect(bx + 6, this.rear.y, bw - 12, 2)
     // Thở: lưng phồng lên 1px rồi xẹp xuống (~3.5s/nhịp) khi đang nằm ngủ
     const inhale = this.frame === 'sleep' && this.breath % 3.5 < 1.6 ? 0.5 : 0
-    ctx.drawImage(atlas, sx, sy, sw, sh, x, REAR.y - h - inhale, w, h + inhale)
+    ctx.drawImage(atlas, sx, sy, sw, sh, x, this.rear.y - h - inhale, w, h + inhale)
     this.drawHearts(ctx)
   }
 

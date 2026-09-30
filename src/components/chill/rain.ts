@@ -51,8 +51,10 @@ export class Rain {
       L(100, [10, 16], [380, 450], [top + 6, bottom - 1], 0.45, 0.75, 0.6),
       L(24, [24, 36], [620, 720], null, 0.28, 2, 0),
     ]
-    this.drips = [0.18, 0.5, 0.83].flatMap((k) => panes.map((p) => ({x: Math.round(p.x + p.w * k), grow: rand(0, 1), y: -1, vy: 0})))
-    for (let i = 0; i < 45; i++) this.beads.push(this.bead())
+    // Không có kính (ban công) → không có giọt đọng; nước mái hiên rải theo cả vùng nhìn
+    const eaves = panes.length ? panes : [{x: glass.x, w: glass.w}]
+    this.drips = [0.18, 0.5, 0.83].flatMap((k) => eaves.map((p) => ({x: Math.round(p.x + p.w * k), grow: rand(0, 1), y: -1, vy: 0})))
+    if (panes.length) for (let i = 0; i < 45; i++) this.beads.push(this.bead())
   }
 
   private streak(len: [number, number], speed: [number, number], ground: [number, number] | null, anywhere = false): Streak {
@@ -154,6 +156,7 @@ export class Rain {
   }
 
   private updateBeads(dt: number) {
+    if (!this.panes.length) return
     const g = this.glass
     this.nextBead -= dt
     if (this.nextBead <= 0 && this.beads.length < 70) {
