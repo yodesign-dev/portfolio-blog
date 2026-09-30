@@ -6,8 +6,9 @@ import tool from './tool'
 import timelineYear from './timelineYear'
 import chillTrack from './chillTrack'
 import chillDestination from './chillDestination'
+import chillWish from './chillWish'
 
 export const schema: {types: SchemaTypeDefinition[]} = {
   // ⬇️ CẬP NHẬT: thêm timelineYear vào danh sách types
-  types: [post, resume, tool, timelineYear, chillTrack, chillDestination],
+  types: [post, resume, tool, timelineYear, chillTrack, chillDestination, chillWish],
 }

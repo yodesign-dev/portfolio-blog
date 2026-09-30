@@ -7,6 +7,7 @@ import {ChillScene, SCENE_H, SCENE_W, type TimeOfDay, type Weather} from './scen
 import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
+import {Wishlist} from './Wishlist'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -14,6 +15,8 @@ const CAT_PETTED_KEY = 'chill:cat-petted'
 const CAT_HINT_DELAY = 4000
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
+
+type Box = {left: number; top: number; width: number; height: number}
 
 type Prefs = {
   trackId: string
@@ -91,7 +94,9 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [travel, setTravel] = useState(5)
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
-  const [catBox, setCatBox] = useState<{left: number; top: number; width: number; height: number} | null>(null)
+  const [catBox, setCatBox] = useState<Box | null>(null)
+  const [bookBox, setBookBox] = useState<Box | null>(null)
+  const [wishOpen, setWishOpen] = useState(false)
   const [catPetted, setCatPetted] = useState(true)
   const [catHint, setCatHint] = useState(false)
 
@@ -188,10 +193,13 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       const bw = SCENE_W * 2
       const bh = SCENE_H * 2
       const k = (portrait ? Math.min : Math.max)(cw / bw, ch / bh)
-      const hit = scene.catHitBox
-      const left = (cw - bw * k) / 2 + hit.x * k
-      const top = (ch - bh * k) / 2 + hit.y * k
-      setCatBox(left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k})
+      const toBox = (hit: {x: number; y: number; w: number; h: number}): Box | null => {
+        const left = (cw - bw * k) / 2 + hit.x * k
+        const top = (ch - bh * k) / 2 + hit.y * k
+        return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
+      }
+      setCatBox(toBox(scene.catHitBox))
+      setBookBox(toBox(scene.notebookHitBox))
     }
     const ro = new ResizeObserver(fit)
     ro.observe(canvas)
@@ -489,7 +497,13 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           break
         case 's':
         case 'S':
+          setWishOpen(false)
           setPanelOpen((o) => !o)
+          break
+        case 'w':
+        case 'W':
+          setPanelOpen(false)
+          setWishOpen((o) => !o)
           break
         case 'Escape':
           setPanelOpen(false)
@@ -536,7 +550,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !hovering
+  const hideUi = idle && started && !panelOpen && !wishOpen && !hovering
   const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -572,6 +586,27 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
             <PawIcon />
             Pet me
             <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
+          </span>
+        </button>
+      )}
+
+      {/* Cuốn sổ trên bàn: mở Wishlist (lối vào thứ 2, cạnh nút pill) */}
+      {bookBox && (
+        <button
+          type="button"
+          aria-label="Open the café wishlist"
+          onClick={() => {
+            setPanelOpen(false)
+            setWishOpen(true)
+          }}
+          className="group absolute cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          style={bookBox}
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
+          >
+            💡 Wishlist
           </span>
         </button>
       )}
@@ -621,7 +656,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       {/* Dock nhạc nổi phía dưới */}
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
-          panelOpen ? 'sm:pr-[436px]' : ''
+          panelOpen ? 'sm:pr-[436px]' : wishOpen ? 'lg:pr-[450px]' : ''
         } ${fade}`}
       >
         <div
@@ -665,7 +700,10 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
             />
             <button
               type="button"
-              onClick={() => setPanelOpen((o) => !o)}
+              onClick={() => {
+                setWishOpen(false)
+                setPanelOpen((o) => !o)
+              }}
               aria-label="Settings"
               aria-expanded={panelOpen}
               aria-controls="chill-panel"
@@ -696,6 +734,17 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           </div>
         </div>
       </div>
+
+      <Wishlist
+        open={wishOpen}
+        onOpenChange={(o) => {
+          if (o) setPanelOpen(false)
+          setWishOpen(o)
+        }}
+        dimmed={hideUi}
+        hidden={panelOpen}
+        context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
+      />
 
       {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}
       <aside

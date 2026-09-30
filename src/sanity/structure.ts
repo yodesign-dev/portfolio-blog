@@ -13,6 +13,34 @@ export const structure: StructureResolver = (S) =>
       // Trang /chill: nhạc + điểm đến thêm từ Studio (ngoài bộ có sẵn trong code)
       S.documentTypeListItem('chillTrack').title('Chill · Nhạc'),
       S.documentTypeListItem('chillDestination').title('Chill · Điểm đến'),
+      // Góp ý người xem gửi từ khung Wishlist (tạo qua API, không tạo tay ở đây)
+      S.listItem()
+        .title('Chill · Wishlist')
+        .id('chillWish')
+        .child(
+          S.list()
+            .title('Chill · Wishlist')
+            .items(
+              [
+                ['pending', '⏳ Chờ duyệt', 'status == "pending"'],
+                ['public', '👀 Đang hiện', 'status in ["considering", "planned"]'],
+                ['shipped', '✅ Đã làm', 'status == "shipped"'],
+                ['hidden', '🚫 Đã ẩn', 'status == "hidden"'],
+                ['all', 'Tất cả', 'true'],
+              ].map(([id, title, filter]) =>
+                S.listItem()
+                  .id(id)
+                  .title(title)
+                  .child(
+                    S.documentTypeList('chillWish')
+                      .title(title)
+                      .filter(`_type == "chillWish" && ${filter}`)
+                      .defaultOrdering([{field: '_createdAt', direction: 'desc'}])
+                      .initialValueTemplates([]),
+                  ),
+              ),
+            ),
+        ),
       S.divider(),
 
       S.listItem()
@@ -25,6 +53,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish'].includes(listItem.getId() as string),
       ),
     ])

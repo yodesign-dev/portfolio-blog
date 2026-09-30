@@ -51,6 +51,9 @@ const LAMP = {x: 63, y: 42}
 const LAPTOP = {x: 235, y: 119}
 const HEADPHONES = {x: 262, y: 90}
 
+// Cuốn sổ trên bàn (px thật trên canvas đệm 640×360)
+const NOTEBOOK_HIT = {x: 324, y: 264, w: 102, h: 44}
+
 const FADE_SECONDS = 1.2
 const INTERIOR_SRC = '/chill/scenes/interior.webp'
 // Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
@@ -579,6 +582,11 @@ export class ChillScene {
     return CAT_HIT
   }
 
+  // Cuốn sổ mở trên bàn → mở Wishlist
+  get notebookHitBox() {
+    return NOTEBOOK_HIT
+  }
+
   private spawnVehicle(x?: number) {
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
@@ -722,8 +730,8 @@ export class ChillScene {
     ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W, SCENE_H)
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)
-    // Màn hình laptop chỉ hiện khi đã khoét vùng người ngồi (sheet đã tải)
-    if (this.charTinted.width) {
+    // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
+    if (this.charTinted.width && ready(this.interior)) {
       drawScreen(ctx, t, this.time === 'night')
       const [sx, sy] = this.charCell(Math.min(CHAR.frames - 1, Math.floor(this.charTime * CHAR.fps)))
       ctx.drawImage(this.charTinted, sx, sy, CHAR.w, CHAR.h, CHAR.x, CHAR.y, CHAR.w, CHAR.h)
