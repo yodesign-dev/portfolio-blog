@@ -287,7 +287,7 @@ export function Wishlist({
         </header>
 
         {view === 'donate' ? (
-          <Donate onThanks={onThanks} />
+          <Donate onThanks={onThanks} context={context} />
         ) : (
           <>
             <div className="flex items-center gap-1 px-5 pt-3" role="tablist" aria-label="Sort wishes">

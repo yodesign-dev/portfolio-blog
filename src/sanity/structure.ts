@@ -41,6 +41,16 @@ export const structure: StructureResolver = (S) =>
               ),
             ),
         ),
+      // Người xem bấm "I've sent it" ở mục Buy Bin a coffee và để lại lời nhắn
+      S.listItem()
+        .title('Chill · Supporters')
+        .id('chillSupporter')
+        .child(
+          S.documentTypeList('chillSupporter')
+            .title('Chill · Supporters')
+            .defaultOrdering([{field: '_createdAt', direction: 'desc'}])
+            .initialValueTemplates([]),
+        ),
       S.divider(),
 
       S.listItem()
@@ -53,6 +63,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter'].includes(listItem.getId() as string),
       ),
     ])
