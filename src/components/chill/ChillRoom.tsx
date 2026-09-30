@@ -133,6 +133,8 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   useEffect(() => {
     const scene = new ChillScene(canvasRef.current!)
     sceneRef.current = scene
+    // Tiếng xe chạy qua, còi, chó sủa ngoài phố → phát qua bộ âm thanh (theo thanh Ambience)
+    scene.onSound = (kind, pan, dir) => audioRef.current?.streetSound(kind, pan, dir)
     let raf = 0
     let lastDraw = 0
     scene.frame(performance.now())

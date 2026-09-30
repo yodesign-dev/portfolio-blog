@@ -2,6 +2,8 @@
 // Sprite AI (Nano Banana qua Figma Weave), nhìn ngang, đáy căn sát mép dưới khung.
 // Hầu hết hướng sang PHẢI; ngoại lệ hướng sang trái khai báo ở FACES_LEFT
 // (scene.ts). Đi ngược chiều thì lật bằng code.
+//   vendor-0…3, walker-0…3: chu kỳ bước chân · dog-0…3: chó chạy
+//   dog-stand / dog-wag / dog-sniff / dog-sit: tư thế chó khi dừng
 
 export const SPRITE_SRC = '/chill/sprites.png'
 
@@ -16,13 +18,23 @@ export const SPRITES = {
   'car-hatch': [324, 0, 62, 28],
   'bus': [388, 0, 84, 44],
   'cyclo': [474, 0, 54, 40],
-  'vendor': [530, 0, 34, 34],
-  'cyclist': [566, 0, 36, 34],
-  'walker': [604, 0, 16, 34],
-  'dog-0': [622, 0, 20, 14],
-  'dog-1': [644, 0, 22, 14],
-  'dog-2': [668, 0, 22, 12],
-  'dog-3': [692, 0, 18, 14],
+  'cyclist': [530, 0, 36, 34],
+  'dog-0': [568, 0, 20, 14],
+  'dog-1': [590, 0, 22, 14],
+  'dog-2': [614, 0, 22, 12],
+  'dog-3': [638, 0, 18, 14],
+  'vendor-0': [658, 0, 30, 34],
+  'vendor-1': [690, 0, 26, 36],
+  'vendor-2': [718, 0, 30, 34],
+  'vendor-3': [750, 0, 24, 34],
+  'walker-0': [776, 0, 16, 34],
+  'walker-1': [794, 0, 10, 34],
+  'walker-2': [806, 0, 16, 34],
+  'walker-3': [824, 0, 16, 34],
+  'dog-stand': [842, 0, 16, 14],
+  'dog-wag': [860, 0, 20, 14],
+  'dog-sit': [882, 0, 16, 14],
+  'dog-sniff': [900, 0, 20, 10],
 } satisfies Record<string, [number, number, number, number]>
 
 export type SpriteName = keyof typeof SPRITES

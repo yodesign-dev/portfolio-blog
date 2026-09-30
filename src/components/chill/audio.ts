@@ -9,6 +9,7 @@
 import type {SynthSpec, Track} from './tracks'
 
 export type Ambience = 'street' | 'rain' | 'quiet'
+export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark'
 
 const midiToHz = (note: number) => 440 * Math.pow(2, (note - 69) / 12)
 
@@ -75,7 +76,9 @@ export class ChillAudio {
   private white!: AudioBuffer
   private rainGain!: GainNode
   private streetGain!: GainNode
+  private sfxGain!: GainNode
   private element: HTMLAudioElement | null = null
+  private sfxIn: AudioNode | null = null
 
   private track: Track | null = null
   private trackBus: GainNode | null = null
@@ -180,6 +183,16 @@ export class ChillAudio {
     this.streetGain.gain.value = 0
     street.connect(streetLp).connect(this.streetGain).connect(ctx.destination)
     street.start()
+
+    // Âm thanh ngoài phố (xe chạy qua, còi, chó sủa): lọc bớt treble như nghe
+    // vọng qua cửa kính, âm lượng đi theo thanh Ambience
+    const sfxLp = ctx.createBiquadFilter()
+    sfxLp.type = 'lowpass'
+    sfxLp.frequency.value = 1800
+    this.sfxGain = ctx.createGain()
+    this.sfxGain.gain.value = 0
+    sfxLp.connect(this.sfxGain).connect(ctx.destination)
+    this.sfxIn = sfxLp
     this.applyAmbience()
 
     return ctx
@@ -264,6 +277,79 @@ export class ChillAudio {
     this.applyAmbience()
   }
 
+  // Âm thanh 1 sự kiện ngoài phố. pan -1…1 là vị trí trái/phải, dir là chiều
+  // xe chạy (tiếng "vù" quét theo chiều đó). Chưa có AudioContext (người xem
+  // chưa bấm gì) thì bỏ qua — không tự bật âm thanh.
+  streetSound(kind: StreetSound, pan = 0, dir: 1 | -1 = 1) {
+    const ctx = this.ctx
+    if (!ctx || !this.sfxIn || this.ambienceLevel <= 0) return
+    const now = ctx.currentTime
+    const panner = ctx.createStereoPanner()
+    panner.connect(this.sfxIn)
+
+    if (kind === 'whoosh' || kind === 'whoosh-big') {
+      const big = kind === 'whoosh-big'
+      const len = big ? 1.8 : 1.2
+      const src = ctx.createBufferSource()
+      src.buffer = this.white
+      const bp = ctx.createBiquadFilter()
+      bp.type = 'bandpass'
+      bp.frequency.setValueAtTime(big ? 380 : 650, now)
+      bp.frequency.linearRampToValueAtTime(big ? 300 : 480, now + len)
+      bp.Q.value = 0.9
+      const env = ctx.createGain()
+      env.gain.setValueAtTime(0, now)
+      env.gain.linearRampToValueAtTime(big ? 0.5 : 0.3, now + len * 0.45)
+      env.gain.linearRampToValueAtTime(0, now + len)
+      panner.pan.setValueAtTime(-0.9 * dir, now)
+      panner.pan.linearRampToValueAtTime(0.9 * dir, now + len)
+      src.connect(bp).connect(env).connect(panner)
+      src.start(now, Math.random())
+      src.stop(now + len + 0.05)
+      return
+    }
+
+    panner.pan.value = Math.max(-1, Math.min(1, pan))
+    if (kind === 'horn') {
+      // Còi xe máy "bíp bíp": 2 tiếng ngắn, 2 nốt chồng
+      for (const [start, dur] of [
+        [0, 0.12],
+        [0.18, 0.16],
+      ]) {
+        const env = ctx.createGain()
+        env.gain.setValueAtTime(0, now + start)
+        env.gain.linearRampToValueAtTime(0.07, now + start + 0.01)
+        env.gain.setValueAtTime(0.07, now + start + dur - 0.02)
+        env.gain.linearRampToValueAtTime(0, now + start + dur)
+        env.connect(panner)
+        for (const f of [415, 523]) {
+          const o = ctx.createOscillator()
+          o.type = 'square'
+          o.frequency.value = f
+          o.connect(env)
+          o.start(now + start)
+          o.stop(now + start + dur + 0.02)
+        }
+      }
+      return
+    }
+
+    // Chó sủa "gâu gâu"
+    for (const start of [0, 0.22]) {
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.frequency.setValueAtTime(560, now + start)
+      o.frequency.exponentialRampToValueAtTime(260, now + start + 0.11)
+      const env = ctx.createGain()
+      env.gain.setValueAtTime(0, now + start)
+      env.gain.linearRampToValueAtTime(0.09, now + start + 0.01)
+      env.gain.exponentialRampToValueAtTime(0.001, now + start + 0.14)
+      o.connect(env).connect(panner)
+      o.start(now + start)
+      o.stop(now + start + 0.16)
+    }
+  }
+
   // Mức năng lượng theo dải tần cho thanh visualizer
   levels(out: Uint8Array<ArrayBuffer>) {
     if (!this.ctx) return out.fill(0)
@@ -288,6 +374,7 @@ export class ChillAudio {
     const street = this.ambience === 'street' ? v * 0.6 : this.ambience === 'rain' ? v * 0.15 : v * 0.25
     this.rainGain.gain.setTargetAtTime(rain, now, 0.4)
     this.streetGain.gain.setTargetAtTime(street, now, 0.4)
+    this.sfxGain.gain.setTargetAtTime(this.ambience === 'quiet' ? v * 0.4 : v, now, 0.2)
   }
 
   private getElement(ctx: AudioContext) {
