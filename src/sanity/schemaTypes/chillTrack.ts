@@ -24,6 +24,7 @@ export default defineType({
           {title: 'Deep Focus', value: 'focus'},
           {title: 'Sax Lounge', value: 'sax'},
           {title: 'Lo-fi', value: 'lofi'},
+          {title: 'Study Beats', value: 'study'},
         ],
         layout: 'radio',
       },

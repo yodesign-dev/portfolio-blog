@@ -816,7 +816,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
             <SectionTitle index="01" title="Music" />
 
             {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
-            <div className="mt-4 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
+            <div className="mt-4 grid grid-cols-5 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
               {STATIONS.map((st) => {
                 const count = tracks.filter((t) => stationOf(t) === st.id).length
                 const on = st.id === station

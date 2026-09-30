@@ -18,13 +18,14 @@ export type SynthSpec = {
 }
 
 // Trạm nhạc theo mood — mỗi trạm phát liền mạch, các bài chồng mờ vào nhau
-export type StationId = 'acoustic' | 'focus' | 'sax' | 'lofi'
+export type StationId = 'acoustic' | 'focus' | 'sax' | 'lofi' | 'study'
 
 export const STATIONS: {id: StationId; label: string; short: string}[] = [
   {id: 'acoustic', label: 'Café Acoustic', short: 'Acoustic'},
   {id: 'focus', label: 'Deep Focus', short: 'Focus'},
   {id: 'sax', label: 'Sax Lounge', short: 'Sax'},
   {id: 'lofi', label: 'Lo-fi', short: 'Lo-fi'},
+  {id: 'study', label: 'Study Beats', short: 'Study'},
 ]
 
 export type Track = {
@@ -192,5 +193,47 @@ export const TRACKS: Track[] = [
     mood: 'Steady · Minimal',
     duration: 180,
     src: '/chill/music/deep-work.m4a',
+  },
+  // 📖 Study Beats — lo-fi hip hop để học / làm việc (Lyria 3 Pro qua Figma Weave),
+  // 70–80 BPM, trống bụi + hợp âm jazz, không lời, không có đoạn lặng giữa bài
+  {
+    id: 'study-sunlit-desk',
+    title: 'Sunlit Desk',
+    mood: 'Rhodes & flute · Bright',
+    duration: 174,
+    src: '/chill/music/study-sunlit-desk.m4a',
+    station: 'study',
+  },
+  {
+    id: 'study-open-notebook',
+    title: 'Open Notebook',
+    mood: 'Rhodes · Dusty drums',
+    duration: 174,
+    src: '/chill/music/study-open-notebook.m4a',
+    station: 'study',
+  },
+  {
+    id: 'study-library-window',
+    title: 'Library Window',
+    mood: 'Felt piano · Deep work',
+    duration: 177,
+    src: '/chill/music/study-library-window.m4a',
+    station: 'study',
+  },
+  {
+    id: 'study-phin-drip-loop',
+    title: 'Phin Drip Loop',
+    mood: 'Jazz piano & guitar · Cozy',
+    duration: 167,
+    src: '/chill/music/study-phin-drip-loop.m4a',
+    station: 'study',
+  },
+  {
+    id: 'study-late-assignment',
+    title: 'Late Assignment',
+    mood: 'Muted guitar · Late night',
+    duration: 175,
+    src: '/chill/music/study-late-assignment.m4a',
+    station: 'study',
   },
 ]
