@@ -65,7 +65,7 @@ export const dictionary = {
       resume: 'Resume',
       tools: 'Tools',
       timeline: 'Timeline',
-      getInTouch: 'Get In Touch',
+      getInTouch: 'Get in touch',
     },
     common: {
       backHome: '← Back to home',

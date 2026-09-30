@@ -52,8 +52,8 @@ function Cursor({
   );
 }
 
-function FrameLabel({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1.5 text-[11px] font-medium tracking-wide text-white/70">{children}</p>;
+function FrameLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <p className={`mb-1.5 text-xs font-semibold tracking-wide text-white/85 ${className}`}>{children}</p>;
 }
 
 // ---------- Câu chuyện ở khung Hi-fi: "người ra lệnh, AI làm, AI review, người quyết" ----------
@@ -288,7 +288,7 @@ function SkeletonScreens({ animated }: { animated: boolean }) {
         <>
           {/* AI đang tạo bản mobile */}
           <span
-            className={`absolute right-[3%] top-[6%] whitespace-nowrap rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-ink opacity-0 ${step}`}
+            className={`absolute right-[3%] top-[6%] whitespace-nowrap rounded bg-accent px-1.5 py-0.5 text-[11px] font-semibold leading-none text-ink opacity-0 ${step}`}
             style={anim(true, "pc-gen")}
           >
             ✦ Generating…
@@ -296,7 +296,7 @@ function SkeletonScreens({ animated }: { animated: boolean }) {
 
           {/* Prompt Bin gõ cho AI */}
           <div
-            className={`absolute bottom-[4%] left-[3%] flex items-center gap-1.5 rounded-md border border-brand/20 bg-white py-1 pl-2 pr-1 text-[10px] font-semibold leading-none text-brand shadow-sm opacity-0 ${step}`}
+            className={`absolute bottom-[4%] left-[3%] flex items-center gap-1.5 rounded-md border border-brand/20 bg-white py-1 pl-2 pr-1 text-[11px] font-semibold leading-none text-brand shadow-sm opacity-0 ${step}`}
             style={anim(true, "pc-prompt")}
           >
             <span aria-hidden="true">✦</span>
@@ -310,7 +310,7 @@ function SkeletonScreens({ animated }: { animated: boolean }) {
 
           {/* Nhận xét AI ghim lên nút New */}
           <div
-            className={`absolute left-[21%] top-[12%] origin-top-left rounded-md bg-accent p-1 text-[10px] font-semibold leading-none text-ink shadow-sm opacity-0 ${step}`}
+            className={`absolute left-[21%] top-[12%] origin-top-left rounded-md bg-accent p-1 text-[11px] font-semibold leading-none text-ink shadow-sm opacity-0 ${step}`}
             style={anim(true, "pc-note-pop")}
           >
             <div className="relative">
@@ -350,28 +350,36 @@ function HiFiFrame({
       } ${study ? "group-hover:-translate-y-1" : ""}`}
     >
       <SkeletonScreens animated={animated} />
+    </div>
+  );
+
+  // Cue "View case study →" luôn hiện trên dòng nhãn (trước chỉ hiện khi
+  // hover, nên không ai biết frame bấm được — và trên mobile thì không bao
+  // giờ thấy). Cả nhãn lẫn frame nằm trong 1 link.
+  const label = (
+    <div className="flex items-baseline justify-between gap-3">
+      <FrameLabel className="min-w-0 truncate">Hi-fi{study ? ` · ${study.title}` : ""}</FrameLabel>
       {study && (
-        <span className="absolute bottom-2 left-2 rounded bg-ink/85 px-2 py-1 text-[11px] font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-          View case study →
+        <span className="mb-1.5 whitespace-nowrap text-xs font-semibold text-white underline decoration-white/40 underline-offset-4 transition group-hover:decoration-white">
+          Case study →
         </span>
       )}
     </div>
   );
 
-  return (
+  return study ? (
+    <Link
+      href={study.href}
+      aria-label={`${study.title} — case study`}
+      className={`group flex flex-col focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white ${className}`}
+    >
+      {label}
+      <div className="min-h-0 flex-1">{body}</div>
+    </Link>
+  ) : (
     <div className={`flex flex-col ${className}`}>
-      <FrameLabel>Hi-fi{study ? ` · ${study.title}` : ""}</FrameLabel>
-      {study ? (
-        <Link
-          href={study.href}
-          aria-label={`${study.title} — case study`}
-          className="group block min-h-0 flex-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-        >
-          {body}
-        </Link>
-      ) : (
-        <div className="min-h-0 flex-1">{body}</div>
-      )}
+      {label}
+      <div className="min-h-0 flex-1">{body}</div>
     </div>
   );
 }

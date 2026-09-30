@@ -24,7 +24,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
             onClick={() => openModal(undefined, 'footer')}
             className="mt-6 flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-sm font-bold text-ink transition hover:bg-accent-hover"
           >
-            Get In Touch
+            Get in touch
           </button>
         </div>
 

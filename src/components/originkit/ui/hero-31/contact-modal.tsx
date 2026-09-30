@@ -192,10 +192,15 @@ export function ContactModal() {
           if (e.target === e.currentTarget) closeModal();
         }}
       >
-        <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="contact-modal-title"
+          className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8"
+        >
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight text-neutral-900">
+              <h2 id="contact-modal-title" className="text-2xl font-extrabold tracking-tight text-neutral-900">
                 Get in touch
               </h2>
               <p className="mt-2 max-w-sm text-base leading-relaxed text-neutral-500">

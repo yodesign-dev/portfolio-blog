@@ -84,7 +84,7 @@ export default async function ResumePage() {
           <div className="flex flex-col items-center gap-2 text-center">
             <p className="text-neutral-600">My resume isn&apos;t public yet.</p>
             <p className="text-neutral-400">
-              Want a copy? Use <span className="font-medium text-neutral-600">Get In Touch</span>{' '}
+              Want a copy? Use <span className="font-medium text-neutral-600">Get in touch</span>{' '}
               at the top and I&apos;ll send it over.
             </p>
           </div>

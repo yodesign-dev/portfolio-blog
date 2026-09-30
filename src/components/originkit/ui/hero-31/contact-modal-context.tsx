@@ -12,8 +12,8 @@ type ContactModalContextValue = {
 
 const ContactModalContext = createContext<ContactModalContextValue | null>(null);
 
-// Provider bọc quanh cả Navbar lẫn EmailCapture (2 nhánh component tách
-// biệt trong SectionHero) — cho phép cả 2 nơi cùng mở chung 1 modal mà
+// Provider bọc quanh Navbar, hero và footer (các nhánh component tách
+// biệt nhau) — cho phép mọi nơi cùng mở chung 1 modal mà
 // không cần "kéo" state qua nhiều tầng props.
 export function ContactModalProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
