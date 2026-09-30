@@ -35,6 +35,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "cdn.sanity.io",
       },
+      // Ảnh bìa bài Medium ở trang Writing (src/lib/medium.ts) — next/image
+      // tải qua server nên không cần thêm vào img-src của CSP.
+      { protocol: "https", hostname: "cdn-images-1.medium.com" },
+      { protocol: "https", hostname: "miro.medium.com" },
     ],
   },
   // Slug cũ của bài viết → slug mới (đổi slug trong Sanity Studio cho khớp).

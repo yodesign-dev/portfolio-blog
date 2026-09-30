@@ -5,6 +5,7 @@ import {sanityFetch} from '@/sanity/lib/fetch'
 import {getLocale} from '@/lib/get-locale'
 import {getDictionary, type Locale} from '@/lib/i18n'
 import {pageMetadata} from '@/lib/site'
+import {getMediumPosts, MEDIUM_URL, type MediumPost} from '@/lib/medium'
 
 export const revalidate = 60
 
@@ -73,6 +74,8 @@ export default async function BlogPage({
   const {tag} = await searchParams
   const [posts, allTags, locale] = await Promise.all([getPosts(tag), getAllTags(), getLocale()])
   const t = getDictionary(locale)
+  // Chưa có bài trên site → hiện tạm bài Medium thay vì trang trống
+  const mediumPosts = posts.length === 0 && !tag ? await getMediumPosts() : []
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
@@ -116,10 +119,12 @@ export default async function BlogPage({
           </div>
         )}
 
-        {posts.length === 0 ? (
-          <p className="text-center text-neutral-400">
-            {tag ? t.blog.emptyTag(tag) : t.blog.empty}
-          </p>
+        {posts.length === 0 && tag ? (
+          <p className="text-center text-neutral-400">{t.blog.emptyTag(tag)}</p>
+        ) : posts.length === 0 && mediumPosts.length > 0 ? (
+          <MediumList posts={mediumPosts} locale={locale} />
+        ) : posts.length === 0 ? (
+          <EmptyWriting locale={locale} />
         ) : (
           <div>
             <FeaturedPost post={posts[0]} locale={locale} viewsSuffix={t.common.viewsSuffix} />
@@ -249,5 +254,130 @@ function PostRow({post, locale, viewsSuffix}: {post: Post; locale: Locale; views
         </p>
       </div>
     </Link>
+  )
+}
+
+// Chữ riêng cho 2 trạng thái "chưa có bài trên site" — chỉ dùng ở trang này
+const WRITING_FALLBACK = {
+  en: {
+    mediumIntro: 'Recent writing on Medium — new posts will live here soon.',
+    onMedium: 'Medium',
+    allOnMedium: 'All posts on Medium',
+    emptyTitle: 'First posts are on the way',
+    emptyBody:
+      'I write about product design, UX research and working with AI. While these notes are being prepared, here’s where to find my work.',
+    readMedium: 'Read on Medium',
+    seeWork: 'See case studies',
+  },
+  vi: {
+    mediumIntro: 'Các bài viết gần đây trên Medium — bài mới sẽ sớm có ở đây.',
+    onMedium: 'Medium',
+    allOnMedium: 'Tất cả bài trên Medium',
+    emptyTitle: 'Những bài đầu tiên đang được viết',
+    emptyBody:
+      'Mình viết về product design, UX research và cách làm việc cùng AI. Trong lúc chờ, bạn có thể xem các nội dung dưới đây.',
+    readMedium: 'Đọc trên Medium',
+    seeWork: 'Xem case study',
+  },
+}
+
+function MediumList({posts, locale}: {posts: MediumPost[]; locale: Locale}) {
+  const f = WRITING_FALLBACK[locale]
+  return (
+    <div>
+      <p className="mb-8 text-neutral-500">{f.mediumIntro}</p>
+      <div className="border-t border-neutral-200">
+        {posts.map((post) => (
+          <a
+            key={post.link}
+            href={post.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-start gap-5 border-b border-neutral-200 py-6 last:border-0"
+          >
+            <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-md bg-neutral-100 sm:block">
+              {post.image && (
+                <Image
+                  src={post.image}
+                  alt=""
+                  width={240}
+                  height={240}
+                  className="h-full w-full object-cover transition-all duration-300 ease-out group-hover:scale-105 group-hover:opacity-90"
+                />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {post.tags.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap gap-1.5">
+                  {post.tags.map((tg) => (
+                    <span
+                      key={tg}
+                      className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
+                    >
+                      {tg}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <h3 className="text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
+                {post.title}
+              </h3>
+
+              {post.excerpt && (
+                <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-neutral-500">{post.excerpt}</p>
+              )}
+
+              <p className="mt-2 text-xs text-neutral-400">
+                {[post.publishedAt && formatDate(post.publishedAt, locale), `${f.onMedium} ↗`]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
+
+      {MEDIUM_URL && (
+        <a
+          href={MEDIUM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-8 inline-block text-sm font-semibold text-neutral-600 transition-colors hover:text-neutral-900"
+        >
+          {f.allOnMedium} ↗
+        </a>
+      )}
+    </div>
+  )
+}
+
+// Không lấy được bài Medium (hoặc chưa có) — vẫn cho người xem đường đi tiếp
+function EmptyWriting({locale}: {locale: Locale}) {
+  const f = WRITING_FALLBACK[locale]
+  return (
+    <div className="mx-auto max-w-xl py-8 text-center">
+      <h2 className="text-2xl font-bold tracking-tight text-neutral-900">{f.emptyTitle}</h2>
+      <p className="mt-3 leading-relaxed text-neutral-500">{f.emptyBody}</p>
+      <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        {MEDIUM_URL && (
+          <a
+            href={MEDIUM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-12 items-center justify-center bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-hover"
+          >
+            {f.readMedium} ↗
+          </a>
+        )}
+        <Link
+          href="/work"
+          className="flex min-h-12 items-center justify-center border border-neutral-300 px-6 text-base font-semibold text-neutral-900 transition hover:border-neutral-900"
+        >
+          {f.seeWork} →
+        </Link>
+      </div>
+    </div>
   )
 }
