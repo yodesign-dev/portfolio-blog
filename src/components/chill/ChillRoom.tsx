@@ -3,12 +3,15 @@
 import Link from 'next/link'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
-import {ChillScene, type TimeOfDay, type Weather} from './scene'
+import {ChillScene, SCENE_H, SCENE_W, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 
 const PREFS_KEY = 'chill:prefs'
+// Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
+const CAT_PETTED_KEY = 'chill:cat-petted'
+const CAT_HINT_DELAY = 4000
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
 
@@ -87,6 +90,10 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [destIndex, setDestIndex] = useState(0)
   const [travel, setTravel] = useState(5)
   const [travelElapsed, setTravelElapsed] = useState(0)
+  // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
+  const [catBox, setCatBox] = useState<{left: number; top: number; width: number; height: number} | null>(null)
+  const [catPetted, setCatPetted] = useState(true)
+  const [catHint, setCatHint] = useState(false)
 
   const track = tracks[index]
   // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
@@ -124,6 +131,11 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     if (savedDest >= 0) setDestIndex(savedDest)
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
+    try {
+      setCatPetted(localStorage.getItem(CAT_PETTED_KEY) === '1')
+    } catch {
+      setCatPetted(false)
+    }
     setLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [tracks, destinations])
@@ -169,7 +181,17 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     const fit = () => {
       const dpr = window.devicePixelRatio || 1
       const portrait = window.matchMedia('(orientation: portrait)').matches
-      scene.resize(canvas.clientWidth * dpr, canvas.clientHeight * dpr, !portrait)
+      const cw = canvas.clientWidth
+      const ch = canvas.clientHeight
+      scene.resize(cw * dpr, ch * dpr, !portrait)
+      // Cùng phép co giãn như object-cover / object-contain của canvas
+      const bw = SCENE_W * 2
+      const bh = SCENE_H * 2
+      const k = (portrait ? Math.min : Math.max)(cw / bw, ch / bh)
+      const hit = scene.catHitBox
+      const left = (cw - bw * k) / 2 + hit.x * k
+      const top = (ch - bh * k) / 2 + hit.y * k
+      setCatBox(left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k})
     }
     const ro = new ResizeObserver(fit)
     ro.observe(canvas)
@@ -193,6 +215,33 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     // Vẽ ngay 1 frame — không chờ rAF (bị dừng khi tab chạy nền / cảnh đang pause)
     scene.frame(performance.now())
   }, [time, weather, dest, nextDest])
+
+  // ---------- Mèo ----------
+
+  // Chưa bấm vào mèo lần nào → sau vài giây hiện bong bóng "Pet me"
+  useEffect(() => {
+    if (catPetted) return
+    const id = setTimeout(() => setCatHint(true), CAT_HINT_DELAY)
+    return () => clearTimeout(id)
+  }, [catPetted])
+
+  const petCat = useCallback(() => {
+    const kind = sceneRef.current?.petCat()
+    if (!kind) return
+    audioRef.current?.catSound(kind)
+    // Cảnh đang pause vẫn vẽ lại 1 frame cho thấy mèo ngẩng lên
+    sceneRef.current?.frame(performance.now())
+    setCatHint(false)
+    if (!catPetted) {
+      setCatPetted(true)
+      trackEvent({name: 'Chill Pet Cat'})
+      try {
+        localStorage.setItem(CAT_PETTED_KEY, '1')
+      } catch {
+        // Chặn storage — lần sau lại hiện gợi ý, không sao
+      }
+    }
+  }, [catPetted])
 
   // ---------- Điểm đến ----------
 
@@ -502,6 +551,30 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         role="img"
         aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
       />
+
+      {/* Mèo trên bậu cửa: bấm (hoặc Tab + Enter) để vuốt ve — mèo ngẩng lên, kêu, tim bay lên */}
+      {catBox && (
+        <button
+          type="button"
+          aria-label="Pet the cat"
+          onClick={petCat}
+          onPointerEnter={() => sceneRef.current?.noticeCat()}
+          className="group absolute cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          style={catBox}
+        >
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute bottom-full left-[68%] mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] sm:text-[11px] ${
+              catHint && !hideUi ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+            }`}
+            style={{transform: 'translate(-50%, 0)'}}
+          >
+            <PawIcon />
+            Pet me
+            <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
+          </span>
+        </button>
+      )}
 
       {/* Thanh trên: về trang chủ + điểm đến, giờ + nút cảnh */}
       <div
@@ -1099,5 +1172,17 @@ function EqualizerIcon() {
         />
       ))}
     </span>
+  )
+}
+
+function PawIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <ellipse cx="8" cy="11" rx="3.6" ry="3" />
+      <circle cx="3.4" cy="6.6" r="1.6" />
+      <circle cx="6.2" cy="3.8" r="1.6" />
+      <circle cx="9.8" cy="3.8" r="1.6" />
+      <circle cx="12.6" cy="6.6" r="1.6" />
+    </svg>
   )
 }

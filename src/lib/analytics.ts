@@ -11,6 +11,7 @@ export type AnalyticsEvent =
   | {name: 'Social Click'; props: {network: string}}
   | {name: 'Share'; props: {platform: string}}
   | {name: 'Chill Play'; props: {track: string}}
+  | {name: 'Chill Pet Cat'; props?: undefined}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

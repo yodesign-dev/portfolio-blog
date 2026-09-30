@@ -36,6 +36,12 @@ body {
   letter-spacing: -0.5px;
 }
 
+/* Bong bóng "Pet me" nhún nhẹ phía trên con mèo ở trang /chill */
+@keyframes chill-bob {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -4px); }
+}
+
 /* Thanh equalizer nhỏ cạnh bài đang phát ở trang /chill */
 @keyframes chill-eq {
   0%, 100% { height: 25%; }

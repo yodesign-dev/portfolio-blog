@@ -9,7 +9,7 @@
 import type {SynthSpec, Track} from './tracks'
 
 export type Ambience = 'street' | 'rain' | 'quiet'
-export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark'
+export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder'
 
 // Thời gian chồng mờ giữa 2 bài (giây)
 const CROSSFADE = 5
@@ -71,6 +71,7 @@ export class ChillAudio {
   onNearEnd: (() => void) | null = null
 
   private ctx: AudioContext | null = null
+  private catCtx: AudioContext | null = null
   private master!: GainNode
   private analyser!: AnalyserNode
   private tone!: BiquadFilterNode
@@ -335,6 +336,28 @@ export class ChillAudio {
       return
     }
 
+    if (kind === 'thunder') {
+      // Sấm xa: tiếng ì ầm trầm, nổ nhẹ rồi rền dài
+      const len = 4.5
+      const src = ctx.createBufferSource()
+      src.buffer = this.white
+      src.loop = true
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.setValueAtTime(900, now)
+      lp.frequency.exponentialRampToValueAtTime(120, now + 1.2)
+      const env = ctx.createGain()
+      env.gain.setValueAtTime(0, now)
+      env.gain.linearRampToValueAtTime(0.9, now + 0.08)
+      env.gain.exponentialRampToValueAtTime(0.35, now + 0.6)
+      env.gain.linearRampToValueAtTime(0.5, now + 1.1)
+      env.gain.exponentialRampToValueAtTime(0.001, now + len)
+      src.connect(lp).connect(env).connect(panner)
+      src.start(now, Math.random())
+      src.stop(now + len)
+      return
+    }
+
     panner.pan.value = Math.max(-1, Math.min(1, pan))
     if (kind === 'horn') {
       // Còi xe máy "bíp bíp": 2 tiếng ngắn, 2 nốt chồng
@@ -376,6 +399,86 @@ export class ChillAudio {
     }
   }
 
+  // Tiếng mèo khi người xem bấm vào: "meo" hoặc gừ gừ. Bấm chuột là thao tác của
+  // người dùng nên tạo AudioContext riêng được, không bật nhạc / ambience theo
+  catSound(kind: 'meow' | 'purr') {
+    const ctx = this.ctx ?? (this.catCtx ??= new AudioContext())
+    if (ctx.state === 'suspended') void ctx.resume()
+    const now = ctx.currentTime
+    const out = ctx.createGain()
+    out.gain.value = 0.35 + this.volume * 0.4
+    out.connect(ctx.destination)
+
+    if (kind === 'meow') {
+      // Dao động răng cưa qua 2 formant, cao độ vút lên rồi hạ: "mi-a-o"
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.frequency.setValueAtTime(520, now)
+      o.frequency.linearRampToValueAtTime(820, now + 0.16)
+      o.frequency.linearRampToValueAtTime(610, now + 0.5)
+      const vib = ctx.createOscillator()
+      vib.frequency.value = 7
+      const vibGain = ctx.createGain()
+      vibGain.gain.value = 12
+      vib.connect(vibGain).connect(o.frequency)
+      const env = ctx.createGain()
+      env.gain.setValueAtTime(0, now)
+      env.gain.linearRampToValueAtTime(0.16, now + 0.05)
+      env.gain.setValueAtTime(0.16, now + 0.34)
+      env.gain.exponentialRampToValueAtTime(0.001, now + 0.58)
+      for (const [f0, f1, q, g] of [
+        [900, 1500, 6, 1],
+        [2600, 1800, 8, 0.5],
+      ]) {
+        const bp = ctx.createBiquadFilter()
+        bp.type = 'bandpass'
+        bp.frequency.setValueAtTime(f0, now)
+        bp.frequency.linearRampToValueAtTime(f1, now + 0.22)
+        bp.frequency.linearRampToValueAtTime(f0 * 0.8, now + 0.55)
+        bp.Q.value = q
+        const gain = ctx.createGain()
+        gain.gain.value = g
+        o.connect(bp).connect(gain).connect(env)
+      }
+      env.connect(out)
+      o.start(now)
+      vib.start(now)
+      o.stop(now + 0.6)
+      vib.stop(now + 0.6)
+      return
+    }
+
+    // Gừ gừ: tiếng ồn trầm, nhịp ~25 lần/giây, hít vào / thở ra 2 nhịp
+    const src = ctx.createBufferSource()
+    src.buffer = noiseBuffer(ctx, 2, 'brown')
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 280
+    const am = ctx.createGain()
+    am.gain.value = 0.5
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 25
+    const depth = ctx.createGain()
+    depth.gain.value = 0.5
+    lfo.connect(depth).connect(am.gain)
+    const env = ctx.createGain()
+    env.gain.setValueAtTime(0, now)
+    for (const [start, peak] of [
+      [0, 0.9],
+      [0.8, 0.7],
+      [1.5, 0.85],
+    ]) {
+      env.gain.linearRampToValueAtTime(peak, now + start + 0.25)
+      env.gain.linearRampToValueAtTime(0.2, now + start + 0.7)
+    }
+    env.gain.linearRampToValueAtTime(0, now + 2.2)
+    src.connect(lp).connect(am).connect(env).connect(out)
+    src.start(now)
+    lfo.start(now)
+    src.stop(now + 2.3)
+    lfo.stop(now + 2.3)
+  }
+
   // Mức năng lượng theo dải tần cho thanh visualizer
   levels(out: Uint8Array<ArrayBuffer>) {
     if (!this.ctx) return out.fill(0)
@@ -386,7 +489,9 @@ export class ChillAudio {
   destroy() {
     this.stopCurrent()
     void this.ctx?.close()
+    void this.catCtx?.close()
     this.ctx = null
+    this.catCtx = null
   }
 
   // ---------- Nội bộ ----------
