@@ -850,46 +850,63 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
 
           <section>
             <SectionTitle index="02" title="Destination" />
-            <div className="mt-4 flex items-center gap-2">
-              <RoundButton label="Previous destination" onClick={() => goTo(destIndex - 1)}>
-                <ArrowIcon dir="left" />
-              </RoundButton>
-              <select
-                value={destIndex}
-                onChange={(e) => goTo(Number(e.target.value))}
-                aria-label="Destination"
-                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-[#1e1a22] px-3 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
-              >
-                {destinations.map((d, i) => (
-                  <option key={d.id} value={i}>
-                    {String(i + 1).padStart(2, '0')} · {d.name}
-                  </option>
-                ))}
-              </select>
-              <RoundButton label="Next destination" onClick={() => goTo(destIndex + 1)}>
-                <ArrowIcon dir="right" />
-              </RoundButton>
+            {/* Chọn điểm đến bằng thẻ có ảnh phố (đúng giờ đang chọn) thay cho <select> gốc */}
+            <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Destination">
+              {destinations.map((d, i) => {
+                const active = i === destIndex
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => goTo(i)}
+                    className={`group relative overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                      active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- ảnh phố đã tải sẵn cho canvas, dùng lại cho nhanh */}
+                    <img
+                      src={d.streets[time]}
+                      alt=""
+                      loading="lazy"
+                      className={`h-16 w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
+                    />
+                    <span className="flex items-baseline justify-between gap-2 px-2.5 py-2">
+                      <span className="min-w-0 truncate text-sm font-semibold text-[#ede6dd]">
+                        <span className="mr-1.5 font-mono text-[10px] font-normal text-[#a79e94]">{String(i + 1).padStart(2, '0')}</span>
+                        {d.name}
+                      </span>
+                      {active && <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-[#e8b27d]">Now</span>}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
             <div className="mt-4 flex items-center justify-between gap-3">
-              <label htmlFor="chill-travel" className="text-sm text-[#a79e94]">
+              <span id="chill-travel" className="text-sm text-[#a79e94]">
                 Auto travel
-              </label>
-              <select
-                id="chill-travel"
-                value={travel}
-                onChange={(e) => {
-                  setTravel(Number(e.target.value))
-                  travelRef.current = 0
-                  setTravelElapsed(0)
-                }}
-                className="h-9 rounded-lg border border-white/10 bg-[#1e1a22] px-2 text-sm text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
-              >
+              </span>
+              <div role="radiogroup" aria-labelledby="chill-travel" className="flex rounded-full border border-white/10 bg-black/20 p-0.5">
                 {TRAVEL_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                  <button
+                    key={o.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={travel === o.value}
+                    onClick={() => {
+                      setTravel(o.value)
+                      travelRef.current = 0
+                      setTravelElapsed(0)
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                      travel === o.value ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
+                    }`}
+                  >
                     {o.label}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
             <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
               <div
