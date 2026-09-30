@@ -53,7 +53,8 @@ export const NAV_LINKS = [
   {href: '/work', label: 'Work'},
   {href: '/blog', label: 'Writing'},
   {href: '/tools', label: 'Toolkit'},
-  {href: '/chill', label: 'Chill'},
+  // "Chill" không nói trang làm gì — nhãn mới nói rõ: nhạc + cảnh để tập trung làm việc
+  {href: '/chill', label: 'Focus music'},
   {href: '/resume', label: 'Resume'},
 ]
 

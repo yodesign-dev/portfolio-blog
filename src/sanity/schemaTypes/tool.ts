@@ -33,6 +33,8 @@ export default defineType({
       title: 'Mô tả ngắn',
       type: 'text',
       rows: 3,
+      description:
+        'Viết ngôi thứ nhất: mình dùng nó để làm gì, lúc nào — đừng dán mô tả từ website của hãng. Vd. "Nơi mình ghép flow và test prototype trước khi handoff."',
       validation: (Rule) => Rule.max(200),
     }),
     defineField({
