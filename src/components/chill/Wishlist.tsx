@@ -9,6 +9,9 @@
 
 import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {trackEvent} from '@/lib/analytics'
+import {Donate} from './Donate'
+import {hasDonate} from './donate-config'
 
 type Wish = {
   id: string
@@ -83,6 +86,7 @@ export function Wishlist({
   dimmed,
   hidden,
   context,
+  onThanks,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -92,6 +96,8 @@ export function Wishlist({
   hidden: boolean
   // Bối cảnh gửi kèm (điểm đến, giờ, thời tiết, bài nhạc)
   context: string
+  // Người xem bấm "đã chuyển" ở màn donate → cảnh ăn mừng (mèo gừ gừ, tim bay)
+  onThanks: () => void
 }) {
   const [wishes, setWishes] = useState<Wish[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -99,6 +105,12 @@ export function Wishlist({
   const [hearted, setHearted] = useState<string[]>([])
   const [seen, setSeen] = useState(true)
   const [tab, setTab] = useState<Tab>('hot')
+  const [view, setView] = useState<'wishes' | 'donate'>('wishes')
+  const donate = hasDonate()
+  const showDonate = () => {
+    setView('donate')
+    trackEvent({name: 'Chill Donate Open'})
+  }
 
   const refresh = useCallback(() => {
     fetch('/api/chill-wish')
@@ -213,15 +225,43 @@ export function Wishlist({
       >
         <header className="flex items-center gap-3 border-b border-white/[0.07] px-5 py-4">
           <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
-          <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Café wishlist</h2>
-          <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 font-mono text-xs tabular-nums text-emerald-200">
-            💡 {count}
-          </span>
+          {view === 'donate' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setView('wishes')}
+                aria-label="Back to wishlist"
+                className="-ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-[#c9c0b6] hover:bg-white/[0.06] hover:text-[#ede6dd]"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+                  <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Buy Bin a coffee ☕</h2>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Café wishlist</h2>
+              <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 font-mono text-xs tabular-nums text-emerald-200">
+                💡 {count}
+              </span>
+            </>
+          )}
+          {donate && view === 'wishes' && (
+            <button
+              type="button"
+              onClick={showDonate}
+              title="Buy Bin a coffee"
+              className="ml-auto flex h-9 items-center gap-1.5 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2.5 text-sm font-semibold text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            >
+              <span aria-hidden>☕</span> Support
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             aria-label="Close wishlist (Esc)"
-            className="ml-auto flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/[0.1] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            className={`${donate && view === 'wishes' ? '' : 'ml-auto'} flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/[0.1] focus-visible:outline-2 focus-visible:outline-[#e8b27d]`}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -229,35 +269,59 @@ export function Wishlist({
           </button>
         </header>
 
-        <div className="flex items-center gap-1 px-5 pt-3" role="tablist" aria-label="Sort wishes">
-          {TABS.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.value}
-              onClick={() => setTab(t.value)}
-              className={`rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.15em] transition ${
-                tab === t.value ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {view === 'donate' ? (
+          <Donate onThanks={onThanks} />
+        ) : (
+          <>
+            <div className="flex items-center gap-1 px-5 pt-3" role="tablist" aria-label="Sort wishes">
+              {TABS.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.value}
+                  onClick={() => setTab(t.value)}
+                  className={`rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.15em] transition ${
+                    tab === t.value ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-        <ol className="min-h-40 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
-          {list.length === 0 && (
-            <li className="py-10 text-center text-sm text-[#a79e94]">
-              {!loaded ? 'Brewing…' : tab === 'shipped' ? 'Nothing shipped yet — soon!' : 'No wishes yet. Be the first ☕'}
-            </li>
-          )}
-          {list.map((w) => (
-            <WishItem key={w.id} wish={w} hearted={hearted.includes(w.id)} onHeart={() => toggleHeart(w)} />
-          ))}
-        </ol>
+            <ol className="min-h-40 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
+              {list.length === 0 && (
+                <li className="py-10 text-center text-sm text-[#a79e94]">
+                  {!loaded ? 'Brewing…' : tab === 'shipped' ? 'Nothing shipped yet — soon!' : 'No wishes yet. Be the first ☕'}
+                </li>
+              )}
+              {list.map((w) => (
+                <WishItem key={w.id} wish={w} hearted={hearted.includes(w.id)} onHeart={() => toggleHeart(w)} />
+              ))}
+            </ol>
 
-        <Composer open={open} context={context} onSent={onSent} />
+            {donate && (
+              <button
+                type="button"
+                onClick={showDonate}
+                className="mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-[#e8b27d]/25 bg-gradient-to-r from-[#e8b27d]/12 to-transparent px-4 py-2.5 text-left transition hover:border-[#e8b27d]/50"
+              >
+                <span aria-hidden className="text-xl">
+                  ☕
+                </span>
+                <span className="min-w-0 flex-1 text-sm text-[#ede6dd]">
+                  Enjoying the café? <span className="font-semibold text-[#f3cfa8]">Buy Bin a coffee</span>
+                </span>
+                <span aria-hidden className="text-[#e8b27d]">
+                  →
+                </span>
+              </button>
+            )}
+
+            <Composer open={open} context={context} onSent={onSent} />
+          </>
+        )}
       </section>
     </>
   )

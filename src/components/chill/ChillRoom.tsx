@@ -744,6 +744,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         dimmed={hideUi}
         hidden={panelOpen}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
+        onThanks={petCat}
       />
 
       {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}
