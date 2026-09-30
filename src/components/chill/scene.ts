@@ -197,9 +197,15 @@ export class ChillScene {
   private theme: Theme = themeById('cafe')
   // Theme ảnh tĩnh: atlas các vùng biến thể của người ngồi (gõ phím, uống)
   private poseSheet: HTMLImageElement | null = null
-  private pose: 'base' | 'typing' | 'sip' = 'base'
-  private poseHold = 0
-  private nextPoseSip = 12
+  // Nhịp gõ phím: gõ liên tục vài giây rồi dừng đọc màn hình; tay nhún khi gõ
+  private typing = true
+  private typingLeft = 3
+  private tap = false
+  private tapLeft = 0
+  // Uống: -1 = không uống, ≥0 = số giây từ lúc bắt đầu (chuyển mờ vào / ra)
+  private sipT = -1
+  private sipFor = 3
+  private nextPoseSip = 15
   private cat = new Cat()
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
@@ -265,7 +271,7 @@ export class ChillScene {
     this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
     const c = this.theme.character
     this.poseSheet = c === 'video' ? null : loadImage(c.src, () => (this.dirty = true))
-    this.pose = 'base'
+    this.sipT = -1
     this.cat.setRear(this.theme.cat)
     this.pawTarget = null
     this.rain = this.makeRain()
@@ -598,22 +604,42 @@ export class ChillScene {
     return spriteSize(m.sprite)
   }
 
-  // Theme ảnh tĩnh: gõ phím = đổi qua lại 2 tư thế tay; thỉnh thoảng cầm ly uống
+  // Theme ảnh tĩnh: gõ phím từng đợt 2–5 giây rồi dừng 1–3 giây như đang đọc,
+  // lúc gõ thì bàn tay nhún 1px không đều; khoảng mỗi phút cầm ly lên uống
   private updatePose(dt: number) {
     if (this.paused) return
-    this.poseHold -= dt
-    this.nextPoseSip -= dt
-    if (this.poseHold > 0) return
-    if (this.nextPoseSip <= 0) {
-      this.pose = 'sip'
-      this.poseHold = 2.4 + this.rng()
-      this.nextPoseSip = 20 + this.rng() * 15
+    if (this.sipT >= 0) {
+      this.sipT += dt
+      if (this.sipT >= this.sipFor) this.sipT = -1
       return
     }
-    // Gõ phím: nhịp không đều như người thật, thỉnh thoảng dừng tay
-    const pause = this.rng() < 0.12
-    this.pose = pause || this.pose === 'typing' ? 'base' : 'typing'
-    this.poseHold = pause ? 0.8 + this.rng() * 1.2 : 0.18 + this.rng() * 0.22
+    this.nextPoseSip -= dt
+    if (this.nextPoseSip <= 0) {
+      this.sipT = 0
+      this.sipFor = 2.8 + this.rng() * 0.9
+      this.nextPoseSip = 45 + this.rng() * 30
+      this.tap = false
+      return
+    }
+    this.typingLeft -= dt
+    if (this.typingLeft <= 0) {
+      this.typing = !this.typing
+      this.typingLeft = this.typing ? 2 + this.rng() * 3 : 1 + this.rng() * 2
+      this.tap = false
+    }
+    if (!this.typing) return
+    this.tapLeft -= dt
+    if (this.tapLeft <= 0) {
+      this.tap = !this.tap
+      this.tapLeft = this.tap ? 0.07 + this.rng() * 0.06 : 0.08 + this.rng() * 0.16
+    }
+  }
+
+  // Độ đậm của tư thế uống (0–1): mờ dần vào / ra trong 0.25s
+  private get sipAlpha() {
+    if (this.sipT < 0) return 0
+    const fade = 0.25
+    return Math.min(1, this.sipT / fade, (this.sipFor - this.sipT) / fade)
   }
 
   // Lặp đoạn gõ phím; cứ vài vòng mới cho phát đoạn cầm ly uống (SIP_START → SIP_END)
@@ -822,8 +848,7 @@ export class ChillScene {
         ctx.drawImage(this.charFrameCanvas(), CHAR.x, CHAR.y, CHAR.w, CHAR.h)
       }
     } else if (ready(this.poseSheet) && ready(this.interior)) {
-      const {at} = character
-      ctx.drawImage(this.poseFrameCanvas(character), at.x, at.y, at.w, at.h)
+      this.drawPose(character)
     }
     this.cat.draw(ctx, this.catTinted)
     if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
@@ -847,24 +872,53 @@ export class ChillScene {
     }
   }
 
-  // Tư thế hiện tại của người ngồi (theme ảnh tĩnh), đã tô màu theo giờ/thời tiết
-  private poseFrame = document.createElement('canvas')
-  private poseFrameKey = ''
-  private poseFrameCanvas(c: Exclude<Theme['character'], 'video'>) {
-    const key = `${this.theme.id}:${this.pose}:${this.time}:${this.weather}`
-    if (key !== this.poseFrameKey && this.poseSheet) {
-      this.poseFrameKey = key
-      const [sx, sy] = c.cells[this.pose]
-      const w = c.at.w * 2
-      const h = c.at.h * 2
-      this.poseFrame.width = w
-      this.poseFrame.height = h
-      const g = this.poseFrame.getContext('2d')!
-      g.clearRect(0, 0, w, h)
-      g.drawImage(this.poseSheet, sx, sy, w, h, 0, 0, w, h)
-      this.wash(g, w, h)
+  // Người ngồi ở theme ảnh tĩnh (vẽ theo px gốc, ctx đã scale RES).
+  // Ngồi: tư thế gốc + thở (nửa trên nhô 1px) + tay nhún khi gõ. Uống: chuyển mờ
+  // sang ô `sip` (hai tư thế vẽ cùng độ mờ bù nhau → không lộ bóng ma khi đã uống hẳn)
+  private drawPose(c: Exclude<Theme['character'], 'video'>) {
+    const ctx = this.ctx
+    const {at, hands} = c
+    const base = this.poseCanvas(c, 'base')
+    const sip = this.sipAlpha
+    const half = 1 / RES // 1 px của canvas đệm
+    if (sip < 1) {
+      ctx.globalAlpha = 1 - sip
+      ctx.drawImage(base, at.x, at.y, at.w, at.h)
+      // Thở: ~4s một nhịp, hít vào 1.6s
+      if (this.clock % 4.2 < 1.6) {
+        const h = Math.round(at.h * c.shoulders)
+        ctx.drawImage(base, 0, 0, base.width, h * 2, at.x, at.y - half, at.w, h)
+      }
+      // Gõ phím: vùng bàn tay nhún lên 1px
+      if (this.tap && sip === 0) {
+        ctx.drawImage(base, (hands.x - at.x) * 2, (hands.y - at.y) * 2, hands.w * 2, hands.h * 2, hands.x, hands.y - half, hands.w, hands.h)
+      }
     }
-    return this.poseFrame
+    if (sip > 0) {
+      ctx.globalAlpha = sip
+      ctx.drawImage(this.poseCanvas(c, 'sip'), at.x, at.y, at.w, at.h)
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // Ô tư thế trong atlas, đã tô màu theo giờ/thời tiết (giữ lại tới khi đổi)
+  private poseCanvases = new Map<string, HTMLCanvasElement>()
+  private poseCanvas(c: Exclude<Theme['character'], 'video'>, pose: 'base' | 'sip') {
+    const key = `${this.theme.id}:${pose}:${this.time}:${this.weather}`
+    let canvas = this.poseCanvases.get(key)
+    if (!canvas && this.poseSheet) {
+      // Giờ / thời tiết đổi thì bỏ các bản tô màu cũ
+      for (const k of this.poseCanvases.keys()) if (!k.endsWith(`:${this.time}:${this.weather}`)) this.poseCanvases.delete(k)
+      canvas = document.createElement('canvas')
+      const [sx, sy] = c.cells[pose]
+      canvas.width = c.at.w * 2
+      canvas.height = c.at.h * 2
+      const g = canvas.getContext('2d')!
+      g.drawImage(this.poseSheet, sx, sy, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height)
+      this.wash(g, canvas.width, canvas.height)
+      this.poseCanvases.set(key, canvas)
+    }
+    return canvas!
   }
 
   private drawBirds(b: {x: number; y: number; p: number}) {

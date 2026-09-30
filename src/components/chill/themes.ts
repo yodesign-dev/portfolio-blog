@@ -21,6 +21,11 @@ export type CharacterFrames = {
   at: Rect
   // Góc trái trên của từng ô trong atlas (px atlas = px gốc × 2)
   cells: {base: [number, number]; typing: [number, number]; sip: [number, number]; mask: [number, number]}
+  // Hai bàn tay trên bàn phím (px gốc) — gõ phím = vùng này nhún lên 1px, tay
+  // không rời bàn phím (ô `typing` AI vẽ tay giơ cao quá nên không dùng)
+  hands: Rect
+  // Phần trên của người (tỉ lệ chiều cao ô, từ trên xuống) nhô lên khi hít thở
+  shoulders: number
 }
 
 export type Theme = {
@@ -88,6 +93,8 @@ export const THEMES: Theme[] = [
       src: '/chill/scenes/room-balcony-pose.webp',
       at: {x: 371, y: 118, w: 269, h: 239},
       cells: {base: [0, 0], typing: [538, 0], sip: [1076, 0], mask: [1614, 0]},
+      hands: {x: 458, y: 271, w: 28, h: 17},
+      shoulders: 0.55,
     },
     screen: false,
     cat: {x: 60, y: 197},
@@ -115,6 +122,8 @@ export const THEMES: Theme[] = [
       src: '/chill/scenes/room-desk-pose.webp',
       at: {x: 442, y: 139, w: 194, h: 205},
       cells: {base: [0, 0], typing: [388, 0], sip: [776, 0], mask: [1164, 0]},
+      hands: {x: 452, y: 270, w: 30, h: 16},
+      shoulders: 0.55,
     },
     screen: false,
     cat: {x: 270, y: 283},
