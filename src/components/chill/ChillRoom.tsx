@@ -13,6 +13,9 @@ const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
 const CAT_PETTED_KEY = 'chill:cat-petted'
 const CAT_HINT_DELAY = 4000
+// Mèo nói cảm ơn sau khi người xem bấm "I've sent it" ở mục donate
+const CAT_THANKS = 'Cám ơn bạn đã mời cafe Meo!'
+const CAT_SAY_MS = 4500
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
 
@@ -99,6 +102,10 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [wishOpen, setWishOpen] = useState(false)
   const [catPetted, setCatPetted] = useState(true)
   const [catHint, setCatHint] = useState(false)
+  // Bong bóng lời nói của mèo: chờ hiện (khung donate đang che mèo trên điện thoại) → hiện → mờ dần
+  const [catSay, setCatSay] = useState<{text: string; show: boolean} | null>(null)
+  const catSayQueued = useRef<string | null>(null)
+  const catSayTimers = useRef<number[]>([])
 
   const track = tracks[index]
   // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
@@ -250,6 +257,33 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       }
     }
   }, [catPetted])
+
+  const sayCat = useCallback((text: string) => {
+    catSayTimers.current.forEach(clearTimeout)
+    setCatSay({text, show: true})
+    catSayTimers.current = [
+      window.setTimeout(() => setCatSay((c) => (c ? {...c, show: false} : c)), CAT_SAY_MS),
+      window.setTimeout(() => setCatSay(null), CAT_SAY_MS + 600),
+    ]
+  }, [])
+  useEffect(() => () => catSayTimers.current.forEach(clearTimeout), [])
+
+  // Người xem báo đã mời cafe → mèo ngẩng lên, kêu, tim bay + nói cảm ơn.
+  // Màn nhỏ: khung donate là bottom sheet che mèo → để dành câu nói tới lúc đóng khung.
+  const thankCat = useCallback(() => {
+    petCat()
+    if (window.matchMedia('(min-width: 1024px)').matches) sayCat(CAT_THANKS)
+    else catSayQueued.current = CAT_THANKS
+  }, [petCat, sayCat])
+
+  useEffect(() => {
+    if (wishOpen || !catSayQueued.current) return
+    const text = catSayQueued.current
+    catSayQueued.current = null
+    // Chờ khung trượt xuống xong
+    const id = window.setTimeout(() => sayCat(text), 350)
+    return () => clearTimeout(id)
+  }, [wishOpen, sayCat])
 
   // ---------- Điểm đến ----------
 
@@ -576,10 +610,20 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           className="group absolute cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
           style={catBox}
         >
+          {catSay && (
+            <span
+              role="status"
+              className={`pointer-events-none absolute bottom-full left-[62%] z-10 mb-2 w-max max-w-[240px] origin-bottom-left rounded-2xl rounded-bl-sm border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-left text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 ${
+                catSay.show ? 'scale-100 opacity-100' : 'translate-y-1 scale-95 opacity-0'
+              } motion-safe:animate-[chill-pop_0.35s_ease-out]`}
+            >
+              {catSay.text} 🐾
+            </span>
+          )}
           <span
             aria-hidden
             className={`pointer-events-none absolute bottom-full left-[68%] mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] sm:text-[11px] ${
-              catHint && !hideUi ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              catSay ? 'opacity-0' : catHint && !hideUi ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
             }`}
             style={{transform: 'translate(-50%, 0)'}}
           >
@@ -744,7 +788,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         dimmed={hideUi}
         hidden={panelOpen}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
-        onThanks={petCat}
+        onThanks={thankCat}
       />
 
       {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}

@@ -67,6 +67,12 @@ body {
   .chill-cup, .chill-steam, .chill-twinkle { animation: none; }
 }
 
+/* Bong bóng lời nói của mèo ở trang /chill bật lên */
+@keyframes chill-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.85); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* Thanh equalizer nhỏ cạnh bài đang phát ở trang /chill */
 @keyframes chill-eq {
   0%, 100% { height: 25%; }
