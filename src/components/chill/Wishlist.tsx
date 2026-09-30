@@ -50,8 +50,6 @@ const AVATAR_BG = ['#f6d2bd', '#f7e2a0', '#fbf1d2', '#d5e8d4', '#d7dcf5', '#f4c7
 const HEARTS_KEY = 'chill:wish-hearts'
 const MINE_KEY = 'chill:my-wishes'
 const SEEN_KEY = 'chill:wish-seen'
-// Đã mở mục donate 1 lần → nút Support thôi nhúc nhích trên máy đó
-const DONATE_SEEN_KEY = 'chill:donate-seen'
 const MAX = 300
 
 function load<T>(key: string, fallback: T): T {
@@ -108,15 +106,10 @@ export function Wishlist({
   const [seen, setSeen] = useState(true)
   const [tab, setTab] = useState<Tab>('hot')
   const [view, setView] = useState<'wishes' | 'donate'>('wishes')
-  const [donateSeen, setDonateSeen] = useState(true)
   const donate = hasDonate()
   const showDonate = () => {
     setView('donate')
     trackEvent({name: 'Chill Donate Open'})
-    if (!donateSeen) {
-      setDonateSeen(true)
-      save(DONATE_SEEN_KEY, true)
-    }
   }
 
   const refresh = useCallback(() => {
@@ -148,7 +141,6 @@ export function Wishlist({
     setMine(load<Wish[]>(MINE_KEY, []))
     setHearted(load<string[]>(HEARTS_KEY, []))
     setSeen(load<boolean>(SEEN_KEY, false))
-    setDonateSeen(load<boolean>(DONATE_SEEN_KEY, false))
     /* eslint-enable react-hooks/set-state-in-effect */
     refresh()
   }, [refresh])
@@ -278,8 +270,8 @@ export function Wishlist({
               title="Buy Bin a coffee"
               className="relative ml-auto flex h-9 items-center gap-1.5 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2.5 text-sm font-semibold text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
             >
-              <SteamingCup lively={!donateSeen} /> Support
-              {!donateSeen && <Sparkles />}
+              <SteamingCup /> Support
+              <Sparkles />
             </button>
           )}
           <button
@@ -332,7 +324,7 @@ export function Wishlist({
                 onClick={showDonate}
                 className="relative mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-[#e8b27d]/25 bg-gradient-to-r from-[#e8b27d]/12 to-transparent px-4 py-2.5 text-left transition hover:border-[#e8b27d]/50"
               >
-                <SteamingCup lively={!donateSeen} className="text-xl" />
+                <SteamingCup className="text-xl" />
                 <span className="min-w-0 flex-1 text-sm text-[#ede6dd]">
                   Enjoying the café? <span className="font-semibold text-[#f3cfa8]">Buy Bin a coffee</span>
                 </span>
@@ -350,19 +342,18 @@ export function Wishlist({
   )
 }
 
-// Tách cà phê: lúc chưa mở mục donate thì bốc hơi + thỉnh thoảng nghiêng
-function SteamingCup({lively, className = ''}: {lively: boolean; className?: string}) {
+// Tách cà phê bốc hơi + thỉnh thoảng nghiêng (luôn chạy, trừ khi giảm chuyển động)
+function SteamingCup({className = ''}: {className?: string}) {
   return (
     <span aria-hidden className={`relative inline-flex ${className}`}>
-      <span className={lively ? 'chill-cup' : ''}>☕</span>
-      {lively &&
-        [0, 0.7, 1.4].map((delay, i) => (
-          <span
-            key={delay}
-            className="chill-steam absolute bottom-[80%] h-[0.45em] w-[2px] rounded-full bg-[#f3cfa8]"
-            style={{left: `${28 + i * 16}%`, animationDelay: `${delay}s`}}
-          />
-        ))}
+      <span className="chill-cup">☕</span>
+      {[0, 0.7, 1.4].map((delay, i) => (
+        <span
+          key={delay}
+          className="chill-steam absolute bottom-[80%] h-[0.45em] w-[2px] rounded-full bg-[#f3cfa8]"
+          style={{left: `${28 + i * 16}%`, animationDelay: `${delay}s`}}
+        />
+      ))}
     </span>
   )
 }
