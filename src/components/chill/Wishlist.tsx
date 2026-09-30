@@ -11,7 +11,7 @@ import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {Donate} from './Donate'
-import {hasDonate} from './donate-config'
+import {hasDonate, loadIntent} from './donate-config'
 
 type Wish = {
   id: string
@@ -34,15 +34,13 @@ const CATEGORIES = [
 
 const STATUS: Record<string, {label: string; className: string}> = {
   pending: {label: 'Awaiting review', className: 'border-white/15 text-[#a79e94]'},
-  considering: {label: 'Considering', className: 'border-sky-300/30 text-sky-200'},
-  planned: {label: 'Planned', className: 'border-amber-300/40 text-amber-200'},
-  shipped: {label: 'Shipped ✓', className: 'border-emerald-300/40 bg-emerald-400/10 text-emerald-200'},
 }
 
-type Tab = 'hot' | 'new' | 'shipped'
+// Tab = trạng thái Bin đặt trong Studio; trong mỗi tab xếp theo ❤️ rồi mới nhất
+type Tab = 'considering' | 'planned' | 'shipped'
 const TABS: {value: Tab; label: string}[] = [
-  {value: 'hot', label: 'Hot'},
-  {value: 'new', label: 'New'},
+  {value: 'considering', label: 'Considering'},
+  {value: 'planned', label: 'Planned'},
   {value: 'shipped', label: 'Shipped'},
 ]
 
@@ -104,13 +102,22 @@ export function Wishlist({
   const [mine, setMine] = useState<Wish[]>([])
   const [hearted, setHearted] = useState<string[]>([])
   const [seen, setSeen] = useState(true)
-  const [tab, setTab] = useState<Tab>('hot')
+  const [tab, setTab] = useState<Tab>('considering')
   const [view, setView] = useState<'wishes' | 'donate'>('wishes')
   const donate = hasDonate()
   const showDonate = () => {
     setView('donate')
     trackEvent({name: 'Chill Donate Open'})
   }
+
+  // Đang ủng hộ dở (đã sang app ngân hàng, trang tải lại) → mở lại đúng bước QR
+  const reopen = useRef(onOpenChange)
+  useEffect(() => {
+    if (!hasDonate() || !loadIntent()) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setView('donate')
+    reopen.current(true)
+  }, [])
 
   const refresh = useCallback(() => {
     fetch('/api/chill-wish')
@@ -168,10 +175,11 @@ export function Wishlist({
 
   const list = useMemo(() => {
     const byNew = (a: Wish, b: Wish) => b.createdAt.localeCompare(a.createdAt)
-    if (tab === 'shipped') return wishes.filter((w) => w.status === 'shipped').sort(byNew)
-    const open = wishes.filter((w) => w.status !== 'shipped')
-    return tab === 'new' ? [...pendingMine, ...open.sort(byNew)] : [...pendingMine, ...open.sort((a, b) => b.hearts - a.hearts || byNew(a, b))]
+    const sorted = wishes.filter((w) => w.status === tab).sort((a, b) => b.hearts - a.hearts || byNew(a, b))
+    // Góp ý của mình đang chờ duyệt hiện đầu tab Considering
+    return tab === 'considering' ? [...pendingMine, ...sorted] : sorted
   }, [wishes, pendingMine, tab])
+  const tabCount = (t: Tab) => wishes.filter((w) => w.status === t).length + (t === 'considering' ? pendingMine.length : 0)
 
   const toggleHeart = (w: Wish) => {
     const on = !hearted.includes(w.id)
@@ -190,7 +198,7 @@ export function Wishlist({
     const next = [w, ...mine].slice(0, 20)
     setMine(next)
     save(MINE_KEY, next)
-    setTab('new')
+    setTab('considering')
   }
 
   const count = wishes.filter((w) => w.status !== 'shipped').length + pendingMine.length
@@ -298,11 +306,12 @@ export function Wishlist({
                   role="tab"
                   aria-selected={tab === t.value}
                   onClick={() => setTab(t.value)}
-                  className={`rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.15em] transition ${
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.15em] outline-none transition focus-visible:ring-2 focus-visible:ring-[#e8b27d]/70 ${
                     tab === t.value ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
                   }`}
                 >
                   {t.label}
+                  {tabCount(t.value) > 0 && <span className="tabular-nums opacity-70">{tabCount(t.value)}</span>}
                 </button>
               ))}
             </div>
@@ -310,7 +319,13 @@ export function Wishlist({
             <ol className="min-h-40 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
               {list.length === 0 && (
                 <li className="py-10 text-center text-sm text-[#a79e94]">
-                  {!loaded ? 'Brewing…' : tab === 'shipped' ? 'Nothing shipped yet — soon!' : 'No wishes yet. Be the first ☕'}
+                  {!loaded
+                    ? 'Brewing…'
+                    : tab === 'shipped'
+                      ? 'Nothing shipped yet — soon!'
+                      : tab === 'planned'
+                        ? 'Nothing planned yet — heart the ideas you want most.'
+                        : 'No wishes yet. Be the first ☕'}
                 </li>
               )}
               {list.map((w) => (
@@ -418,7 +433,8 @@ function WishItem({wish: w, hearted, onHeart}: {wish: Wish; hearted: boolean; on
               {w.hearts}
             </button>
           )}
-          {status && <span className={`rounded-full border px-2 py-0.5 text-[11px] ${status.className}`}>{status.label}</span>}
+          {/* Trạng thái đã thể hiện qua tab — chỉ còn nhãn "chờ duyệt" cho góp ý của chính mình */}
+          {pending && status && <span className={`rounded-full border px-2 py-0.5 text-[11px] ${status.className}`}>{status.label}</span>}
         </div>
       </div>
     </li>

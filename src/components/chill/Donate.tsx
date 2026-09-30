@@ -1,20 +1,27 @@
 'use client'
 
 // "Buy Bin a coffee" — màn donate trong khung Wishlist trang /chill.
-// QR MoMo (ảnh tĩnh) + QR Vietcombank (VietQR, điền sẵn số tiền + nội dung).
-// Không có cách tự biết tiền đã tới (tài khoản cá nhân) → nút "Mình đã chuyển"
-// chạy theo kiểu tin người xem: cảm ơn + mèo gừ gừ, tim bay, rồi mời để lại tên /
-// số tiền / lời nhắn (không bắt buộc) → lưu vào Studio "Chill · Supporters".
+//
+// 3 bước:
+//   1. Để lại lời nhắn (không bắt buộc): mức tiền, tên, lời nhắn. Có điền thì lưu
+//      ngay vào Studio ("Chờ đối chiếu") + mã riêng → người chuyển xong đóng trang
+//      luôn thì Bin vẫn khớp được với sao kê qua nội dung "Chill cafe K7Q2 Minh".
+//   2. Quét QR: Vietcombank (VietQR, điền sẵn số tiền + nội dung có mã) hoặc MoMo
+//      (QR tĩnh, copy nội dung dán vào lời nhắn). Quay lại tab từ app ngân hàng →
+//      nhắc bấm "I've sent it".
+//   3. Cảm ơn: mèo gừ gừ, tim bay. Ai bỏ qua bước 1 có thể để lại tên ở đây.
+// Trang không biết tiền có về thật hay không (tài khoản cá nhân) — Bin tự đối chiếu.
 
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
-import {DONATE, DONATE_TIERS, hasMomo, hasVcb, vietQrUrl} from './donate-config'
+import {DONATE, DONATE_TIERS, hasMomo, hasVcb, loadIntent, saveIntent, vietQrUrl, type DonateIntent} from './donate-config'
 
 type Method = 'vcb' | 'momo'
+type Step = 'note' | 'pay' | 'thanks'
 
 const vnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`
 
-// Nội dung chuyển khoản: bỏ dấu + ký tự lạ (nhiều ngân hàng không nhận), tối đa 25 ký tự
+// Nội dung chuyển khoản: bỏ dấu + ký tự lạ (nhiều ngân hàng không nhận), tối đa 30 ký tự
 const plain = (s: string) =>
   s
     .normalize('NFD')
@@ -24,25 +31,213 @@ const plain = (s: string) =>
     .replace(/[^A-Za-z0-9 -]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+    .slice(0, 30)
+
+const field =
+  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-[#ede6dd] placeholder:text-[#8d857c] focus:border-[#e8b27d]/50 focus:outline-none'
+const primary =
+  'w-full rounded-full bg-[#e8b27d] py-3 font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]'
+
+async function post(body: Record<string, unknown>) {
+  const res = await fetch('/api/chill-support', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
+  const data = (await res.json()) as {id?: string; code?: string; error?: string}
+  if (!res.ok) throw new Error(data.error ?? "Couldn't send, please try again.")
+  return data
+}
 
 export function Donate({onThanks, context}: {onThanks: () => void; context: string}) {
   const methods: Method[] = [...(hasVcb() ? (['vcb'] as const) : []), ...(hasMomo() ? (['momo'] as const) : [])]
-  const [method, setMethod] = useState<Method>(methods[0] ?? 'vcb')
-  const [tier, setTier] = useState<number>(DONATE_TIERS[0].amount)
-  const [custom, setCustom] = useState('')
-  const [name, setName] = useState('')
-  const [thanked, setThanked] = useState(false)
-  const [copied, setCopied] = useState('')
+  const [step, setStep] = useState<Step>('note')
+  const [intent, setIntent] = useState<DonateIntent | null>(null)
+  const [resumed, setResumed] = useState(false)
 
-  const amount = custom ? Number(custom.replace(/\D/g, '')) * 1000 : tier
-  const note = plain(name ? `${DONATE.note} - ${name}` : DONATE.note).slice(0, 25)
-  // QR đổi chậm lại một nhịp khi đang gõ số tiền / tên, khỏi tải ảnh mỗi phím
-  const [qr, setQr] = useState(() => (hasVcb() ? vietQrUrl(amount, note) : ''))
+  // Quay lại trang sau khi sang app ngân hàng → tiếp tục ở bước QR
   useEffect(() => {
-    if (!hasVcb()) return
-    const id = setTimeout(() => setQr(vietQrUrl(amount, note)), 450)
-    return () => clearTimeout(id)
-  }, [amount, note])
+    const saved = loadIntent()
+    if (!saved) return
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setIntent(saved)
+    setStep('pay')
+    setResumed(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [])
+
+  const toPay = (next: DonateIntent) => {
+    setIntent(next)
+    saveIntent(next)
+    setStep('pay')
+    setResumed(false)
+  }
+
+  if (step === 'note' || !intent) return <NoteStep initial={intent} context={context} onNext={toPay} />
+  if (step === 'pay')
+    return (
+      <PayStep
+        intent={intent}
+        methods={methods}
+        context={context}
+        resumed={resumed}
+        onBack={() => setStep('note')}
+        onSent={(id) => {
+          setIntent({...intent, id})
+          saveIntent(null)
+          setStep('thanks')
+          onThanks()
+        }}
+      />
+    )
+  return <ThanksStep intent={intent} onBack={() => setStep('pay')} />
+}
+
+// ---------- Bước 1: lời nhắn (không bắt buộc) ----------
+
+function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; context: string; onNext: (i: DonateIntent) => void}) {
+  const preset = DONATE_TIERS.some((t) => t.amount === initial?.amount)
+  const [tier, setTier] = useState(preset ? initial!.amount : DONATE_TIERS[0].amount)
+  const [custom, setCustom] = useState(initial && !preset && initial.amount ? String(initial.amount / 1000) : '')
+  const [otherOpen, setOtherOpen] = useState(Boolean(custom))
+  const [name, setName] = useState(initial?.name ?? '')
+  const [message, setMessage] = useState(initial?.message ?? '')
+  const [company, setCompany] = useState('')
+  const [busy, setBusy] = useState(false)
+  const otherRef = useRef<HTMLInputElement>(null)
+
+  const amount = otherOpen ? Number(custom || 0) * 1000 : tier
+
+  const next = async (withNote: boolean) => {
+    const base = {name: withNote ? name.trim() : '', message: withNote ? message.trim() : '', amount, at: Date.now()}
+    // Không để lại gì → khỏi tạo bản ghi, sang QR luôn
+    if (!base.name && !base.message) return onNext({...base, id: initial?.id, code: initial?.code})
+    // Đã có bản ghi từ lần trước (quay lại sửa) → giữ mã cũ
+    if (initial?.id) return onNext({...base, id: initial.id, code: initial.code})
+    setBusy(true)
+    try {
+      const {id, code} = await post({action: 'intent', ...base, method: 'vcb', context, company})
+      onNext({...base, id, code})
+    } catch {
+      // Lỗi thì vẫn cho sang QR — ủng hộ quan trọng hơn bản ghi
+      onNext(base)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
+      <p className="text-[15px] leading-relaxed text-[#ede6dd]">Enjoying the café? Buy Bin a coffee — every cup keeps the music playing and new features brewing.</p>
+
+      <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">Step 1 of 2 · A cup of</p>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Amount">
+        {DONATE_TIERS.map((t) => {
+          const on = !otherOpen && tier === t.amount
+          return (
+            <button
+              key={t.amount}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => {
+                setTier(t.amount)
+                setOtherOpen(false)
+              }}
+              className={`rounded-full border px-3 py-1.5 text-sm transition ${on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#c9c0b6] hover:text-[#ede6dd]'}`}
+            >
+              {t.icon} {t.label}
+              {t.amount ? ` · ${vnd(t.amount)}` : ''}
+            </button>
+          )
+        })}
+        {otherOpen ? (
+          <label className="flex items-center rounded-full border border-[#e8b27d]/60 bg-[#e8b27d]/15 px-3 text-sm">
+            <input
+              ref={otherRef}
+              inputMode="numeric"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value.replace(/\D/g, '').slice(0, 5))}
+              placeholder="0"
+              aria-label="Other amount, in thousand đồng"
+              className="w-12 bg-transparent py-1.5 text-right text-[#f3cfa8] placeholder:text-[#8d857c] focus:outline-none"
+            />
+            <span className="text-[#c9c0b6]">.000đ</span>
+          </label>
+        ) : (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={false}
+            onClick={() => {
+              setOtherOpen(true)
+              setTimeout(() => otherRef.current?.focus(), 0)
+            }}
+            className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-[#c9c0b6] transition hover:text-[#ede6dd]"
+          >
+            ✏️ Other
+          </button>
+        )}
+      </div>
+
+      <p className="mt-5 text-sm font-semibold text-[#f3ece4]">Leave Bin a note?</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[#8d857c]">Optional. Your name goes into the transfer note so Bin knows who to thank — only he sees it.</p>
+      <div className="mt-2 space-y-2">
+        <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder="Your name" aria-label="Your name (optional)" className={field} />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value.slice(0, 300))}
+          rows={2}
+          placeholder="A few words for Bin"
+          aria-label="Message (optional)"
+          className={`${field} resize-none`}
+        />
+        {/* Honeypot: người thật không thấy field này */}
+        <input tabIndex={-1} autoComplete="off" aria-hidden value={company} onChange={(e) => setCompany(e.target.value)} className="absolute -left-[9999px] h-0 w-0 opacity-0" />
+      </div>
+
+      <button type="button" onClick={() => next(true)} disabled={busy} className={`mt-4 ${primary}`}>
+        {busy ? 'One sec…' : 'Show the QR →'}
+      </button>
+      {(name || message) && (
+        <button type="button" onClick={() => next(false)} className="mt-2 w-full text-center text-xs text-[#8d857c] underline-offset-4 hover:underline">
+          Skip the note, just show the QR
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ---------- Bước 2: quét QR ----------
+
+function PayStep({
+  intent,
+  methods,
+  context,
+  resumed,
+  onBack,
+  onSent,
+}: {
+  intent: DonateIntent
+  methods: Method[]
+  context: string
+  resumed: boolean
+  onBack: () => void
+  onSent: (id?: string) => void
+}) {
+  const [method, setMethod] = useState<Method>(methods[0] ?? 'vcb')
+  const [copied, setCopied] = useState('')
+  const [nudge, setNudge] = useState(resumed)
+  const [busy, setBusy] = useState(false)
+  const note = plain([DONATE.note, intent.code, intent.name].filter(Boolean).join(' '))
+  const qr = hasVcb() ? vietQrUrl(intent.amount, note) : ''
+
+  // Rời tab (sang app ngân hàng) rồi quay lại → nhắc bấm "I've sent it"
+  useEffect(() => {
+    let hiddenAt = 0
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') hiddenAt = Date.now()
+      else if (hiddenAt && Date.now() - hiddenAt > 4000) setNudge(true)
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
 
   const copy = (label: string, value: string) => {
     void navigator.clipboard?.writeText(value).then(() => {
@@ -51,38 +246,37 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
     })
   }
 
-  const thanks = () => {
-    setThanked(true)
-    onThanks()
+  const sent = async () => {
+    if (busy) return
+    setBusy(true)
     trackEvent({name: 'Chill Donate Thanks', props: {method}})
-  }
-
-  if (thanked) {
-    return (
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-8 text-center">
-        <p className="text-4xl" aria-hidden>
-          ☕💛
-        </p>
-        <p className="mt-3 text-xl font-semibold tracking-tight text-[#f3ece4]">Cảm ơn bạn nhiều!</p>
-        <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">
-          Your coffee keeps the lights on and new things brewing at the café. The cat says thanks too 🐾
-        </p>
-        <ThanksNote method={method} amount={amount} name={name} note={note} context={context} />
-        <button type="button" onClick={() => setThanked(false)} className="mt-4 text-xs text-[#8d857c] underline-offset-4 hover:underline">
-          Back to the QR
-        </button>
-      </div>
-    )
+    let id = intent.id
+    try {
+      ;({id} = await post({action: 'sent', id: intent.id, method, amount: intent.amount, name: intent.name, note, context}))
+    } catch {
+      // Ghi nhận lỗi cũng không chặn lời cảm ơn
+    }
+    setBusy(false)
+    onSent(id)
   }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
-      <p className="text-[15px] leading-relaxed text-[#ede6dd]">
-        Enjoying the café? Buy Bin a coffee — every cup keeps the music playing and new features brewing.
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">Step 2 of 2 · Scan to send</p>
+        <button type="button" onClick={onBack} className="text-xs text-[#c9c0b6] underline-offset-4 hover:underline">
+          ← Edit
+        </button>
+      </div>
+
+      {nudge && (
+        <p role="status" className="mt-3 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-3 py-2 text-sm text-[#f3cfa8]">
+          Back from your bank app? Tap <span className="font-semibold">“I&apos;ve sent it”</span> so Bin can thank you 💛
+        </p>
+      )}
 
       {methods.length > 1 && (
-        <div className="mt-4 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/20 p-1" role="tablist" aria-label="Payment method">
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/20 p-1" role="tablist" aria-label="Payment method">
           {methods.map((m) => (
             <button
               key={m}
@@ -101,71 +295,19 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
       )}
 
       {method === 'vcb' && hasVcb() && (
-        <>
-          <div className="mt-4 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Amount">
-            {DONATE_TIERS.map((t) => (
-              <button
-                key={t.amount}
-                type="button"
-                role="radio"
-                aria-checked={!custom && tier === t.amount}
-                onClick={() => {
-                  setTier(t.amount)
-                  setCustom('')
-                }}
-                className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  !custom && tier === t.amount ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#c9c0b6] hover:text-[#ede6dd]'
-                }`}
-              >
-                {t.icon} {t.label}
-                {t.amount ? ` · ${vnd(t.amount)}` : ''}
-              </button>
-            ))}
-            <label className={`flex items-center rounded-full border px-3 text-sm ${custom ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15' : 'border-white/10'}`}>
-              <input
-                inputMode="numeric"
-                value={custom}
-                onChange={(e) => setCustom(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                placeholder="Other"
-                aria-label="Other amount, in thousand đồng"
-                className="w-14 bg-transparent py-1.5 text-[#f3cfa8] placeholder:text-[#8d857c] focus:outline-none"
-              />
-              <span className="text-[#8d857c]">.000đ</span>
-            </label>
-          </div>
-
-          <p className="mt-2 text-xs text-[#a79e94]">Any amount is lovely — even a sip ☕</p>
-
-          <div className="mt-4 flex gap-4">
-            <a
-              href={qr}
-              target="_blank"
-              rel="noopener"
-              title="Open the QR (to save it on your phone)"
-              className="shrink-0 rounded-2xl bg-white p-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- ảnh QR động từ img.vietqr.io */}
-              <img src={qr} alt={`Vietcombank VietQR, ${vnd(amount)}`} width={148} height={148} className="h-[148px] w-[148px]" />
-            </a>
-            <dl className="min-w-0 flex-1 space-y-1.5 text-sm">
-              <Row label="Bank" value="Vietcombank" />
-              <Row label="Account" value={DONATE.vcb.account} onCopy={() => copy('account', DONATE.vcb.account)} copied={copied === 'account'} mono />
-              <Row label="Name" value={DONATE.vcb.name} />
-              <Row label="Amount" value={amount ? vnd(amount) : 'You choose'} />
-              <Row label="Note" value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
-            </dl>
-          </div>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value.slice(0, 16))}
-            placeholder="Your name in the note (optional)"
-            aria-label="Your name, added to the transfer note (optional)"
-            className="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-[#ede6dd] placeholder:text-[#8d857c] focus:border-[#e8b27d]/50 focus:outline-none"
-          />
-          <p className="mt-2 text-[11px] leading-relaxed text-[#8d857c]">
-            Scan with any Vietnamese banking app (or MoMo). On your phone? Tap the QR to open it, save it, then pick it from your bank app&apos;s QR scanner.
-          </p>
-        </>
+        <div className="mt-4 flex gap-4">
+          <a href={qr} target="_blank" rel="noopener" title="Open the QR (to save it on your phone)" className="shrink-0 rounded-2xl bg-white p-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- ảnh QR động từ img.vietqr.io */}
+            <img src={qr} alt={`Vietcombank VietQR${intent.amount ? `, ${vnd(intent.amount)}` : ''}`} width={148} height={148} className="h-[148px] w-[148px]" />
+          </a>
+          <dl className="min-w-0 flex-1 space-y-1.5 text-sm">
+            <Row label="Bank" value="Vietcombank" />
+            <Row label="Account" value={DONATE.vcb.account} onCopy={() => copy('account', DONATE.vcb.account)} copied={copied === 'account'} mono />
+            <Row label="Name" value={DONATE.vcb.name} />
+            <Row label="Amount" value={intent.amount ? vnd(intent.amount) : 'You choose'} />
+            <Row label="Note" value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
+          </dl>
+        </div>
       )}
 
       {method === 'momo' && hasMomo() && (
@@ -177,11 +319,9 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
           <div className="min-w-0 flex-1 space-y-2 text-sm">
             <dl className="space-y-1.5">
               {DONATE.momo.name && <Row label="Name" value={DONATE.momo.name} />}
-              {DONATE.momo.phone && (
-                <Row label="Phone" value={DONATE.momo.phone} onCopy={() => copy('phone', DONATE.momo.phone.replace(/\s/g, ''))} copied={copied === 'phone'} mono />
-              )}
+              <Row label="Note" value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
             </dl>
-            <p className="text-[11px] leading-relaxed text-[#8d857c]">Scan with MoMo or any banking app, then type any amount you like. On your phone, save the QR and scan it from your gallery.</p>
+            <p className="text-[11px] leading-relaxed text-[#8d857c]">Type the amount{intent.amount ? ` (${vnd(intent.amount)})` : ''} and paste the note into the MoMo message.</p>
             <a href={DONATE.momo.qr} download="bin-momo-qr.webp" className="inline-block text-xs text-[#f3cfa8] underline-offset-4 hover:underline">
               Save QR
             </a>
@@ -189,39 +329,32 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={thanks}
-        className="mt-5 w-full rounded-full bg-[#e8b27d] py-3 font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
-      >
+      <p className="mt-3 text-[11px] leading-relaxed text-[#8d857c]">
+        Works with any Vietnamese banking app. On your phone? Tap the QR to open it, save it, then pick it from your bank app&apos;s QR scanner — come back here after.
+      </p>
+
+      <button type="button" onClick={sent} disabled={busy} className={`mt-4 ${primary} ${nudge ? 'ring-2 ring-[#e8b27d]/60 ring-offset-2 ring-offset-[#1b1a21]' : ''}`}>
         I&apos;ve sent it 💛
       </button>
     </div>
   )
 }
 
-// Để lại tên / số tiền / lời nhắn cho Bin sau khi chuyển (đều không bắt buộc)
-function ThanksNote({method, amount, name, note, context}: {method: Method; amount: number; name: string; note: string; context: string}) {
-  const [who, setWho] = useState(name)
-  const [sent, setSent] = useState(amount ? String(amount / 1000) : '')
+// ---------- Bước 3: cảm ơn ----------
+
+function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}) {
+  const askName = !intent.name && Boolean(intent.id)
+  const [name, setName] = useState('')
   const [message, setMessage] = useState('')
-  const [company, setCompany] = useState('')
   const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle')
   const [error, setError] = useState('')
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (state === 'sending') return
     setState('sending')
     setError('')
     try {
-      const res = await fetch('/api/chill-support', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name: who, amount: Number(sent || 0) * 1000, method, note, message, context, company}),
-      })
-      const data = (await res.json()) as {error?: string}
-      if (!res.ok) throw new Error(data.error ?? "Couldn't send, please try again.")
+      await post({action: 'update', id: intent.id, name, message})
       setState('done')
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send, please try again.")
@@ -229,57 +362,46 @@ function ThanksNote({method, amount, name, note, context}: {method: Method; amou
     }
   }
 
-  if (state === 'done') {
-    return (
-      <p role="status" className="mt-6 rounded-2xl bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-        Note sent — Bin will see it with his coffee ☕
-      </p>
-    )
-  }
-
-  const field =
-    'w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-[#ede6dd] placeholder:text-[#8d857c] focus:border-[#e8b27d]/50 focus:outline-none'
   return (
-    <form onSubmit={submit} className="mt-6 space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left">
-      <p className="text-sm font-semibold text-[#f3ece4]">Leave Bin a note?</p>
-      <p className="text-[11px] text-[#8d857c]">Optional — so he knows who to thank. Only Bin sees it.</p>
-      <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
-        <input value={who} onChange={(e) => setWho(e.target.value.slice(0, 40))} placeholder="Your name" aria-label="Your name (optional)" className={field} />
-        <label className={`flex items-center gap-1 ${field}`}>
-          <input
-            inputMode="numeric"
-            value={sent}
-            onChange={(e) => setSent(e.target.value.replace(/\D/g, '').slice(0, 5))}
-            placeholder="Amount"
-            aria-label="Amount you sent, in thousand đồng (optional)"
-            className="w-full min-w-0 bg-transparent focus:outline-none"
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-8 text-center">
+      <p className="text-4xl" aria-hidden>
+        ☕💛
+      </p>
+      <p className="mt-3 text-xl font-semibold tracking-tight text-[#f3ece4]">Cảm ơn {intent.name || 'bạn'} nhiều!</p>
+      <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">Your coffee keeps the lights on and new things brewing at the café. The cat says thanks too 🐾</p>
+
+      {askName && state !== 'done' && (
+        <form onSubmit={submit} className="mt-6 space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left">
+          <p className="text-sm font-semibold text-[#f3ece4]">Want Bin to know it was you?</p>
+          <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder="Your name" aria-label="Your name (optional)" className={field} />
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value.slice(0, 300))}
+            rows={2}
+            placeholder="A few words for Bin"
+            aria-label="Message (optional)"
+            className={`${field} resize-none`}
           />
-          <span className="shrink-0 text-[#8d857c]">.000đ</span>
-        </label>
-      </div>
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value.slice(0, 300))}
-        rows={2}
-        placeholder="A few words for Bin"
-        aria-label="Message (optional)"
-        className={`${field} resize-none`}
-      />
-      {/* Honeypot: người thật không thấy field này */}
-      <input tabIndex={-1} autoComplete="off" aria-hidden value={company} onChange={(e) => setCompany(e.target.value)} className="absolute -left-[9999px] h-0 w-0 opacity-0" />
-      {error && (
-        <p role="alert" className="text-sm text-rose-300">
-          {error}
+          {error && (
+            <p role="alert" className="text-sm text-rose-300">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={state === 'sending' || (!name.trim() && !message.trim())} className={`${primary} py-2.5 text-sm`}>
+            {state === 'sending' ? 'Sending…' : 'Send note'}
+          </button>
+        </form>
+      )}
+      {state === 'done' && (
+        <p role="status" className="mt-6 rounded-2xl bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
+          Note sent — Bin will see it with his coffee ☕
         </p>
       )}
-      <button
-        type="submit"
-        disabled={state === 'sending' || (!who.trim() && !sent && !message.trim())}
-        className="w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
-      >
-        {state === 'sending' ? 'Sending…' : 'Send note'}
+
+      <button type="button" onClick={onBack} className="mt-4 text-xs text-[#8d857c] underline-offset-4 hover:underline">
+        Back to the QR
       </button>
-    </form>
+    </div>
   )
 }
 

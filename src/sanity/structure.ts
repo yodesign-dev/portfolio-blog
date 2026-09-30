@@ -46,10 +46,27 @@ export const structure: StructureResolver = (S) =>
         .title('Chill · Supporters')
         .id('chillSupporter')
         .child(
-          S.documentTypeList('chillSupporter')
+          S.list()
             .title('Chill · Supporters')
-            .defaultOrdering([{field: '_createdAt', direction: 'desc'}])
-            .initialValueTemplates([]),
+            .items(
+              [
+                // Chưa tick "Đã nhận" trong 7 ngày gần đây — cũ hơn thì coi như không chuyển, chỉ còn ở "Tất cả"
+                ['todo', '⏳ Chờ đối chiếu', 'received != true && dateTime(_createdAt) > dateTime(now()) - 60*60*24*7'],
+                ['received', '✅ Đã nhận', 'received == true'],
+                ['all', 'Tất cả', 'true'],
+              ].map(([id, title, filter]) =>
+                S.listItem()
+                  .id(id)
+                  .title(title)
+                  .child(
+                    S.documentTypeList('chillSupporter')
+                      .title(title)
+                      .filter(`_type == "chillSupporter" && ${filter}`)
+                      .defaultOrdering([{field: '_createdAt', direction: 'desc'}])
+                      .initialValueTemplates([]),
+                  ),
+              ),
+            ),
         ),
       S.divider(),
 

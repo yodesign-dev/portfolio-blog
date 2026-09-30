@@ -41,3 +41,36 @@ export function vietQrUrl(amount: number, note: string) {
   if (amount > 0) q.set('amount', String(Math.round(amount)))
   return `https://img.vietqr.io/image/VCB-${account}-qr_only.png?${q}`
 }
+
+// Người xem đang ủng hộ dở (đã qua bước 1, chưa bấm "I've sent it"). Lưu lại để
+// khi quay về từ app ngân hàng — trang có thể đã tải lại — vẫn tiếp tục ở bước QR.
+export type DonateIntent = {
+  id?: string // bản ghi "Chờ đối chiếu" trong Studio (chỉ có khi đã để lại tên / lời nhắn)
+  code?: string // mã đối chiếu nằm trong nội dung chuyển khoản
+  name: string
+  message: string
+  amount: number
+  at: number
+}
+
+const INTENT_KEY = 'chill:donate-intent'
+const INTENT_TTL = 2 * 60 * 60 * 1000
+
+export function loadIntent(): DonateIntent | null {
+  try {
+    const raw = localStorage.getItem(INTENT_KEY)
+    const intent = raw ? (JSON.parse(raw) as DonateIntent) : null
+    return intent && Date.now() - intent.at < INTENT_TTL ? intent : null
+  } catch {
+    return null
+  }
+}
+
+export function saveIntent(intent: DonateIntent | null) {
+  try {
+    if (intent) localStorage.setItem(INTENT_KEY, JSON.stringify(intent))
+    else localStorage.removeItem(INTENT_KEY)
+  } catch {
+    // Chặn storage — chỉ mất phần "tiếp tục sau khi quay lại"
+  }
+}
