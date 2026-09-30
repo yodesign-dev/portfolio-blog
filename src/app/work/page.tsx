@@ -1,4 +1,6 @@
 import {CaseStudyCard, getCaseStudies} from '@/components/CaseStudyCard'
+import {BehanceArchive} from '@/components/BehanceArchive'
+import {getBehanceProjects} from '@/lib/behance'
 import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
@@ -10,7 +12,8 @@ export const metadata = pageMetadata({
 })
 
 export default async function WorkPage() {
-  const studies = await getCaseStudies(revalidate)
+  // Behance RSS cache riêng 1 ngày (dự án cũ, ít thay đổi)
+  const [studies, behance] = await Promise.all([getCaseStudies(revalidate), getBehanceProjects()])
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
@@ -33,6 +36,8 @@ export default async function WorkPage() {
             ))}
           </div>
         )}
+
+        <BehanceArchive projects={behance} />
       </main>
     </div>
   )

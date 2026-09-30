@@ -35,6 +35,12 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "cdn.sanity.io",
       },
+      // Ảnh cover project Behance (section "More on Behance" ở /work)
+      {
+        protocol: "https",
+        hostname: "mir-s3-cdn-cf.behance.net",
+        pathname: "/projects/**",
+      },
       // Ảnh bìa bài Medium ở trang Writing (src/lib/medium.ts) — next/image
       // tải qua server nên không cần thêm vào img-src của CSP.
       { protocol: "https", hostname: "cdn-images-1.medium.com" },
