@@ -1,8 +1,8 @@
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { AvatarLoop } from "@/components/originkit/ui/hero-31/avatar-loop";
 import { InfoBand } from "@/components/originkit/ui/hero-31/info-band";
 import {
   ProcessCanvas,
@@ -48,14 +48,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
         <div>
           <div className="mb-4 flex justify-center md:mb-6 md:justify-start">
             <div className="h-14 w-14 shrink-0 md:h-28 md:w-28 overflow-hidden rounded-full shadow-lg ring-2 ring-white/20">
-              <Image
-                src="/avatar.png"
-                alt={SITE_NAME}
-                width={144}
-                height={144}
-                priority
-                className="h-full w-full object-cover"
-              />
+              <AvatarLoop alt={SITE_NAME} />
             </div>
           </div>
 
