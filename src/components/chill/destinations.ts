@@ -34,4 +34,7 @@ export const DESTINATIONS: Destination[] = [
   {id: 'dalat', name: 'Đà Lạt', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('dalat'), tilt: -0.075, laneShift: -3},
   {id: 'saigon', name: 'Sài Gòn', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('saigon')},
   {id: 'hue', name: 'Huế', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('hue')},
+  {id: 'tiengiang', name: 'Tiền Giang', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('tiengiang')},
+  {id: 'cantho', name: 'Cần Thơ', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('cantho')},
+  {id: 'nhatrang', name: 'Nha Trang', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('nhatrang')},
 ]
