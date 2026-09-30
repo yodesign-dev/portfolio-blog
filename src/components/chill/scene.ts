@@ -125,7 +125,7 @@ type Note = {x: number; y: number; age: number; drift: number}
 const BIKES: SpriteName[] = ['bike-cub', 'bike-vespa', 'bike-flowers', 'bike-boxes', 'bike-duo']
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
 // Sprite AI vẽ hướng sang TRÁI (còn lại đều hướng sang phải) — lật ngược lại khi vẽ
-const FACES_LEFT = new Set<string>(['vendor'])
+const FACES_LEFT = new Set<string>(['cyclo'])
 const spriteSize = (name: SpriteName) => {
   const [, , w, h] = SPRITES[name]
   return {w: w / SCALE, h: h / SCALE}
