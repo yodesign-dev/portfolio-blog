@@ -41,7 +41,9 @@ export type Track = {
 export const stationOf = (t: Track): StationId => t.station ?? 'lofi'
 
 export const TRACKS: Track[] = [
-  // Lyria 3 (Google) qua Figma Weave — không lời, mỗi bài ~3 phút
+  // Lyria 3 (Google) qua Figma Weave — không lời, mỗi bài ~3 phút.
+  // Trong mỗi trạm xếp xen kẽ bài nhanh / chậm để mix không bị đều đều.
+  // ☕ Café Acoustic
   {
     id: 'acoustic-morning-letters',
     title: 'Morning Letters',
@@ -51,6 +53,39 @@ export const TRACKS: Track[] = [
     station: 'acoustic',
   },
   {
+    id: 'acoustic-sunday-window',
+    title: 'Sunday Window',
+    mood: 'Bossa folk · Sunny',
+    duration: 174,
+    src: '/chill/music/acoustic-sunday-window.m4a',
+    station: 'acoustic',
+  },
+  {
+    id: 'acoustic-old-polaroids',
+    title: 'Old Polaroids',
+    mood: 'Guitar & piano · Nostalgic',
+    duration: 177,
+    src: '/chill/music/acoustic-old-polaroids.m4a',
+    station: 'acoustic',
+  },
+  {
+    id: 'acoustic-evening-stroll',
+    title: 'Evening Stroll',
+    mood: 'Folk-pop · Uplifting',
+    duration: 177,
+    src: '/chill/music/acoustic-evening-stroll.m4a',
+    station: 'acoustic',
+  },
+  {
+    id: 'acoustic-rainy-veranda',
+    title: 'Rainy Veranda',
+    mood: 'Fingerstyle & cello · Rain',
+    duration: 167,
+    src: '/chill/music/acoustic-rainy-veranda.m4a',
+    station: 'acoustic',
+  },
+  // 🎧 Deep Focus
+  {
     id: 'focus-still-water',
     title: 'Still Water',
     mood: 'Ambient · Deep focus',
@@ -59,6 +94,31 @@ export const TRACKS: Track[] = [
     station: 'focus',
   },
   {
+    id: 'focus-glass-hours',
+    title: 'Glass Hours',
+    mood: 'Minimal synth · Flow',
+    duration: 167,
+    src: '/chill/music/focus-glass-hours.m4a',
+    station: 'focus',
+  },
+  {
+    id: 'focus-night-library',
+    title: 'Night Library',
+    mood: 'Piano & drone · Late night',
+    duration: 175,
+    src: '/chill/music/focus-night-library.m4a',
+    station: 'focus',
+  },
+  {
+    id: 'focus-cloud-drift',
+    title: 'Cloud Drift',
+    mood: 'Strings & pads · Bright',
+    duration: 172,
+    src: '/chill/music/focus-cloud-drift.m4a',
+    station: 'focus',
+  },
+  // 🎷 Sax Lounge
+  {
     id: 'sax-midnight-avenue',
     title: 'Midnight Avenue',
     mood: 'Smooth sax · Lounge',
@@ -66,9 +126,45 @@ export const TRACKS: Track[] = [
     src: '/chill/music/sax-midnight-avenue.m4a',
     station: 'sax',
   },
+  {
+    id: 'sax-velvet-rooftop',
+    title: 'Velvet Rooftop',
+    mood: 'Bossa sax · Dusk',
+    duration: 178,
+    src: '/chill/music/sax-velvet-rooftop.m4a',
+    station: 'sax',
+  },
+  {
+    id: 'sax-late-taxi',
+    title: 'Late Taxi',
+    mood: 'Sax ballad · Midnight',
+    duration: 180,
+    src: '/chill/music/sax-late-taxi.m4a',
+    station: 'sax',
+  },
+  {
+    id: 'sax-neon-harbor',
+    title: 'Neon Harbor',
+    mood: 'Smooth jazz · Groove',
+    duration: 180,
+    src: '/chill/music/sax-neon-harbor.m4a',
+    station: 'sax',
+  },
   // CassetteAI / MiniMax — trạm Lo-fi
-  {id: 'morning-phin', title: 'Morning Phin', mood: 'Rhodes · Warm', duration: 180, src: '/chill/music/morning-phin.m4a'},
-  {id: 'hanoi-mist', title: 'Hanoi Morning Mist', mood: 'Ambient · Slow', duration: 180, src: '/chill/music/hanoi-mist.m4a'},
+  {
+    id: 'morning-phin',
+    title: 'Morning Phin',
+    mood: 'Rhodes · Warm',
+    duration: 180,
+    src: '/chill/music/morning-phin.m4a',
+  },
+  {
+    id: 'hanoi-mist',
+    title: 'Hanoi Morning Mist',
+    mood: 'Ambient · Slow',
+    duration: 180,
+    src: '/chill/music/hanoi-mist.m4a',
+  },
   {
     id: 'scooter-traffic',
     title: 'Scooter Traffic',
@@ -76,7 +172,13 @@ export const TRACKS: Track[] = [
     duration: 180,
     src: '/chill/music/scooter-traffic.m4a',
   },
-  {id: 'rain-awning', title: 'Rain on the Awning', mood: 'Jazzy · Soft', duration: 180, src: '/chill/music/rain-awning.m4a'},
+  {
+    id: 'rain-awning',
+    title: 'Rain on the Awning',
+    mood: 'Jazzy · Soft',
+    duration: 180,
+    src: '/chill/music/rain-awning.m4a',
+  },
   {
     id: 'rainy-morning-beats',
     title: 'Rainy Morning Beats',
@@ -84,5 +186,11 @@ export const TRACKS: Track[] = [
     duration: 75,
     src: '/chill/music/rainy-morning-beats.m4a',
   },
-  {id: 'deep-work', title: 'Deep Work Loop', mood: 'Steady · Minimal', duration: 180, src: '/chill/music/deep-work.m4a'},
+  {
+    id: 'deep-work',
+    title: 'Deep Work Loop',
+    mood: 'Steady · Minimal',
+    duration: 180,
+    src: '/chill/music/deep-work.m4a',
+  },
 ]
