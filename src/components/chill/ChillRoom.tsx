@@ -164,7 +164,20 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       scene.frame(now)
     }
     raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
+    // Canvas vẽ ở bội số nguyên của 640×360 vừa đủ phủ khung hiển thị (px thiết bị)
+    const canvas = canvasRef.current!
+    const fit = () => {
+      const dpr = window.devicePixelRatio || 1
+      const portrait = window.matchMedia('(orientation: portrait)').matches
+      scene.resize(canvas.clientWidth * dpr, canvas.clientHeight * dpr, !portrait)
+    }
+    const ro = new ResizeObserver(fit)
+    ro.observe(canvas)
+    fit()
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
   }, [])
 
   useEffect(() => {
@@ -485,7 +498,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       {/* Ngang: cảnh phủ kín màn hình · Dọc (điện thoại): giữ nguyên khung, không cắt mất người ngồi */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full object-cover [image-rendering:pixelated] portrait:object-contain"
+        className="absolute inset-0 h-full w-full object-cover portrait:object-contain"
         role="img"
         aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
       />

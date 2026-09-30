@@ -4,16 +4,20 @@
 // Weave): mỗi điểm đến 3 bản phố sáng/chiều/đêm + 1 lớp nội thất dùng chung
 // đã cắt trong suốt ô kính. Đổi điểm đến / giờ thì ảnh phố mờ dần sang ảnh mới.
 // Mọi thứ chuyển động vẫn vẽ bằng canvas ở lưới 320×180 (mỗi "pixel" = 2px
-// thật trên canvas 640×360), rồi CSS phóng to bằng `image-rendering: pixelated`.
+// thật trên canvas đệm 640×360). Canvas hiển thị phóng đệm lên k lần nguyên
+// (nearest) — pixel nào cũng to đều nhau — rồi trình duyệt chỉ co giãn nốt phần
+// lẻ còn lại cho vừa màn hình (xem resize()).
 //
 // Xe cộ, người đi bộ, chó ngoài phố là sprite AI (public/chill/sprites.png,
-// xem sprites.ts). Nhân vật trong quán là video loop AI (Kling) — gõ phím rồi
-// thỉnh thoảng cầm ly cà phê uống; nền xanh ô kính được cắt trên từng khung.
+// xem sprites.ts). Nhân vật trong quán gõ phím rồi thỉnh thoảng cầm ly cà phê
+// uống: chuỗi khung cắt từ video loop AI (Kling), đã cắt nền xanh sẵn và chỉ giữ
+// vùng người ngồi (public/chill/scenes/interior-loop.webp) — phần nội thất còn
+// lại vẫn là ảnh tĩnh nét. Mèo mướp nằm ngủ trên bậu cửa (public/chill/cat.png).
 //
 // Thứ tự lớp (xa → gần):
 //   ảnh phố → chim → người/chó trên vỉa hè → xe làn xa → xe làn gần → mưa/sương
-//   → kính cửa → nội thất (video hoặc ảnh tĩnh, tô màu theo giờ) → hơi cà phê,
-//   nốt nhạc → ánh đèn
+//   → kính cửa → nội thất (ảnh tĩnh + khung người ngồi, tô màu theo giờ) → mèo
+//   → hơi cà phê, nốt nhạc → ánh đèn
 
 import {DESTINATIONS, type Destination} from './destinations'
 import {SPRITES, SPRITE_SRC, type SpriteName} from './sprites'
@@ -44,11 +48,21 @@ const HEADPHONES = {x: 262, y: 90}
 
 const FADE_SECONDS = 1.2
 const INTERIOR_SRC = '/chill/scenes/interior.webp'
-const INTERIOR_VIDEO_SRC = '/chill/scenes/interior-loop.mp4'
-// Mốc trong video (giây): 0–0.75 và 6.8–hết là gõ phím, giữa là cầm ly uống.
-// Khung đầu = khung cuối nên video tự loop liền mạch.
+// Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
+// thật, đặt tại (429, 116) trên ảnh nội thất 640×360. Ô cuối (121) là mặt nạ:
+// vùng khoét khỏi ảnh tĩnh để khung chuyển động thay vào.
+const CHAR = {src: '/chill/scenes/interior-loop.webp', x: 429, y: 116, w: 211, h: 220, cols: 12, frames: 121, fps: 12}
+const CHAR_MASK = CHAR.frames
+const CHAR_DURATION = CHAR.frames / CHAR.fps
+// Mốc (giây): 0–0.75 và 6.8–hết là gõ phím, giữa là cầm ly uống.
+// Khung đầu = khung cuối nên loop liền mạch.
 const SIP_START = 0.75
 const SIP_END = 6.8
+
+// Mèo trên bậu cửa: 4 khung 92×58 px thật — ngủ · ngóc đầu (mắt nhắm) · vẫy
+// đuôi · ngẩng đầu nhìn ra phố. Toạ độ theo lưới 320×180, (x, đáy chân)
+const CAT = {src: '/chill/cat.png', x: 52, y: 148, w: 92, h: 58}
+type CatPose = 0 | 1 | 2 | 3
 
 // Màu nhân cho sprite ngoài phố để hợp ánh sáng của ảnh nền
 const SPRITE_TINT: Record<TimeOfDay, string | null> = {
@@ -167,15 +181,20 @@ export class ChillScene {
   private interiorLayer: HTMLCanvasElement
   private atlas: HTMLImageElement
   private atlasTinted: HTMLCanvasElement
-  private video: HTMLVideoElement | null = null
-  private videoLayer: HTMLCanvasElement
-  private videoFrameTime = -1
-  private videoReady = false
+  private buffer: HTMLCanvasElement
+  private display: HTMLCanvasElement
+  private displayCtx: CanvasRenderingContext2D
+  private charSheet: HTMLImageElement
+  private charTinted: HTMLCanvasElement
+  private charTime = 0
   private sipping = false
   private idleLoops = 0
   private nextSip = 2 // lần uống đầu tiên đến sớm để người xem thấy
   private paused = false
   private dirty = true
+  private catSheet: HTMLImageElement
+  private catTinted: HTMLCanvasElement
+  private cat = {pose: 0 as CatPose, hold: 0, next: 6, breath: 0}
 
   private rng = Math.random
   private movers: Mover[] = []
@@ -195,18 +214,22 @@ export class ChillScene {
   private clock = 0
 
   constructor(canvas: HTMLCanvasElement) {
-    canvas.width = SCENE_W * SCALE
-    canvas.height = SCENE_H * SCALE
-    this.ctx = canvas.getContext('2d')!
+    this.display = canvas
+    this.displayCtx = canvas.getContext('2d')!
+    this.buffer = this.makeLayer()
+    this.ctx = this.buffer.getContext('2d')!
     this.ctx.imageSmoothingEnabled = false
+    this.resize(SCENE_W * SCALE, SCENE_H * SCALE)
 
     this.street = this.image(this.destination.streets[this.time])
     this.interior = loadImage(INTERIOR_SRC, () => (this.dirty = true))
     this.interiorLayer = this.makeLayer()
-    this.videoLayer = this.makeLayer()
     this.atlas = loadImage(SPRITE_SRC, () => (this.dirty = true))
     this.atlasTinted = document.createElement('canvas')
-    this.setupVideo()
+    this.charSheet = loadImage(CHAR.src, () => (this.dirty = true))
+    this.charTinted = document.createElement('canvas')
+    this.catSheet = loadImage(CAT.src, () => (this.dirty = true))
+    this.catTinted = document.createElement('canvas')
 
     for (let i = 0; i < 140; i++) {
       this.rain.push({
@@ -261,12 +284,30 @@ export class ChillScene {
     this.musicOn = on
   }
 
-  // Tạm dừng cảnh (nút pause / giảm chuyển động): dừng luôn video nhân vật
+  // Tạm dừng cảnh (nút pause / giảm chuyển động)
   setPaused(paused: boolean) {
     this.paused = paused
-    if (!this.video) return
-    if (paused) this.video.pause()
-    else void this.video.play().catch(() => {})
+  }
+
+  // Kích thước canvas trên màn hình (px thiết bị) mà cảnh cần phủ. Canvas hiển
+  // thị = đệm × k (k nguyên, nearest) với k vừa đủ ≥ kích thước đó → trình duyệt
+  // chỉ thu nhỏ nhẹ phần lẻ, pixel không bị to nhỏ lệch nhau / nhoè như khi
+  // phóng thẳng 640×360 lên theo hệ số lẻ.
+  resize(deviceW: number, deviceH: number, cover = true) {
+    const fit = cover ? Math.max : Math.min
+    const k = Math.min(8, Math.max(1, Math.ceil(fit(deviceW / this.buffer.width, deviceH / this.buffer.height) - 0.01)))
+    const w = this.buffer.width * k
+    const h = this.buffer.height * k
+    if (this.display.width === w && this.display.height === h) return
+    this.display.width = w
+    this.display.height = h
+    this.blit()
+  }
+
+  private blit() {
+    const c = this.displayCtx
+    c.imageSmoothingEnabled = false
+    c.drawImage(this.buffer, 0, 0, this.display.width, this.display.height)
   }
 
   private makeLayer() {
@@ -274,22 +315,6 @@ export class ChillScene {
     c.width = SCENE_W * SCALE
     c.height = SCENE_H * SCALE
     return c
-  }
-
-  private setupVideo() {
-    const v = document.createElement('video')
-    v.src = INTERIOR_VIDEO_SRC
-    v.muted = true
-    v.loop = true
-    v.playsInline = true
-    v.preload = 'auto'
-    v.addEventListener('loadeddata', () => {
-      this.videoReady = true
-      if (!this.paused) void v.play().catch(() => {})
-    })
-    // Lỗi tải / trình duyệt không hỗ trợ → giữ ảnh tĩnh
-    v.addEventListener('error', () => (this.video = null))
-    this.video = v
   }
 
   // Gọi mỗi frame từ requestAnimationFrame
@@ -300,6 +325,7 @@ export class ChillScene {
     if (this.dirty) this.rebuild()
     this.update(dt)
     this.draw(this.clock)
+    this.blit()
   }
 
   // ---------- Cập nhật ----------
@@ -307,8 +333,6 @@ export class ChillScene {
   private rebuild() {
     this.dirty = false
     this.tint = combine(SPRITE_TINT[this.time], this.weather === 'rain' ? '#aab3be' : null)
-    // Khung video hiện tại phải tô lại màu theo giờ/thời tiết mới (kể cả khi video đang dừng)
-    this.videoFrameTime = -1
 
     // Atlas sprite tô sẵn màu theo giờ/thời tiết (nhân màu rồi giữ lại alpha gốc)
     if (ready(this.atlas)) {
@@ -327,22 +351,51 @@ export class ChillScene {
       }
     }
 
+    // Sheet người ngồi + mèo: tô sẵn cùng màu với nội thất
+    this.washed(this.charSheet, this.charTinted)
+    this.washed(this.catSheet, this.catTinted)
+
     // Lớp nội thất tô sẵn màu theo giờ/thời tiết, chỉ vẽ lại khi đổi
     const ctx = this.interiorLayer.getContext('2d')!
     ctx.globalCompositeOperation = 'source-over'
     ctx.clearRect(0, 0, this.interiorLayer.width, this.interiorLayer.height)
-    if (!this.interior.complete || !this.interior.naturalWidth) return
+    if (!ready(this.interior)) return
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
+    // Sheet người ngồi đã tải → khoét vùng người khỏi ảnh tĩnh, khung động thay vào
+    if (ready(this.charSheet)) {
+      const [sx, sy] = this.charCell(CHAR_MASK)
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.drawImage(this.charSheet, sx, sy, CHAR.w, CHAR.h, CHAR.x, CHAR.y, CHAR.w, CHAR.h)
+    }
+    this.wash(ctx, this.interiorLayer.width, this.interiorLayer.height)
+  }
+
+  // Phủ màu theo giờ/thời tiết lên phần không trong suốt
+  private wash(ctx: CanvasRenderingContext2D, w: number, h: number) {
     ctx.globalCompositeOperation = 'source-atop'
     const wash = INTERIOR_WASH[this.time]
     if (wash) {
       ctx.fillStyle = wash
-      ctx.fillRect(0, 0, this.interiorLayer.width, this.interiorLayer.height)
+      ctx.fillRect(0, 0, w, h)
     }
     if (this.weather === 'rain') {
       ctx.fillStyle = 'rgba(40,52,72,0.18)'
-      ctx.fillRect(0, 0, this.interiorLayer.width, this.interiorLayer.height)
+      ctx.fillRect(0, 0, w, h)
     }
+    ctx.globalCompositeOperation = 'source-over'
+  }
+
+  private washed(src: HTMLImageElement, out: HTMLCanvasElement) {
+    if (!ready(src)) return
+    out.width = src.naturalWidth
+    out.height = src.naturalHeight
+    const c = out.getContext('2d')!
+    c.drawImage(src, 0, 0)
+    this.wash(c, out.width, out.height)
+  }
+
+  private charCell(i: number): [number, number] {
+    return [(i % CHAR.cols) * CHAR.w, Math.floor(i / CHAR.cols) * CHAR.h]
   }
 
   private randomGlassDrop(top = false): GlassDrop {
@@ -424,7 +477,8 @@ export class ChillScene {
     }
     this.notes = this.notes.filter((n) => n.age < 3)
 
-    this.updateVideo()
+    this.updateCharacter(dt)
+    this.updateCat(dt)
 
     if (rainy) {
       for (const d of this.rain) {
@@ -511,10 +565,9 @@ export class ChillScene {
   }
 
   // Lặp đoạn gõ phím; cứ vài vòng mới cho phát đoạn cầm ly uống (SIP_START → SIP_END)
-  private updateVideo() {
-    const v = this.video
-    if (!v || !this.videoReady || this.paused) return
-    const t = v.currentTime
+  private updateCharacter(dt: number) {
+    if (this.paused) return
+    let t = (this.charTime + dt) % CHAR_DURATION
     if (this.sipping) {
       if (t >= SIP_END) this.sipping = false
     } else if (t >= SIP_START && t < SIP_END) {
@@ -523,10 +576,38 @@ export class ChillScene {
         this.idleLoops = 0
         this.nextSip = 5 + Math.floor(this.rng() * 4) // ~20–35s giữa 2 lần uống
       } else {
-        v.currentTime = SIP_END
+        t = SIP_END
         this.idleLoops++
       }
     }
+    this.charTime = t
+  }
+
+  // Mèo ngủ, thở đều; thỉnh thoảng vẫy đuôi (bật nhạc thì vẫy nhiều hơn), trở
+  // mình ngóc đầu, hoặc ngẩng lên nhìn ra phố (mưa thì hay nhìn hơn, đêm thì ngủ say)
+  private updateCat(dt: number) {
+    const c = this.cat
+    c.breath += dt
+    if (c.hold > 0) {
+      c.hold -= dt
+      if (c.hold <= 0) c.pose = 0
+      return
+    }
+    c.next -= dt
+    if (c.next > 0) return
+    const r = this.rng()
+    const watch = this.time === 'night' ? 0 : this.weather === 'rain' ? 0.45 : 0.2
+    if (r < watch) {
+      c.pose = 3
+      c.hold = 3 + this.rng() * 4
+    } else if (r < watch + 0.15) {
+      c.pose = 1
+      c.hold = 1.5 + this.rng()
+    } else {
+      c.pose = 2
+      c.hold = 0.35 + this.rng() * 0.3
+    }
+    c.next = (this.musicOn ? 4 : 7) + this.rng() * 8
   }
 
   private spawnVehicle(x?: number) {
@@ -672,7 +753,12 @@ export class ChillScene {
     }
     ctx.restore()
 
-    ctx.drawImage(this.interiorFrame(), 0, 0, SCENE_W, SCENE_H)
+    ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W, SCENE_H)
+    if (this.charTinted.width) {
+      const [sx, sy] = this.charCell(Math.min(CHAR.frames - 1, Math.floor(this.charTime * CHAR.fps)))
+      ctx.drawImage(this.charTinted, sx, sy, CHAR.w, CHAR.h, CHAR.x / SCALE, CHAR.y / SCALE, CHAR.w / SCALE, CHAR.h / SCALE)
+    }
+    this.drawCat()
     this.drawSteam(t)
     this.drawNotes()
     this.drawLights()
@@ -691,81 +777,6 @@ export class ChillScene {
       this.rect(x - 2, up ? y - 1 : y + 1, 2, 1, col)
       this.rect(x + 1, up ? y - 1 : y + 1, 2, 1, col)
     }
-  }
-
-  // Nội thất: khung video hiện tại (đã cắt nền xanh + tô màu), chưa có video thì ảnh tĩnh
-  private interiorFrame(): HTMLCanvasElement {
-    const v = this.video
-    if (!v || !this.videoReady || v.readyState < 2) return this.interiorLayer
-    if (v.currentTime !== this.videoFrameTime) {
-      this.videoFrameTime = v.currentTime
-      this.keyVideoFrame(v)
-    }
-    return this.videoLayer
-  }
-
-  private keyVideoFrame(v: HTMLVideoElement) {
-    const c = this.videoLayer.getContext('2d', {willReadFrequently: true})!
-    const {width: W, height: H} = this.videoLayer
-    c.globalCompositeOperation = 'source-over'
-    c.drawImage(v, 0, 0, W, H)
-    const img = c.getImageData(0, 0, W, H)
-    const d = img.data
-    const keyed = new Uint8Array(W * H)
-    for (let i = 0, p = 0; p < keyed.length; i += 4, p++) {
-      const r = d[i]
-      const g = d[i + 1]
-      const b = d[i + 2]
-      if (g > 150 && r < 140 && b < 140 && g > r * 1.4 && g > b * 1.4) {
-        keyed[p] = 1
-        d[i + 3] = 0
-      }
-    }
-    // Viền ám xanh do nén video (2 lượt):
-    // 1) pixel hơi xanh sát vùng đã cắt → bỏ luôn
-    // 2) pixel còn lại cách vùng cắt ≤ 2px mà vẫn ngả xanh → kéo kênh G về mức R/B
-    const near = (p: number, m: Uint8Array) => m[p - 1] || m[p + 1] || m[p - W] || m[p + W]
-    const edge = keyed.slice()
-    for (let y = 1; y < H - 1; y++) {
-      for (let x = 1; x < W - 1; x++) {
-        const p = y * W + x
-        if (keyed[p] || !near(p, keyed)) continue
-        const i = p * 4
-        const r = d[i]
-        const g = d[i + 1]
-        const b = d[i + 2]
-        if (g > 100 && g > Math.max(r, b) * 1.2) {
-          edge[p] = 1
-          d[i + 3] = 0
-        }
-      }
-    }
-    for (let pass = 0; pass < 2; pass++) {
-      const grown = edge.slice()
-      for (let y = 1; y < H - 1; y++) {
-        for (let x = 1; x < W - 1; x++) {
-          const p = y * W + x
-          if (edge[p] || !near(p, edge)) continue
-          const i = p * 4
-          const m = Math.max(d[i], d[i + 2])
-          if (d[i + 1] > m) d[i + 1] = m
-          grown[p] = 1
-        }
-      }
-      edge.set(grown)
-    }
-    c.putImageData(img, 0, 0)
-    c.globalCompositeOperation = 'source-atop'
-    const wash = INTERIOR_WASH[this.time]
-    if (wash) {
-      c.fillStyle = wash
-      c.fillRect(0, 0, W, H)
-    }
-    if (this.weather === 'rain') {
-      c.fillStyle = 'rgba(40,52,72,0.18)'
-      c.fillRect(0, 0, W, H)
-    }
-    c.globalCompositeOperation = 'source-over'
   }
 
   // Khung hình theo trạng thái: người đi → 4 khung bước theo quãng đường, đứng →
@@ -825,9 +836,7 @@ export class ChillScene {
       ctx.translate(x * 2 + w, 0)
       ctx.scale(-1, 1)
     }
-    ctx.imageSmoothingEnabled = scale !== 1
     ctx.drawImage(this.atlasTinted, sx, sy, sw, sh, x, y, w, h)
-    ctx.imageSmoothingEnabled = false
     // Đêm: cửa kính ô tô / xe buýt sáng đèn bên trong (vẽ trong hệ toạ độ đã lật)
     const win = WINDOWS[name]
     if (night && win) {
@@ -907,6 +916,21 @@ export class ChillScene {
     ctx.restore()
     this.rect(front, ly, 1, 1, '#fff6c8')
     this.rect(back, ly, 1, 1, m.braking ? '#ff5a44' : '#e0382a')
+  }
+
+  private drawCat() {
+    if (!this.catTinted.width) return
+    const ctx = this.ctx
+    const {pose, breath} = this.cat
+    const w = CAT.w / SCALE
+    const h = CAT.h / SCALE
+    // Bóng mềm dưới bụng
+    ctx.fillStyle = 'rgba(40,20,10,0.22)'
+    ctx.fillRect(CAT.x + 3, CAT.y - 1, w - 8, 1)
+    ctx.fillRect(CAT.x + 5, CAT.y, w - 12, 1)
+    // Thở: lưng phồng lên 1px rồi xẹp xuống (~3.5s/nhịp) khi đang nằm ngủ
+    const inhale = pose === 0 && breath % 3.5 < 1.6 ? 0.5 : 0
+    ctx.drawImage(this.catTinted, pose * CAT.w, 0, CAT.w, CAT.h, CAT.x, CAT.y - h - inhale, w, h + inhale)
   }
 
   // Hơi nước bốc lên từ nắp phin
