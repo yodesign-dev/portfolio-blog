@@ -4,7 +4,7 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, type Destination} from './destinations'
-import {TRACKS, type Track} from './tracks'
+import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 
 const PREFS_KEY = 'chill:prefs'
@@ -16,6 +16,7 @@ type Prefs = {
   time: TimeOfDay
   weather: Weather
   shuffle: boolean
+  station: StationId
   destination: string
   travel: number
 }
@@ -76,6 +77,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [volume, setVolume] = useState(0.7)
   const [ambience, setAmbience] = useState(0.35)
   const [shuffle, setShuffle] = useState(false)
+  const [station, setStation] = useState<StationId>('acoustic')
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(tracks[0].duration)
   const [scenePaused, setScenePaused] = useState(false)
@@ -85,6 +87,9 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [travelElapsed, setTravelElapsed] = useState(0)
 
   const track = tracks[index]
+  // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
+  const stationList = tracks.map((t, i) => ({t, i})).filter(({t}) => stationOf(t) === station)
+  const stationPos = stationList.findIndex(({i}) => i === index)
   const dest = destinations[destIndex]
   const nextDest = destinations[(destIndex + 1) % destinations.length]
 
@@ -102,6 +107,17 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     if (prefs.time && ['morning', 'afternoon', 'night'].includes(prefs.time)) setTime(prefs.time)
     if (prefs.weather && ['clear', 'rain', 'mist'].includes(prefs.weather)) setWeather(prefs.weather)
     if (typeof prefs.shuffle === 'boolean') setShuffle(prefs.shuffle)
+    const savedStation = STATIONS.find((st) => st.id === prefs.station)?.id
+    // Không có lựa chọn cũ thì mở trạm có bài đầu tiên (ưu tiên Café Acoustic)
+    const firstStation = savedStation ?? STATIONS.find((st) => tracks.some((t) => stationOf(t) === st.id))?.id ?? 'lofi'
+    setStation(saved >= 0 ? stationOf(tracks[saved]) : firstStation)
+    if (saved < 0) {
+      const first = tracks.findIndex((t) => stationOf(t) === firstStation)
+      if (first >= 0) {
+        setIndex(first)
+        setDuration(tracks[first].duration)
+      }
+    }
     const savedDest = destinations.findIndex((d) => d.id === prefs.destination)
     if (savedDest >= 0) setDestIndex(savedDest)
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
@@ -119,6 +135,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       time,
       weather,
       shuffle,
+      station,
       destination: dest.id,
       travel,
     }
@@ -127,7 +144,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle, dest.id, travel])
+  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -220,11 +237,12 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
 
   // ---------- Điều khiển nhạc ----------
 
-  const playAt = useCallback((i: number) => {
+  // crossfade: bài đang phát nhỏ dần, bài mới to dần (chuyển bài tự động / đổi trạm)
+  const playAt = useCallback((i: number, crossfade = false) => {
     const audio = audioRef.current
     if (!audio) return
     const next = tracks[i]
-    audio.play(next)
+    audio.play(next, crossfade)
     setIndex(i)
     setStarted(true)
     setPlaying(true)
@@ -233,17 +251,22 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     trackEvent({name: 'Chill Play', props: {track: next.id}})
   }, [tracks])
 
+  // Bài kế tiếp trong CÙNG trạm (vòng lại đầu trạm khi hết)
   const nextIndex = useCallback(
     (from: number) => {
-      if (!shuffle || tracks.length < 2) return (from + 1) % tracks.length
-      let i = from
-      while (i === from) i = Math.floor(Math.random() * tracks.length)
-      return i
+      const list = tracks.map((t, i) => ({t, i})).filter(({t}) => stationOf(t) === stationOf(tracks[from]))
+      if (list.length < 2) return list[0]?.i ?? from
+      const pos = list.findIndex(({i}) => i === from)
+      if (!shuffle) return list[(pos + 1) % list.length].i
+      let k = pos
+      while (k === pos) k = Math.floor(Math.random() * list.length)
+      return list[k].i
     },
-    [shuffle, tracks.length]
+    [shuffle, tracks]
   )
 
   const next = useCallback(() => playAt(nextIndex(index)), [index, nextIndex, playAt])
+  const nextSmooth = useCallback(() => playAt(nextIndex(index), true), [index, nextIndex, playAt])
 
   const prev = useCallback(() => {
     const audio = audioRef.current
@@ -252,8 +275,25 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       setPosition(0)
       return
     }
-    playAt((index - 1 + tracks.length) % tracks.length)
-  }, [index, playAt, started, tracks.length])
+    const list = tracks.map((t, i) => ({t, i})).filter(({t}) => stationOf(t) === stationOf(tracks[index]))
+    const pos = list.findIndex(({i}) => i === index)
+    playAt(list[(pos - 1 + list.length) % list.length].i)
+  }, [index, playAt, started, tracks])
+
+  const changeStation = (id: StationId) => {
+    if (id === station) return
+    setStation(id)
+    const first = tracks.findIndex((t) => stationOf(t) === id)
+    if (first < 0) return
+    if (playing) playAt(first, true)
+    else {
+      setIndex(first)
+      setPosition(0)
+      setDuration(tracks[first].duration)
+      setStarted(false)
+      audioRef.current?.pause()
+    }
+  }
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
@@ -268,11 +308,14 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     }
   }, [index, playAt, playing, started])
 
-  // Hết bài → tự chuyển bài tiếp theo
+  // Sắp hết bài → chồng mờ sang bài tiếp theo (liền mạch như 1 bản mix);
+  // onEnded chỉ là dự phòng khi trình duyệt không báo kịp
   useEffect(() => {
     const audio = audioRef.current
-    if (audio) audio.onEnded = next
-  }, [next])
+    if (!audio) return
+    audio.onNearEnd = nextSmooth
+    audio.onEnded = next
+  }, [next, nextSmooth])
 
   useEffect(() => {
     if (!playing) return
@@ -464,6 +507,30 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <SectionTitle index="03" title="Music" />
 
+            {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
+            <div className="mt-5 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
+              {STATIONS.map((st) => {
+                const count = tracks.filter((t) => stationOf(t) === st.id).length
+                const on = st.id === station
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    disabled={count === 0}
+                    onClick={() => changeStation(st.id)}
+                    className={`min-w-0 truncate rounded-lg px-1.5 py-2 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                      on ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">{st.label}</span>
+                    <span className="sm:hidden">{st.short}</span>
+                  </button>
+                )
+              })}
+            </div>
+
             <div className="mt-5 flex items-center gap-4">
               <div className="flex shrink-0 items-center gap-2">
                 <RoundButton label="Previous track" onClick={prev}>
@@ -483,7 +550,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
-                  Now playing · {index + 1}/{tracks.length}
+                  Now playing · {stationPos + 1}/{stationList.length}
                 </p>
                 <p className="mt-1 truncate text-lg font-semibold">{track.title}</p>
                 <p className="truncate text-sm text-[#a79e94]">{track.mood}</p>
@@ -538,7 +605,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
             </div>
 
             <ol className="mt-5 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-              {tracks.map((t, i) => {
+              {stationList.map(({t, i}, pos) => {
                 const active = i === index
                 return (
                   <li key={t.id}>
@@ -551,7 +618,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
                       }`}
                     >
                       <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
-                        {active && playing ? <EqualizerIcon /> : String(i + 1).padStart(2, '0')}
+                        {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
                       </span>
                       <span className="min-w-0">
                         <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{t.title}</span>

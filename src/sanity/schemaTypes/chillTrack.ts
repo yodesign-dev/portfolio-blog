@@ -14,6 +14,21 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: 'station',
+      title: 'Trạm nhạc',
+      type: 'string',
+      initialValue: 'lofi',
+      options: {
+        list: [
+          {title: 'Café Acoustic', value: 'acoustic'},
+          {title: 'Deep Focus', value: 'focus'},
+          {title: 'Sax Lounge', value: 'sax'},
+          {title: 'Lo-fi', value: 'lofi'},
+        ],
+        layout: 'radio',
+      },
+    }),
+    defineField({
       name: 'mood',
       title: 'Mô tả ngắn',
       type: 'string',

@@ -1,6 +1,6 @@
 import {ChillRoom} from '@/components/chill/ChillRoom'
 import {DESTINATIONS, type Destination} from '@/components/chill/destinations'
-import {TRACKS, type Track} from '@/components/chill/tracks'
+import {STATIONS, TRACKS, type StationId, type Track} from '@/components/chill/tracks'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {pageMetadata} from '@/lib/site'
 
@@ -19,6 +19,7 @@ const CHILL_QUERY = `{
     _id,
     title,
     mood,
+    station,
     duration,
     "src": audio.asset->url
   },
@@ -38,7 +39,7 @@ const CHILL_QUERY = `{
 }`
 
 type ChillContent = {
-  tracks: {_id: string; title: string; mood?: string; duration?: number; src: string}[]
+  tracks: {_id: string; title: string; mood?: string; station?: string; duration?: number; src: string}[]
   destinations: {
     id: string
     name: string
@@ -78,6 +79,7 @@ export default async function ChillPage() {
       mood: t.mood ?? '',
       duration: t.duration ?? 0,
       src: t.src,
+      station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,
     })),
   ]
 

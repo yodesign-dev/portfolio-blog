@@ -11,6 +11,9 @@ import type {SynthSpec, Track} from './tracks'
 export type Ambience = 'street' | 'rain' | 'quiet'
 export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark'
 
+// Thời gian chồng mờ giữa 2 bài (giây)
+const CROSSFADE = 5
+
 const midiToHz = (note: number) => 440 * Math.pow(2, (note - 69) / 12)
 
 function noiseBuffer(ctx: AudioContext, seconds: number, color: 'white' | 'pink' | 'brown') {
@@ -64,6 +67,8 @@ function impulseResponse(ctx: AudioContext, seconds: number) {
 
 export class ChillAudio {
   onEnded: (() => void) | null = null
+  // Bài sắp hết (còn CROSSFADE giây) → nơi gọi chuyển bài để chồng mờ liền mạch
+  onNearEnd: (() => void) | null = null
 
   private ctx: AudioContext | null = null
   private master!: GainNode
@@ -77,7 +82,10 @@ export class ChillAudio {
   private rainGain!: GainNode
   private streetGain!: GainNode
   private sfxGain!: GainNode
-  private element: HTMLAudioElement | null = null
+  // 2 "đầu đĩa" luân phiên để bài mới to dần trong khi bài cũ nhỏ dần (crossfade)
+  private decks: {el: HTMLAudioElement; gain: GainNode}[] = []
+  private active = 0
+  private nearEndFired = false
   private sfxIn: AudioNode | null = null
 
   private track: Track | null = null
@@ -200,17 +208,35 @@ export class ChillAudio {
 
   // ---------- Điều khiển ----------
 
-  play(track: Track) {
+  // crossfade = true: bài đang phát nhỏ dần trong CROSSFADE giây, bài mới to dần
+  play(track: Track, crossfade = false) {
     const ctx = this.ensure()
-    this.stopCurrent()
+    const prev = crossfade && this.playing && this.track?.src ? this.decks[this.active] : null
+    this.stopCurrent(prev !== null)
     this.track = track
     this.offset = 0
     this.playing = true
+    this.nearEndFired = false
 
     if (track.src) {
-      const el = this.getElement(ctx)
-      el.src = track.src
-      void el.play()
+      const next = prev ? 1 - this.active : this.active
+      const deck = this.getDeck(ctx, next)
+      const now = ctx.currentTime
+      const fade = prev ? CROSSFADE : 0.05
+      deck.el.src = track.src
+      void deck.el.play()
+      deck.gain.gain.cancelScheduledValues(now)
+      deck.gain.gain.setValueAtTime(prev ? 0 : 1, now)
+      deck.gain.gain.linearRampToValueAtTime(1, now + fade)
+      if (prev) {
+        prev.gain.gain.cancelScheduledValues(now)
+        prev.gain.gain.setValueAtTime(prev.gain.gain.value, now)
+        prev.gain.gain.linearRampToValueAtTime(0, now + fade)
+        setTimeout(() => {
+          if (this.decks[this.active] !== prev) prev.el.pause()
+        }, fade * 1000 + 150)
+      }
+      this.active = next
     } else if (track.synth) {
       this.startSynth(ctx, track.synth)
     }
@@ -220,7 +246,7 @@ export class ChillAudio {
     if (!this.playing || !this.ctx) return
     this.playing = false
     if (this.track?.src) {
-      this.element?.pause()
+      for (const d of this.decks) d.el.pause()
     } else {
       this.offset = this.position()
       this.stopScheduler()
@@ -359,7 +385,6 @@ export class ChillAudio {
 
   destroy() {
     this.stopCurrent()
-    this.element?.pause()
     void this.ctx?.close()
     this.ctx = null
   }
@@ -377,22 +402,38 @@ export class ChillAudio {
     this.sfxGain.gain.setTargetAtTime(this.ambience === 'quiet' ? v * 0.4 : v, now, 0.2)
   }
 
-  private getElement(ctx: AudioContext) {
-    if (!this.element) {
+  private get element(): HTMLAudioElement | null {
+    return this.decks[this.active]?.el ?? null
+  }
+
+  private getDeck(ctx: AudioContext, i: number) {
+    if (!this.decks[i]) {
       const el = new Audio()
       el.crossOrigin = 'anonymous'
       el.preload = 'auto'
-      el.addEventListener('ended', () => this.onEnded?.())
-      ctx.createMediaElementSource(el).connect(this.master)
-      this.element = el
+      const gain = ctx.createGain()
+      ctx.createMediaElementSource(el).connect(gain).connect(this.master)
+      const deck = {el, gain}
+      // Chỉ đầu đĩa đang phát mới được báo hết bài
+      el.addEventListener('ended', () => {
+        if (this.decks[this.active] === deck) this.onEnded?.()
+      })
+      el.addEventListener('timeupdate', () => {
+        if (this.decks[this.active] !== deck || this.nearEndFired || !Number.isFinite(el.duration)) return
+        if (el.duration - el.currentTime <= CROSSFADE + 0.2) {
+          this.nearEndFired = true
+          this.onNearEnd?.()
+        }
+      })
+      this.decks[i] = deck
     }
-    return this.element
+    return this.decks[i]
   }
 
-  private stopCurrent() {
+  private stopCurrent(keepDecks = false) {
     this.playing = false
     this.stopScheduler()
-    if (this.track?.src) this.element?.pause()
+    if (!keepDecks) for (const d of this.decks) d.el.pause()
     if (this.trackBus && this.ctx) {
       const bus = this.trackBus
       bus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08)
