@@ -815,7 +815,7 @@ export function ChillRoom({
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Link
             href="/"
-            className="flex items-center gap-1.5 rounded-md bg-black/45 px-2.5 py-1.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
           >
             <ArrowIcon dir="left" />
             Bin Nguyen
@@ -823,7 +823,7 @@ export function ChillRoom({
           {[dest.name, weatherLabel, timeLabel].map((label, i) => (
             <span
               key={label}
-              className={`${i > 0 ? 'hidden sm:inline' : ''} pointer-events-none rounded-md bg-black/45 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:text-[11px]`}
+              className={`${i > 0 ? 'hidden sm:flex' : 'flex'} pointer-events-none h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:text-[11px]`}
             >
               {label}
             </span>
@@ -842,7 +842,7 @@ export function ChillRoom({
               onHoldToast={updatesSeen.holdToast}
             />
           )}
-          <span className="pointer-events-none rounded-md bg-black/45 px-2.5 py-1.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
+          <span className="pointer-events-none flex h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
             {clock}
           </span>
           <StageButton label={scenePaused ? 'Resume scene' : 'Pause scene'} onClick={() => setScenePaused((p) => !p)}>
