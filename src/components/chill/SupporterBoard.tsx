@@ -1,6 +1,8 @@
 'use client'
 
 // Bảng cảm ơn trang /chill — tấm bảng gỗ ghim giấy note, mở khi bấm lọ tip trên bàn.
+// Popup giữa màn (desktop) / sheet từ dưới lên (điện thoại), có nền tối phía sau —
+// không đè lên dock nhạc như khi còn neo ở góc trái dưới.
 //
 // Dữ liệu từ GET /api/chill-support: chỉ người Bin đã tick "Đã nhận tiền" trong
 // Studio VÀ tự chọn hiện tên. Người không muốn hiện tên vẫn được đếm vào lọ tip
@@ -60,8 +62,23 @@ export function SupporterBoard({
       role="dialog"
       aria-label="Thank-you board"
       inert={!open}
-      className={`absolute inset-x-0 bottom-0 z-40 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-3xl border-2 border-[#3a2414] bg-[#5e3d22] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] transition-all duration-300 ease-out lg:inset-x-auto lg:bottom-5 lg:left-5 lg:max-h-[min(640px,calc(100dvh-96px))] lg:w-[380px] lg:rounded-2xl ${
-        open ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0'
+      aria-modal="true"
+      onKeyDown={(e) => {
+        // Giữ Tab trong popup khi đang mở
+        if (e.key !== 'Tab') return
+        const items = e.currentTarget.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')
+        const first = items[0]
+        const last = items[items.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last?.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first?.focus()
+        }
+      }}
+      className={`absolute inset-x-0 bottom-0 z-40 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-3xl border-2 border-[#3a2414] bg-[#5e3d22] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] transition-all duration-300 ease-out lg:inset-x-auto lg:bottom-auto lg:left-1/2 lg:top-1/2 lg:max-h-[min(640px,calc(100dvh-160px))] lg:w-[420px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-2xl ${
+        open ? 'translate-y-0 opacity-100 lg:scale-100' : 'pointer-events-none translate-y-6 opacity-0 lg:scale-95'
       }`}
       style={{
         // Vân ván gỗ ghép ngang

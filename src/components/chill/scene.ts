@@ -1194,12 +1194,14 @@ export class ChillScene {
       // Bóng đèn thả của quán
       if (this.theme.id === 'cafe') this.rect(lamp.x - 3, lamp.y - 1, 7, 2, 'rgba(255,231,168,0.9)')
     }
-    const screen = this.time === 'night' ? 0.28 : 0.1
-    const g = ctx.createRadialGradient(laptop.x, laptop.y, 1, laptop.x, laptop.y, 40)
-    g.addColorStop(0, `rgba(130,175,255,${screen})`)
-    g.addColorStop(1, 'rgba(130,175,255,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(laptop.x - 40, laptop.y - 40, 80, 80)
+    if (laptop) {
+      const screen = this.time === 'night' ? 0.28 : 0.1
+      const g = ctx.createRadialGradient(laptop.x, laptop.y, 1, laptop.x, laptop.y, 40)
+      g.addColorStop(0, `rgba(130,175,255,${screen})`)
+      g.addColorStop(1, 'rgba(130,175,255,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(laptop.x - 40, laptop.y - 40, 80, 80)
+    }
     ctx.restore()
 
     const v = ctx.createRadialGradient(SCENE_W / 2, SCENE_H / 2, 90, SCENE_W / 2, SCENE_H / 2, 200)

@@ -6,8 +6,7 @@
 //
 // - café: ảnh nội thất 640×360 + người ngồi là sprite sheet cắt từ video (scene.ts).
 // - desk: ảnh AI 1280×720 (Nano Banana 2) + người ngồi là video loop Kling như quán.
-// - balcony: ảnh AI 1280×720 đã có sẵn người ngồi; tư thế uống cắt từ bản biến thể
-//   của chính ảnh đó, gõ phím / thở làm bằng code.
+// - balcony: ảnh AI 1280×720 (người đọc sách, không laptop) + video loop Kling như quán.
 
 export type ThemeId = 'cafe' | 'balcony' | 'desk'
 
@@ -72,7 +71,8 @@ export type Theme = {
   lamp: Pt
   // Đèn luôn sáng (đèn bàn, đèn lồng) hay chỉ bật khi chiều/tối/mưa (đèn thả của quán)
   lampAlways: boolean
-  laptop: Pt
+  // Quầng sáng màn laptop (null = không có laptop)
+  laptop: Pt | null
   headphones: Pt
 }
 
@@ -101,7 +101,8 @@ export const THEMES: Theme[] = [
     screen: true,
     cat: {x: 112, y: 296},
     notebook: {x: 324, y: 264, w: 102, h: 44},
-    tipJar: {x: 290, y: 292, cupDx: 22},
+    // Cạnh trái cuốn sổ, ly của người mời đứng giữa phin và lọ
+    tipJar: {x: 310, y: 294, cupDx: -22},
     steam: {x: 127, y: 113},
     lamp: {x: 63, y: 42},
     lampAlways: false,
@@ -118,23 +119,24 @@ export const THEMES: Theme[] = [
     view: {x: 0, y: 0, w: 320, h: 156},
     panes: [],
     streetDy: 18,
+    // Video loop Kling (O1 Pro, 10s): đọc sách, lật trang, cầm ly cà phê đá uống rồi đặt lại
     character: {
-      kind: 'frames',
-      src: '/chill/scenes/room-balcony-pose.webp',
+      kind: 'video',
       at: {x: 371, y: 118, w: 269, h: 239},
-      cells: {base: [0, 0], typing: [538, 0], sip: [1076, 0], mask: [1614, 0]},
-      hands: {x: 458, y: 271, w: 28, h: 17},
-      shoulders: 0.55,
+      hi: {src: '/chill/scenes/room-balcony-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+      lo: {src: '/chill/scenes/room-balcony-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+      duration: 121 / 12,
+      sip: [1.1, 9.1],
     },
     screen: false,
     cat: {x: 60, y: 197},
     notebook: null,
-    // Trên mặt lan can (ghế đỏ dưới sàn bị dock nhạc che)
-    tipJar: {x: 352, y: 197, cupDx: -22},
+    // Trên bàn nhỏ, giữa ly cà phê đá và quyển sách; ly của người mời đứng mép trái bàn
+    tipJar: {x: 440, y: 293, cupDx: -46},
     steam: null,
     lamp: {x: 44, y: 28},
     lampAlways: false,
-    laptop: {x: 233, y: 120},
+    laptop: null,
     headphones: {x: 256, y: 80},
   },
   {
@@ -162,7 +164,8 @@ export const THEMES: Theme[] = [
     screen: false,
     cat: {x: 270, y: 283},
     notebook: {x: 118, y: 258, w: 92, h: 28},
-    tipJar: {x: 392, y: 296, cupDx: 22},
+    // Mép trước bàn, giữa sổ mở và cốc cà phê nóng — ngay dưới ánh đèn bàn
+    tipJar: {x: 222, y: 304, cupDx: 24},
     steam: {x: 124, y: 126},
     lamp: {x: 33, y: 106},
     lampAlways: true,

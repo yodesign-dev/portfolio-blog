@@ -776,6 +776,17 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         </div>
       </div>
 
+      {/* Nền tối sau bảng cảm ơn — bấm ra ngoài để đóng */}
+      <button
+        type="button"
+        aria-label="Close thank-you board"
+        tabIndex={-1}
+        onClick={() => setBoardOpen(false)}
+        className={`absolute inset-0 z-30 cursor-default bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
+          boardOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
+
       {/* Bấm ra ngoài để đóng bảng cài đặt */}
       {panelOpen && (
         <button type="button" aria-label="Close settings" onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
@@ -784,7 +795,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
       {/* Dock nhạc nổi phía dưới */}
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
-          panelOpen ? 'sm:pr-[436px]' : wishOpen ? 'lg:pr-[450px]' : boardOpen ? 'lg:pl-[420px]' : ''
+          panelOpen ? 'sm:pr-[436px]' : wishOpen ? 'lg:pr-[450px]' : ''
         } ${fade}`}
       >
         <div
