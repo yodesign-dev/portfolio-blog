@@ -11,7 +11,7 @@ import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {Donate} from './Donate'
-import {hasDonate, loadIntent} from './donate-config'
+import {hasDonate, loadIntent, saveIntent} from './donate-config'
 
 type Wish = {
   id: string
@@ -48,6 +48,13 @@ const AVATAR_BG = ['#f6d2bd', '#f7e2a0', '#fbf1d2', '#d5e8d4', '#d7dcf5', '#f4c7
 const HEARTS_KEY = 'chill:wish-hearts'
 const MINE_KEY = 'chill:my-wishes'
 const SEEN_KEY = 'chill:wish-seen'
+// Số lần đã hiện lời mời "Got an idea…" — chỉ mời vài lần đầu, mỗi lần vài giây
+// Chỉ tự mở lại bước QR nếu người xem vừa rời trang chưa lâu
+const REOPEN_WITHIN = 30 * 60 * 1000
+const HINT_KEY = 'chill:wish-hint'
+const HINT_TIMES = 3
+const HINT_DELAY = 2000
+const HINT_MS = 7000
 const MAX = 300
 
 function load<T>(key: string, fallback: T): T {
@@ -108,6 +115,7 @@ export function Wishlist({
   const [mine, setMine] = useState<Wish[]>([])
   const [hearted, setHearted] = useState<string[]>([])
   const [seen, setSeen] = useState(true)
+  const [hint, setHint] = useState(false)
   const [tab, setTab] = useState<Tab>('considering')
   const [view, setView] = useState<'wishes' | 'donate'>('wishes')
   const donate = hasDonate()
@@ -123,10 +131,14 @@ export function Wishlist({
     trackEvent({name: 'Chill Donate Open', props: {from: 'board'}})
   }, [donateRequest])
 
-  // Đang ủng hộ dở (đã sang app ngân hàng, trang tải lại) → mở lại đúng bước QR
+  // Đang ủng hộ dở (vừa sang app ngân hàng, trang tải lại) → mở lại đúng bước QR,
+  // nhưng chỉ 1 lần và chỉ trong 30 phút — không bật panel mỗi lần vào trang.
+  // Mở Wishlist → "Mời Bin 1 ly" thủ công thì vẫn về đúng bước QR (Donate tự đọc intent).
   const reopen = useRef(onOpenChange)
   useEffect(() => {
-    if (!hasDonate() || !loadIntent()) return
+    const intent = hasDonate() ? loadIntent() : null
+    if (!intent || intent.reopened || Date.now() - intent.at > REOPEN_WITHIN) return
+    saveIntent({...intent, reopened: true})
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setView('donate')
     reopen.current(true)
@@ -164,6 +176,20 @@ export function Wishlist({
     /* eslint-enable react-hooks/set-state-in-effect */
     refresh()
   }, [refresh])
+
+  // Lời mời: hiện sau 2s, tự ẩn sau 7s, tối đa 3 lần vào trang (chưa từng mở Wishlist)
+  useEffect(() => {
+    if (seen) return
+    const shown = load<number>(HINT_KEY, 0)
+    if (shown >= HINT_TIMES) return
+    save(HINT_KEY, shown + 1)
+    const on = window.setTimeout(() => setHint(true), HINT_DELAY)
+    const off = window.setTimeout(() => setHint(false), HINT_DELAY + HINT_MS)
+    return () => {
+      window.clearTimeout(on)
+      window.clearTimeout(off)
+    }
+  }, [seen])
 
   useEffect(() => {
     if (!open) return
@@ -231,7 +257,7 @@ export function Wishlist({
         } ${hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'}`}
       >
         {/* Lần đầu: vòng sáng lan ra để mắt chú ý tới */}
-        {!seen && !open && <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full motion-safe:animate-ping motion-safe:[animation-duration:2.2s] border-2 border-[#f08a5d]/60" />}
+        {hint && !open && <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full motion-safe:animate-ping motion-safe:[animation-duration:2.2s] border-2 border-[#f08a5d]/60" />}
         <span aria-hidden className="text-lg leading-none">
           💡
         </span>
@@ -245,7 +271,7 @@ export function Wishlist({
       {!seen && !open && !hidden && (
         <p
           aria-hidden
-          className={`pointer-events-none absolute right-3 z-30 rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
+          className={`pointer-events-none absolute right-3 z-30 transition-opacity duration-500 ${hint ? 'opacity-100' : 'opacity-0'} rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
             stacked
               ? 'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+210px)] sm:right-5 sm:bottom-[230px] xl:bottom-[128px]'
               : 'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+156px)] sm:right-5 sm:bottom-[176px] xl:bottom-[76px]'

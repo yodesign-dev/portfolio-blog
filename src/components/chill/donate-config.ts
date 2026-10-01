@@ -65,6 +65,8 @@ export type DonateIntent = {
   // Đồng ý hiện tên + lời nhắn trên bảng cảm ơn (sau khi Bin xác nhận đã nhận tiền)
   board?: boolean
   at: number
+  // Đã tự mở lại panel 1 lần sau khi quay về từ app ngân hàng → không tự mở nữa
+  reopened?: boolean
 }
 
 const INTENT_KEY = 'chill:donate-intent'
