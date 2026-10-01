@@ -1,4 +1,5 @@
 import type {StructureResolver} from 'sanity/structure'
+import {STATION_OPTIONS} from './schemaTypes/chillTrack'
 
 export const structure: StructureResolver = (S) =>
   S.list()
@@ -11,7 +12,37 @@ export const structure: StructureResolver = (S) =>
       S.documentTypeListItem('timelineYear').title('Timeline'),
       S.divider(),
       // Trang /chill: nhạc + điểm đến thêm từ Studio (ngoài bộ có sẵn trong code)
-      S.documentTypeListItem('chillTrack').title('Chill · Nhạc'),
+      // Nhạc chia theo trạm cho dễ tìm khi playlist dài ra
+      S.listItem()
+        .title('Chill · Nhạc')
+        .id('chillTrack')
+        .child(
+          S.list()
+            .title('Chill · Nhạc')
+            .items([
+              S.listItem()
+                .title('Tất cả bài')
+                .id('chillTrack-all')
+                .child(
+                  S.documentTypeList('chillTrack')
+                    .title('Tất cả bài')
+                    .defaultOrdering([{field: 'station', direction: 'asc'}, {field: 'order', direction: 'asc'}]),
+                ),
+              S.divider(),
+              ...STATION_OPTIONS.map(({title, value}) =>
+                S.listItem()
+                  .title(title)
+                  .id(`chillTrack-${value}`)
+                  .child(
+                    S.documentTypeList('chillTrack')
+                      .title(title)
+                      .filter('_type == "chillTrack" && coalesce(station, "lofi") == $station')
+                      .params({station: value})
+                      .defaultOrdering([{field: 'order', direction: 'asc'}]),
+                  ),
+              ),
+            ]),
+        ),
       S.documentTypeListItem('chillDestination').title('Chill · Điểm đến'),
       // Nhật ký thay đổi: nút "Có gì mới" trên trang /chill
       S.documentTypeListItem('chillUpdate').title('Chill · Nhật ký thay đổi'),

@@ -1,7 +1,7 @@
 import {defineField, defineType} from 'sanity'
 
-// Điểm đến cho trang /chill — cảnh phố ngoài cửa sổ quán, nối vào sau các
-// điểm đến có sẵn trong code (src/components/chill/destinations.ts).
+// Điểm đến cho trang /chill — cảnh phố ngoài cửa sổ quán. Toàn bộ danh sách
+// quản lý ở đây; src/components/chill/destinations.ts chỉ còn Hà Nội dự phòng.
 const sceneImage = (name: string, title: string) =>
   defineField({
     name,
@@ -60,6 +60,14 @@ export default defineType({
       type: 'number',
       group: 'content',
       description: 'Số nhỏ đứng trước. Để trống thì xếp theo ngày tạo.',
+    }),
+    defineField({
+      name: 'hidden',
+      title: 'Ẩn khỏi trang',
+      type: 'boolean',
+      group: 'content',
+      initialValue: false,
+      description: 'Tạm gỡ điểm đến khỏi danh sách mà không cần xoá.',
     }),
     defineField({
       name: 'tilt',

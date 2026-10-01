@@ -13,18 +13,21 @@ export const metadata = pageMetadata({
   path: '/chill',
 })
 
-// Nhạc + điểm đến thêm trong Sanity Studio, nối vào sau bộ có sẵn trong code.
-// Chỉ lấy bản đã đủ file/ảnh để trang không bị bài câm hay cảnh trống.
+// Nhạc + điểm đến quản lý trong Sanity Studio. Code (tracks.ts / destinations.ts)
+// chỉ còn vài bài + Hà Nội dự phòng, dùng khi Sanity không trả về gì.
+// Chỉ lấy bản đã đủ file/ảnh và không bị "Ẩn khỏi trang".
 const CHILL_QUERY = `{
-  "tracks": *[_type == "chillTrack" && defined(audio.asset)] | order(coalesce(order, 9999) asc, _createdAt asc) {
-    _id,
+  "tracks": *[_type == "chillTrack" && hidden != true && (defined(audio.asset) || defined(localFile))]
+    | order(select(station == "acoustic" => 0, station == "focus" => 1, station == "sax" => 2, station == "lofi" => 3, station == "study" => 4, 5) asc,
+            coalesce(order, 9999) asc, _createdAt asc) {
+    "id": coalesce(key.current, _id),
     title,
     mood,
     station,
     duration,
-    "src": audio.asset->url
+    "src": coalesce(audio.asset->url, localFile)
   },
-  "destinations": *[_type == "chillDestination" && defined(slug.current)
+  "destinations": *[_type == "chillDestination" && hidden != true && defined(slug.current)
     && defined(morning.asset) && defined(afternoon.asset) && defined(night.asset)]
     | order(coalesce(order, 9999) asc, _createdAt asc) {
     "id": slug.current,
@@ -54,7 +57,7 @@ const CHILL_QUERY = `{
 }`
 
 type ChillContent = {
-  tracks: {_id: string; title: string; mood?: string; station?: string; duration?: number; src: string}[]
+  tracks: {id: string; title: string; mood?: string; station?: string; duration?: number; src: string}[]
   destinations: {
     id: string
     name: string
@@ -87,33 +90,27 @@ export default async function ChillPage() {
     (): ChillContent => ({tracks: [], destinations: [], updates: []})
   )
 
-  const tracks: Track[] = [
-    ...TRACKS,
-    ...content.tracks.map((t) => ({
-      id: t._id,
-      title: t.title,
-      mood: t.mood ?? '',
-      duration: t.duration ?? 0,
-      src: t.src,
-      station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,
-    })),
-  ]
+  const fromStudio: Track[] = content.tracks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    mood: t.mood ?? '',
+    duration: t.duration ?? 0,
+    src: t.src,
+    station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,
+  }))
+  // Sanity lỗi / chưa có bài nào → bộ dự phòng trong code
+  const tracks: Track[] = fromStudio.length ? fromStudio : TRACKS
 
-  const taken = new Set(DESTINATIONS.map((d) => d.id))
-  const destinations: Destination[] = [
-    ...DESTINATIONS,
-    ...content.destinations
-      .filter((d) => !taken.has(d.id))
-      .map((d) => ({
-        id: d.id,
-        name: d.name,
-        region: d.region ?? '',
-        timeZone: isTimeZone(d.timeZone) ? d.timeZone : 'Asia/Ho_Chi_Minh',
-        tilt: d.tilt,
-        laneShift: d.laneShift,
-        streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
-      })),
-  ]
+  const fromStudioDest: Destination[] = content.destinations.map((d) => ({
+    id: d.id,
+    name: d.name,
+    region: d.region ?? '',
+    timeZone: isTimeZone(d.timeZone) ? d.timeZone : 'Asia/Ho_Chi_Minh',
+    tilt: d.tilt,
+    laneShift: d.laneShift,
+    streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
+  }))
+  const destinations: Destination[] = fromStudioDest.length ? fromStudioDest : DESTINATIONS
 
   // Ảnh tĩnh: CDN thu về 800px webp · GIF giữ nguyên để còn chuyển động
   const updates: ChillUpdate[] = (content.updates ?? []).map(({image, ...u}) => ({

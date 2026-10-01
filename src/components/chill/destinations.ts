@@ -2,9 +2,8 @@
 // quán (nội thất giữ nguyên). Cùng bố cục với ảnh Hà Nội để lòng đường khớp
 // làn xe máy (xem STREET_IMG trong scene.ts).
 //
-// 2 nguồn, nối tiếp nhau (xem src/app/chill/page.tsx):
-// - Có sẵn trong code: ảnh 560×238 ở public/chill/scenes/<id>-<giờ>.webp
-// - Thêm trong Sanity Studio ("Chill · Điểm đến"), ảnh lấy từ Sanity CDN
+// Danh sách thật quản lý trong Sanity Studio ("Chill · Điểm đến"), ảnh từ Sanity CDN
+// (xem src/app/chill/page.tsx). Ở đây chỉ còn Hà Nội dự phòng khi Sanity không trả về gì.
 
 import type {TimeOfDay} from './scene'
 
@@ -31,10 +30,4 @@ const local = (id: string): Record<TimeOfDay, string> => ({
 
 export const DESTINATIONS: Destination[] = [
   {id: 'hanoi', name: 'Hà Nội', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('hanoi')},
-  {id: 'dalat', name: 'Đà Lạt', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('dalat'), tilt: -0.075, laneShift: -3},
-  {id: 'saigon', name: 'Sài Gòn', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('saigon')},
-  {id: 'hue', name: 'Huế', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('hue')},
-  {id: 'tiengiang', name: 'Tiền Giang', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('tiengiang')},
-  {id: 'cantho', name: 'Cần Thơ', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('cantho')},
-  {id: 'nhatrang', name: 'Nha Trang', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('nhatrang')},
 ]
