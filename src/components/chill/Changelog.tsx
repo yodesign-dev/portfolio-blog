@@ -132,14 +132,14 @@ export function WhatsNewButton({
       <button
         type="button"
         onClick={() => onOpen('button')}
-        aria-label={dot ? 'Có gì mới — có cập nhật chưa xem' : 'Có gì mới'}
+        aria-label={dot ? "What's new — unseen update" : "What's new"}
         aria-expanded={open}
         aria-controls="chill-updates"
-        title="Có gì mới"
+        title="What's new"
         className="relative flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
       >
         <SparkIcon />
-        <span className="hidden sm:inline">Có gì mới</span>
+        <span className="hidden sm:inline">What&apos;s new</span>
         {dot && (
           <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />

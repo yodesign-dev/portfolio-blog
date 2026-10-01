@@ -8,6 +8,7 @@ import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
+import {ShareButton} from './ShareButton'
 import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
@@ -829,6 +830,7 @@ export function ChillRoom({
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <ShareButton />
           {updates.length > 0 && (
             <WhatsNewButton
               dot={updatesSeen.dot}
