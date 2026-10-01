@@ -136,7 +136,7 @@ export function WhatsNewButton({
         aria-expanded={open}
         aria-controls="chill-updates"
         title="What's new"
-        className="relative flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+        className="relative flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 px-2.5 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
       >
         <SparkIcon />
         <span className="hidden sm:inline">What&apos;s new</span>
