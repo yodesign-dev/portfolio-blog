@@ -13,6 +13,8 @@ export const structure: StructureResolver = (S) =>
       // Trang /chill: nhạc + điểm đến thêm từ Studio (ngoài bộ có sẵn trong code)
       S.documentTypeListItem('chillTrack').title('Chill · Nhạc'),
       S.documentTypeListItem('chillDestination').title('Chill · Điểm đến'),
+      // Nhật ký thay đổi: nút "Có gì mới" trên trang /chill
+      S.documentTypeListItem('chillUpdate').title('Chill · Nhật ký thay đổi'),
       // Góp ý người xem gửi từ khung Wishlist (tạo qua API, không tạo tay ở đây)
       S.listItem()
         .title('Chill · Wishlist')
@@ -80,6 +82,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate'].includes(listItem.getId() as string),
       ),
     ])

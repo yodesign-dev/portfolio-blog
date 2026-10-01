@@ -15,6 +15,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Donate Open'; props?: {from: string}}
   | {name: 'Chill Board Open'; props?: undefined}
   | {name: 'Chill Donate Thanks'; props: {method: string}}
+  | {name: 'Chill Updates Open'; props: {from: string}}
+  | {name: 'Chill Update Try'; props: {action: string}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

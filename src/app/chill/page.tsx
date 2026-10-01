@@ -3,6 +3,7 @@ import {DESTINATIONS, type Destination} from '@/components/chill/destinations'
 import {STATIONS, TRACKS, type StationId, type Track} from '@/components/chill/tracks'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {pageMetadata} from '@/lib/site'
+import type {ChillUpdate} from '@/components/chill/Changelog'
 
 export const revalidate = 60
 
@@ -35,6 +36,20 @@ const CHILL_QUERY = `{
     "morning": morning.asset->url,
     "afternoon": afternoon.asset->url,
     "night": night.asset->url
+  },
+  "updates": *[_type == "chillUpdate" && defined(title) && defined(date) && count(items) > 0]
+    | order(date desc, _createdAt desc)[0...12] {
+    "id": _id,
+    title,
+    date,
+    kind,
+    version,
+    announce,
+    action,
+    actionLabel,
+    "items": items[defined(text)]{icon, text},
+    "image": image.asset->{url, mimeType, "w": metadata.dimensions.width, "h": metadata.dimensions.height},
+    "imageAlt": image.alt
   }
 }`
 
@@ -51,6 +66,7 @@ type ChillContent = {
     afternoon: string
     night: string
   }[]
+  updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
 // Sanity CDN tự cắt/thu nhỏ ảnh về đúng khung phố của canvas (560×238)
@@ -68,7 +84,7 @@ function isTimeZone(tz?: string): tz is string {
 
 export default async function ChillPage() {
   const content = await sanityFetch<ChillContent>({query: CHILL_QUERY, revalidate}).catch(
-    (): ChillContent => ({tracks: [], destinations: []})
+    (): ChillContent => ({tracks: [], destinations: [], updates: []})
   )
 
   const tracks: Track[] = [
@@ -99,5 +115,13 @@ export default async function ChillPage() {
       })),
   ]
 
-  return <ChillRoom tracks={tracks} destinations={destinations} />
+  // Ảnh tĩnh: CDN thu về 800px webp · GIF giữ nguyên để còn chuyển động
+  const updates: ChillUpdate[] = (content.updates ?? []).map(({image, ...u}) => ({
+    ...u,
+    image: image?.url
+      ? {src: image.mimeType === 'image/gif' ? image.url : `${image.url}?w=800&fm=webp&q=85`, w: image.w ?? 16, h: image.h ?? 9}
+      : null,
+  }))
+
+  return <ChillRoom tracks={tracks} destinations={destinations} updates={updates} />
 }

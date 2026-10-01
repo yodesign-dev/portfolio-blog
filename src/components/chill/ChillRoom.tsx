@@ -11,6 +11,7 @@ import {Wishlist} from './Wishlist'
 import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
+import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -77,7 +78,15 @@ function readPrefs(): Partial<Prefs> {
 }
 
 // Mặc định dùng bộ có sẵn trong code; page.tsx truyền thêm nội dung từ Sanity
-export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {tracks?: Track[]; destinations?: Destination[]}) {
+export function ChillRoom({
+  tracks = TRACKS,
+  destinations = DESTINATIONS,
+  updates = [],
+}: {
+  tracks?: Track[]
+  destinations?: Destination[]
+  updates?: ChillUpdate[]
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<ChillScene | null>(null)
   const audioRef = useRef<ChillAudio | null>(null)
@@ -113,6 +122,9 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const [boardOpen, setBoardOpen] = useState(false)
   const [myCup, setMyCup] = useState(false)
   const [donateRequest, setDonateRequest] = useState(0)
+  // Nhật ký thay đổi. `returning` = máy này đã từng vào /chill (có prefs từ trước)
+  const [updatesOpen, setUpdatesOpen] = useState(false)
+  const [returning, setReturning] = useState<boolean | null>(null)
   const [catPetted, setCatPetted] = useState(true)
   const [catHint, setCatHint] = useState(false)
   // Bong bóng lời nói của mèo: chờ hiện (khung donate đang che mèo trên điện thoại) → hiện → mờ dần
@@ -130,6 +142,12 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   // Khôi phục lựa chọn lần trước (chạy sau hydrate để HTML server/client khớp nhau)
   useEffect(() => {
     const prefs = readPrefs()
+    let hadPrefs = false
+    try {
+      hadPrefs = localStorage.getItem(PREFS_KEY) !== null
+    } catch {
+      // Chặn storage → coi như khách mới
+    }
     const saved = tracks.findIndex((t) => t.id === prefs.trackId)
     /* eslint-disable react-hooks/set-state-in-effect */
     if (saved >= 0) {
@@ -162,6 +180,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     } catch {
       setCatPetted(false)
     }
+    setReturning(hadPrefs)
     setLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [tracks, destinations])
@@ -281,7 +300,19 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     scene.frame(performance.now())
   }, [board, myCup])
 
+  const updatesSeen = useUpdatesSeen(updates, returning)
+
+  const openUpdates = (from: 'button' | 'toast') => {
+    setPanelOpen(false)
+    setWishOpen(false)
+    setBoardOpen(false)
+    setUpdatesOpen(true)
+    updatesSeen.markSeen()
+    trackEvent({name: 'Chill Updates Open', props: {from}})
+  }
+
   const openBoard = () => {
+    setUpdatesOpen(false)
     setPanelOpen(false)
     setWishOpen(false)
     setBoardOpen(true)
@@ -462,6 +493,18 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
     }
   }
 
+  // Nút "Thử ngay" trong nhật ký: đưa người xem tới đúng tính năng
+  const runAction = (action: string) => {
+    setUpdatesOpen(false)
+    trackEvent({name: 'Chill Update Try', props: {action}})
+    const [kind, id] = action.split(':')
+    if (kind === 'room' && THEMES.some((t) => t.id === id)) setTheme(id as ThemeId)
+    else if (kind === 'station' && STATIONS.some((st) => st.id === id)) changeStation(id as StationId)
+    else if (kind === 'board') openBoard()
+    else if (kind === 'wishlist') setWishOpen(true)
+    else if (kind === 'settings') setPanelOpen(true)
+  }
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -594,17 +637,20 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         case 'S':
           setWishOpen(false)
           setBoardOpen(false)
+          setUpdatesOpen(false)
           setPanelOpen((o) => !o)
           break
         case 'w':
         case 'W':
           setPanelOpen(false)
           setBoardOpen(false)
+          setUpdatesOpen(false)
           setWishOpen((o) => !o)
           break
         case 'Escape':
           setPanelOpen(false)
           setBoardOpen(false)
+          setUpdatesOpen(false)
           break
       }
     }
@@ -648,7 +694,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !wishOpen && !boardOpen && !hovering
+  const hideUi = idle && started && !panelOpen && !wishOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
   const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -762,6 +808,17 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {updates.length > 0 && (
+            <WhatsNewButton
+              dot={updatesSeen.dot}
+              toast={updatesSeen.toast}
+              latest={updates[0]}
+              open={updatesOpen}
+              onOpen={openUpdates}
+              onCloseToast={updatesSeen.closeToast}
+              onHoldToast={updatesSeen.holdToast}
+            />
+          )}
           <span className="pointer-events-none rounded-md bg-black/45 px-2.5 py-1.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
             {clock}
           </span>
@@ -776,14 +833,17 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
         </div>
       </div>
 
-      {/* Nền tối sau bảng cảm ơn — bấm ra ngoài để đóng */}
+      {/* Nền tối sau bảng cảm ơn / nhật ký — bấm ra ngoài để đóng */}
       <button
         type="button"
-        aria-label="Close thank-you board"
+        aria-label={updatesOpen ? 'Close updates' : 'Close thank-you board'}
         tabIndex={-1}
-        onClick={() => setBoardOpen(false)}
+        onClick={() => {
+          setBoardOpen(false)
+          setUpdatesOpen(false)
+        }}
         className={`absolute inset-0 z-30 cursor-default bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
-          boardOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          boardOpen || updatesOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       />
 
@@ -880,6 +940,7 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           if (o) {
             setPanelOpen(false)
             setBoardOpen(false)
+            setUpdatesOpen(false)
           }
           setWishOpen(o)
         }}
@@ -900,6 +961,14 @@ export function ChillRoom({tracks = TRACKS, destinations = DESTINATIONS}: {track
           setWishOpen(true)
           setDonateRequest((n) => n + 1)
         }}
+      />
+
+      <Changelog
+        open={updatesOpen}
+        onClose={() => setUpdatesOpen(false)}
+        updates={updates}
+        unseen={updatesSeen.unseen}
+        onAction={runAction}
       />
 
       {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}
