@@ -12,6 +12,7 @@ import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
+import {ChillChat} from './ChillChat'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -124,6 +125,9 @@ export function ChillRoom({
   const [donateRequest, setDonateRequest] = useState(0)
   // Nhật ký thay đổi. `returning` = máy này đã từng vào /chill (có prefs từ trước)
   const [updatesOpen, setUpdatesOpen] = useState(false)
+  // Phòng chat (góc phải, chung chỗ với Wishlist) — Studio có thể tắt
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatAvailable, setChatAvailable] = useState(false)
   const [returning, setReturning] = useState<boolean | null>(null)
   const [catPetted, setCatPetted] = useState(true)
   const [catHint, setCatHint] = useState(false)
@@ -501,8 +505,13 @@ export function ChillRoom({
     if (kind === 'room' && THEMES.some((t) => t.id === id)) setTheme(id as ThemeId)
     else if (kind === 'station' && STATIONS.some((st) => st.id === id)) changeStation(id as StationId)
     else if (kind === 'board') openBoard()
-    else if (kind === 'wishlist') setWishOpen(true)
-    else if (kind === 'settings') setPanelOpen(true)
+    else if (kind === 'wishlist') {
+      setChatOpen(false)
+      setWishOpen(true)
+    } else if (kind === 'settings') {
+      setChatOpen(false)
+      setPanelOpen(true)
+    } else if (kind === 'chat') setChatOpen(true)
   }
 
   const togglePlay = useCallback(() => {
@@ -608,7 +617,7 @@ export function ChillRoom({
     return () => document.removeEventListener('fullscreenchange', sync)
   }, [])
 
-  // Phím tắt: Space phát/dừng · N/P chuyển bài · F fullscreen · S cài đặt · Esc đóng
+  // Phím tắt: Space phát/dừng · N/P chuyển bài · F fullscreen · S cài đặt · C chat · W wishlist · Esc đóng
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -636,18 +645,29 @@ export function ChillRoom({
         case 's':
         case 'S':
           setWishOpen(false)
+          setChatOpen(false)
           setBoardOpen(false)
           setUpdatesOpen(false)
           setPanelOpen((o) => !o)
           break
+        case 'c':
+        case 'C':
+          setPanelOpen(false)
+          setWishOpen(false)
+          setBoardOpen(false)
+          setUpdatesOpen(false)
+          setChatOpen((o) => !o)
+          break
         case 'w':
         case 'W':
+          setChatOpen(false)
           setPanelOpen(false)
           setBoardOpen(false)
           setUpdatesOpen(false)
           setWishOpen((o) => !o)
           break
         case 'Escape':
+          setChatOpen(false)
           setPanelOpen(false)
           setBoardOpen(false)
           setUpdatesOpen(false)
@@ -694,7 +714,7 @@ export function ChillRoom({
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !wishOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
+  const hideUi = idle && started && !panelOpen && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
   const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -751,6 +771,7 @@ export function ChillRoom({
           aria-label="Open the café wishlist"
           onClick={() => {
             setPanelOpen(false)
+            setChatOpen(false)
             setWishOpen(true)
           }}
           className="group absolute cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
@@ -855,7 +876,7 @@ export function ChillRoom({
       {/* Dock nhạc nổi phía dưới */}
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
-          panelOpen ? 'sm:pr-[436px]' : wishOpen ? 'lg:pr-[450px]' : ''
+          panelOpen ? 'sm:pr-[436px]' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''
         } ${fade}`}
       >
         <div
@@ -901,6 +922,7 @@ export function ChillRoom({
               type="button"
               onClick={() => {
                 setWishOpen(false)
+                setChatOpen(false)
                 setPanelOpen((o) => !o)
               }}
               aria-label="Settings"
@@ -941,14 +963,30 @@ export function ChillRoom({
             setPanelOpen(false)
             setBoardOpen(false)
             setUpdatesOpen(false)
+            setChatOpen(false)
           }
           setWishOpen(o)
         }}
         dimmed={hideUi}
         hidden={panelOpen}
+        stacked={chatAvailable}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
         donateRequest={donateRequest}
+      />
+
+      <ChillChat
+        open={chatOpen}
+        onOpenChange={(o) => {
+          if (o) {
+            setPanelOpen(false)
+            setWishOpen(false)
+          }
+          setChatOpen(o)
+        }}
+        hidden={panelOpen}
+        dimmed={hideUi}
+        onAvailable={setChatAvailable}
       />
 
       <SupporterBoard

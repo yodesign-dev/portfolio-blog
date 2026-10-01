@@ -86,6 +86,7 @@ export function Wishlist({
   context,
   onThanks,
   donateRequest,
+  stacked = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -99,6 +100,8 @@ export function Wishlist({
   onThanks: () => void
   // Tăng lên mỗi lần nơi khác (bảng cảm ơn) muốn mở thẳng màn "mời Bin 1 ly"
   donateRequest: number
+  // Nút chat đang nằm ngay trên nút Wishlist → bong bóng gợi ý nhích lên trên nó
+  stacked?: boolean
 }) {
   const [wishes, setWishes] = useState<Wish[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -242,7 +245,11 @@ export function Wishlist({
       {!seen && !open && !hidden && (
         <p
           aria-hidden
-          className="pointer-events-none absolute right-3 z-30 rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+156px)] sm:right-5 sm:bottom-[176px] xl:bottom-[76px]"
+          className={`pointer-events-none absolute right-3 z-30 rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
+            stacked
+              ? 'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+210px)] sm:right-5 sm:bottom-[230px] xl:bottom-[128px]'
+              : 'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+156px)] sm:right-5 sm:bottom-[176px] xl:bottom-[76px]'
+          }`}
         >
           Got an idea for the café? Tell us ☕
         </p>

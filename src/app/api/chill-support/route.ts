@@ -3,6 +3,7 @@ import {after, NextRequest, NextResponse} from "next/server";
 import {Resend} from "resend";
 import {writeClient} from "@/sanity/lib/writeClient";
 import {drinkFor} from "@/components/chill/donate-config";
+import {pushChatEvent} from "@/lib/chillChat";
 
 // Người ủng hộ ở mục "Buy Bin a coffee" trang /chill (Studio: "Chill · Supporters").
 //
@@ -160,6 +161,8 @@ async function sent(request: NextRequest, body: Body) {
 
   const who = doc?.name || name;
   const vnd = amount || doc?.amount || 0;
+  // Báo vào phòng chat (không nêu tên / số tiền — Bin chưa đối chiếu)
+  after(() => pushChatEvent("Có người vừa mời Bin 1 ly cà phê ☕ Cảm ơn nha!"));
   after(() =>
     notify(
       `[Chill ☕] ${who || "Someone"} bought you a coffee${vnd ? ` · ${vnd.toLocaleString("vi-VN")}đ` : ""}`,

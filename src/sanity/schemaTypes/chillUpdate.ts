@@ -25,6 +25,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Chuyển kênh Study Beats', value: 'station:study'},
   {title: 'Mở bảng cảm ơn (lọ tip)', value: 'board'},
   {title: 'Mở Wishlist', value: 'wishlist'},
+  {title: 'Mở phòng chat', value: 'chat'},
   {title: 'Mở bảng cài đặt', value: 'settings'},
 ]
 
