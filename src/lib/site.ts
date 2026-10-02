@@ -27,12 +27,15 @@ export function pageMetadata({
   title,
   description,
   path,
+  image: imageUrl,
 }: {
   title: string
   description: string
   path: string
+  // Ảnh OG riêng 1200×630 (vd. ảnh chụp cảnh /chill); không có thì dùng ảnh chữ từ /og
+  image?: string
 }): Metadata {
-  const image = {url: ogImageUrl(title), width: 1200, height: 630}
+  const image = {url: imageUrl ?? ogImageUrl(title), width: 1200, height: 630}
   return {
     title,
     description,
