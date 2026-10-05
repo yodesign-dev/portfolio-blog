@@ -204,6 +204,10 @@ export class ChillScene {
   private propsLayer: HTMLCanvasElement
   private propsKey = ''
   private coinAt = -1
+  // Bàn nhóm (thử nghiệm): null = không ở bàn nào → không vẽ dây đèn.
+  // Có bàn → dây 4 bóng trên ô cửa giữa, mỗi người bạn đang ở bàn sáng 1 bóng.
+  private friendLights: number | null = null
+  private bulbGlow = [0, 0, 0, 0]
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
   private rng = Math.random
@@ -483,6 +487,11 @@ export class ChillScene {
 
   private update(dt: number) {
     const rainy = this.weather === 'rain'
+    // Bóng đèn bạn bè sáng / tắt dần trong ~1 giây
+    for (let i = 0; i < this.bulbGlow.length; i++) {
+      const on = (this.friendLights ?? 0) > i ? 1 : 0
+      this.bulbGlow[i] += Math.sign(on - this.bulbGlow[i]) * Math.min(Math.abs(on - this.bulbGlow[i]), dt)
+    }
     // Chỉ bắt đầu mờ dần khi ảnh mới đã tải xong
     if (this.fade < 1 && ready(this.street)) {
       this.fade = Math.min(1, this.fade + dt / FADE_SECONDS)
@@ -714,6 +723,13 @@ export class ChillScene {
     this.tip = {cups, cup}
   }
 
+  // Số người bạn đang ở bàn nhóm (null = không ở bàn) — chỉ quán cà phê có dây đèn
+  setFriendLights(friends: number | null) {
+    this.friendLights = friends
+    // Cảnh đang dừng (hoặc giảm chuyển động) → không có frame nào để sáng dần, bật luôn
+    if (this.paused) this.bulbGlow = this.bulbGlow.map((_, i) => ((friends ?? 0) > i ? 1 : 0))
+  }
+
   // Người xem vừa bấm "I've sent it" → đồng xu rơi vào lọ, ly của họ hiện trên bàn
   dropCoin() {
     this.coinAt = this.clock
@@ -889,11 +905,49 @@ export class ChillScene {
     }
     if (ready(this.interior)) this.drawTip(ctx, t)
     this.cat.draw(ctx, this.catTinted)
+    if (this.friendLights !== null && this.theme.id === 'cafe') this.drawFriendLights(ctx, t)
     if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
     ctx.restore()
     this.drawSteam(t)
     this.drawNotes()
     this.drawLights()
+  }
+
+  // Dây đèn bạn bè: võng ngang ô cửa giữa (2 đầu buộc vào 2 thanh khung), 4 bóng.
+  // Bóng tắt là thuỷ tinh mờ; bóng sáng có quầng ấm và chập chờn rất nhẹ.
+  // ctx đang ở px gốc 640×360 — ô cửa giữa nằm trong vùng luôn thấy ở mọi tỉ lệ màn.
+  private drawFriendLights(ctx: CanvasRenderingContext2D, t: number) {
+    const x0 = 226
+    const x1 = 414
+    const y0 = 30
+    const sag = 16
+    const wireY = (x: number) => y0 + sag * (1 - ((x - (x0 + x1) / 2) / ((x1 - x0) / 2)) ** 2)
+    ctx.fillStyle = '#2a1d15'
+    for (let x = x0; x <= x1; x++) ctx.fillRect(x, Math.round(wireY(x)), 1, 1)
+
+    this.bulbGlow.forEach((glow, i) => {
+      const bx = Math.round(x0 + ((i + 1) * (x1 - x0)) / (this.bulbGlow.length + 1))
+      const by = Math.round(wireY(bx)) + 1
+      ctx.fillStyle = '#2a1d15'
+      ctx.fillRect(bx - 1, by, 3, 2)
+      const flicker = 0.9 + 0.1 * Math.sin(t * 2.3 + i * 1.7)
+      if (glow > 0) {
+        const g = ctx.createRadialGradient(bx, by + 4, 1, bx, by + 4, 18)
+        g.addColorStop(0, `rgba(255,200,120,${(0.45 * glow * flicker).toFixed(3)})`)
+        g.addColorStop(1, 'rgba(255,200,120,0)')
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.fillStyle = g
+        ctx.fillRect(bx - 18, by - 14, 36, 36)
+        ctx.restore()
+      }
+      // Thân bóng 3×4: pha giữa màu tắt và màu sáng theo độ sáng hiện tại
+      const mix = (a: number[], b: number[]) => `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * glow)).join(',')})`
+      ctx.fillStyle = mix([92, 78, 64], [255, 214, 138])
+      ctx.fillRect(bx - 1, by + 2, 3, 4)
+      ctx.fillStyle = mix([128, 112, 96], [255, 245, 205])
+      ctx.fillRect(bx, by + 3, 1, 2)
+    })
   }
 
   // Lọ tip + ly cà phê (lớp tô sẵn màu) + đồng xu đang rơi. ctx đang ở px gốc 640×360

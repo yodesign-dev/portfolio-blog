@@ -58,7 +58,8 @@ const post = async (body: Record<string, unknown>) => {
 
 const inviteUrl = (id: string) => `${window.location.origin}/chill?table=${id}`
 
-export function GroupTable({visible, onFriends}: {visible: boolean; onFriends?: (friends: TableMember[]) => void}) {
+// onTable: số người bạn đang ở bàn (null = không ở bàn nào) → cảnh vẽ dây đèn
+export function GroupTable({visible, onTable}: {visible: boolean; onTable?: (friends: number | null) => void}) {
   const [available, setAvailable] = useState(false)
   const [me, setMe] = useState<Me | null>(null)
   const [tableId, setTableId] = useState<string | null>(null)
@@ -165,7 +166,8 @@ export function GroupTable({visible, onFriends}: {visible: boolean; onFriends?: 
   }, [tableId, me, join, leaveLocal])
 
   const friends = members.filter((m) => !m.you)
-  useEffect(() => onFriends?.(friends), [members]) // eslint-disable-line react-hooks/exhaustive-deps
+  const friendCount = tableId ? friends.length : null
+  useEffect(() => onTable?.(friendCount), [friendCount, onTable])
 
   // Đóng menu khi bấm ra ngoài / Esc
   useEffect(() => {

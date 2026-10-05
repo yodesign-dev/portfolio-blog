@@ -324,6 +324,14 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [board, myCup])
 
+  // Bàn nhóm: mỗi người bạn đang ở bàn sáng 1 bóng trên dây đèn của quán
+  const onTable = useCallback((friends: number | null) => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setFriendLights(friends)
+    scene.frame(performance.now())
+  }, [])
+
   const updatesSeen = useUpdatesSeen(updates, returning)
 
   const openUpdates = (from: 'button' | 'toast') => {
@@ -909,7 +917,7 @@ export function ChillRoom({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {/* Bàn nhóm (thử nghiệm) — Studio tắt thì không hiện gì */}
-          <GroupTable visible={theme === 'cafe'} />
+          <GroupTable visible={theme === 'cafe'} onTable={onTable} />
           <ShareButton />
           {updates.length > 0 && (
             <WhatsNewButton
