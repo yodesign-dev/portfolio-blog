@@ -38,7 +38,17 @@ type Prefs = {
   destination: string
   travel: number
   theme: ThemeId
+  panelTab: PanelTab
 }
+
+// Bảng cài đặt chia 3 tab để khỏi cuộn dài — tab cuối cùng mở được nhớ lại
+type PanelTab = 'music' | 'scene' | 'atmosphere'
+
+const PANEL_TABS: {id: PanelTab; label: string; icon: React.ReactNode}[] = [
+  {id: 'music', label: 'Music', icon: <MusicIcon />},
+  {id: 'scene', label: 'Scene', icon: <MapIcon />},
+  {id: 'atmosphere', label: 'Atmosphere', icon: <CloudIcon />},
+]
 
 // Tự chuyển điểm đến sau N phút (0 = tắt)
 const TRAVEL_OPTIONS = [
@@ -113,6 +123,7 @@ export function ChillRoom({
   const [destIndex, setDestIndex] = useState(0)
   const [travel, setTravel] = useState(5)
   const [theme, setTheme] = useState<ThemeId>('cafe')
+  const [panelTab, setPanelTab] = useState<PanelTab>('music')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
   const [catBox, setCatBox] = useState<Box | null>(null)
@@ -179,6 +190,7 @@ export function ChillRoom({
     if (savedDest >= 0) setDestIndex(savedDest)
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
+    if (PANEL_TABS.some((t) => t.id === prefs.panelTab)) setPanelTab(prefs.panelTab!)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
     try {
       setCatPetted(localStorage.getItem(CAT_PETTED_KEY) === '1')
@@ -203,13 +215,14 @@ export function ChillRoom({
       destination: dest.id,
       travel,
       theme,
+      panelTab,
     }
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme])
+  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme, panelTab])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -503,8 +516,13 @@ export function ChillRoom({
     setUpdatesOpen(false)
     trackEvent({name: 'Chill Update Try', props: {action}})
     const [kind, id] = action.split(':')
-    if (kind === 'room' && THEMES.some((t) => t.id === id)) setTheme(id as ThemeId)
-    else if (kind === 'station' && STATIONS.some((st) => st.id === id)) changeStation(id as StationId)
+    if (kind === 'room' && THEMES.some((t) => t.id === id)) {
+      setTheme(id as ThemeId)
+      setPanelTab('scene')
+    } else if (kind === 'station' && STATIONS.some((st) => st.id === id)) {
+      changeStation(id as StationId)
+      setPanelTab('music')
+    }
     else if (kind === 'board') openBoard()
     else if (kind === 'wishlist') {
       setChatOpen(false)
@@ -587,6 +605,17 @@ export function ChillRoom({
   // ---------- Chế độ tập trung ----------
 
   const [panelOpen, setPanelOpen] = useState(false)
+  const [volumeOpen, setVolumeOpen] = useState(false)
+
+  // Chạm ra ngoài thì đóng thanh volume nổi (chỉ có trên điện thoại)
+  useEffect(() => {
+    if (!volumeOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest('#chill-volume, [aria-controls="chill-volume"]')) setVolumeOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [volumeOpen])
   const [idle, setIdle] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -668,6 +697,7 @@ export function ChillRoom({
           setWishOpen((o) => !o)
           break
         case 'Escape':
+          setVolumeOpen(false)
           setChatOpen(false)
           setPanelOpen(false)
           setBoardOpen(false)
@@ -715,7 +745,7 @@ export function ChillRoom({
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
   const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -885,8 +915,8 @@ export function ChillRoom({
           {...hoverProps}
           className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               <RoundButton label="Previous track (P)" onClick={prev}>
                 <PrevIcon />
               </RoundButton>
@@ -920,9 +950,43 @@ export function ChillRoom({
               aria-label="Volume"
               className="hidden w-24 accent-[#e8b27d] md:block"
             />
+            {/* Điện thoại không đủ chỗ cho thanh volume — nút loa mở thanh trượt nổi phía trên */}
+            <div className="relative md:hidden">
+              <button
+                type="button"
+                onClick={() => setVolumeOpen((o) => !o)}
+                aria-label="Volume"
+                aria-expanded={volumeOpen}
+                aria-controls="chill-volume"
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition ${
+                  volumeOpen ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
+                }`}
+              >
+                <VolumeIcon muted={volume === 0} />
+              </button>
+              {volumeOpen && (
+                <div
+                  id="chill-volume"
+                  className="absolute bottom-full right-0 mb-3 flex w-56 items-center gap-3 rounded-xl border border-white/10 bg-[#16131a]/95 px-4 py-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md"
+                >
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={volume}
+                    onChange={(e) => setVolume(Number(e.target.value))}
+                    aria-label="Volume"
+                    className="w-full accent-[#e8b27d]"
+                  />
+                  <span className="w-8 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#a79e94]">{Math.round(volume * 100)}</span>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {
+                setVolumeOpen(false)
                 setWishOpen(false)
                 setChatOpen(false)
                 setPanelOpen((o) => !o)
@@ -970,7 +1034,7 @@ export function ChillRoom({
           setWishOpen(o)
         }}
         dimmed={hideUi}
-        hidden={panelOpen}
+        hidden={panelOpen || volumeOpen}
         stacked={chatAvailable}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
@@ -986,7 +1050,7 @@ export function ChillRoom({
           }
           setChatOpen(o)
         }}
-        hidden={panelOpen}
+        hidden={panelOpen || volumeOpen}
         dimmed={hideUi}
         onAvailable={setChatAvailable}
       />
@@ -1011,214 +1075,250 @@ export function ChillRoom({
         onAction={runAction}
       />
 
-      {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop */}
+      {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop.
+          Chia 3 tab (Music · Scene · Atmosphere) để mỗi tab vừa 1 màn hình, không phải cuộn dài */}
       <aside
         id="chill-panel"
         aria-label="Chill settings"
         inert={!panelOpen}
-        className={`absolute inset-x-0 bottom-0 z-30 flex max-h-[85dvh] flex-col rounded-t-2xl border-t border-white/10 bg-[#16131a]/95 backdrop-blur-md transition-transform duration-300 ease-out sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:w-[420px] sm:rounded-none sm:border-l sm:border-t-0 ${
+        className={`absolute inset-x-0 bottom-0 z-30 flex h-[75dvh] flex-col rounded-t-2xl border-t border-white/10 bg-[#16131a]/95 backdrop-blur-md transition-transform duration-300 ease-out sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-[420px] sm:rounded-none sm:border-l sm:border-t-0 ${
           panelOpen ? 'translate-x-0 translate-y-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'
         }`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] p-5">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
-            <p className="mt-2 text-xl font-semibold tracking-tight">Slow morning, strong coffee.</p>
-            <p className="mt-1 text-sm text-[#a79e94]">A pixel café by the window, somewhere in Vietnam.</p>
-          </div>
+        <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-4">
+          <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
           <RoundButton label="Close settings (Esc)" onClick={() => setPanelOpen(false)}>
             <CloseIcon />
           </RoundButton>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-          {/* Căn phòng người xem ngồi — phố, giờ, thời tiết bên ngoài giữ nguyên */}
-          <section>
-            <SectionTitle index="01" title="Room" />
-            <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Room">
-              {THEMES.map((t) => {
-                const active = t.id === theme
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setTheme(t.id)}
-                    className={`group overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-                      active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
-                    <img
-                      src={t.thumb}
-                      alt=""
-                      loading="lazy"
-                      className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
-                    />
-                    <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.name}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-
-          <section>
-            <SectionTitle index="02" title="Music" />
-
-            {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
-            <div className="mt-4 grid grid-cols-5 gap-1 rounded-xl border border-white/10 p-1" role="tablist" aria-label="Music station">
-              {STATIONS.map((st) => {
-                const count = tracks.filter((t) => stationOf(t) === st.id).length
-                const on = st.id === station
-                return (
-                  <button
-                    key={st.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={on}
-                    disabled={count === 0}
-                    onClick={() => changeStation(st.id)}
-                    className={`min-w-0 truncate rounded-lg px-1.5 py-2 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
-                      on ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
-                    }`}
-                  >
-                    {st.short}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="mt-4 flex items-center gap-4">
-              <label className="flex flex-1 items-center gap-3 text-sm text-[#a79e94]">
-                Volume
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-full accent-[#e8b27d]"
-                />
-              </label>
+        {/* Tab chính kiểu gạch chân — khác hẳn chip chọn trạm nhạc bên trong tab Music */}
+        <div
+          role="tablist"
+          aria-label="Settings"
+          className="grid grid-cols-3 border-b border-white/[0.08] px-3"
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+            e.preventDefault()
+            const i = PANEL_TABS.findIndex((t) => t.id === panelTab)
+            const nextTab = PANEL_TABS[(i + (e.key === 'ArrowRight' ? 1 : -1) + PANEL_TABS.length) % PANEL_TABS.length]
+            setPanelTab(nextTab.id)
+            document.getElementById(`chill-tab-${nextTab.id}`)?.focus()
+          }}
+        >
+          {PANEL_TABS.map((t) => {
+            const on = t.id === panelTab
+            return (
               <button
+                key={t.id}
+                id={`chill-tab-${t.id}`}
                 type="button"
-                onClick={() => setShuffle((s) => !s)}
-                aria-pressed={shuffle}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
-                  shuffle ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
+                role="tab"
+                aria-selected={on}
+                aria-controls={`chill-tabpanel-${t.id}`}
+                tabIndex={on ? 0 : -1}
+                onClick={() => setPanelTab(t.id)}
+                className={`relative flex min-w-0 items-center justify-center gap-2 px-2 py-3 text-sm transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                  on ? 'font-semibold text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
                 }`}
               >
-                <ShuffleIcon />
-                Shuffle
+                {t.icon}
+                <span className="truncate">{t.label}</span>
+                <span
+                  aria-hidden
+                  className={`absolute inset-x-3 -bottom-px h-0.5 rounded-full transition ${on ? 'bg-[#e8b27d]' : 'bg-transparent'}`}
+                />
               </button>
-            </div>
+            )
+          })}
+        </div>
 
-            <ol className="mt-4 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-              {stationList.map(({t, i}, pos) => {
-                const active = i === index
-                return (
-                  <li key={t.id}>
+        <div
+          id={`chill-tabpanel-${panelTab}`}
+          role="tabpanel"
+          aria-labelledby={`chill-tab-${panelTab}`}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5"
+        >
+          {panelTab === 'music' && (
+            <>
+              {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Music station">
+                {STATIONS.map((st) => {
+                  const count = tracks.filter((t) => stationOf(t) === st.id).length
+                  const on = st.id === station
+                  return (
                     <button
+                      key={st.id}
                       type="button"
-                      onClick={() => (active && started ? togglePlay() : playAt(i))}
-                      aria-current={active ? 'true' : undefined}
-                      className={`grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition ${
-                        active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
+                      role="radio"
+                      aria-checked={on}
+                      disabled={count === 0}
+                      onClick={() => changeStation(st.id)}
+                      className={`rounded-full border px-3 py-1.5 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                        on
+                          ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
+                          : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
                     >
-                      <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
-                        {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
-                      </span>
-                      <span className="min-w-0">
-                        <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{t.title}</span>
-                        <span className="block truncate text-xs text-[#a79e94]">{t.mood}</span>
-                      </span>
-                      <span className="font-mono text-xs tabular-nums text-[#a79e94]">{t.duration ? formatTime(t.duration) : '–:––'}</span>
+                      {st.short}
                     </button>
-                  </li>
-                )
-              })}
-            </ol>
-          </section>
-
-          <section>
-            <SectionTitle index="03" title="Destination" />
-            {/* Chọn điểm đến bằng thẻ có ảnh phố (đúng giờ đang chọn) thay cho <select> gốc */}
-            <div className="mt-4 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Destination">
-              {destinations.map((d, i) => {
-                const active = i === destIndex
-                return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => goTo(i)}
-                    className={`group relative overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-                      active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- ảnh phố đã tải sẵn cho canvas, dùng lại cho nhanh */}
-                    <img
-                      src={d.streets[time]}
-                      alt=""
-                      loading="lazy"
-                      className={`h-16 w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
-                    />
-                    <span className="flex items-baseline justify-between gap-2 px-2.5 py-2">
-                      <span className="min-w-0 truncate text-sm font-semibold text-[#ede6dd]">
-                        <span className="mr-1.5 font-mono text-[10px] font-normal text-[#a79e94]">{String(i + 1).padStart(2, '0')}</span>
-                        {d.name}
-                      </span>
-                      {active && <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-[#e8b27d]">Now</span>}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span id="chill-travel" className="text-sm text-[#a79e94]">
-                Auto travel
-              </span>
-              <div role="radiogroup" aria-labelledby="chill-travel" className="flex rounded-full border border-white/10 bg-black/20 p-0.5">
-                {TRAVEL_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={travel === o.value}
-                    onClick={() => {
-                      setTravel(o.value)
-                      travelRef.current = 0
-                      setTravelElapsed(0)
-                    }}
-                    className={`rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
-                      travel === o.value ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
-                    }`}
-                  >
-                    {o.label}
-                  </button>
-                ))}
+                  )
+                })}
               </div>
-            </div>
-            <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-[#e8b27d] transition-[width] duration-1000 ease-linear"
-                style={{
-                  width: travel ? `${Math.min(100, (travelElapsed / (travel * 60)) * 100)}%` : '0%',
-                }}
-              />
-            </div>
-            <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
-              {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · Next: {nextDest.name}
-            </p>
-          </section>
 
-          <section>
-            <SectionTitle index="04" title="Atmosphere" />
-            <div className="mt-4 space-y-4">
+              {/* Volume nằm trên thanh phát nhạc (desktop: thanh trượt, điện thoại: nút loa) */}
+              <div className="mt-4 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShuffle((s) => !s)}
+                  aria-pressed={shuffle}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
+                    shuffle ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
+                  }`}
+                >
+                  <ShuffleIcon />
+                  Shuffle
+                </button>
+              </div>
+
+              <ol className="mt-3 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+                {stationList.map(({t, i}, pos) => {
+                  const active = i === index
+                  return (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => (active && started ? togglePlay() : playAt(i))}
+                        aria-current={active ? 'true' : undefined}
+                        className={`grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition ${
+                          active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
+                          {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
+                        </span>
+                        <span className="min-w-0">
+                          <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{t.title}</span>
+                          <span className="block truncate text-xs text-[#a79e94]">{t.mood}</span>
+                        </span>
+                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{t.duration ? formatTime(t.duration) : '–:––'}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+            </>
+          )}
+
+          {panelTab === 'scene' && (
+            <div className="space-y-8">
+              {/* Căn phòng người xem ngồi — phố, giờ, thời tiết bên ngoài giữ nguyên */}
+              <section>
+                <SectionTitle index="01" title="Room" />
+                <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Room">
+                  {THEMES.map((t) => {
+                    const active = t.id === theme
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setTheme(t.id)}
+                        className={`group overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                          active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
+                        <img
+                          src={t.thumb}
+                          alt=""
+                          loading="lazy"
+                          className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
+                        />
+                        <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section>
+                <SectionTitle index="02" title="Destination" />
+                {/* Chọn điểm đến bằng thẻ có ảnh phố (đúng giờ đang chọn) thay cho <select> gốc */}
+                <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Destination">
+                  {destinations.map((d, i) => {
+                    const active = i === destIndex
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => goTo(i)}
+                        className={`group relative overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                          active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- ảnh phố đã tải sẵn cho canvas, dùng lại cho nhanh */}
+                        <img
+                          src={d.streets[time]}
+                          alt=""
+                          loading="lazy"
+                          className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
+                        />
+                        {active && (
+                          <span className="absolute right-1.5 top-1.5 rounded bg-[#e8b27d] px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#2a1a10]">
+                            Now
+                          </span>
+                        )}
+                        <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{d.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <span id="chill-travel" className="text-sm text-[#a79e94]">
+                    Auto travel
+                  </span>
+                  <div role="radiogroup" aria-labelledby="chill-travel" className="flex rounded-full border border-white/10 bg-black/20 p-0.5">
+                    {TRAVEL_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={travel === o.value}
+                        onClick={() => {
+                          setTravel(o.value)
+                          travelRef.current = 0
+                          setTravelElapsed(0)
+                        }}
+                        className={`rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                          travel === o.value ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-[#e8b27d] transition-[width] duration-1000 ease-linear"
+                    style={{
+                      width: travel ? `${Math.min(100, (travelElapsed / (travel * 60)) * 100)}%` : '0%',
+                    }}
+                  />
+                </div>
+                <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
+                  {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · Next: {nextDest.name}
+                </p>
+              </section>
+            </div>
+          )}
+
+          {panelTab === 'atmosphere' && (
+            <div className="space-y-4">
               <Field label="Time">
                 <Segmented options={TIMES} value={time} onChange={setTime} />
               </Field>
@@ -1241,22 +1341,22 @@ export function ChillRoom({
                 </div>
               </Field>
             </div>
-          </section>
+          )}
+        </div>
 
-          <div className="hidden flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] text-[#a79e94] sm:flex">
-            {[
-              ['Space', 'Play'],
-              ['N / P', 'Next / prev'],
-              ['F', 'Fullscreen'],
-              ['S', 'Settings'],
-            ].map(([key, label]) => (
-              <span key={key}>
-                <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
-              </span>
-            ))}
-          </div>
-
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/30">No rush. Just coffee. · Art &amp; music made with AI.</p>
+        {/* Đáy cố định: phím tắt (desktop) + credit */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.06] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] font-mono text-[11px] text-[#a79e94]">
+          {[
+            ['Space', 'Play'],
+            ['N / P', 'Next / prev'],
+            ['F', 'Fullscreen'],
+            ['S', 'Settings'],
+          ].map(([key, label]) => (
+            <span key={key} className="hidden sm:inline">
+              <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
+            </span>
+          ))}
+          <span className="uppercase tracking-[0.2em] text-white/30 sm:basis-full">No rush. Just coffee. · Art &amp; music made with AI.</span>
         </div>
       </aside>
     </div>
@@ -1519,6 +1619,42 @@ function MistIcon() {
   return (
     <svg {...iconProps}>
       <path d="M4 14h16M4 18h12M6 10h14M8 6h10" />
+    </svg>
+  )
+}
+
+function VolumeIcon({muted}: {muted: boolean}) {
+  return (
+    <svg {...iconProps}>
+      <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+      {muted ? <path d="m22 9-6 6M16 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />}
+    </svg>
+  )
+}
+
+function MusicIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  )
+}
+
+function MapIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </svg>
+  )
+}
+
+function CloudIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M17.5 19H7a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 11 4 4 0 0 1 17.5 19Z" />
     </svg>
   )
 }
