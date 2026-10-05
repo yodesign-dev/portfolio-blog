@@ -51,8 +51,15 @@ const FAR_LANE = 119 // đáy bánh xe làn xa
 const NEAR_LANE = 124 // làn gần
 
 const FADE_SECONDS = 1.2
-// Bàn nhóm: tâm 4 ghế (px gốc) — trong vùng luôn thấy ở màn 4:3 (x 80…560)
-const GROUP_SEATS = [228, 318, 408, 498]
+// Bàn nhóm: nền AI public/chill/scenes/group/group-bg.webp (1280×720, ô kính trong
+// suốt). Toạ độ px gốc 640×360 đo trên ảnh: tâm 4 ghế, mép xa mặt bàn, ô kính, bóng đèn.
+const GROUP_BG_SRC = '/chill/scenes/group/group-bg.webp'
+const GROUP_SEATS = [135, 264, 392, 522]
+const GROUP = {
+  tableTop: 270,
+  window: {x: 70, y: 80, w: 92, h: 95},
+  lamp: {x: 320, y: 86},
+}
 // Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
 // thật, đặt tại (429, 116) trên ảnh nội thất 640×360. Ô cuối (121) là mặt nạ:
 // vùng khoét khỏi ảnh tĩnh để khung chuyển động thay vào.
@@ -217,6 +224,9 @@ export class ChillScene {
   private seated: SeatedFriend[] = []
   private panLayer: HTMLCanvasElement | null = null
   private groupLayer: HTMLCanvasElement | null = null
+  private groupBg: HTMLImageElement | null = null
+  private groupBgTinted: HTMLCanvasElement | null = null
+  private groupBgKey = ''
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
   private rng = Math.random
@@ -737,6 +747,8 @@ export class ChillScene {
   // Số người bạn đang ở bàn nhóm (null = không ở bàn) — chỉ quán cà phê có dây đèn
   setFriendLights(friends: number | null) {
     this.friendLights = friends
+    // Đang ở bàn → tải sẵn nền bàn nhóm để lúc lia máy vào đã có ảnh
+    if (friends !== null) this.groupBgLayer()
     // Cảnh đang dừng (hoặc giảm chuyển động) → không có frame nào để sáng dần, bật luôn
     if (this.paused) this.bulbGlow = this.bulbGlow.map((_, i) => ((friends ?? 0) > i ? 1 : 0))
   }
@@ -759,12 +771,37 @@ export class ChillScene {
   // Vùng từng ghế ở cảnh bàn nhóm (px gốc 640×360) — để đặt bảng tên lên trên đầu
   groupSeatBox(i: number) {
     const cx = GROUP_SEATS[i]
-    return {x: cx - 44, y: 118, w: 88, h: 128}
+    return {x: cx - 40, y: GROUP.tableTop - 98, w: 80, h: 98}
   }
 
-  // Chỗ nhãn "+n" — mép phải mặt bàn
+  // Chỗ nhãn "+n" — giữa mặt bàn (mép phải bàn bị cắt mất trên màn 4:3)
   get groupMoreBox() {
-    return {x: 556, y: 222, w: 56, h: 22}
+    return {x: 304, y: GROUP.tableTop + 10, w: 32, h: 18}
+  }
+
+  // Nền bàn nhóm đã tô màu theo giờ (giống nội thất quầy), chỉ tô lại khi đổi giờ / thời tiết
+  private groupBgLayer() {
+    this.groupBg ??= loadImage(GROUP_BG_SRC, () => (this.groupBgKey = ''))
+    if (!ready(this.groupBg)) return null
+    const key = this.tint ?? 'none'
+    if (this.groupBgTinted && this.groupBgKey === key) return this.groupBgTinted
+    const c = (this.groupBgTinted ??= document.createElement('canvas'))
+    c.width = this.groupBg.naturalWidth
+    c.height = this.groupBg.naturalHeight
+    const cc = c.getContext('2d')!
+    cc.clearRect(0, 0, c.width, c.height)
+    cc.drawImage(this.groupBg, 0, 0)
+    if (this.tint) {
+      cc.globalCompositeOperation = 'multiply'
+      cc.fillStyle = this.tint
+      cc.fillRect(0, 0, c.width, c.height)
+      // Giữ nguyên ô kính trong suốt sau khi nhân màu
+      cc.globalCompositeOperation = 'destination-in'
+      cc.drawImage(this.groupBg, 0, 0)
+      cc.globalCompositeOperation = 'source-over'
+    }
+    this.groupBgKey = key
+    return c
   }
 
   // Người xem vừa bấm "I've sent it" → đồng xu rơi vào lọ, ly của họ hiện trên bàn
@@ -892,67 +929,41 @@ export class ChillScene {
       gc.fillRect(x, y, w, h)
     }
 
-    // Tường + ốp gỗ chân tường
-    R(0, 0, 640, 360, o('#6a4630'))
-    R(0, 0, 640, 6, o('#4f3322'))
-    R(0, 258, 640, 102, o('#553826'))
-    R(0, 256, 640, 3, o('#3f2a1c'))
-
-    // Cửa sổ nhỏ bên trái: nhìn ra đúng con phố / giờ / thời tiết của quầy
-    const win = {x: 70, y: 62, w: 96, h: 124}
-    R(win.x - 7, win.y - 7, win.w + 14, win.h + 14, o('#3a2618'))
+    // Nền AI (gạch, kệ, đèn thả, tranh, bàn dài 4 ghế trống). Ô kính cửa sổ bên trái
+    // đã khoét trong suốt → vẽ con phố đang chọn ra sau trước, rồi mới đặt nền lên.
+    const bg = this.groupBgLayer()
+    const win = GROUP.window
     if (ready(this.street)) {
       const img = this.street
-      gc.drawImage(img, img.width * 0.38, img.height * 0.04, img.width * 0.22, img.height * 0.66, win.x, win.y, win.w, win.h)
+      gc.drawImage(img, img.width * 0.38, img.height * 0.04, img.width * 0.22, img.height * 0.5, win.x, win.y, win.w, win.h)
       if (this.weather === 'mist') R(win.x, win.y, win.w, win.h, night ? 'rgba(150,160,190,0.35)' : 'rgba(236,238,240,0.45)')
       if (this.weather === 'rain') R(win.x, win.y, win.w, win.h, 'rgba(120,130,150,0.25)')
     } else R(win.x, win.y, win.w, win.h, '#e8b48a')
-    R(win.x + win.w / 2 - 2, win.y, 4, win.h, o('#3a2618'))
-    R(win.x, win.y + 52, win.w, 4, o('#3a2618'))
-    R(win.x - 10, win.y + win.h + 5, win.w + 20, 6, o('#a8774d'))
+    if (bg) gc.drawImage(bg, 0, 0, 640, 360)
+    else R(0, 0, 640, 360, o('#6a4630'))
 
-    // Tranh nhỏ trên tường phải (cho đỡ trống) — ngoài vùng 4:3 thì bị cắt cũng không sao
-    R(586, 80, 40, 50, o('#3a2618'))
-    R(590, 84, 32, 42, o('#e0c27d'))
-    R(590, 108, 32, 18, o('#c98f5a'))
-
-    // Đèn thả giữa bàn
-    const lamp = {x: 380, y: 92}
-    R(lamp.x, 0, 1, lamp.y - 10, '#2a1d15')
-    gc.fillStyle = o('#55704f')
-    gc.beginPath()
-    gc.moveTo(lamp.x - 8, lamp.y - 10)
-    gc.lineTo(lamp.x + 9, lamp.y - 10)
-    gc.lineTo(lamp.x + 22, lamp.y + 4)
-    gc.lineTo(lamp.x - 21, lamp.y + 4)
-    gc.fill()
-    R(lamp.x - 5, lamp.y + 4, 11, 3, 'rgba(255,231,168,0.95)')
-
-    // Dây đèn bạn bè chạy dọc tường phía trên bàn (cùng độ sáng với dây ở quầy)
+    // Dây đèn bạn bè chạy dọc tường gạch phía trên (cùng độ sáng với dây ở quầy)
+    const lamp = GROUP.lamp
     const x0 = 200
     const x1 = 600
-    const wireY = (x: number) => 34 + 14 * (1 - ((x - (x0 + x1) / 2) / ((x1 - x0) / 2)) ** 2)
+    const wireY = (x: number) => 30 + 14 * (1 - ((x - (x0 + x1) / 2) / ((x1 - x0) / 2)) ** 2)
     gc.fillStyle = '#2a1d15'
     for (let x = x0; x <= x1; x++) gc.fillRect(x, Math.round(wireY(x)), 1, 1)
 
-    // Ghế + người (sau bàn), rồi mặt bàn + laptop đè lên
+    // Người ngồi (tạm vẽ khối cho tới khi có sprite) che lưng ghế, rồi vẽ lại phần
+    // mặt bàn của nền đè lên cho người "ngồi sau bàn"
+    const top = GROUP.tableTop
     for (let i = 0; i < GROUP_SEATS.length; i++) {
       const cx = GROUP_SEATS[i]
       const f = this.seated.find((s) => s.display === i)
-      if (!f || f.status === 'away') {
-        R(cx - 24, 190, 48, 6, o('#3a2618'))
-        R(cx - 22, 196, 4, 46, o('#3a2618'))
-        R(cx + 18, 196, 4, 46, o('#3a2618'))
-        R(cx - 18, 204, 36, 4, o('#3a2618'))
-        continue
-      }
+      if (!f || f.status === 'away') continue
       const c = CHARACTERS[f.character] ?? CHARACTERS[0]
       const sleep = f.status === 'sleep'
       const bob = sleep ? 8 : Math.round(Math.sin(t * 2.4 + i * 1.9))
-      const hy = 150 + bob
-      R(cx - 26, 192, 52, 58, o(c.shirt))
-      R(cx - 22, 188, 44, 6, o(c.shirt))
-      R(cx - 6, 184 + bob, 12, 8, o(c.skin))
+      const hy = top - 88 + bob
+      R(cx - 28, top - 50, 56, 52, o(c.shirt))
+      R(cx - 24, top - 54, 48, 6, o(c.shirt))
+      R(cx - 6, top - 58 + bob, 12, 8, o(c.skin))
       R(cx - 15, hy, 30, 34, o(c.skin))
       R(cx - 16, hy - 4, 32, 12, o(c.hair))
       R(cx - 16, hy + 8, 4, 10, o(c.hair))
@@ -982,12 +993,7 @@ export class ChillScene {
         R(cx + 9, hy + 22, 9, 2, o('#6b3f22'))
       }
     }
-
-    // Mặt bàn dài
-    R(186, 236, 420, 12, o('#a8774d'))
-    R(186, 248, 420, 4, o('#7a5236'))
-    R(196, 252, 400, 108, o('#835838'))
-    R(196, 252, 400, 3, o('#6a4630'))
+    if (bg) gc.drawImage(bg, 0, top * RES, bg.width, bg.height - top * RES, 0, top, 640, 360 - top)
 
     // Laptop (nhìn mặt lưng) + ly của từng người; người vắng thì gập máy
     for (let i = 0; i < GROUP_SEATS.length; i++) {
@@ -995,27 +1001,27 @@ export class ChillScene {
       const f = this.seated.find((s) => s.display === i)
       if (!f) continue
       if (f.status === 'away') {
-        R(cx - 18, 232, 36, 4, o('#9aa1ab'))
+        R(cx - 18, top + 4, 36, 3, o('#9aa1ab'))
         continue
       }
       const sleep = f.status === 'sleep'
-      R(cx - 20, 208, 40, 28, o('#9aa1ab'))
-      R(cx - 20, 208, 40, 2, o('#b7bdc6'))
-      R(cx - 1, 220, 3, 3, o('#d7dbe1'))
+      R(cx - 20, top - 22, 40, 28, o('#9aa1ab'))
+      R(cx - 20, top - 22, 40, 2, o('#b7bdc6'))
+      R(cx - 1, top - 10, 3, 3, o('#d7dbe1'))
       // Ánh màn hình hắt lên mặt (trừ người ngủ gật)
       if (!sleep) {
-        const g = gc.createRadialGradient(cx, 200, 2, cx, 200, 30)
+        const g = gc.createRadialGradient(cx, top - 30, 2, cx, top - 30, 30)
         g.addColorStop(0, `rgba(130,175,255,${night ? 0.22 : 0.08})`)
         g.addColorStop(1, 'rgba(130,175,255,0)')
         gc.save()
         gc.globalCompositeOperation = 'lighter'
         gc.fillStyle = g
-        gc.fillRect(cx - 30, 170, 60, 60)
+        gc.fillRect(cx - 30, top - 60, 60, 60)
         gc.restore()
       }
       if (f.status !== 'coffee') {
-        R(cx + 26, 226, 9, 10, '#f3ece4')
-        R(cx + 27, 226, 7, 2, o('#6b3f22'))
+        R(cx + 26, top - 4, 9, 10, '#f3ece4')
+        R(cx + 27, top - 4, 7, 2, o('#6b3f22'))
       }
     }
 
