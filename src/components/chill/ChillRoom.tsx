@@ -18,6 +18,11 @@ import {ChillChat} from './ChillChat'
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
 const CAT_PETTED_KEY = 'chill:cat-petted'
+// Đã mở bảng cài đặt lần nào chưa — chưa thì nút Settings sáng lên + gợi ý
+const SETTINGS_SEEN_KEY = 'chill:settings-seen'
+// Gợi ý hiện sau khi bấm Play bao lâu, và tự ẩn sau bao lâu
+const SETTINGS_HINT_DELAY_MS = 3000
+const SETTINGS_HINT_MS = 8000
 const CAT_HINT_DELAY = 4000
 // Mèo nói cảm ơn sau khi người xem bấm "I've sent it" ở mục donate
 const CAT_THANKS = 'Cám ơn bạn đã mời cafe Meo!'
@@ -616,6 +621,48 @@ export function ChillRoom({
     document.addEventListener('pointerdown', onDown)
     return () => document.removeEventListener('pointerdown', onDown)
   }, [volumeOpen])
+
+  // Người chưa mở cài đặt lần nào: nút Settings có vòng cam lan + gợi ý ngắn.
+  // Mặc định coi như đã thấy để server render không nháy hiệu ứng
+  const [settingsSeen, setSettingsSeen] = useState(true)
+  const [hintShown, setHintShown] = useState(false)
+  const [hintTip, setHintTip] = useState(false)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+      setSettingsSeen(localStorage.getItem(SETTINGS_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → không làm phiền bằng gợi ý
+    }
+  }, [])
+  useEffect(() => {
+    if (!panelOpen || settingsSeen) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mở cài đặt lần đầu thì tắt hẳn gợi ý
+    setSettingsSeen(true)
+    setHintTip(false)
+    try {
+      localStorage.setItem(SETTINGS_SEEN_KEY, '1')
+    } catch {
+      // bỏ qua
+    }
+  }, [panelOpen, settingsSeen])
+  // Hiện sau khi bấm Play một lúc, nhường thông báo "Có gì mới" hiện trước
+  const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast
+  useEffect(() => {
+    if (settingsSeen || hintShown || !started || panelOpen || otherOverlay) return
+    const t = window.setTimeout(() => {
+      setHintShown(true)
+      setHintTip(true)
+    }, SETTINGS_HINT_DELAY_MS)
+    return () => window.clearTimeout(t)
+  }, [settingsSeen, hintShown, started, panelOpen, otherOverlay])
+  useEffect(() => {
+    if (!hintTip) return
+    const t = window.setTimeout(() => setHintTip(false), SETTINGS_HINT_MS)
+    return () => window.clearTimeout(t)
+  }, [hintTip])
+  const settingsGlow = hintShown && !settingsSeen
+  const showHintTip = hintTip && !settingsSeen && !panelOpen && !volumeOpen && !otherOverlay
   const [idle, setIdle] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -745,7 +792,7 @@ export function ChillRoom({
   const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
   const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -983,24 +1030,45 @@ export function ChillRoom({
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setVolumeOpen(false)
-                setWishOpen(false)
-                setChatOpen(false)
-                setPanelOpen((o) => !o)
-              }}
-              aria-label="Settings"
-              aria-expanded={panelOpen}
-              aria-controls="chill-panel"
-              title="Settings (S)"
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition ${
-                panelOpen ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
-              }`}
-            >
-              <SlidersIcon />
-            </button>
+            {/* Desktop có chữ "Tuỳ chỉnh" cho rõ nghĩa; người chưa mở lần nào thấy vòng cam + gợi ý */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setVolumeOpen(false)
+                  setWishOpen(false)
+                  setChatOpen(false)
+                  setPanelOpen((o) => !o)
+                }}
+                aria-label="Settings"
+                aria-expanded={panelOpen}
+                aria-controls="chill-panel"
+                aria-describedby={showHintTip ? 'chill-settings-hint' : undefined}
+                title="Settings (S)"
+                className={`relative flex h-10 w-10 items-center justify-center gap-2 rounded-full border transition md:w-auto md:px-3.5 ${
+                  panelOpen || settingsGlow
+                    ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
+                    : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
+                }`}
+              >
+                {settingsGlow && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-full border-2 border-[#e8b27d]" />}
+                <SlidersIcon />
+                <span className="hidden text-sm md:inline">Tuỳ chỉnh</span>
+              </button>
+              {showHintTip && (
+                <button
+                  id="chill-settings-hint"
+                  type="button"
+                  onClick={() => {
+                    setVolumeOpen(false)
+                    setPanelOpen(true)
+                  }}
+                  className="absolute bottom-full right-0 mb-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:right-4 after:top-full after:border-[6px] after:border-transparent after:border-t-[#e8b27d] after:content-['']"
+                >
+                  Đổi nhạc, phòng, thời tiết ở đây
+                </button>
+              )}
+            </div>
           </div>
           <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tabular-nums text-[#a79e94]">
             <span className="w-8">{formatTime(position)}</span>
@@ -1034,7 +1102,7 @@ export function ChillRoom({
           setWishOpen(o)
         }}
         dimmed={hideUi}
-        hidden={panelOpen || volumeOpen}
+        hidden={panelOpen || volumeOpen || showHintTip}
         stacked={chatAvailable}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
@@ -1050,7 +1118,7 @@ export function ChillRoom({
           }
           setChatOpen(o)
         }}
-        hidden={panelOpen || volumeOpen}
+        hidden={panelOpen || volumeOpen || showHintTip}
         dimmed={hideUi}
         onAvailable={setChatAvailable}
       />
