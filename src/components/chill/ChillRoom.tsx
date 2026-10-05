@@ -1030,7 +1030,7 @@ export function ChillRoom({
                 </div>
               )}
             </div>
-            {/* Desktop có chữ "Tuỳ chỉnh" cho rõ nghĩa; người chưa mở lần nào thấy vòng cam + gợi ý */}
+            {/* Người chưa mở cài đặt lần nào thấy vòng cam + gợi ý */}
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -1045,7 +1045,7 @@ export function ChillRoom({
                 aria-controls="chill-panel"
                 aria-describedby={showHintTip ? 'chill-settings-hint' : undefined}
                 title="Settings (S)"
-                className={`relative flex h-10 w-10 items-center justify-center gap-2 rounded-full border transition md:w-auto md:px-3.5 ${
+                className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition ${
                   panelOpen || settingsGlow
                     ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
                     : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
@@ -1053,7 +1053,6 @@ export function ChillRoom({
               >
                 {settingsGlow && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-full border-2 border-[#e8b27d]" />}
                 <SlidersIcon />
-                <span className="hidden text-sm md:inline">Tuỳ chỉnh</span>
               </button>
               {showHintTip && (
                 <button
