@@ -2,6 +2,7 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
+import {CHARACTERS, SEATS, STATUS_LABEL, arrangeFriends, type TableMember} from './table-view'
 
 // Bàn nhóm (thử nghiệm) — phía quầy cửa sổ: nút "Mời bạn" trên thanh trên,
 // chọn nhân vật, danh sách bạn đang ở bàn. Backend: /api/chill-table.
@@ -12,27 +13,15 @@ import {trackEvent} from '@/lib/analytics'
 // Bàn vẽ 4 ghế; ai vào sau 4 người đầu là "+n". Người xem luôn ngồi ở quầy nên
 // trong danh sách "bạn bè" không tính chính mình.
 
-const SEATS = 4
 const ME_KEY = 'chill:table-me'
 const TABLE_KEY = 'chill:table-id'
 const CHAT_ME_KEY = 'chill:chat-me'
 const POLL_MS = 20_000
 const BEAT_MS = 60_000
 
-// 6 nhân vật có sẵn — tạm vẽ bằng khối màu, sẽ thay bằng sprite nhìn chính diện
-export const CHARACTERS = [
-  {name: 'Áo đỏ', shirt: '#b85f5a', hair: '#2b1d16', skin: '#e8b98f'},
-  {name: 'Áo xanh lá', shirt: '#56785a', hair: '#3a2618', skin: '#d9a77c'},
-  {name: 'Áo tím', shirt: '#6a5fa0', hair: '#1f1a17', skin: '#f0c7a0'},
-  {name: 'Áo xanh dương', shirt: '#3e6a8a', hair: '#5a3a22', skin: '#c99068'},
-  {name: 'Áo vàng', shirt: '#b08a3e', hair: '#2b1d16', skin: '#e8b98f'},
-  {name: 'Áo hồng', shirt: '#9a4e78', hair: '#3a2618', skin: '#d9a77c'},
-]
 const NAMES = ['Mây Chiều', 'Phin Đen', 'Bạc Xỉu', 'Hoa Sữa', 'Mưa Phùn', 'Lá Me', 'Trà Đá', 'Sương Sớm', 'Hẻm Nhỏ', 'Nắng Nhạt']
-const STATUS_LABEL: Record<string, string> = {work: 'đang làm', coffee: 'uống cà phê', sleep: 'ngủ gật', away: 'đi vắng'}
 
 type Me = {uid: string; name: string; character: number | null}
-export type TableMember = {name: string; character: number; status: string; seat: number; you: boolean}
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -58,8 +47,17 @@ const post = async (body: Record<string, unknown>) => {
 
 const inviteUrl = (id: string) => `${window.location.origin}/chill?table=${id}`
 
-// onTable: số người bạn đang ở bàn (null = không ở bàn nào) → cảnh vẽ dây đèn
-export function GroupTable({visible, onTable}: {visible: boolean; onTable?: (friends: number | null) => void}) {
+// onTable: thành viên bàn (null = không ở bàn nào) → cảnh vẽ dây đèn + bàn nhóm
+// onView: người xem bấm "Xem bàn nhóm" (lia máy vào trong quán)
+export function GroupTable({
+  visible,
+  onTable,
+  onView,
+}: {
+  visible: boolean
+  onTable?: (members: TableMember[] | null) => void
+  onView?: () => void
+}) {
   const [available, setAvailable] = useState(false)
   const [me, setMe] = useState<Me | null>(null)
   const [tableId, setTableId] = useState<string | null>(null)
@@ -166,8 +164,8 @@ export function GroupTable({visible, onTable}: {visible: boolean; onTable?: (fri
   }, [tableId, me, join, leaveLocal])
 
   const friends = members.filter((m) => !m.you)
-  const friendCount = tableId ? friends.length : null
-  useEffect(() => onTable?.(friendCount), [friendCount, onTable])
+  const {seated, rest} = arrangeFriends(members)
+  useEffect(() => onTable?.(tableId ? members : null), [tableId, members, onTable])
 
   // Đóng menu khi bấm ra ngoài / Esc
   useEffect(() => {
@@ -277,18 +275,31 @@ export function GroupTable({visible, onTable}: {visible: boolean; onTable?: (fri
               </p>
               {friends.length === 0 && <p className="mt-2 text-[13px] text-[#a79e94]">Gửi link cho bạn bè. Ai mở link sẽ ngồi vào bàn trong quán.</p>}
               <ul className="mt-2 space-y-1.5">
-                {friends.map((f, i) => (
+                {[...seated, ...rest].map((f, i) => (
                   <li key={i} className="flex items-center gap-2">
                     <Avatar character={f.character} size={22} />
                     <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                    <span className="text-[11px] text-[#a79e94]">{f.seat < 0 ? 'bàn bên' : STATUS_LABEL[f.status] ?? ''}</span>
+                    <span className="text-[11px] text-[#a79e94]">{i >= seated.length ? 'bàn bên' : STATUS_LABEL[f.status] ?? ''}</span>
                   </li>
                 ))}
               </ul>
-              {friends.length > SEATS && (
-                <p className="mt-2 text-[11px] text-[#a79e94]">Bàn có {SEATS} ghế, {friends.length - SEATS} người còn lại hiện thành “+{friends.length - SEATS}”.</p>
+              {rest.length > 0 && (
+                <p className="mt-2 text-[11px] text-[#a79e94]">Bàn có {SEATS} ghế, {rest.length} người còn lại hiện thành “+{rest.length}”.</p>
               )}
-              <div className="mt-3 flex gap-2">
+              {friends.length > 0 && onView && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    onView()
+                    trackEvent({name: 'Chill Table', props: {action: 'view'}})
+                  }}
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-[#e8b27d]/45 px-3 py-2 text-xs font-medium text-[#f6dcbd] transition hover:border-[#e8b27d]/80 hover:bg-white/[0.06]"
+                >
+                  Xem bàn nhóm <span aria-hidden>→</span>
+                </button>
+              )}
+              <div className="mt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={copy}

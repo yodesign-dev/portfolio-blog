@@ -10,6 +10,7 @@ import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
 import {ShareButton} from './ShareButton'
 import {GroupTable} from './GroupTable'
+import {STATUS_LABEL, arrangeFriends, type TableMember} from './table-view'
 import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
@@ -135,6 +136,11 @@ export function ChillRoom({
   const [catBox, setCatBox] = useState<Box | null>(null)
   const [bookBox, setBookBox] = useState<Box | null>(null)
   const [jarBox, setJarBox] = useState<Box | null>(null)
+  // Bàn nhóm (thử nghiệm): thành viên bàn mình đang ngồi + đang xem bàn nhóm hay quầy
+  const [tableMembers, setTableMembers] = useState<TableMember[] | null>(null)
+  const [groupView, setGroupView] = useState(false)
+  const [seatBoxes, setSeatBoxes] = useState<(Box | null)[]>([])
+  const [moreBox, setMoreBox] = useState<Box | null>(null)
   const [wishOpen, setWishOpen] = useState(false)
   // Lọ tip + bảng cảm ơn: số ly Bin đã xác nhận, người đồng ý hiện tên
   const [board, setBoard] = useState<Board | null>(null)
@@ -267,6 +273,8 @@ export function ChillRoom({
       const book = scene.notebookHitBox
       setBookBox(book ? toBox(book) : null)
       setJarBox(hasDonate() ? toBox(scene.tipJarHitBox) : null)
+      setSeatBoxes([0, 1, 2, 3].map((i) => toBox(scene.groupSeatBox(i))))
+      setMoreBox(toBox(scene.groupMoreBox))
     }
     fitRef.current = fit
     const ro = new ResizeObserver(fit)
@@ -324,13 +332,31 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [board, myCup])
 
-  // Bàn nhóm: mỗi người bạn đang ở bàn sáng 1 bóng trên dây đèn của quán
-  const onTable = useCallback((friends: number | null) => {
+  // Bàn nhóm: mỗi người bạn đang ở bàn sáng 1 bóng trên dây đèn của quán,
+  // bạn bè ngồi vào 4 ghế ở cảnh bàn nhóm
+  const onTable = useCallback((members: TableMember[] | null) => {
+    setTableMembers(members)
+    if (!members) setGroupView(false)
     const scene = sceneRef.current
     if (!scene) return
-    scene.setFriendLights(friends)
+    scene.setFriendLights(members ? members.filter((m) => !m.you).length : null)
+    scene.setSeated(members ? arrangeFriends(members).seated : [])
     scene.frame(performance.now())
   }, [])
+  const table = tableMembers ? arrangeFriends(tableMembers) : null
+
+  // Bàn nhóm chỉ có ở quán cà phê
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (theme !== 'cafe') setGroupView(false)
+  }, [theme])
+
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setGroupView(groupView)
+    scene.frame(performance.now())
+  }, [groupView])
 
   const updatesSeen = useUpdatesSeen(updates, returning)
 
@@ -753,6 +779,7 @@ export function ChillRoom({
           setWishOpen((o) => !o)
           break
         case 'Escape':
+          setGroupView(false)
           setVolumeOpen(false)
           setChatOpen(false)
           setPanelOpen(false)
@@ -814,11 +841,58 @@ export function ChillRoom({
         ref={canvasRef}
         className="absolute inset-0 h-full w-full object-cover portrait:object-contain"
         role="img"
-        aria-label={`Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`}
+        aria-label={
+          groupView && table
+            ? `Pixel art: friends at a long table inside the café — ${table.seated.map((f) => `${f.name} ${STATUS_LABEL[f.status] ?? ''}`).join(', ') || 'empty chairs'}${table.rest.length ? `, and ${table.rest.length} more` : ''}`
+            : `Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`
+        }
       />
 
+      {/* Bàn nhóm: bảng tên trên đầu từng người + nhãn "+n" + nút quay về quầy.
+          Hiện sau khi lia máy xong (~1,2 giây) để không trôi theo cảnh. */}
+      {groupView && table && (
+        <div className="pointer-events-none absolute inset-0 motion-safe:animate-[chill-fade-in_0.4s_ease-out_1.1s_both]">
+          {table.seated.map((f) => {
+            const box = seatBoxes[f.display]
+            if (!box) return null
+            // Ghế hẹp (điện thoại dọc) → chỉ tên, cắt gọn trong bề ngang ghế
+            const roomy = box.width >= 120
+            return (
+              <span
+                key={f.display}
+                className="absolute flex -translate-x-1/2 -translate-y-full items-center gap-1 whitespace-nowrap rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] text-[#f6dcbd] backdrop-blur"
+                style={{left: box.left + box.width / 2, top: box.top, maxWidth: roomy ? undefined : box.width - 4}}
+                title={`${f.name} · ${STATUS_LABEL[f.status] ?? ''}`}
+              >
+                <span className="truncate">{f.name}</span>
+                {roomy && <span className="text-[#a79e94]">· {STATUS_LABEL[f.status] ?? ''}</span>}
+              </span>
+            )
+          })}
+          {table.rest.length > 0 && moreBox && (
+            <span
+              className="pointer-events-auto absolute flex items-center justify-center whitespace-nowrap rounded-full border border-[#f6d58a] bg-[#3a2618]/90 px-2.5 py-0.5 text-xs text-[#f6d58a]"
+              style={{left: moreBox.left, top: moreBox.top}}
+              title={table.rest.map((f) => f.name).join(', ')}
+            >
+              +{table.rest.length}
+            </span>
+          )}
+        </div>
+      )}
+      {groupView && (
+        <button
+          type="button"
+          onClick={() => setGroupView(false)}
+          className={`absolute left-3 top-28 z-10 flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 px-3 text-xs font-medium text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white sm:left-5 sm:top-20 ${fade}`}
+        >
+          <ArrowIcon dir="left" />
+          Về chỗ cửa sổ
+        </button>
+      )}
+
       {/* Mèo trên bậu cửa: bấm (hoặc Tab + Enter) để vuốt ve — mèo ngẩng lên, kêu, tim bay lên */}
-      {catBox && (
+      {catBox && !groupView && (
         <button
           type="button"
           aria-label="Pet the cat"
@@ -852,7 +926,7 @@ export function ChillRoom({
       )}
 
       {/* Cuốn sổ trên bàn: mở Wishlist (lối vào thứ 2, cạnh nút pill) */}
-      {bookBox && (
+      {bookBox && !groupView && (
         <button
           type="button"
           aria-label="Open the café wishlist"
@@ -874,7 +948,7 @@ export function ChillRoom({
       )}
 
       {/* Lọ tip trên bàn: mở bảng cảm ơn (tên người đã mời Bin cà phê) */}
-      {jarBox && (
+      {jarBox && !groupView && (
         <button
           type="button"
           aria-label={`Tip jar — thank-you board${board?.cups ? `, ${board.cups} coffees` : ''}`}
@@ -917,7 +991,7 @@ export function ChillRoom({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {/* Bàn nhóm (thử nghiệm) — Studio tắt thì không hiện gì */}
-          <GroupTable visible={theme === 'cafe'} onTable={onTable} />
+          <GroupTable visible={theme === 'cafe'} onTable={onTable} onView={() => setGroupView(true)} />
           <ShareButton />
           {updates.length > 0 && (
             <WhatsNewButton

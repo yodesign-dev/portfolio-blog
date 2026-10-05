@@ -73,6 +73,12 @@ body {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Bảng tên ở bàn nhóm trang /chill hiện dần sau khi lia máy xong */
+@keyframes chill-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 /* Nút Settings trang /chill: vòng cam lan ra cho người chưa mở cài đặt lần nào.
    Giảm chuyển động → chỉ còn viền cam tĩnh. */
 @keyframes chill-ring {
