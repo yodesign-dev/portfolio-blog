@@ -49,8 +49,10 @@ async function settings() {
       {},
       {next: {revalidate: 30}},
     );
-    // Mặc định TẮT — khác chat: tính năng thử nghiệm chỉ chạy khi được bật rõ ràng
-    return {open: s?.open === true, max: s?.max && s.max >= 2 ? Math.min(12, Math.round(s.max)) : DEFAULT_MAX_MEMBERS};
+    // Mặc định TẮT — khác chat: tính năng thử nghiệm chỉ chạy khi được bật rõ ràng.
+    // Máy dev có thể bật riêng bằng CHILL_TABLE_DEV_OPEN=1 mà không đụng Studio.
+    const devOpen = process.env.NODE_ENV === "development" && process.env.CHILL_TABLE_DEV_OPEN === "1";
+    return {open: s?.open === true || devOpen, max: s?.max && s.max >= 2 ? Math.min(12, Math.round(s.max)) : DEFAULT_MAX_MEMBERS};
   } catch {
     return {open: false, max: DEFAULT_MAX_MEMBERS};
   }
