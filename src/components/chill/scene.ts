@@ -55,10 +55,22 @@ const FADE_SECONDS = 1.2
 // suốt). Toạ độ px gốc 640×360 đo trên ảnh: tâm 4 ghế, mép xa mặt bàn, ô kính, bóng đèn.
 const GROUP_BG_SRC = '/chill/scenes/group/group-bg.webp'
 const GROUP_SEATS = [135, 264, 392, 522]
-// Nhân vật nhìn chính diện (AI, đã cắt nền xanh + mặt bàn): 1 hàng 6 ô 187×185 px
-// canvas đệm, thứ tự như CHARACTERS (table-view.ts). Neo: tâm người cách mép trái
-// ô 82 px, mép bàn cách mép trên ô 167 px (px đệm = 2 × px gốc).
+// Nhân vật nhìn chính diện (AI, đã cắt nền xanh + mặt bàn): 6 cột (thứ tự như
+// CHARACTERS trong table-view.ts) × 3 hàng khung — 0 bình thường, 1 nhắm mắt (chớp /
+// ngủ gật), 2 nâng ly uống. Ô 187×185 px canvas đệm; neo: tâm người cách mép trái ô
+// 82 px, mép bàn cách mép trên ô 167 px (px đệm = 2 × px gốc).
 const GROUP_CHARS = {src: '/chill/scenes/group/group-chars.webp', w: 187, h: 185, ax: 82, ay: 167}
+// Khung hình người ngồi bàn nhóm theo thời gian: thỉnh thoảng chớp mắt, lâu lâu nhấp
+// ngụm cà phê (trạng thái "uống cà phê" thì nhấp dày hơn), ngủ gật thì nhắm mắt luôn.
+// `k` lệch nhịp từng ghế để cả bàn không chớp / uống cùng lúc.
+function groupFrame(status: string, t: number, k: number) {
+  if (status === 'sleep') return 1
+  const sipEvery = status === 'coffee' ? 8 : 24 + (k % 3) * 6
+  if ((t + k * 5.3) % sipEvery < 2.8) return 2
+  const blinkEvery = 3.4 + (k % 4) * 0.6
+  return (t + k * 1.7) % blinkEvery < 0.14 ? 1 : 0
+}
+
 const GROUP = {
   tableTop: 270,
   window: {x: 70, y: 80, w: 92, h: 95},
@@ -987,7 +999,8 @@ export class ChillScene {
         if (!f || f.status === 'away') continue
         const cx = GROUP_SEATS[i]
         const sx = ((f.character % CHARACTERS.length) + CHARACTERS.length) % CHARACTERS.length
-        gc.drawImage(chars, sx * w, 0, w, h, cx - ax / RES, top - ay / RES, w / RES, h / RES)
+        const row = groupFrame(f.status, t, i + sx * 0.37)
+        gc.drawImage(chars, sx * w, row * h, w, h, cx - ax / RES, top - ay / RES, w / RES, h / RES)
         if (f.status === 'sleep') this.drawZ(gc, cx + 18, top - 96, t, i)
       }
       this.drawGroupGlow(gc, t, x0, x1, wireY, lamp, night)
