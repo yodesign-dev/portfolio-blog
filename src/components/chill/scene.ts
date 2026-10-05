@@ -55,6 +55,10 @@ const FADE_SECONDS = 1.2
 // suốt). Toạ độ px gốc 640×360 đo trên ảnh: tâm 4 ghế, mép xa mặt bàn, ô kính, bóng đèn.
 const GROUP_BG_SRC = '/chill/scenes/group/group-bg.webp'
 const GROUP_SEATS = [135, 264, 392, 522]
+// Nhân vật nhìn chính diện (AI, đã cắt nền xanh + mặt bàn): 1 hàng 6 ô 187×185 px
+// canvas đệm, thứ tự như CHARACTERS (table-view.ts). Neo: tâm người cách mép trái
+// ô 82 px, mép bàn cách mép trên ô 167 px (px đệm = 2 × px gốc).
+const GROUP_CHARS = {src: '/chill/scenes/group/group-chars.webp', w: 187, h: 185, ax: 82, ay: 167}
 const GROUP = {
   tableTop: 270,
   window: {x: 70, y: 80, w: 92, h: 95},
@@ -227,6 +231,9 @@ export class ChillScene {
   private groupBg: HTMLImageElement | null = null
   private groupBgTinted: HTMLCanvasElement | null = null
   private groupBgKey = ''
+  private groupChars: HTMLImageElement | null = null
+  private groupCharsTinted: HTMLCanvasElement | null = null
+  private groupCharsKey = ''
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
   private rng = Math.random
@@ -747,8 +754,11 @@ export class ChillScene {
   // Số người bạn đang ở bàn nhóm (null = không ở bàn) — chỉ quán cà phê có dây đèn
   setFriendLights(friends: number | null) {
     this.friendLights = friends
-    // Đang ở bàn → tải sẵn nền bàn nhóm để lúc lia máy vào đã có ảnh
-    if (friends !== null) this.groupBgLayer()
+    // Đang ở bàn → tải sẵn nền + nhân vật bàn nhóm để lúc lia máy vào đã có ảnh
+    if (friends !== null) {
+      this.groupBgLayer()
+      this.groupCharsLayer()
+    }
     // Cảnh đang dừng (hoặc giảm chuyển động) → không có frame nào để sáng dần, bật luôn
     if (this.paused) this.bulbGlow = this.bulbGlow.map((_, i) => ((friends ?? 0) > i ? 1 : 0))
   }
@@ -771,7 +781,8 @@ export class ChillScene {
   // Vùng từng ghế ở cảnh bàn nhóm (px gốc 640×360) — để đặt bảng tên lên trên đầu
   groupSeatBox(i: number) {
     const cx = GROUP_SEATS[i]
-    return {x: cx - 40, y: GROUP.tableTop - 98, w: 80, h: 98}
+    // Đỉnh đầu sprite ≈ mép bàn − 81 px gốc → bảng tên đặt sát trên đầu
+    return {x: cx - 40, y: GROUP.tableTop - 84, w: 80, h: 84}
   }
 
   // Chỗ nhãn "+n" — giữa mặt bàn (mép phải bàn bị cắt mất trên màn 4:3)
@@ -779,28 +790,44 @@ export class ChillScene {
     return {x: 304, y: GROUP.tableTop + 10, w: 32, h: 18}
   }
 
-  // Nền bàn nhóm đã tô màu theo giờ (giống nội thất quầy), chỉ tô lại khi đổi giờ / thời tiết
+  // Nền + nhân vật bàn nhóm đã tô màu theo giờ (giống nội thất quầy), chỉ tô lại khi
+  // đổi giờ / thời tiết
   private groupBgLayer() {
     this.groupBg ??= loadImage(GROUP_BG_SRC, () => (this.groupBgKey = ''))
     if (!ready(this.groupBg)) return null
     const key = this.tint ?? 'none'
     if (this.groupBgTinted && this.groupBgKey === key) return this.groupBgTinted
-    const c = (this.groupBgTinted ??= document.createElement('canvas'))
-    c.width = this.groupBg.naturalWidth
-    c.height = this.groupBg.naturalHeight
+    this.groupBgTinted = this.tinted(this.groupBg, this.groupBgTinted)
+    this.groupBgKey = key
+    return this.groupBgTinted
+  }
+
+  private groupCharsLayer() {
+    this.groupChars ??= loadImage(GROUP_CHARS.src, () => (this.groupCharsKey = ''))
+    if (!ready(this.groupChars)) return null
+    const key = this.tint ?? 'none'
+    if (this.groupCharsTinted && this.groupCharsKey === key) return this.groupCharsTinted
+    this.groupCharsTinted = this.tinted(this.groupChars, this.groupCharsTinted)
+    this.groupCharsKey = key
+    return this.groupCharsTinted
+  }
+
+  // Nhân màu giờ lên ảnh, giữ nguyên vùng trong suốt (ô kính, nền quanh nhân vật)
+  private tinted(img: HTMLImageElement, reuse: HTMLCanvasElement | null) {
+    const c = reuse ?? document.createElement('canvas')
+    c.width = img.naturalWidth
+    c.height = img.naturalHeight
     const cc = c.getContext('2d')!
     cc.clearRect(0, 0, c.width, c.height)
-    cc.drawImage(this.groupBg, 0, 0)
+    cc.drawImage(img, 0, 0)
     if (this.tint) {
       cc.globalCompositeOperation = 'multiply'
       cc.fillStyle = this.tint
       cc.fillRect(0, 0, c.width, c.height)
-      // Giữ nguyên ô kính trong suốt sau khi nhân màu
       cc.globalCompositeOperation = 'destination-in'
-      cc.drawImage(this.groupBg, 0, 0)
+      cc.drawImage(img, 0, 0)
       cc.globalCompositeOperation = 'source-over'
     }
-    this.groupBgKey = key
     return c
   }
 
@@ -950,9 +977,25 @@ export class ChillScene {
     gc.fillStyle = '#2a1d15'
     for (let x = x0; x <= x1; x++) gc.fillRect(x, Math.round(wireY(x)), 1, 1)
 
-    // Người ngồi (tạm vẽ khối cho tới khi có sprite) che lưng ghế, rồi vẽ lại phần
-    // mặt bàn của nền đè lên cho người "ngồi sau bàn"
     const top = GROUP.tableTop
+    const chars = this.groupCharsLayer()
+    if (chars) {
+      // Sprite đã gồm laptop + ly trên mặt bàn, cắt ngang đúng mép bàn → đặt lên là xong
+      const {w, h, ax, ay} = GROUP_CHARS
+      for (let i = 0; i < GROUP_SEATS.length; i++) {
+        const f = this.seated.find((s) => s.display === i)
+        if (!f || f.status === 'away') continue
+        const cx = GROUP_SEATS[i]
+        const sx = ((f.character % CHARACTERS.length) + CHARACTERS.length) % CHARACTERS.length
+        gc.drawImage(chars, sx * w, 0, w, h, cx - ax / RES, top - ay / RES, w / RES, h / RES)
+        if (f.status === 'sleep') this.drawZ(gc, cx + 18, top - 96, t, i)
+      }
+      this.drawGroupGlow(gc, t, x0, x1, wireY, lamp, night)
+      return
+    }
+
+    // Chưa tải xong sprite → người khối tạm (che lưng ghế), rồi vẽ lại phần mặt bàn
+    // của nền đè lên cho người "ngồi sau bàn"
     for (let i = 0; i < GROUP_SEATS.length; i++) {
       const cx = GROUP_SEATS[i]
       const f = this.seated.find((s) => s.display === i)
@@ -971,16 +1014,7 @@ export class ChillScene {
       if (sleep) {
         R(cx - 8, hy + 19, 5, 1, '#2a1d15')
         R(cx + 3, hy + 19, 5, 1, '#2a1d15')
-        // "z z" bay lên
-        const zt = (t * 0.6 + i) % 1
-        const zc = `rgba(255,240,210,${(0.9 * (1 - zt)).toFixed(2)})`
-        const zx = cx + 18 + Math.round(zt * 8)
-        const zy = hy - 6 - Math.round(zt * 18)
-        R(zx, zy, 5, 1, zc)
-        R(zx + 3, zy + 1, 1, 1, zc)
-        R(zx + 2, zy + 2, 1, 1, zc)
-        R(zx + 1, zy + 3, 1, 1, zc)
-        R(zx, zy + 4, 5, 1, zc)
+        this.drawZ(gc, cx + 18, hy - 6, t, i)
       } else {
         const blink = (t + i * 0.7) % 4 < 0.12
         R(cx - 8, hy + 17, 3, blink ? 1 : 3, '#2a1d15')
@@ -1025,7 +1059,36 @@ export class ChillScene {
       }
     }
 
-    // Bóng đèn dây + quầng sáng, đèn thả, tối dần ở góc
+    this.drawGroupGlow(gc, t, x0, x1, wireY, lamp, night)
+  }
+
+  // "z z" bay lên trên đầu người ngủ gật
+  private drawZ(gc: CanvasRenderingContext2D, x: number, y: number, t: number, i: number) {
+    const zt = (t * 0.6 + i) % 1
+    gc.fillStyle = `rgba(255,240,210,${(0.9 * (1 - zt)).toFixed(2)})`
+    const zx = x + Math.round(zt * 8)
+    const zy = y - Math.round(zt * 18)
+    gc.fillRect(zx, zy, 5, 1)
+    gc.fillRect(zx + 3, zy + 1, 1, 1)
+    gc.fillRect(zx + 2, zy + 2, 1, 1)
+    gc.fillRect(zx + 1, zy + 3, 1, 1)
+    gc.fillRect(zx, zy + 4, 5, 1)
+  }
+
+  // Bóng đèn dây + quầng sáng, đèn thả, tối dần ở góc (lớp trên cùng của bàn nhóm)
+  private drawGroupGlow(
+    gc: CanvasRenderingContext2D,
+    t: number,
+    x0: number,
+    x1: number,
+    wireY: (x: number) => number,
+    lamp: {x: number; y: number},
+    night: boolean,
+  ) {
+    const R = (x: number, y: number, w: number, h: number, c: string) => {
+      gc.fillStyle = c
+      gc.fillRect(x, y, w, h)
+    }
     gc.save()
     gc.globalCompositeOperation = 'lighter'
     this.bulbGlow.forEach((glow, i) => {
