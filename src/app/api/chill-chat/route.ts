@@ -17,6 +17,7 @@ import {
   redis,
   sweepExtras,
   type ChatMessage,
+  whoOf,
 } from "@/lib/chillChat";
 
 // Phòng chat trang /chill (src/lib/chillChat.ts). Tin tự xoá sau 24 giờ.
@@ -162,7 +163,7 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
   if (count > RATE.count) return NextResponse.json({error: "Bạn nhắn hơi nhiều rồi, nghỉ tay chút nha ☕", pass: issued}, {status: 429});
 
   const ts = Date.now();
-  const msg: ChatMessage = {id: newId(ts), kind: "msg", name, color, text, ts};
+  const msg: ChatMessage = {id: newId(ts), kind: "msg", name, color, text, ts, who: whoOf(uid)};
   await pushMessage(r, msg);
   if (Math.random() < 0.2) await sweepExtras(r).catch(() => {});
   return NextResponse.json({message: msg, pass: issued});

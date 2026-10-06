@@ -15,7 +15,7 @@ import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
-import {ChillChat} from './ChillChat'
+import {ChillChat, type ChatMessage} from './ChillChat'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -361,6 +361,47 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [])
   const table = tableMembers ? arrangeFriends(tableMembers) : null
+
+  // Bong bóng lời thoại: bạn cùng bàn vừa nhắn trong phòng chat → tin hiện trên đầu
+  // nhân vật của họ ở bàn nhóm ~6 giây, bóng đèn của họ ở quầy nháy sáng. Chỉ tin mới
+  // từ lúc mở trang (bỏ qua lịch sử), chỉ của người cùng bàn (khớp mã ẩn danh `who`)
+  // ts = lúc nhận (để tự tắt), sent = lúc gửi (để biết tin nào mới nhất)
+  const [bubbles, setBubbles] = useState<Record<string, {name: string; text: string; ts: number; sent: number}>>({})
+  const lastChatTs = useRef<number | null>(null)
+  const membersRef = useRef<TableMember[] | null>(null)
+  useEffect(() => {
+    membersRef.current = tableMembers
+  }, [tableMembers])
+  const onChatMessages = useCallback((messages: ChatMessage[]) => {
+    const latest = messages.reduce((t, m) => Math.max(t, m.ts), 0)
+    if (lastChatTs.current === null) {
+      lastChatTs.current = latest
+      return
+    }
+    const since = lastChatTs.current
+    lastChatTs.current = Math.max(since, latest)
+    const friends = (membersRef.current ?? []).filter((m) => !m.you)
+    const fresh = messages.filter((m) => m.kind === 'msg' && m.ts > since && m.who && friends.some((f) => f.who === m.who))
+    if (!fresh.length) return
+    setBubbles((prev) => {
+      const next = {...prev}
+      for (const m of fresh) next[m.who!] = {name: m.name ?? '', text: m.text, ts: Date.now(), sent: m.ts}
+      return next
+    })
+    for (const m of fresh) sceneRef.current?.flashBulb(friends.findIndex((f) => f.who === m.who))
+  }, [])
+  // Tự tắt sau ~6,5 giây
+  useEffect(() => {
+    const ids = Object.keys(bubbles)
+    if (!ids.length) return
+    const t = window.setTimeout(() => {
+      const now = Date.now()
+      setBubbles((prev) => Object.fromEntries(Object.entries(prev).filter(([, b]) => now - b.ts < 6500)))
+    }, 1000)
+    return () => window.clearTimeout(t)
+  }, [bubbles])
+  const latestBubble = Object.values(bubbles).sort((a, b) => b.sent - a.sent)[0]
+  const clip = (text: string, n = 60) => (text.length > n ? `${text.slice(0, n - 1)}…` : text)
 
   // Bàn nhóm chỉ có ở quán cà phê
   useEffect(() => {
@@ -1080,6 +1121,34 @@ export function ChillRoom({
           {table.seated.map((f) => {
             const box = seatBoxes[f.display]
             if (!box) return null
+            const bubble = f.who ? bubbles[f.who] : undefined
+            if (bubble) {
+              // Bong bóng lời thoại pixel (cùng kiểu icon chat): nền kem, viền nâu, đuôi chỉ
+              // xuống đầu; bấm là mở phòng chat đọc đủ
+              return (
+                <button
+                  key={`b-${f.display}-${bubble.ts}`}
+                  type="button"
+                  onClick={() => {
+                    setPanelOpen(false)
+                    setWishOpen(false)
+                    setChatOpen(true)
+                  }}
+                  className="pointer-events-auto absolute -translate-x-1/2 -translate-y-full pb-2 text-left motion-safe:animate-[chill-pop_0.25s_ease-out]"
+                  style={{left: box.left + box.width / 2, top: box.top}}
+                  aria-label={`${f.name}: ${bubble.text}`}
+                >
+                  <span
+                    className="relative block rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1.5 text-[12px] leading-snug text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)]"
+                    style={{width: 'max-content', maxWidth: Math.max(150, Math.min(240, box.width * 2))}}
+                  >
+                    <span className="block text-[10px] font-medium text-[#9a6a45]">{f.name}</span>
+                    <span className="line-clamp-2">{clip(bubble.text)}</span>
+                    <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-[#2a1d15] bg-[#fbf6ec]" />
+                  </span>
+                </button>
+              )
+            }
             // Ghế hẹp (điện thoại dọc) → chỉ tên, cắt gọn trong bề ngang ghế
             const roomy = box.width >= 120
             return (
@@ -1105,6 +1174,20 @@ export function ChillRoom({
           )}
         </div>
       )}
+      {/* Ở quầy: bạn cùng bàn vừa nhắn → 1 dòng xem trước dưới dây đèn (bóng của họ đang
+          nháy); bấm là mở bàn nhóm để thấy bong bóng trên đầu họ */}
+      {!groupView && theme === 'cafe' && latestBubble && (
+        <button
+          key={latestBubble.sent}
+          type="button"
+          onClick={() => setGroupView(true)}
+          className="absolute left-1/2 top-[64px] z-10 max-w-[min(360px,calc(100vw-24px))] -translate-x-1/2 truncate rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1 text-[12px] text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:top-[76px]"
+          title="Xem bàn nhóm"
+        >
+          <span className="font-medium text-[#9a6a45]">{latestBubble.name}:</span> {clip(latestBubble.text, 48)}
+        </button>
+      )}
+
       {groupView && (
         <button
           type="button"
@@ -1454,6 +1537,8 @@ export function ChillRoom({
         dimmed={hideUi}
         onAvailable={setChatAvailable}
         slot={chatSlot}
+        onMessages={onChatMessages}
+        fastPoll={Boolean(tableMembers?.some((m) => !m.you))}
       />
 
       <SupporterBoard

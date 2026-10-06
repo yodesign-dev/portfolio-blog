@@ -1,5 +1,6 @@
 import {randomBytes} from "node:crypto";
 import type {Redis} from "@upstash/redis";
+import {whoOf} from "./chillChat";
 
 // Bàn nhóm trang /chill (thử nghiệm, bật/tắt bằng "Mở bàn nhóm" trong Studio).
 // Dùng chung Redis với phòng chat (src/lib/chillChat.ts) nhưng khoá riêng
@@ -75,7 +76,7 @@ export function settle(members: Record<string, Member>, now: number) {
 export function publicView(members: Record<string, Member>, uid: string) {
   return Object.entries(members)
     .sort(([, a], [, b]) => a.joined - b.joined)
-    .map(([id, m]) => ({name: m.name, character: m.character, status: m.status, seat: m.seat, you: id === uid}));
+    .map(([id, m]) => ({name: m.name, character: m.character, status: m.status, seat: m.seat, you: id === uid, who: whoOf(id)}));
 }
 
 export async function readMembers(r: Redis, id: string) {

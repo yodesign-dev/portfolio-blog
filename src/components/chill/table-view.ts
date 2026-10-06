@@ -16,7 +16,7 @@ export const CHARACTERS = [
 
 export const STATUS_LABEL: Record<string, string> = {work: 'đang làm', coffee: 'uống cà phê', sleep: 'ngủ gật', away: 'đi vắng'}
 
-export type TableMember = {name: string; character: number; status: string; seat: number; you: boolean}
+export type TableMember = {name: string; character: number; status: string; seat: number; you: boolean; who?: string}
 export type SeatedFriend = TableMember & {display: number}
 
 // Server xếp ghế cho cả bàn, kể cả chính mình. Nhưng trên màn hình của mình,

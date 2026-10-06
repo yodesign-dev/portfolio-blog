@@ -234,6 +234,8 @@ export class ChillScene {
   // Có bàn → dây 4 bóng trên ô cửa giữa, mỗi người bạn đang ở bàn sáng 1 bóng.
   private friendLights: number | null = null
   private bulbGlow = [0, 0, 0, 0]
+  // Lúc bóng đèn của 1 người bạn nháy sáng (người đó vừa nhắn trong chat)
+  private bulbFlash = [-9, -9, -9, -9]
   // Cảnh bàn nhóm: lia máy ngang từ quầy (0) vào trong quán (1)
   private groupOn = false
   private pan = 0
@@ -775,6 +777,16 @@ export class ChillScene {
     if (this.paused) this.bulbGlow = this.bulbGlow.map((_, i) => ((friends ?? 0) > i ? 1 : 0))
   }
 
+  // Người bạn thứ `i` (theo thứ tự trong bàn) vừa nhắn → bóng của họ nháy sáng 1 nhịp
+  flashBulb(i: number) {
+    this.bulbFlash[Math.max(0, Math.min(this.bulbFlash.length - 1, i))] = this.clock
+  }
+
+  // 0…1, tắt dần trong 1,2 giây sau khi nháy
+  private flashBoost(i: number) {
+    return Math.max(0, 1 - (this.clock - this.bulbFlash[i]) / 1.2) * 1.4
+  }
+
   // Bạn bè đang ngồi ở 4 ghế (đã xếp sẵn: table-view.ts arrangeFriends)
   setSeated(seated: SeatedFriend[]) {
     this.seated = seated
@@ -1109,11 +1121,12 @@ export class ChillScene {
       const by = Math.round(wireY(bx)) + 1
       if (glow > 0) {
         const flicker = 0.9 + 0.1 * Math.sin(t * 2.3 + i * 1.7)
-        const g = gc.createRadialGradient(bx, by + 4, 1, bx, by + 4, 22)
-        g.addColorStop(0, `rgba(255,200,120,${(0.5 * glow * flicker).toFixed(3)})`)
+        const boost = this.flashBoost(i)
+        const g = gc.createRadialGradient(bx, by + 4, 1, bx, by + 4, 22 * (1 + boost * 0.4))
+        g.addColorStop(0, `rgba(255,200,120,${Math.min(1, 0.5 * glow * flicker * (1 + boost)).toFixed(3)})`)
         g.addColorStop(1, 'rgba(255,200,120,0)')
         gc.fillStyle = g
-        gc.fillRect(bx - 22, by - 18, 44, 44)
+        gc.fillRect(bx - 32, by - 28, 64, 64)
       }
     })
     const lampOn = night || this.weather === 'rain' || this.time === 'afternoon'
@@ -1253,13 +1266,14 @@ export class ChillScene {
       ctx.fillRect(bx - 1, by, 3, 2)
       const flicker = 0.9 + 0.1 * Math.sin(t * 2.3 + i * 1.7)
       if (glow > 0) {
-        const g = ctx.createRadialGradient(bx, by + 4, 1, bx, by + 4, 18)
-        g.addColorStop(0, `rgba(255,200,120,${(0.45 * glow * flicker).toFixed(3)})`)
+        const boost = this.flashBoost(i)
+        const g = ctx.createRadialGradient(bx, by + 4, 1, bx, by + 4, 18 * (1 + boost * 0.4))
+        g.addColorStop(0, `rgba(255,200,120,${Math.min(1, 0.45 * glow * flicker * (1 + boost)).toFixed(3)})`)
         g.addColorStop(1, 'rgba(255,200,120,0)')
         ctx.save()
         ctx.globalCompositeOperation = 'lighter'
         ctx.fillStyle = g
-        ctx.fillRect(bx - 18, by - 14, 36, 36)
+        ctx.fillRect(bx - 26, by - 22, 52, 52)
         ctx.restore()
       }
       // Thân bóng 3×4: pha giữa màu tắt và màu sáng theo độ sáng hiện tại

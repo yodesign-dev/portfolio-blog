@@ -1,5 +1,5 @@
 import {Redis} from "@upstash/redis";
-import {randomBytes} from "node:crypto";
+import {createHash, randomBytes} from "node:crypto";
 
 // Phòng chat trang /chill — lưu trên Upstash Redis (Vercel Marketplace, biến
 // chill_chat_KV_REST_API_URL / _TOKEN). Không lưu gì quá 24 giờ:
@@ -37,7 +37,13 @@ export type ChatMessage = {
   color?: number;
   text: string;
   ts: number;
+  // Mã ẩn danh của người gửi (băm 1 chiều từ uid) — để bàn nhóm biết tin của bạn nào
+  // mà hiện bong bóng lời thoại, không lộ uid (uid là "chìa khoá" gửi tin / giữ ghế)
+  who?: string;
 };
+
+// Cùng 1 người (cùng uid) ở chat và ở bàn nhóm → cùng `who`
+export const whoOf = (uid: string) => createHash("sha256").update(`who:${uid}`).digest("hex").slice(0, 12);
 
 let client: Redis | null | undefined;
 export function redis() {

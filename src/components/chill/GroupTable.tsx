@@ -102,6 +102,17 @@ export function GroupTable({
         }
         save(ME_KEY, saved)
       }
+      // Bàn nhóm và chat phải dùng chung 1 uid để tin nhắn nhận ra đúng người ở bàn
+      // (bong bóng lời thoại). Lệch nhau → theo uid của chat; chưa có chat → tạo sẵn
+      const chatMe = load<{uid?: string; name?: string; color?: number} | null>(CHAT_ME_KEY, null)
+      if (chatMe?.uid && /^[a-z0-9]{8,32}$/i.test(chatMe.uid)) {
+        if (chatMe.uid !== saved.uid) {
+          saved = {...saved, uid: chatMe.uid}
+          save(ME_KEY, saved)
+        }
+      } else {
+        save(CHAT_ME_KEY, {uid: saved.uid, name: saved.name, color: Math.floor(Math.random() * 8)})
+      }
       setMe(saved)
 
       const params = new URLSearchParams(window.location.search)

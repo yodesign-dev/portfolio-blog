@@ -15,7 +15,8 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 
-type Message = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number}
+export type ChatMessage = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number; who?: string}
+type Message = ChatMessage
 type Room = {open: boolean; online: number; messages: Message[]; reactions: Record<string, Record<string, number>>}
 type Me = {uid: string; name: string; color: number}
 
@@ -63,6 +64,8 @@ export function ChillChat({
   dimmed,
   onAvailable,
   slot,
+  onMessages,
+  fastPoll = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -74,6 +77,10 @@ export function ChillChat({
   onAvailable: (available: boolean) => void
   // Ô trong hàng nút góc phải dưới — nút mở được đặt vào đây
   slot: HTMLElement | null
+  // Mỗi lần tải tin → báo lên trang (bàn nhóm hiện bong bóng lời thoại trên đầu bạn bè)
+  onMessages?: (messages: ChatMessage[]) => void
+  // Đang có bạn ở bàn nhóm → hỏi tin dày hơn cho bong bóng hiện kịp, dù chat đang đóng
+  fastPoll?: boolean
 }) {
   const [me, setMe] = useState<Me | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
@@ -89,7 +96,10 @@ export function ChillChat({
   useEffect(() => {
     let saved = load<Me | null>(ME_KEY, null)
     if (!saved || !/^[a-z0-9]{8,32}$/i.test(saved.uid)) {
-      saved = {uid: crypto.randomUUID().replace(/-/g, '').slice(0, 20), name: pick(NAMES), color: Math.floor(Math.random() * COLORS.length)}
+      // Đã có danh tính ở bàn nhóm → dùng chung uid (bong bóng lời thoại nhận ra đúng người)
+      const table = load<{uid?: string} | null>('chill:table-me', null)
+      const uid = table?.uid && /^[a-z0-9]{8,32}$/i.test(table.uid) ? table.uid : crypto.randomUUID().replace(/-/g, '').slice(0, 20)
+      saved = {uid, name: pick(NAMES), color: Math.floor(Math.random() * COLORS.length)}
       save(ME_KEY, saved)
     }
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -140,15 +150,18 @@ export function ChillChat({
     if (!visible) return
     const first = window.setTimeout(() => void refresh(), 0)
     const busy = Date.now() - lastTs < 120_000
-    const every = open ? (busy ? 3000 : 10_000) : 30_000
+    const every = open ? (busy ? 3000 : 10_000) : fastPoll ? 6000 : 30_000
     const t = window.setInterval(() => void refresh(), every)
     return () => {
       window.clearTimeout(first)
       window.clearInterval(t)
     }
-  }, [visible, open, lastTs, refresh])
+  }, [visible, open, lastTs, refresh, fastPoll])
 
   const messages = useMemo(() => room?.messages ?? [], [room])
+  useEffect(() => {
+    if (room?.open) onMessages?.(room.messages)
+  }, [room, onMessages])
   const mineSet = useMemo(() => new Set(mine), [mine])
   const unread = open ? 0 : messages.filter((m) => m.kind === 'msg' && m.ts > readAt && !mineSet.has(m.id)).length
 
