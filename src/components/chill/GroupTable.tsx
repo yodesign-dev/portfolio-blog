@@ -308,7 +308,7 @@ export function GroupTable({
                   <span aria-hidden className="text-base leading-none">
                     👥
                   </span>
-                  <span className="hidden sm:inline">{tableId ? 'Bàn nhóm' : 'Mời bạn'}</span>
+                  <span className="hidden lg:inline">{tableId ? 'Bàn nhóm' : 'Mời bạn'}</span>
                 </>
               )}
               {!inviteSeen && (
@@ -320,8 +320,9 @@ export function GroupTable({
             </button>
 
             {open && tableId && (
-              // Nút nằm ở đáy màn hình → menu bung lên trên
-              <div className="absolute bottom-full right-0 z-50 mb-2 w-[min(16rem,calc(100vw-24px))] rounded-xl border border-white/10 bg-[#1b1a21]/95 p-3 text-sm text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+              // Điện thoại: nút ở hàng đáy → menu bung lên trên. Máy tính: nút nằm giữa cột dọc
+              // (Wishlist ở trên) → menu bung sang trái, đáy ngang đáy nút
+              <div className="absolute bottom-full right-0 z-50 mb-2 w-[min(16rem,calc(100vw-24px))] lg:bottom-0 lg:right-full lg:mb-0 lg:mr-2 rounded-xl border border-white/10 bg-[#1b1a21]/95 p-3 text-sm text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-[#a79e94]">
                   {friends.length ? `${friends.length} người bạn đang ở bàn` : 'Bàn đang chờ bạn bè'}
                 </p>

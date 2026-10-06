@@ -264,7 +264,7 @@ export function Wishlist({
         <span aria-hidden className="text-lg leading-none">
           💡
         </span>
-        <span className="text-[15px] font-semibold tracking-tight text-[#f3ece4]">Wishlist</span>
+        <span className="hidden text-[15px] font-semibold tracking-tight text-[#f3ece4] lg:inline">Wishlist</span>
         <span className="min-w-7 rounded-full bg-gradient-to-b from-[#f59a6c] to-[#d9603b] px-2 py-0.5 text-center text-sm font-bold tabular-nums text-white shadow-[0_0_18px_rgba(240,120,80,0.55)]">
           {loaded ? count : '·'}
         </span>
@@ -277,7 +277,7 @@ export function Wishlist({
         <p
           aria-hidden
           className={`pointer-events-none absolute right-3 z-30 transition-opacity duration-500 ${hint ? 'opacity-100' : 'opacity-0'} rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
-            'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+160px)] sm:right-5 sm:bottom-[180px] 2xl:bottom-[76px]'
+            'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+160px)] sm:right-5 sm:bottom-[180px] lg:bottom-[176px]'
           }`}
         >
           Got an idea for the café? Tell us ☕
