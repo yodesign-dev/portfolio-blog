@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
-import {ChillScene, SCENE_H, SCENE_W, type TimeOfDay, type Weather} from './scene'
+import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
@@ -52,6 +52,7 @@ type Prefs = {
   theme: ThemeId
   panelTab: PanelTab
   zen: boolean
+  groupWall: GroupWall
 }
 
 // Bảng cài đặt chia 3 tab để khỏi cuộn dài — tab cuối cùng mở được nhớ lại
@@ -151,6 +152,8 @@ export function ChillRoom({
   // Bàn nhóm (thử nghiệm): thành viên bàn mình đang ngồi + đang xem bàn nhóm hay quầy
   const [tableMembers, setTableMembers] = useState<TableMember[] | null>(null)
   const [groupView, setGroupView] = useState(false)
+  // Phía sau bàn nhóm: tường gạch / vách kính (mỗi người tự chọn, lưu trong prefs)
+  const [groupWall, setGroupWall] = useState<GroupWall>('brick')
   const [seatBoxes, setSeatBoxes] = useState<(Box | null)[]>([])
   const [moreBox, setMoreBox] = useState<Box | null>(null)
   const [wishOpen, setWishOpen] = useState(false)
@@ -220,6 +223,7 @@ export function ChillRoom({
     if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
     if (PANEL_TABS.some((t) => t.id === prefs.panelTab)) setPanelTab(prefs.panelTab!)
     if (prefs.zen === true) setZen(true)
+    if (prefs.groupWall === 'glass') setGroupWall('glass')
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
     try {
       setCatPetted(localStorage.getItem(CAT_PETTED_KEY) === '1')
@@ -246,13 +250,14 @@ export function ChillRoom({
       theme,
       panelTab,
       zen,
+      groupWall,
     }
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme, panelTab, zen])
+  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme, panelTab, zen, groupWall])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -439,6 +444,13 @@ export function ChillRoom({
     scene.setGroupView(groupView)
     scene.frame(performance.now())
   }, [groupView])
+
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setGroupWall(groupWall)
+    scene.frame(performance.now())
+  }, [groupWall])
 
   const updatesSeen = useUpdatesSeen(updates, returning)
 
@@ -1251,14 +1263,41 @@ export function ChillRoom({
       )}
 
       {groupView && (
-        <button
-          type="button"
-          onClick={() => setGroupView(false)}
-          className={`absolute left-3 top-28 z-10 flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 px-3 text-xs font-medium text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white sm:left-5 sm:top-20 ${fade}`}
-        >
-          <ArrowIcon dir="left" />
-          Về chỗ cửa sổ
-        </button>
+        <div className={`absolute left-3 top-28 z-10 flex flex-wrap items-center gap-2 sm:left-5 sm:top-20 ${fade}`}>
+          <button
+            type="button"
+            onClick={() => setGroupView(false)}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 px-3 text-xs font-medium text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white"
+          >
+            <ArrowIcon dir="left" />
+            Về chỗ cửa sổ
+          </button>
+          {/* Phía sau bàn: tường gạch ấm, kín / vách kính nhìn ra phố đang chọn */}
+          <div role="group" aria-label="Phía sau bàn" className="flex h-9 items-center rounded-md border border-white/15 bg-[#2a1f18]/80 p-1 backdrop-blur">
+            {(
+              [
+                ['brick', 'Tường gạch'],
+                ['glass', 'Vách kính'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={groupWall === value}
+                onClick={() => {
+                  if (groupWall === value) return
+                  setGroupWall(value)
+                  trackEvent({name: 'Chill Table', props: {action: value === 'glass' ? 'wall-glass' : 'wall-brick'}})
+                }}
+                className={`h-full rounded px-2.5 text-xs font-medium transition ${
+                  groupWall === value ? 'bg-[#e8b27d] text-[#2a1d15]' : 'text-[#ede6dd]/80 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Mèo trên bậu cửa: bấm (hoặc Tab + Enter) để vuốt ve — mèo ngẩng lên, kêu, tim bay lên */}

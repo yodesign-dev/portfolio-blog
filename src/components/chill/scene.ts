@@ -76,6 +76,30 @@ const GROUP = {
   window: {x: 70, y: 80, w: 92, h: 95},
   lamp: {x: 320, y: 86},
 }
+
+// Phía sau bàn nhóm: tường gạch (mặc định) hoặc vách kính nhìn ra con phố đang chọn.
+// Nền vách kính cùng khung với nền gạch (bàn, 4 ghế, đèn thả đúng chỗ cũ), chỉ khác
+// phần tường phía trên ốp gỗ: ô kính khoét trong suốt → code vẽ phố, mưa, sương,
+// đèn đêm ra sau; nắng sáng / chiều rọi lên bàn vẽ đè lên trên.
+export type GroupWall = 'brick' | 'glass'
+const GROUP_GLASS_SRC = '/chill/scenes/group/group-bg-glass.webp'
+const GLASS = {
+  // Vùng kính (px gốc) — từ dưới xà trần tới mép trên ốp gỗ
+  x: 0,
+  y: 20,
+  w: 640,
+  h: 208,
+  // Phần ảnh phố (ảnh 560×238) lấy ra: hết bề ngang, bỏ bớt trời, giữ vỉa hè ở đáy kính
+  crop: {y: 0.1, h: 0.82},
+  // Song cửa gỗ — chỉ dùng khi ảnh vách kính chưa tải xong (vẽ tạm)
+  mullions: [0, 158, 316, 474, 634],
+  transom: 64,
+}
+// Hạt giả ngẫu nhiên cố định theo chỉ số (vệt mưa, đèn phố đêm không nhảy chỗ mỗi khung)
+const seeded = (i: number, k = 0) => {
+  const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453
+  return s - Math.floor(s)
+}
 // Sprite sheet người ngồi: 121 khung 12fps (10s) cắt từ video, mỗi ô 211×220 px
 // thật, đặt tại (429, 116) trên ảnh nội thất 640×360. Ô cuối (121) là mặt nạ:
 // vùng khoét khỏi ảnh tĩnh để khung chuyển động thay vào.
@@ -245,6 +269,13 @@ export class ChillScene {
   private groupBg: HTMLImageElement | null = null
   private groupBgTinted: HTMLCanvasElement | null = null
   private groupBgKey = ''
+  private groupWall: GroupWall = 'brick'
+  private glassBg: HTMLImageElement | null = null
+  private glassBgTinted: HTMLCanvasElement | null = null
+  private glassBgKey = ''
+  // Phố nhoè như tranh màu nước khi mưa (thu nhỏ rồi phóng lại có làm mịn)
+  private softStreet: HTMLCanvasElement | null = null
+  private softStreetOf: HTMLImageElement | null = null
   private groupChars: HTMLImageElement | null = null
   private groupCharsTinted: HTMLCanvasElement | null = null
   private groupCharsKey = ''
@@ -808,6 +839,12 @@ export class ChillScene {
     return this.pan > 0
   }
 
+  // Đổi phía sau bàn nhóm (lựa chọn của từng người, lưu trong prefs)
+  setGroupWall(wall: GroupWall) {
+    this.groupWall = wall
+    if (wall === 'glass') this.glassBgLayer()
+  }
+
   // Vùng từng ghế ở cảnh bàn nhóm (px gốc 640×360) — để đặt bảng tên lên trên đầu
   groupSeatBox(i: number) {
     const cx = GROUP_SEATS[i]
@@ -830,6 +867,16 @@ export class ChillScene {
     this.groupBgTinted = this.tinted(this.groupBg, this.groupBgTinted)
     this.groupBgKey = key
     return this.groupBgTinted
+  }
+
+  private glassBgLayer() {
+    this.glassBg ??= loadImage(GROUP_GLASS_SRC, () => (this.glassBgKey = ''))
+    if (!ready(this.glassBg)) return null
+    const key = this.tint ?? 'none'
+    if (this.glassBgTinted && this.glassBgKey === key) return this.glassBgTinted
+    this.glassBgTinted = this.tinted(this.glassBg, this.glassBgTinted)
+    this.glassBgKey = key
+    return this.glassBgTinted
   }
 
   private groupCharsLayer() {
@@ -988,16 +1035,20 @@ export class ChillScene {
 
     // Nền AI (gạch, kệ, đèn thả, tranh, bàn dài 4 ghế trống). Ô kính cửa sổ bên trái
     // đã khoét trong suốt → vẽ con phố đang chọn ra sau trước, rồi mới đặt nền lên.
-    const bg = this.groupBgLayer()
-    const win = GROUP.window
-    if (ready(this.street)) {
-      const img = this.street
-      gc.drawImage(img, img.width * 0.38, img.height * 0.04, img.width * 0.22, img.height * 0.5, win.x, win.y, win.w, win.h)
-      if (this.weather === 'mist') R(win.x, win.y, win.w, win.h, night ? 'rgba(150,160,190,0.35)' : 'rgba(236,238,240,0.45)')
-      if (this.weather === 'rain') R(win.x, win.y, win.w, win.h, 'rgba(120,130,150,0.25)')
-    } else R(win.x, win.y, win.w, win.h, '#e8b48a')
-    if (bg) gc.drawImage(bg, 0, 0, 640, 360)
-    else R(0, 0, 640, 360, o('#6a4630'))
+    // Vách kính: drawGlassWall tự vẽ phố + nền.
+    const glass = this.groupWall === 'glass'
+    const bg = glass ? this.drawGlassWall(gc, t) : this.groupBgLayer()
+    if (!glass) {
+      const win = GROUP.window
+      if (ready(this.street)) {
+        const img = this.street
+        gc.drawImage(img, img.width * 0.38, img.height * 0.04, img.width * 0.22, img.height * 0.5, win.x, win.y, win.w, win.h)
+        if (this.weather === 'mist') R(win.x, win.y, win.w, win.h, night ? 'rgba(150,160,190,0.35)' : 'rgba(236,238,240,0.45)')
+        if (this.weather === 'rain') R(win.x, win.y, win.w, win.h, 'rgba(120,130,150,0.25)')
+      } else R(win.x, win.y, win.w, win.h, '#e8b48a')
+      if (bg) gc.drawImage(bg, 0, 0, 640, 360)
+      else R(0, 0, 640, 360, o('#6a4630'))
+    }
 
     // Dây đèn bạn bè chạy dọc tường gạch phía trên (cùng độ sáng với dây ở quầy)
     const lamp = GROUP.lamp
@@ -1021,6 +1072,7 @@ export class ChillScene {
         gc.drawImage(chars, sx * w, row * h, w, h, cx - ax / RES, top - ay / RES, w / RES, h / RES)
         if (f.status === 'sleep') this.drawZ(gc, cx + 18, top - 96, t, i)
       }
+      if (glass) this.drawGlassLight(gc, t)
       this.drawGroupGlow(gc, t, x0, x1, wireY, lamp, night)
       return
     }
@@ -1090,7 +1142,164 @@ export class ChillScene {
       }
     }
 
+    if (glass) this.drawGlassLight(gc, t)
     this.drawGroupGlow(gc, t, x0, x1, wireY, lamp, night)
+  }
+
+  // Vách kính: phố đang chọn (nhoè khi mưa) + vệt nước / sương / đèn phố đêm trên kính,
+  // rồi đặt nền vách kính lên. Trả về nền (để vẽ lại phần mặt bàn khi chưa có sprite).
+  // Ảnh vách kính chưa tải xong → vẽ tạm: phần dưới của nền gạch + song cửa bằng code.
+  private drawGlassWall(gc: CanvasRenderingContext2D, t: number) {
+    const {x, y, w, h, crop} = GLASS
+    const night = this.time === 'night'
+    const rain = this.weather === 'rain'
+    const R = (rx: number, ry: number, rw: number, rh: number, c: string) => {
+      gc.fillStyle = c
+      gc.fillRect(rx, ry, rw, rh)
+    }
+    if (ready(this.street)) {
+      const img = this.street
+      const sy = img.height * crop.y
+      const sh = img.height * crop.h
+      gc.drawImage(img, 0, sy, img.width, sh, x, y, w, h)
+      if (rain) {
+        // Màu nước: lớp phố đã làm mịn phủ lên, nét gốc chỉ còn thấp thoáng
+        if (this.softStreetOf !== img) {
+          const s = (this.softStreet ??= document.createElement('canvas'))
+          s.width = Math.round(img.width / 5)
+          s.height = Math.round(img.height / 5)
+          const sc = s.getContext('2d')!
+          sc.imageSmoothingEnabled = true
+          sc.drawImage(img, 0, 0, s.width, s.height)
+          this.softStreetOf = img
+        }
+        const s = this.softStreet!
+        gc.save()
+        gc.imageSmoothingEnabled = true
+        gc.globalAlpha = 0.75
+        gc.drawImage(s, 0, s.height * crop.y, s.width, s.height * crop.h, x, y, w, h)
+        gc.restore()
+        R(x, y, w, h, night ? 'rgba(40,46,70,0.25)' : 'rgba(120,132,150,0.22)')
+      }
+    } else R(x, y, w, h, '#e8b48a')
+
+    // Đèn phố, bảng hiệu hắt lên kính ban đêm (nhoè to hơn khi mưa)
+    if (night) {
+      gc.save()
+      gc.globalCompositeOperation = 'lighter'
+      const hues = ['255,190,110', '255,140,90', '140,200,255', '255,220,150']
+      for (let i = 0; i < 14; i++) {
+        const bx = x + seeded(i, 1) * w
+        const by = y + h * (0.35 + seeded(i, 2) * 0.55)
+        const r = (rain ? 10 : 6) + seeded(i, 3) * 8
+        const a = 0.22 + 0.08 * Math.sin(t * (0.4 + seeded(i, 4)) + i)
+        const g = gc.createRadialGradient(bx, by, 0, bx, by, r)
+        g.addColorStop(0, `rgba(${hues[i % hues.length]},${a.toFixed(3)})`)
+        g.addColorStop(1, `rgba(${hues[i % hues.length]},0)`)
+        gc.fillStyle = g
+        gc.fillRect(bx - r, by - r, r * 2, r * 2)
+      }
+      gc.restore()
+    }
+
+    if (this.weather === 'mist') {
+      const m = gc.createLinearGradient(0, y, 0, y + h)
+      const c = night ? '150,160,190' : '236,238,240'
+      m.addColorStop(0, `rgba(${c},0.55)`)
+      m.addColorStop(1, `rgba(${c},0.3)`)
+      gc.fillStyle = m
+      gc.fillRect(x, y, w, h)
+    }
+
+    // Vệt nước chảy dài trên kính + vài giọt đọng; thỉnh thoảng một giọt lớn trượt xuống
+    if (rain) {
+      for (let i = 0; i < 46; i++) {
+        const sx = Math.round(x + seeded(i, 5) * w)
+        const len = 6 + Math.round(seeded(i, 6) * 18)
+        const speed = 18 + seeded(i, 7) * 40
+        const sy = Math.round(y + ((t * speed + seeded(i, 8) * 400) % (h + len)) - len)
+        R(sx, sy, 1, len, 'rgba(220,230,245,0.18)')
+        R(sx, sy + len - 2, 1, 2, 'rgba(240,246,255,0.45)')
+      }
+      for (let i = 0; i < 70; i++) R(Math.round(x + seeded(i, 9) * w), Math.round(y + seeded(i, 10) * h), 1, 1, 'rgba(235,242,255,0.35)')
+      for (let i = 0; i < 3; i++) {
+        const cyc = 9 + i * 4
+        const p = ((t + i * 5.1) % cyc) / cyc
+        if (p > 0.45) continue
+        const dx = Math.round(x + seeded(Math.floor((t + i * 5.1) / cyc), 11 + i) * w)
+        const dy = Math.round(y + 10 + (p / 0.45) ** 1.6 * (h - 16))
+        R(dx, y + 10, 1, dy - y - 10, 'rgba(225,235,250,0.22)')
+        R(dx - 1, dy, 3, 3, 'rgba(240,246,255,0.5)')
+      }
+    }
+
+    const bg = this.glassBgLayer()
+    if (bg) {
+      gc.drawImage(bg, 0, 0, 640, 360)
+      return bg
+    }
+    // Vẽ tạm: phần dưới nền gạch (ốp gỗ, ghế, bàn, sàn) + khung, song cửa gỗ
+    const brick = this.groupBgLayer()
+    const wood = this.o('#5a3820')
+    const cut = y + h
+    if (brick) gc.drawImage(brick, 0, cut * RES, brick.width, brick.height - cut * RES, 0, cut, 640, 360 - cut)
+    else R(0, cut, 640, 360 - cut, this.o('#6a4630'))
+    R(0, 0, 640, y, this.o('#3f2a1c'))
+    for (const mx of GLASS.mullions) R(mx, y, 6, h, wood)
+    R(0, y + GLASS.transom, 640, 4, wood)
+    R(0, cut - 6, 640, 6, wood)
+    return brick
+  }
+
+  // Nắng qua vách kính: sáng xiên trắng ngà, chiều vàng mật ong, dài và thấp hơn.
+  // Vệt sáng rọi lên mặt bàn làm ly cà phê ánh màu caramel. Mưa / sương / đêm thì thôi.
+  private drawGlassLight(gc: CanvasRenderingContext2D, t: number) {
+    if (this.weather !== 'clear' || this.time === 'night') return
+    const morning = this.time === 'morning'
+    const c = morning ? '255,236,190' : '255,178,90'
+    const top = GROUP.tableTop
+    gc.save()
+    gc.globalCompositeOperation = 'lighter'
+    // Mỗi vệt là 1 hình bình hành: từ ô kính xuống tới mặt bàn / sàn
+    const slant = morning ? 70 : 150
+    const beams = morning
+      ? [{x: 40, w: 46}, {x: 200, w: 36}, {x: 360, w: 52}, {x: 520, w: 30}]
+      : [{x: 10, w: 64}, {x: 230, w: 50}, {x: 430, w: 70}]
+    beams.forEach((b, i) => {
+      const a = (morning ? 0.13 : 0.12) * (0.85 + 0.15 * Math.sin(t * 0.35 + i * 1.3))
+      const y0 = GLASS.y + 20
+      const y1 = top + 70
+      const g = gc.createLinearGradient(0, y0, 0, y1)
+      g.addColorStop(0, `rgba(${c},0)`)
+      g.addColorStop(0.35, `rgba(${c},${a.toFixed(3)})`)
+      g.addColorStop(1, `rgba(${c},${(a * 0.4).toFixed(3)})`)
+      gc.fillStyle = g
+      gc.beginPath()
+      gc.moveTo(b.x, y0)
+      gc.lineTo(b.x + b.w, y0)
+      gc.lineTo(b.x + b.w + slant, y1)
+      gc.lineTo(b.x + slant, y1)
+      gc.closePath()
+      gc.fill()
+    })
+    // Vũng nắng trên mặt bàn, ánh lên chỗ ly của từng ghế
+    for (let i = 0; i < GROUP_SEATS.length; i++) {
+      const cx = GROUP_SEATS[i] + 26
+      const g = gc.createRadialGradient(cx, top + 2, 1, cx, top + 2, morning ? 20 : 26)
+      g.addColorStop(0, `rgba(${morning ? '255,214,150' : '255,170,80'},${morning ? 0.16 : 0.2})`)
+      g.addColorStop(1, 'rgba(255,190,110,0)')
+      gc.fillStyle = g
+      gc.fillRect(cx - 28, top - 26, 56, 56)
+    }
+    gc.restore()
+    // Chiều muộn: cả phòng ngả vàng
+    if (!morning) {
+      gc.save()
+      gc.globalCompositeOperation = 'soft-light'
+      gc.fillStyle = 'rgba(255,170,70,0.35)'
+      gc.fillRect(0, 0, 640, 360)
+      gc.restore()
+    }
   }
 
   // "z z" bay lên trên đầu người ngủ gật

@@ -159,3 +159,30 @@ Từ đó mình làm tiếp:
 - **Mép bàn phải nằm ngang tuyệt đối** ở đáy ảnh nhân vật. Nếu bị nghiêng, mình không ghép khớp vào nền được.
 - **Không để nhân vật có bóng đổ lên nền xanh**, vì bóng sẽ thành viền xanh bẩn khi cắt.
 - **Nếu Kling làm trôi màu nền xanh** trong video, báo mình. Mình sẽ cắt theo khoảng màu thay vì một màu cố định.
+
+---
+
+## 4. Nền vách kính (lựa chọn "Vách kính" ở cảnh bàn nhóm): Nano Banana 2 edit
+
+Sửa từ **ảnh nền gạch đã dùng (v3a)** để bàn, 4 ghế, ốp gỗ, sàn, cây hai bên giữ đúng chỗ, vì sprite nhân vật đặt theo toạ độ ghế cũ. 1K, 16:9. Code vẽ phố, mưa, sương, đèn đêm vào phần kính và vẽ nắng lên bàn (`drawGlassWall` / `drawGlassLight` trong `scene.ts`).
+
+```
+Edit this exact image. Keep EVERYTHING below the top edge of the wooden
+wainscoting exactly as it is: the long table, the four empty chairs, the
+wainscoting, the patterned floor, the two potted plants at the sides, same
+positions, same pixel art style, same palette.
+
+Replace the whole brick wall above the wainscoting with a floor-to-ceiling
+café shop-front window: four tall glass panes separated by slim dark wooden
+mullions, a thin horizontal wooden transom bar near the top, a wooden ceiling
+beam at the very top and a narrow wooden sill on top of the wainscoting.
+Remove the small window, the shelf with jars, the framed picture and the menu
+board. Keep the green enamel pendant lamp hanging in the middle, now in front
+of the glass.
+
+All glass areas must be pure flat magenta #FF00FF (no reflections, no
+gradient, nothing visible through the glass) so it can be cut out later.
+Crisp 1px dark brown outlines, no people, no text.
+```
+
+**Sau khi có ảnh:** khoét magenta thành trong suốt → `public/chill/scenes/group/group-bg-glass.webp` (1280×720), đo lại vùng kính để chỉnh `GLASS` trong `scene.ts`.
