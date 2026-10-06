@@ -757,6 +757,16 @@ export function ChillRoom({
   const [zenTip, setZenTip] = useState(false)
   // Thanh nhạc gọn trong Ngắm cảnh: mở danh sách bài (giữ thanh hiện trong lúc chọn)
   const [zenList, setZenList] = useState(false)
+  const zenBarRef = useRef<HTMLDivElement>(null)
+  // Danh sách đang mở: chạm / bấm ra ngoài thanh nhạc là đóng (khỏi phải bấm lại nút)
+  useEffect(() => {
+    if (!zenList) return
+    const onDown = (e: PointerEvent) => {
+      if (zenBarRef.current && !zenBarRef.current.contains(e.target as Node)) setZenList(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [zenList])
   const toggleZen = useCallback(() => {
     const next = !zen
     setZenHint(false)
@@ -871,6 +881,11 @@ export function ChillRoom({
           toggleZen()
           break
         case 'Escape':
+          // Đang mở danh sách nhạc thì Esc chỉ đóng danh sách, chưa thoát Ngắm cảnh
+          if (zenList) {
+            setZenList(false)
+            break
+          }
           setZen(false)
           setGroupView(false)
           setVolumeOpen(false)
@@ -883,7 +898,7 @@ export function ChillRoom({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [togglePlay, next, prev, toggleFullscreen, toggleZen])
+  }, [togglePlay, next, prev, toggleFullscreen, toggleZen, zenList])
 
   // Đang phát nhạc thì giữ màn hình không tự tắt (trình duyệt tự nhả khi tab ẩn)
   useEffect(() => {
@@ -958,12 +973,13 @@ export function ChillRoom({
       )}
 
       {/* Ngắm cảnh: thanh nhạc gọn giữa đáy — lùi / phát / sang bài, tên bài, mở danh sách.
-          Luôn hiện để đổi nhạc được ngay; để yên thì mờ đi cho đỡ che cảnh, rê chuột /
-          chạm là rõ lại */}
+          Luôn hiện để đổi nhạc được ngay; để yên thì mờ còn 65% (vẫn đọc được tên bài),
+          rê chuột / chạm là rõ lại. Bấm ra ngoài là đóng danh sách */}
       {zen && (
         <div
+          ref={zenBarRef}
           className={`absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[min(420px,calc(100vw-24px))] -translate-x-1/2 transition-opacity duration-700 ${
-            idle && !zenTip && !zenList ? 'opacity-35 hover:opacity-100 focus-within:opacity-100' : 'opacity-100'
+            idle && !zenTip && !zenList ? 'opacity-65 hover:opacity-100 focus-within:opacity-100' : 'opacity-100'
           }`}
         >
           {zenList && (
