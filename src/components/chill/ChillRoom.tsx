@@ -22,6 +22,11 @@ const PREFS_KEY = 'chill:prefs'
 const CAT_PETTED_KEY = 'chill:cat-petted'
 // Đã mở bảng cài đặt lần nào chưa — chưa thì nút Settings sáng lên + gợi ý
 const SETTINGS_SEEN_KEY = 'chill:settings-seen'
+// Đã bật Zen lần nào chưa (chưa → công tắc có chấm cam + vòng sáng), đã hiện gợi ý chưa
+const ZEN_SEEN_KEY = 'chill:zen-seen'
+const ZEN_HINT_KEY = 'chill:zen-hint'
+const ZEN_HINT_DELAY_MS = 4000
+const ZEN_HINT_MS = 9000
 // Gợi ý hiện sau khi bấm Play bao lâu, và tự ẩn sau bao lâu
 const SETTINGS_HINT_DELAY_MS = 3000
 const SETTINGS_HINT_MS = 8000
@@ -577,6 +582,7 @@ export function ChillRoom({
       setChatOpen(false)
       setPanelOpen(true)
     } else if (kind === 'chat') setChatOpen(true)
+    else if (kind === 'zen' && !zen) toggleZen()
   }
 
   const togglePlay = useCallback(() => {
@@ -703,11 +709,56 @@ export function ChillRoom({
     return () => window.clearTimeout(t)
   }, [hintTip])
   const settingsGlow = hintShown && !settingsSeen
+
+  // Zen là tính năng mới: công tắc có chấm cam + vòng sáng tới khi bật thử lần đầu.
+  // Người đã quen quán (đã mở cài đặt) thì thêm 1 bong bóng gợi ý — nhường thông báo
+  // "Có gì mới" và gợi ý Settings hiện trước, không chồng lên nhau
+  const [zenSeen, setZenSeen] = useState(true)
+  const [zenHint, setZenHint] = useState(false)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+      setZenSeen(localStorage.getItem(ZEN_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → không làm phiền
+    }
+  }, [])
+  useEffect(() => {
+    if (zenSeen || !settingsSeen || hintTip || panelOpen || otherOverlay) return
+    try {
+      if (localStorage.getItem(ZEN_HINT_KEY) === '1') return
+    } catch {
+      return
+    }
+    const t = window.setTimeout(() => {
+      setZenHint(true)
+      try {
+        localStorage.setItem(ZEN_HINT_KEY, '1')
+      } catch {
+        // bỏ qua
+      }
+    }, ZEN_HINT_DELAY_MS)
+    return () => window.clearTimeout(t)
+  }, [zenSeen, settingsSeen, hintTip, panelOpen, otherOverlay])
+  useEffect(() => {
+    if (!zenHint) return
+    const t = window.setTimeout(() => setZenHint(false), ZEN_HINT_MS)
+    return () => window.clearTimeout(t)
+  }, [zenHint])
   const showHintTip = hintTip && !settingsSeen && !panelOpen && !volumeOpen && !otherOverlay
   const [idle, setIdle] = useState(false)
   const [zenTip, setZenTip] = useState(false)
   const toggleZen = useCallback(() => {
     const next = !zen
+    setZenHint(false)
+    if (!zenSeen) {
+      setZenSeen(true)
+      try {
+        localStorage.setItem(ZEN_SEEN_KEY, '1')
+      } catch {
+        // bỏ qua
+      }
+    }
     if (next) {
       // Vào Zen: đóng hết bảng đang mở, nhắc cách hiện lại công tắc
       setPanelOpen(false)
@@ -720,7 +771,7 @@ export function ChillRoom({
     }
     setZen(next)
     trackEvent({name: 'Chill Zen', props: {on: next ? 'on' : 'off'}})
-  }, [zen])
+  }, [zen, zenSeen])
   useEffect(() => {
     if (!zenTip) return
     const t = window.setTimeout(() => setZenTip(false), 3500)
@@ -1055,7 +1106,7 @@ export function ChillRoom({
               onHoldToast={updatesSeen.holdToast}
             />
           )}
-          <ZenToggle on={false} onToggle={toggleZen} />
+          <ZenToggle on={false} onToggle={toggleZen} fresh={!zenSeen} hint={zenHint} onCloseHint={() => setZenHint(false)} />
           <span className="pointer-events-none flex h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
             {clock}
           </span>
@@ -1663,25 +1714,80 @@ function RoundButton({label, onClick, children}: {label: string; onClick: () => 
   )
 }
 
-// Công tắc Zen: viên thuốc có nhãn + rãnh gạt, bấm là bật / tắt (role="switch")
-function ZenToggle({on, onToggle}: {on: boolean; onToggle: () => void}) {
+// Công tắc Zen: viền cam như nút "What's new", bấm là bật / tắt (role="switch").
+// `fresh` = chưa bật lần nào → chấm cam + vòng sáng; `hint` = bong bóng giới thiệu 1 lần
+function ZenToggle({
+  on,
+  onToggle,
+  fresh = false,
+  hint = false,
+  onCloseHint,
+}: {
+  on: boolean
+  onToggle: () => void
+  fresh?: boolean
+  hint?: boolean
+  onCloseHint?: () => void
+}) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label="Zen mode — chỉ cảnh và nhạc (H)"
-      title="Zen — ẩn hết nút, chỉ còn cảnh và nhạc (H)"
-      onClick={onToggle}
-      className={`flex h-9 items-center gap-2 rounded-md px-2.5 text-xs font-medium backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-        on ? 'bg-[#e8b27d]/90 text-[#2a1a10] hover:bg-[#f0c08f]' : 'bg-black/45 text-white/90 hover:bg-black/65'
-      }`}
-    >
-      <span className="hidden sm:inline">Zen</span>
-      <span aria-hidden className={`relative h-4 w-7 rounded-full transition-colors ${on ? 'bg-[#2a1a10]/35' : 'bg-white/20'}`}>
-        <span className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${on ? 'left-3.5 bg-[#2a1a10]' : 'left-0.5 bg-white/85'}`} />
-      </span>
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={fresh ? 'Zen mode, new — chỉ cảnh và nhạc (H)' : 'Zen mode — chỉ cảnh và nhạc (H)'}
+        title="Zen — ẩn hết nút, chỉ còn cảnh và nhạc (H)"
+        onClick={onToggle}
+        className={`relative flex h-9 items-center gap-2 rounded-md border px-2.5 text-xs font-medium shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+          on
+            ? 'border-[#e8b27d] bg-[#e8b27d]/90 text-[#2a1a10] hover:bg-[#f0c08f]'
+            : 'border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white'
+        }`}
+      >
+        {fresh && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-md border-2 border-[#e8b27d]" />}
+        <span className="hidden sm:inline">Zen</span>
+        <span aria-hidden className={`relative h-4 w-7 rounded-full transition-colors ${on ? 'bg-[#2a1a10]/35' : 'bg-white/20'}`}>
+          <span className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${on ? 'left-3.5 bg-[#2a1a10]' : 'left-0.5 bg-[#f6dcbd]'}`} />
+        </span>
+        {fresh && (
+          <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d]" />
+          </span>
+        )}
+      </button>
+
+      {/* Bong bóng giới thiệu ngay dưới công tắc, cùng kiểu thông báo "Có gì mới" */}
+      <div
+        role="status"
+        className={`absolute right-0 top-full z-40 mt-2 w-[min(280px,calc(100vw-24px))] transition duration-300 ${
+          hint ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
+        }`}
+      >
+        {hint && (
+          <div className="flex items-start gap-2 rounded-xl border border-[#e8b27d]/30 bg-[#1b1a21]/95 p-3 text-left shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md">
+            <span aria-hidden className="mt-0.5 text-sm leading-none">
+              🍃
+            </span>
+            <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
+              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Zen</span>
+              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Ẩn hết nút, chỉ còn cảnh và nhạc</span>
+              <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">Bật thử → (phím H)</span>
+            </button>
+            <button
+              type="button"
+              onClick={onCloseHint}
+              aria-label="Ẩn gợi ý"
+              className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#a79e94] transition hover:bg-white/10 hover:text-[#ede6dd]"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
