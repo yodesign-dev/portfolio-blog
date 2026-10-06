@@ -756,6 +756,12 @@ export class ChillScene {
   }
 
   // Vùng bấm vào mèo, theo lưới canvas đệm (px thật 640×360)
+  // Đỉnh đầu người ngồi ở quầy (px gốc) — để đặt bong bóng lời thoại của chính mình
+  get headBox() {
+    const at = this.theme.character.at
+    return {x: Math.round(at.x + at.w * 0.45) - 1, y: at.y + 6, w: 2, h: 2}
+  }
+
   get catHitBox() {
     return this.cat.hitBox
   }

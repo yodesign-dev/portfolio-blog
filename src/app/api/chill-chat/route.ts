@@ -36,6 +36,8 @@ import {
 
 const RATE = {count: 20, seconds: 600, gap: 3};
 const REPORTS_TO_HIDE = 3;
+// Còn "đang gõ" bao lâu sau lần gõ cuối
+const TYPING_MS = 6000;
 const UID_RE = /^[a-z0-9]{8,32}$/i;
 
 const ipHash = (request: NextRequest) => {
@@ -67,7 +69,9 @@ export async function GET(request: NextRequest) {
     p.zrange(K.msgs, now - DAY_MS, "+inf", {byScore: true});
     p.hgetall(K.rx);
     p.zcount(K.online, now - ONLINE_WINDOW_MS, "+inf");
-    const [rows, rx, online] = (await p.exec()) as [unknown[], Record<string, number> | null, number];
+    p.zrange(K.typing, now - TYPING_MS, "+inf", {byScore: true});
+    const [rows, rx, online, typingRaw] = (await p.exec()) as [unknown[], Record<string, number> | null, number, unknown[]];
+    const typing = (typingRaw ?? []).filter((w): w is string => typeof w === "string");
     const messages = rows
       .map((row) => (typeof row === "string" ? (JSON.parse(row) as ChatMessage) : (row as ChatMessage)))
       .filter((m) => m && m.ts > now - DAY_MS)
@@ -79,7 +83,7 @@ export async function GET(request: NextRequest) {
       if (!alive.has(id) || Number(count) <= 0) continue;
       (reactions[id] ??= {})[emoji] = Number(count);
     }
-    return NextResponse.json({open: true, online: Math.max(online, 0), messages, reactions}, {headers: cache});
+    return NextResponse.json({open: true, online: Math.max(online, 0), messages, reactions, typing}, {headers: cache});
   } catch (error) {
     console.error("chill-chat GET error:", error);
     return NextResponse.json({open: true, online: 0, messages: [], reactions: {}, error: true}, {status: 500});
@@ -103,6 +107,8 @@ export async function POST(request: NextRequest) {
         return react(request, uid, body);
       case "report":
         return report(request, body);
+      case "typing":
+        return typing(uid);
     }
     return NextResponse.json({error: "Unknown action"}, {status: 400});
   } catch (error) {
@@ -167,6 +173,20 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
   await pushMessage(r, msg);
   if (Math.random() < 0.2) await sweepExtras(r).catch(() => {});
   return NextResponse.json({message: msg, pass: issued});
+}
+
+// "Đang gõ" của người đang ngồi bàn nhóm → bạn cùng bàn thấy "• • •" trên đầu nhân vật.
+// Chỉ lưu mã ẩn danh `who`, sống vài giây; client gửi tối đa 1 lần / 3 giây khi gõ
+async function typing(uid: string) {
+  const r = redis()!;
+  if (!uid || !(await chatOpen())) return NextResponse.json({ok: true});
+  const now = Date.now();
+  const p = r.pipeline();
+  p.zremrangebyscore(K.typing, 0, now - TYPING_MS);
+  p.zadd(K.typing, {score: now, member: whoOf(uid)});
+  p.expire(K.typing, 60);
+  await p.exec();
+  return NextResponse.json({ok: true});
 }
 
 async function react(request: NextRequest, uid: string, body: Record<string, unknown>) {

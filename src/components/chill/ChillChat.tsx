@@ -17,7 +17,7 @@ import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 
 export type ChatMessage = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number; who?: string}
 type Message = ChatMessage
-type Room = {open: boolean; online: number; messages: Message[]; reactions: Record<string, Record<string, number>>}
+type Room = {open: boolean; online: number; messages: Message[]; reactions: Record<string, Record<string, number>>; typing?: string[]}
 type Me = {uid: string; name: string; color: number}
 
 const ME_KEY = 'chill:chat-me'
@@ -66,6 +66,8 @@ export function ChillChat({
   slot,
   onMessages,
   fastPoll = false,
+  shareTyping = false,
+  onSentText,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -78,9 +80,14 @@ export function ChillChat({
   // Ô trong hàng nút góc phải dưới — nút mở được đặt vào đây
   slot: HTMLElement | null
   // Mỗi lần tải tin → báo lên trang (bàn nhóm hiện bong bóng lời thoại trên đầu bạn bè)
-  onMessages?: (messages: ChatMessage[]) => void
+  // typing = mã ẩn danh `who` của những người đang gõ (chỉ người ở bàn nhóm mới gửi)
+  onMessages?: (messages: ChatMessage[], typing: string[]) => void
   // Đang có bạn ở bàn nhóm → hỏi tin dày hơn cho bong bóng hiện kịp, dù chat đang đóng
   fastPoll?: boolean
+  // Đang ngồi bàn có bạn bè → báo "đang gõ" để bạn cùng bàn thấy "• • •" trên đầu mình
+  shareTyping?: boolean
+  // Mình vừa gửi tin → trang hiện bong bóng trên đầu nhân vật của mình ở quầy
+  onSentText?: (text: string) => void
 }) {
   const [me, setMe] = useState<Me | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
@@ -160,7 +167,7 @@ export function ChillChat({
 
   const messages = useMemo(() => room?.messages ?? [], [room])
   useEffect(() => {
-    if (room?.open) onMessages?.(room.messages)
+    if (room?.open) onMessages?.(room.messages, room.typing ?? [])
   }, [room, onMessages])
   const mineSet = useMemo(() => new Set(mine), [mine])
   const unread = open ? 0 : messages.filter((m) => m.kind === 'msg' && m.ts > readAt && !mineSet.has(m.id)).length
@@ -189,7 +196,19 @@ export function ChillChat({
     setNewBelow(false)
   }
 
+  // "Đang gõ": tối đa 1 lần / 3 giây, chỉ khi đang ở bàn có bạn bè
+  const lastTyping = useRef(0)
+  const onTyping = () => {
+    if (!shareTyping || !me) return
+    const now = Date.now()
+    if (now - lastTyping.current < 3000) return
+    lastTyping.current = now
+    void post({action: 'typing', uid: me.uid}).catch(() => {})
+  }
+
   const onSent = (m: Message) => {
+    onSentText?.(m.text)
+    lastTyping.current = 0
     const next = [...mine, m.id].slice(-60)
     setMine(next)
     save(MINE_KEY, next)
@@ -344,7 +363,7 @@ export function ChillChat({
           )}
         </div>
 
-        <Composer me={me} open={open} onSent={onSent} />
+        <Composer me={me} open={open} onSent={onSent} onTyping={onTyping} />
       </section>
     </>
   )
@@ -509,7 +528,7 @@ function Bubble({
   )
 }
 
-function Composer({me, open, onSent}: {me: Me; open: boolean; onSent: (m: Message) => void}) {
+function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: (m: Message) => void; onTyping: () => void}) {
   const [text, setText] = useState('')
   const [company, setCompany] = useState('')
   const [sending, setSending] = useState(false)
@@ -649,6 +668,7 @@ function Composer({me, open, onSent}: {me: Me; open: boolean; onSent: (m: Messag
           maxLength={MAX}
           onChange={(e) => {
             setText(e.target.value)
+            if (e.target.value.trim()) onTyping()
             if (error) setError('')
           }}
           onKeyDown={(e) => {

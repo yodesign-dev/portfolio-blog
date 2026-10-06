@@ -22,6 +22,7 @@ export const K = {
   reportBy: "chill:chat:repu", // set "<id>|<ipHash>"
   online: "chill:chat:online", // zset người → lần cuối thấy (ms)
   joinLock: "chill:chat:joinlock",
+  typing: "chill:chat:typing", // zset `who` → lần cuối gõ (ms); chỉ người đang ở bàn nhóm gửi
   pass: (p: string) => `chill:chat:pass:${p}`,
   last: (ip: string) => `chill:chat:last:${ip}`,
   rate: (ip: string) => `chill:chat:rl:${ip}`,

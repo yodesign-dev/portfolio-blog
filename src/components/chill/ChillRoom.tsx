@@ -145,6 +145,7 @@ export function ChillRoom({
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
   const [catBox, setCatBox] = useState<Box | null>(null)
+  const [headBox, setHeadBox] = useState<Box | null>(null)
   const [bookBox, setBookBox] = useState<Box | null>(null)
   const [jarBox, setJarBox] = useState<Box | null>(null)
   // Bàn nhóm (thử nghiệm): thành viên bàn mình đang ngồi + đang xem bàn nhóm hay quầy
@@ -287,6 +288,7 @@ export function ChillRoom({
         return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
       }
       setCatBox(toBox(scene.catHitBox))
+      setHeadBox(toBox(scene.headBox))
       const book = scene.notebookHitBox
       setBookBox(book ? toBox(book) : null)
       setJarBox(hasDonate() ? toBox(scene.tipJarHitBox) : null)
@@ -372,7 +374,10 @@ export function ChillRoom({
   useEffect(() => {
     membersRef.current = tableMembers
   }, [tableMembers])
-  const onChatMessages = useCallback((messages: ChatMessage[]) => {
+  // Bạn cùng bàn đang gõ (mã `who`) → "• • •" trên đầu họ
+  const [typingWho, setTypingWho] = useState<string[]>([])
+  const onChatMessages = useCallback((messages: ChatMessage[], typing: string[]) => {
+    setTypingWho((prev) => (prev.join() === typing.join() ? prev : typing))
     const latest = messages.reduce((t, m) => Math.max(t, m.ts), 0)
     if (lastChatTs.current === null) {
       lastChatTs.current = latest
@@ -401,6 +406,25 @@ export function ChillRoom({
     return () => window.clearTimeout(t)
   }, [bubbles])
   const latestBubble = Object.values(bubbles).sort((a, b) => b.sent - a.sent)[0]
+
+  // Bong bóng của chính mình trên đầu người ngồi ở quầy. Đang mở chat thì bảng chat
+  // che mất nhân vật → để dành, hiện lúc đóng chat (nếu tin vừa gửi trong 30 giây)
+  const [myBubble, setMyBubble] = useState<{text: string; sentAt: number; shownAt: number | null} | null>(null)
+  const onSentText = useCallback((text: string) => setMyBubble({text, sentAt: Date.now(), shownAt: null}), [])
+  useEffect(() => {
+    if (!myBubble) return
+    if (myBubble.shownAt === null) {
+      if (chatOpen) {
+        const t = window.setTimeout(() => setMyBubble(null), Math.max(0, 30_000 - (Date.now() - myBubble.sentAt)))
+        return () => window.clearTimeout(t)
+      }
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- chat vừa đóng → hiện bong bóng
+      setMyBubble({...myBubble, shownAt: Date.now()})
+      return
+    }
+    const t = window.setTimeout(() => setMyBubble(null), 6000)
+    return () => window.clearTimeout(t)
+  }, [myBubble, chatOpen])
   const clip = (text: string, n = 60) => (text.length > n ? `${text.slice(0, n - 1)}…` : text)
 
   // Bàn nhóm chỉ có ở quán cà phê
@@ -1149,6 +1173,29 @@ export function ChillRoom({
                 </button>
               )
             }
+            if (f.who && typingWho.includes(f.who)) {
+              // Đang gõ → bong bóng nhỏ "• • •", 3 chấm nhấp nháy lần lượt
+              return (
+                <span
+                  key={`t-${f.display}`}
+                  aria-label={`${f.name} đang gõ`}
+                  className="absolute -translate-x-1/2 -translate-y-full pb-2 motion-safe:animate-[chill-pop_0.25s_ease-out]"
+                  style={{left: box.left + box.width / 2, top: box.top}}
+                >
+                  <span className="relative flex items-center gap-1 rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1.5 shadow-[3px_3px_0_rgba(42,29,21,0.35)]">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        aria-hidden
+                        className="h-1.5 w-1.5 bg-[#9a6a45] motion-safe:animate-pulse"
+                        style={{animationDelay: `${i * 200}ms`}}
+                      />
+                    ))}
+                    <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-[#2a1d15] bg-[#fbf6ec]" />
+                  </span>
+                </span>
+              )
+            }
             // Ghế hẹp (điện thoại dọc) → chỉ tên, cắt gọn trong bề ngang ghế
             const roomy = box.width >= 120
             return (
@@ -1174,6 +1221,21 @@ export function ChillRoom({
           )}
         </div>
       )}
+      {/* Ở quầy: bong bóng của chính mình trên đầu người ngồi (tin mình vừa gửi) */}
+      {!groupView && headBox && myBubble?.shownAt && (
+        <span
+          key={myBubble.sentAt}
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full pb-2 motion-safe:animate-[chill-pop_0.25s_ease-out]"
+          style={{left: headBox.left + headBox.width / 2, top: headBox.top}}
+        >
+          <span className="relative block max-w-[min(240px,70vw)] rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1.5 text-[12px] leading-snug text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)]" style={{width: 'max-content'}}>
+            <span className="block text-[10px] font-medium text-[#9a6a45]">Bạn</span>
+            <span className="line-clamp-2">{clip(myBubble.text)}</span>
+            <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-[#2a1d15] bg-[#fbf6ec]" />
+          </span>
+        </span>
+      )}
+
       {/* Ở quầy: bạn cùng bàn vừa nhắn → 1 dòng xem trước dưới dây đèn (bóng của họ đang
           nháy); bấm là mở bàn nhóm để thấy bong bóng trên đầu họ */}
       {!groupView && theme === 'cafe' && latestBubble && (
@@ -1539,6 +1601,8 @@ export function ChillRoom({
         slot={chatSlot}
         onMessages={onChatMessages}
         fastPoll={Boolean(tableMembers?.some((m) => !m.you))}
+        shareTyping={Boolean(tableMembers?.some((m) => !m.you))}
+        onSentText={onSentText}
       />
 
       <SupporterBoard
