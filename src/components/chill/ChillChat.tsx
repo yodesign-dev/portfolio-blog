@@ -12,6 +12,7 @@
 
 import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 
 type Message = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number}
 type Room = {open: boolean; online: number; messages: Message[]; reactions: Record<string, Record<string, number>>}
@@ -60,6 +61,7 @@ export function ChillChat({
   hidden,
   dimmed,
   onAvailable,
+  slot,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -69,6 +71,8 @@ export function ChillChat({
   dimmed: boolean
   // Phòng chat có mở không (Studio có thể tắt) — để Wishlist xếp lại chỗ
   onAvailable: (available: boolean) => void
+  // Ô trong hàng nút góc phải dưới — nút mở được đặt vào đây
+  slot: HTMLElement | null
 }) {
   const [me, setMe] = useState<Me | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
@@ -217,6 +221,9 @@ export function ChillChat({
   return (
     <>
       {/* Nút mở: nhỏ, ngay trên nút Wishlist */}
+      {/* Nút mở: ô cuối trong hàng nút góc phải dưới (Wishlist · Mời bạn · Chat) */}
+      {slot &&
+        createPortal(
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
@@ -224,7 +231,7 @@ export function ChillChat({
         aria-controls="chill-chat"
         aria-label={`Trò chuyện ở quán — ${online} người online${unread ? `, ${unread} tin chưa đọc` : ''} (C)`}
         title="Trò chuyện ở quán (C)"
-        className={`absolute right-3 z-30 flex h-11 items-center gap-2 rounded-full border border-white/15 bg-[#1e2030]/90 pl-3 pr-3.5 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-500 hover:border-white/30 hover:bg-[#262a3d]/95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+158px)] sm:right-5 sm:bottom-[178px] xl:bottom-[74px] ${
+        className={`relative flex h-11 items-center gap-2 rounded-full border border-white/15 bg-[#1e2030]/90 pl-3 pr-3.5 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-500 hover:border-white/30 hover:bg-[#262a3d]/95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
           hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
         }`}
       >
@@ -240,7 +247,9 @@ export function ChillChat({
             {unread > 9 ? '9+' : unread}
           </span>
         )}
-      </button>
+      </button>,
+          slot,
+        )}
 
       <section
         id="chill-chat"

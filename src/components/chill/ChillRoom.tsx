@@ -162,7 +162,11 @@ export function ChillRoom({
   const [updatesOpen, setUpdatesOpen] = useState(false)
   // Phòng chat (góc phải, chung chỗ với Wishlist) — Studio có thể tắt
   const [chatOpen, setChatOpen] = useState(false)
-  const [chatAvailable, setChatAvailable] = useState(false)
+  const [, setChatAvailable] = useState(false)
+  // 3 ô của hàng nút góc phải dưới (Wishlist · Mời bạn · Chat)
+  const [wishSlot, setWishSlot] = useState<HTMLDivElement | null>(null)
+  const [inviteSlot, setInviteSlot] = useState<HTMLDivElement | null>(null)
+  const [chatSlot, setChatSlot] = useState<HTMLDivElement | null>(null)
   const [returning, setReturning] = useState<boolean | null>(null)
   const [catPetted, setCatPetted] = useState(true)
   const [catHint, setCatHint] = useState(false)
@@ -1211,8 +1215,6 @@ export function ChillRoom({
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* Bàn nhóm (thử nghiệm) — Studio tắt thì không hiện gì */}
-          <GroupTable visible={theme === 'cafe'} onTable={onTable} onView={() => setGroupView(true)} openSignal={tableSignal} />
           <ShareButton />
           {updates.length > 0 && (
             <WhatsNewButton
@@ -1397,7 +1399,29 @@ export function ChillRoom({
         </div>
       </div>
 
+      {/* Hàng nút góc phải dưới, theo thứ tự Wishlist · Mời bạn · Chat. Mỗi component tự
+          đặt nút của mình vào đúng ô (portal) nên thứ tự luôn cố định; ô trống (chat bị
+          Studio tắt, phòng không phải café) thì hàng tự dồn lại. Màn rất rộng (2xl) thì
+          nằm ngang thanh nhạc, còn lại nằm ngay trên thanh nhạc */}
+      <div className="absolute right-3 z-30 flex items-center gap-2 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] 2xl:bottom-5">
+        <div ref={setWishSlot} className="contents" />
+        <div ref={setInviteSlot} className="contents" />
+        <div ref={setChatSlot} className="contents" />
+      </div>
+
+      {/* Bàn nhóm (thử nghiệm) — Studio tắt thì không hiện gì */}
+      <GroupTable
+        visible={theme === 'cafe'}
+        slot={inviteSlot}
+        dimmed={hideUi}
+        hidden={panelOpen || volumeOpen || showHintTip}
+        onTable={onTable}
+        onView={() => setGroupView(true)}
+        openSignal={tableSignal}
+      />
+
       <Wishlist
+        slot={wishSlot}
         open={wishOpen}
         onOpenChange={(o) => {
           if (o) {
@@ -1410,7 +1434,6 @@ export function ChillRoom({
         }}
         dimmed={hideUi}
         hidden={panelOpen || volumeOpen || showHintTip}
-        stacked={chatAvailable}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
         donateRequest={donateRequest}
@@ -1428,6 +1451,7 @@ export function ChillRoom({
         hidden={panelOpen || volumeOpen || showHintTip}
         dimmed={hideUi}
         onAvailable={setChatAvailable}
+        slot={chatSlot}
       />
 
       <SupporterBoard

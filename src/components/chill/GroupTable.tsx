@@ -1,6 +1,7 @@
 'use client'
 
 import {useCallback, useEffect, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {trackEvent} from '@/lib/analytics'
 import {CHARACTERS, SEATS, STATUS_LABEL, arrangeFriends, type TableMember} from './table-view'
 
@@ -14,6 +15,7 @@ import {CHARACTERS, SEATS, STATUS_LABEL, arrangeFriends, type TableMember} from 
 // trong danh sách "bạn bè" không tính chính mình.
 
 const ME_KEY = 'chill:table-me'
+const INVITE_SEEN_KEY = 'chill:invite-seen'
 const TABLE_KEY = 'chill:table-id'
 const CHAT_ME_KEY = 'chill:chat-me'
 const POLL_MS = 20_000
@@ -51,11 +53,19 @@ const inviteUrl = (id: string) => `${window.location.origin}/chill?table=${id}`
 // onView: người xem bấm "Xem bàn nhóm" (lia máy vào trong quán)
 export function GroupTable({
   visible,
+  slot,
+  dimmed = false,
+  hidden = false,
   onTable,
   onView,
   openSignal = 0,
 }: {
   visible: boolean
+  // Ô giữa trong hàng nút góc phải dưới (Wishlist · Mời bạn · Chat) — nút được đặt vào đây
+  slot: HTMLElement | null
+  // Giao diện đang tự ẩn → mờ đi như Chat / Wishlist; bảng cài đặt đang mở → nhường chỗ
+  dimmed?: boolean
+  hidden?: boolean
   onTable?: (members: TableMember[] | null) => void
   onView?: () => void
   // Tăng lên 1 = mở từ ngoài (nút "Thử ngay" ở Có gì mới): chưa ở bàn → màn tạo bàn,
@@ -175,6 +185,25 @@ export function GroupTable({
   }, [openSignal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const friends = members.filter((m) => !m.you)
+
+  // Nút mời vừa chuyển từ thanh trên xuống cạnh Chat → chấm cam + viền cam tới lần bấm đầu
+  const [inviteSeen, setInviteSeen] = useState(true)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+      setInviteSeen(localStorage.getItem(INVITE_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → không làm phiền
+    }
+  }, [])
+  const markInviteSeen = () => {
+    setInviteSeen(true)
+    try {
+      localStorage.setItem(INVITE_SEEN_KEY, '1')
+    } catch {
+      // bỏ qua
+    }
+  }
   const {seated, rest} = arrangeFriends(members)
   useEffect(() => onTable?.(tableId ? members : null), [tableId, members, onTable])
 
@@ -243,89 +272,102 @@ export function GroupTable({
   }
 
   const onButton = () => {
+    markInviteSeen()
     if (tableId) setOpen((o) => !o)
     else setPicker({mode: 'create'})
   }
 
   return (
     <>
-      {visible && (
-        <div ref={ref} className="relative">
-          <button
-            type="button"
-            onClick={onButton}
-            aria-label={tableId ? `Bàn nhóm: ${friends.length} người bạn đang ở đây` : 'Mời bạn ngồi cùng'}
-            aria-expanded={tableId ? open : undefined}
-            title={tableId ? 'Bàn nhóm' : 'Mời bạn ngồi cùng'}
-            className="flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 px-2.5 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
-          >
-            {tableId && friends.length > 0 ? (
-              <>
-                {/* Màn hẹp: thanh trên đã chật → chỉ icon + số người */}
-                <span className="hidden -space-x-1.5 sm:flex" aria-hidden>
-                  {friends.slice(0, 3).map((f, i) => (
-                    <Avatar key={i} character={f.character} size={18} ring />
-                  ))}
+      {visible &&
+        slot &&
+        createPortal(
+          <div ref={ref} className="relative">
+            <button
+              type="button"
+              onClick={onButton}
+              aria-label={tableId ? `Bàn nhóm: ${friends.length} người bạn đang ở đây` : 'Mời bạn ngồi cùng'}
+              aria-expanded={tableId ? open : undefined}
+              title={tableId ? 'Bàn nhóm' : 'Mời bạn ngồi cùng'}
+              // Cùng kiểu viên thuốc với nút Chat bên cạnh
+              className={`relative flex h-11 items-center gap-2 rounded-full border bg-[#1e2030]/90 pl-3 pr-3.5 text-sm text-[#ede6dd] shadow-[0_12px_40px_-10px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-500 hover:bg-[#262a3d]/95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                inviteSeen ? 'border-white/15 hover:border-white/30' : 'border-[#e8b27d]/55 hover:border-[#e8b27d]/80'
+              } ${hidden ? 'pointer-events-none translate-y-2 opacity-0' : dimmed && !open ? 'opacity-60 hover:opacity-100' : 'opacity-100'}`}
+            >
+              {tableId && friends.length > 0 ? (
+                <>
+                  <span className="flex -space-x-1.5" aria-hidden>
+                    {friends.slice(0, 3).map((f, i) => (
+                      <Avatar key={i} character={f.character} size={20} ring />
+                    ))}
+                  </span>
+                  <span className="tabular-nums text-[#f3cfa8]">{friends.length}</span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden className="text-base leading-none">
+                    👥
+                  </span>
+                  <span className="hidden sm:inline">{tableId ? 'Bàn nhóm' : 'Mời bạn'}</span>
+                </>
+              )}
+              {!inviteSeen && (
+                <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d]" />
                 </span>
-                <PeopleIcon className="sm:hidden" />
-                <span className="tabular-nums">{friends.length}</span>
-              </>
-            ) : (
-              <>
-                <PeopleIcon plus />
-                <span className="hidden sm:inline">{tableId ? 'Bàn nhóm' : 'Mời bạn'}</span>
-              </>
-            )}
-          </button>
+              )}
+            </button>
 
-          {open && tableId && (
-            // Điện thoại: nút nằm giữa thanh trên → menu căn theo màn hình cho khỏi tràn mép
-            <div className="fixed inset-x-3 top-16 z-50 rounded-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64 border border-white/10 bg-[#1b1a21]/95 p-3 text-sm text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[#a79e94]">
-                {friends.length ? `${friends.length} người bạn đang ở bàn` : 'Bàn đang chờ bạn bè'}
-              </p>
-              {friends.length === 0 && <p className="mt-2 text-[13px] text-[#a79e94]">Gửi link cho bạn bè. Ai mở link sẽ ngồi vào bàn trong quán.</p>}
-              <ul className="mt-2 space-y-1.5">
-                {[...seated, ...rest].map((f, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <Avatar character={f.character} size={22} />
-                    <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                    <span className="text-[11px] text-[#a79e94]">{i >= seated.length ? 'bàn bên' : STATUS_LABEL[f.status] ?? ''}</span>
-                  </li>
-                ))}
-              </ul>
-              {rest.length > 0 && (
-                <p className="mt-2 text-[11px] text-[#a79e94]">Bàn có {SEATS} ghế, {rest.length} người còn lại hiện thành “+{rest.length}”.</p>
-              )}
-              {friends.length > 0 && onView && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false)
-                    onView()
-                    trackEvent({name: 'Chill Table', props: {action: 'view'}})
-                  }}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-[#e8b27d]/45 px-3 py-2 text-xs font-medium text-[#f6dcbd] transition hover:border-[#e8b27d]/80 hover:bg-white/[0.06]"
-                >
-                  Xem bàn nhóm <span aria-hidden>→</span>
-                </button>
-              )}
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={copy}
-                  className="flex-1 rounded-md bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] transition hover:bg-[#f0c08f]"
-                >
-                  {copied ? 'Đã copy link ✓' : 'Copy link mời'}
-                </button>
-                <button type="button" onClick={leave} className="rounded-md px-3 py-2 text-xs text-[#a79e94] transition hover:bg-white/[0.08] hover:text-white">
-                  Rời bàn
-                </button>
+            {open && tableId && (
+              // Nút nằm ở đáy màn hình → menu bung lên trên
+              <div className="absolute bottom-full right-0 z-50 mb-2 w-[min(16rem,calc(100vw-24px))] rounded-xl border border-white/10 bg-[#1b1a21]/95 p-3 text-sm text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[#a79e94]">
+                  {friends.length ? `${friends.length} người bạn đang ở bàn` : 'Bàn đang chờ bạn bè'}
+                </p>
+                {friends.length === 0 && <p className="mt-2 text-[13px] text-[#a79e94]">Gửi link cho bạn bè. Ai mở link sẽ ngồi vào bàn trong quán.</p>}
+                <ul className="mt-2 space-y-1.5">
+                  {[...seated, ...rest].map((f, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <Avatar character={f.character} size={22} />
+                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                      <span className="text-[11px] text-[#a79e94]">{i >= seated.length ? 'bàn bên' : STATUS_LABEL[f.status] ?? ''}</span>
+                    </li>
+                  ))}
+                </ul>
+                {rest.length > 0 && (
+                  <p className="mt-2 text-[11px] text-[#a79e94]">Bàn có {SEATS} ghế, {rest.length} người còn lại hiện thành “+{rest.length}”.</p>
+                )}
+                {friends.length > 0 && onView && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      onView()
+                      trackEvent({name: 'Chill Table', props: {action: 'view'}})
+                    }}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-[#e8b27d]/45 px-3 py-2 text-xs font-medium text-[#f6dcbd] transition hover:border-[#e8b27d]/80 hover:bg-white/[0.06]"
+                  >
+                    Xem bàn nhóm <span aria-hidden>→</span>
+                  </button>
+                )}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={copy}
+                    className="flex-1 rounded-md bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] transition hover:bg-[#f0c08f]"
+                  >
+                    {copied ? 'Đã copy link ✓' : 'Copy link mời'}
+                  </button>
+                  <button type="button" onClick={leave} className="rounded-md px-3 py-2 text-xs text-[#a79e94] transition hover:bg-white/[0.08] hover:text-white">
+                    Rời bàn
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>,
+          slot,
+        )}
 
       {picker && (
         <CharacterPicker
@@ -346,20 +388,6 @@ export function GroupTable({
         </div>
       )}
     </>
-  )
-}
-
-function PeopleIcon({plus, className}: {plus?: boolean; className?: string}) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden className={className}>
-      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M1.5 13.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      {plus ? (
-        <path d="M12.5 5v4M10.5 7h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      ) : (
-        <path d="M11 3.2a2.5 2.5 0 010 4.6M12.5 9.8c1.2.5 2 1.8 2 3.7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      )}
-    </svg>
   )
 }
 
