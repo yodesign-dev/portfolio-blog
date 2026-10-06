@@ -2071,6 +2071,18 @@ export function ChillRoom({
             </span>
           ))}
           <span className="uppercase tracking-[0.2em] text-white/30 sm:basis-full">No rush. Just coffee. · Art &amp; music made with AI.</span>
+          <span className="text-white/30 sm:basis-full">
+            Animated emoji:{' '}
+            <a
+              href="https://googlefonts.github.io/noto-emoji-animation/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline"
+            >
+              Noto Emoji
+            </a>{' '}
+            (CC BY 4.0)
+          </span>
         </div>
       </aside>
       </div>

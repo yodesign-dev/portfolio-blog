@@ -14,6 +14,7 @@ import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
+import {NOTO, NotoEmoji, withNoto} from './noto-emoji'
 
 export type ChatMessage = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number; who?: string}
 type Message = ChatMessage
@@ -27,7 +28,8 @@ const RX_KEY = 'chill:chat-rx'
 const READ_KEY = 'chill:chat-read'
 
 const REACTIONS = ['☕', '❤️', '😂', '🐱']
-const QUICK = ['☕', '🎧', '🌧️', '🐱', '❤️', '😂', '👋', '🔥']
+// Hàng chèn nhanh = đúng 16 emoji động Noto (noto-emoji.tsx)
+const QUICK = NOTO.map((e) => e.char)
 const COLORS = ['#f08a5d', '#e8b27d', '#7bb98a', '#7fa6d6', '#c98bd6', '#e39bb0', '#6fc2c0', '#d6c26f']
 const NAMES = [
   'Mây Chiều', 'Phin Đen', 'Mèo Mướp', 'Gió Heo May', 'Bạc Xỉu', 'Hoa Sữa', 'Mưa Phùn', 'Đèn Lồng', 'Lá Me', 'Trà Đá',
@@ -325,13 +327,13 @@ export function ChillChat({
             aria-live="polite"
           >
             <li className="pb-2 text-center text-[11px] text-[#7d756d]">Tin nhắn tự xoá sau 24 giờ · Nhẹ nhàng với nhau nha ☕</li>
-            {messages.length === 0 && <li className="py-10 text-center text-sm text-[#a79e94]">Quán đang yên, chào một câu nhé 👋</li>}
+            {messages.length === 0 && <li className="py-10 text-center text-sm text-[#a79e94]">Quán đang yên, chào một câu nhé {withNoto('👋')}</li>}
             {messages.map((m, i) => {
               if (m.kind !== 'msg') {
                 return (
                   <li key={m.id} className="py-1.5 text-center text-xs text-[#8d857c]">
-                    {m.kind === 'cat' ? '🐱 ' : '· '}
-                    {m.text}
+                    {m.kind === 'cat' ? withNoto('🐱 ', 16) : '· '}
+                    {withNoto(m.text, 16)}
                     {m.kind === 'event' ? ' ·' : ''}
                   </li>
                 )
@@ -466,7 +468,7 @@ function Bubble({
               own ? 'rounded-tr-md bg-[#4a3428] text-[#f7ece0]' : 'rounded-tl-md border border-white/[0.07] bg-white/[0.05] text-[#e6ddd2]'
             }`}
           >
-            {m.text}
+            {withNoto(m.text)}
           </p>
           {/* Thanh cảm xúc: rê chuột (desktop) / chạm (điện thoại) */}
           <div
@@ -485,7 +487,7 @@ function Bubble({
                 aria-label={`Thả ${e}`}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-sm transition hover:scale-125 hover:bg-white/10"
               >
-                {e}
+                <NotoEmoji char={e} size={20} />
               </button>
             ))}
             {!own && (
@@ -516,7 +518,7 @@ function Bubble({
                     on ? 'border-[#e8b27d]/50 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 bg-white/[0.04] text-[#c9c0b6] hover:bg-white/10'
                   }`}
                 >
-                  <span>{e}</span>
+                  <NotoEmoji char={e} size={16} />
                   {n}
                 </button>
               )
@@ -645,7 +647,7 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
             aria-label={`Chèn ${e}`}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base transition hover:scale-110 hover:bg-white/10"
           >
-            {e}
+            <NotoEmoji char={e} size={22} />
           </button>
         ))}
       </div>
