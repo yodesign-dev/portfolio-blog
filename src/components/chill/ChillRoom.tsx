@@ -755,6 +755,8 @@ export function ChillRoom({
   const showHintTip = hintTip && !settingsSeen && !panelOpen && !volumeOpen && !otherOverlay
   const [idle, setIdle] = useState(false)
   const [zenTip, setZenTip] = useState(false)
+  // Thanh nhạc gọn trong Ngắm cảnh: mở danh sách bài (giữ thanh hiện trong lúc chọn)
+  const [zenList, setZenList] = useState(false)
   const toggleZen = useCallback(() => {
     const next = !zen
     setZenHint(false)
@@ -777,6 +779,7 @@ export function ChillRoom({
       setZenTip(true)
     }
     setZen(next)
+    setZenList(false)
     trackEvent({name: 'Chill Zen', props: {on: next ? 'on' : 'off'}})
   }, [zen, zenSeen])
   useEffect(() => {
@@ -923,7 +926,7 @@ export function ChillRoom({
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
-    <div className={`relative h-dvh w-full select-none overflow-hidden bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle) ? 'cursor-none' : ''}`}>
+    <div className={`relative h-dvh w-full select-none overflow-hidden bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle && !zenList) ? 'cursor-none' : ''}`}>
       <h1 className="sr-only">Chill for work — slow morning, strong coffee</h1>
 
       {/* Ngang: cảnh phủ kín màn hình · Dọc (điện thoại): giữ nguyên khung, không cắt mất người ngồi */}
@@ -942,7 +945,7 @@ export function ChillRoom({
       {zen && (
         <div
           className={`absolute right-3 top-3 z-40 flex flex-col items-end gap-2 transition-opacity duration-500 sm:right-5 sm:top-5 ${
-            idle && !zenTip ? 'pointer-events-none opacity-0' : 'opacity-100'
+            idle && !zenTip && !zenList ? 'pointer-events-none opacity-0' : 'opacity-100'
           }`}
         >
           <ZenToggle on onToggle={toggleZen} floating />
@@ -951,6 +954,98 @@ export function ChillRoom({
               Chạm màn hình hoặc nhích chuột để hiện lại · phím H
             </p>
           )}
+        </div>
+      )}
+
+      {/* Ngắm cảnh: thanh nhạc gọn giữa đáy — lùi / phát / sang bài, tên bài, mở danh sách.
+          Hiện cùng công tắc khi nhích chuột / chạm, để yên thì ẩn cho trọn "tranh động" */}
+      {zen && (
+        <div
+          className={`absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[min(420px,calc(100vw-24px))] -translate-x-1/2 transition-opacity duration-500 ${
+            idle && !zenTip && !zenList ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
+        >
+          {zenList && (
+            <div className="mb-2 max-h-[min(55dvh,420px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md">
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Music station">
+                {STATIONS.map((st) => {
+                  const count = tracks.filter((t) => stationOf(t) === st.id).length
+                  const on = st.id === station
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      disabled={count === 0}
+                      onClick={() => changeStation(st.id)}
+                      className={`rounded-full border px-3 py-1.5 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                        on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
+                      }`}
+                    >
+                      {st.short}
+                    </button>
+                  )
+                })}
+              </div>
+              <ol className="mt-2 divide-y divide-white/[0.06]">
+                {stationList.map(({t, i}, pos) => {
+                  const active = i === index
+                  return (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => (active && started ? togglePlay() : playAt(i))}
+                        aria-current={active ? 'true' : undefined}
+                        className={`grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition ${
+                          active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
+                          {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
+                        </span>
+                        <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{t.title}</span>
+                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{t.duration ? formatTime(t.duration) : '–:––'}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+            </div>
+          )}
+          <div className="flex h-14 items-center gap-1 rounded-2xl border border-white/10 bg-[#16131a]/80 px-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.9)] backdrop-blur-md">
+            <button type="button" onClick={prev} aria-label="Previous track (P)" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
+              <PrevIcon />
+            </button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              aria-label={playing ? 'Pause (Space)' : 'Play (Space)'}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c08f]"
+            >
+              {playing ? <PauseIcon small /> : <PlayIcon small />}
+            </button>
+            <button type="button" onClick={next} aria-label="Next track (N)" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
+              <NextIcon />
+            </button>
+            <span className="min-w-0 flex-1 px-1.5">
+              <span className="block truncate font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{stationLabel}</span>
+              <span className="block truncate text-sm text-[#ede6dd]">{track.title}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setZenList((o) => !o)}
+              aria-label="Danh sách nhạc"
+              aria-expanded={zenList}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition ${zenList ? 'bg-[#e8b27d]/20 text-[#f3cfa8]' : 'text-[#ede6dd] hover:bg-white/10'}`}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                <path d="M3 4.5h9M3 9h9M3 13.5h5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <path d="M14 8.5v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <circle cx="12.6" cy="14.6" r="1.6" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
