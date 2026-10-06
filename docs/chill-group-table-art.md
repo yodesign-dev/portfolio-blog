@@ -186,3 +186,33 @@ Crisp 1px dark brown outlines, no people, no text.
 ```
 
 **Sau khi có ảnh:** khoét magenta thành trong suốt → `public/chill/scenes/group/group-bg-glass.webp` (1280×720), đo lại vùng kính để chỉnh `GLASS` trong `scene.ts`.
+
+---
+
+## 5. Người qua đường sau vách kính
+
+Xe, người đi bộ, chó: dùng lại atlas `public/chill/sprites.webp` của phố ở quầy (code vẽ ra sau kính, không cần ảnh mới).
+
+**Anh shipper** (`public/chill/scenes/group/shipper.webp`, 4 khung 56×87: chạy · dừng · nghe điện thoại · cười). Làm 2 bước bằng Nano Banana 2, 21:9: (1) prompt dưới với ảnh tham chiếu `https://applebin.me/chill/sprites.webp` ra dáng xe và tư thế; (2) sửa ảnh đó sang áo, mũ, thùng giao hàng màu cam, có điện thoại kẹp trên tay lái, không logo, thêm khung đang chạy:
+
+```
+Pixel art sprite sheet based on the reference sprite atlas. Use EXACTLY the same
+character: the delivery rider in a grey helmet, grey jacket and dark trousers on a
+silver Honda Cub style motorbike with a tall stack of cardboard boxes strapped on
+the back (the 4th sprite from the left in the reference). Same side view facing
+RIGHT, same proportions, same pixel art style, same 1px dark outlines and palette.
+
+Draw 4 frames in ONE horizontal row, evenly spaced, every frame the same size, the
+motorbike at the same position and scale in every frame, wheels on the same baseline:
+1. Stopped at the curb, engine off, left foot down on the ground, sitting upright,
+   both hands on the handlebar.
+2. Stopped, holding a smartphone to his ear with his right hand, other hand on the
+   handlebar, smiling, mouth closed.
+3. Same as frame 2 but talking, mouth open, eyebrows raised.
+4. Same pose, laughing happily, head tilted back, eyes closed, phone still at his ear.
+
+Solid flat chroma green #00FF00 background everywhere, no ground, no shadows, no
+text, no frame borders.
+```
+
+Hậu kỳ: khoét nền xanh, khử ám xanh ở viền, thu cả dải về cao 92 px (bằng sprite `bike-boxes`), alpha cứng.

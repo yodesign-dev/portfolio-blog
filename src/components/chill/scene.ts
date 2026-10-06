@@ -89,12 +89,31 @@ const GLASS = {
   y: 20,
   w: 640,
   h: 208,
-  // Phần ảnh phố (ảnh 560×238) lấy ra: hết bề ngang, bỏ bớt trời, giữ vỉa hè ở đáy kính
-  crop: {y: 0.1, h: 0.82},
+  // Ảnh phố phủ hết bề ngang kính (giữ đúng tỉ lệ); cropY = phần trên ảnh bị bỏ
+  // để vỉa hè + làn xa nằm ngay trên bậu cửa, làn gần khuất sau ốp gỗ
+  cropY: 0.22,
   // Song cửa gỗ — chỉ dùng khi ảnh vách kính chưa tải xong (vẽ tạm)
   mullions: [0, 158, 316, 474, 634],
   transom: 64,
 }
+// Cảnh nhỏ sau vách kính: anh shipper áo cam chạy tới, tấp vào lề, nghe điện thoại,
+// nói, cười ngả đầu rồi chạy tiếp. shipper.webp: 4 khung 56×87 cùng tỉ lệ atlas phố
+// (chạy · dừng chống chân · nghe điện thoại · cười). frontX = tâm bánh trước tính từ
+// mép trái khung — giữ bánh trước đứng yên khi đổi khung.
+const SHIPPER = {src: '/chill/scenes/group/shipper.webp', w: 56, h: 87, frontX: 47.5}
+// Chỗ tấp vào lề (tâm bánh trước, lưới phố 320): những khoảng kính không bị đầu các bạn
+// ngồi bàn lẫn song cửa của group-bg-glass.webp che (đo trên màn 1280×720)
+// (bỏ mép trái: bị chậu cây che + bị cắt trên màn 4:3)
+const SHIPPER_STOPS = [97, 216]
+// Mốc thời gian lúc dừng (giây): khung nào, đến khi nào
+const SHIPPER_BEATS: [number, 'stop' | 'talk' | 'laugh'][] = [
+  [0.9, 'stop'],
+  [4.4, 'talk'],
+  [6.0, 'laugh'],
+  [8.4, 'talk'],
+  [9.2, 'stop'],
+]
+
 // Hạt giả ngẫu nhiên cố định theo chỉ số (vệt mưa, đèn phố đêm không nhảy chỗ mỗi khung)
 const seeded = (i: number, k = 0) => {
   const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453
@@ -276,6 +295,11 @@ export class ChillScene {
   // Phố nhoè như tranh màu nước khi mưa (thu nhỏ rồi phóng lại có làm mịn)
   private softStreet: HTMLCanvasElement | null = null
   private softStreetOf: HTMLImageElement | null = null
+  private shipper: {x: number; target: number; speed: number; stopT: number; leaving: boolean} | null = null
+  private nextShipper = 10
+  private shipperImg: HTMLImageElement | null = null
+  private shipperTinted: HTMLCanvasElement | null = null
+  private shipperKey = ''
   private groupChars: HTMLImageElement | null = null
   private groupCharsTinted: HTMLCanvasElement | null = null
   private groupCharsKey = ''
@@ -577,6 +601,7 @@ export class ChillScene {
       const busy = this.time === 'night' ? 2 : 1
       this.nextVehicle = (1.3 + this.rng() * 2.6) * busy * (rainy ? 1.5 : 1)
     }
+    this.updateShipper(dt)
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
@@ -1150,7 +1175,7 @@ export class ChillScene {
   // rồi đặt nền vách kính lên. Trả về nền (để vẽ lại phần mặt bàn khi chưa có sprite).
   // Ảnh vách kính chưa tải xong → vẽ tạm: phần dưới của nền gạch + song cửa bằng code.
   private drawGlassWall(gc: CanvasRenderingContext2D, t: number) {
-    const {x, y, w, h, crop} = GLASS
+    const {x, y, w, h} = GLASS
     const night = this.time === 'night'
     const rain = this.weather === 'rain'
     const R = (rx: number, ry: number, rw: number, rh: number, c: string) => {
@@ -1159,9 +1184,23 @@ export class ChillScene {
     }
     if (ready(this.street)) {
       const img = this.street
-      const sy = img.height * crop.y
-      const sh = img.height * crop.h
-      gc.drawImage(img, 0, sy, img.width, sh, x, y, w, h)
+      // Phóng đúng hệ lưới phố ở quầy (320×180) ra vùng kính → xe, người, chó đang
+      // chạy ngoài phố vẽ bằng chính drawMover, khớp vỉa hè / làn đường của ảnh
+      const k = w / STREET_IMG.w
+      const top = STREET_IMG.y + GLASS.cropY * STREET_IMG.h
+      gc.save()
+      gc.beginPath()
+      gc.rect(x, y, w, h)
+      gc.clip()
+      gc.setTransform(RES * k, 0, 0, RES * k, RES * (x - STREET_IMG.x * k), RES * (y - top * k))
+      gc.drawImage(img, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+      const counter = this.ctx
+      this.ctx = gc
+      // Vỉa hè → shipper đỗ ở mép lề → làn xa (xe chạy qua che trước mặt anh ấy)
+      for (const m of this.movers) if (!m.road) this.drawMover(m, t)
+      this.drawShipper(t)
+      for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane)) this.drawMover(m, t)
+      this.ctx = counter
       if (rain) {
         // Màu nước: lớp phố đã làm mịn phủ lên, nét gốc chỉ còn thấp thoáng
         if (this.softStreetOf !== img) {
@@ -1173,14 +1212,12 @@ export class ChillScene {
           sc.drawImage(img, 0, 0, s.width, s.height)
           this.softStreetOf = img
         }
-        const s = this.softStreet!
-        gc.save()
         gc.imageSmoothingEnabled = true
         gc.globalAlpha = 0.75
-        gc.drawImage(s, 0, s.height * crop.y, s.width, s.height * crop.h, x, y, w, h)
-        gc.restore()
-        R(x, y, w, h, night ? 'rgba(40,46,70,0.25)' : 'rgba(120,132,150,0.22)')
+        gc.drawImage(this.softStreet!, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
       }
+      gc.restore()
+      if (rain) R(x, y, w, h, night ? 'rgba(40,46,70,0.25)' : 'rgba(120,132,150,0.22)')
     } else R(x, y, w, h, '#e8b48a')
 
     // Đèn phố, bảng hiệu hắt lên kính ban đêm (nhoè to hơn khi mưa)
@@ -1249,6 +1286,90 @@ export class ChillScene {
     R(0, y + GLASS.transom, 640, 4, wood)
     R(0, cut - 6, 640, 6, wood)
     return brick
+  }
+
+  // Shipper chỉ xuất hiện khi đang nhìn vách kính (không mưa), mỗi 35–65 giây
+  private updateShipper(dt: number) {
+    const sh = this.shipper
+    if (!sh) {
+      if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain') return
+      this.shipperLayer()
+      this.nextShipper -= dt
+      if (this.nextShipper > 0) return
+      this.nextShipper = 35 + this.rng() * 30
+      // Chạy làn xa nên đi từ phải sang trái (sprite lật), tấp vào 1 khe ngẫu nhiên
+      this.shipper = {x: SCENE_W + 12, target: pick(this.rng, SHIPPER_STOPS), speed: 28, stopT: -1, leaving: false}
+      return
+    }
+    if (sh.leaving) {
+      sh.speed = Math.min(30, sh.speed + 20 * dt)
+      sh.x -= sh.speed * dt
+      if (sh.x < -30) this.shipper = null
+      return
+    }
+    if (sh.stopT >= 0) {
+      sh.stopT += dt
+      if (sh.stopT >= SHIPPER_BEATS[SHIPPER_BEATS.length - 1][0]) {
+        sh.leaving = true
+        sh.speed = 0
+      }
+      return
+    }
+    // Phanh đều để dừng đúng chỗ
+    const dist = sh.x - sh.target
+    sh.speed = Math.min(28, Math.sqrt(2 * 18 * Math.max(0, dist)))
+    sh.x -= sh.speed * dt
+    if (dist < 0.3 || sh.speed < 0.5) {
+      sh.x = sh.target
+      sh.speed = 0
+      sh.stopT = 0
+    }
+  }
+
+  private shipperLayer() {
+    this.shipperImg ??= loadImage(SHIPPER.src, () => (this.shipperKey = ''))
+    if (!ready(this.shipperImg)) return null
+    const key = this.tint ?? 'none'
+    if (this.shipperTinted && this.shipperKey === key) return this.shipperTinted
+    this.shipperTinted = this.tinted(this.shipperImg, this.shipperTinted)
+    this.shipperKey = key
+    return this.shipperTinted
+  }
+
+  // Vẽ trong hệ lưới phố (this.ctx đang là lớp kính, đã phóng theo vùng kính)
+  private drawShipper(t: number) {
+    const sh = this.shipper
+    if (!sh) return
+    const ctx = this.ctx
+    const base = this.groundY(SIDEWALK_Y + 4, sh.x)
+    const snap = SCALE * SPRITE_SCALE
+    const img = this.shipperLayer()
+    if (!img) return
+    let frame = 0
+    let bob = 0
+    if (sh.stopT < 0 || sh.leaving) {
+      if (sh.speed > 1 && (t * 2.5) % 1 < 0.14) bob = 0.5
+    } else {
+      const beat = SHIPPER_BEATS.find(([end]) => sh.stopT < end)?.[1] ?? 'stop'
+      frame = beat === 'stop' ? 1 : beat === 'talk' ? 2 : 3
+      // Đang nói: gật gù chậm; cười: người rung nhẹ
+      if (beat === 'talk' && Math.floor(sh.stopT * 1.6) % 2) bob = 0.25
+      if (beat === 'laugh' && Math.floor(sh.stopT * 5) % 2) bob = 0.25
+    }
+    const src = [frame * SHIPPER.w, 0, SHIPPER.w, SHIPPER.h]
+    const front = SHIPPER.frontX
+    const w = src[2] / snap
+    const h = src[3] / snap
+    // Sprite hướng phải, chạy sang trái → lật; giữ tâm bánh trước tại sh.x
+    const left = Math.round((sh.x - (src[2] - front) / snap) * snap) / snap
+    const y = Math.round((base - h - bob) * snap) / snap
+    ctx.fillStyle = this.time === 'night' ? 'rgba(0,0,0,0.14)' : 'rgba(0,0,0,0.2)'
+    ctx.fillRect(left + w * 0.1, base - 1, w * 0.8, 1)
+    ctx.save()
+    ctx.translate(left * 2 + w, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(img, src[0], src[1], src[2], src[3], left, y, w, h)
+    ctx.restore()
   }
 
   // Nắng qua vách kính: sáng xiên trắng ngà, chiều vàng mật ong, dài và thấp hơn.
