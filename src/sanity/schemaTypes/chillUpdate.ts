@@ -28,6 +28,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Mở phòng chat', value: 'chat'},
   {title: 'Mở bảng cài đặt', value: 'settings'},
   {title: 'Bật "Ẩn nút" (chỉ cảnh + nhạc)', value: 'zen'},
+  {title: 'Mời bạn vào bàn nhóm', value: 'table'},
 ]
 
 export default defineType({

@@ -53,10 +53,14 @@ export function GroupTable({
   visible,
   onTable,
   onView,
+  openSignal = 0,
 }: {
   visible: boolean
   onTable?: (members: TableMember[] | null) => void
   onView?: () => void
+  // Tăng lên 1 = mở từ ngoài (nút "Thử ngay" ở Có gì mới): chưa ở bàn → màn tạo bàn,
+  // đang ở bàn → menu bàn nhóm
+  openSignal?: number
 }) {
   const [available, setAvailable] = useState(false)
   const [me, setMe] = useState<Me | null>(null)
@@ -162,6 +166,13 @@ export function GroupTable({
       window.clearInterval(pulse)
     }
   }, [tableId, me, join, leaveLocal])
+
+  useEffect(() => {
+    if (!openSignal || !available || !me) return
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    if (tableId) setOpen(true)
+    else setPicker({mode: 'create'})
+  }, [openSignal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const friends = members.filter((m) => !m.you)
   const {seated, rest} = arrangeFriends(members)

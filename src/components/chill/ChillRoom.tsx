@@ -139,6 +139,8 @@ export function ChillRoom({
   // Chế độ Zen: giấu hết nút, chỉ còn cảnh động + nhạc. Bật / tắt bằng công tắc trên
   // thanh trên (hoặc phím H); trong Zen công tắc chỉ hiện lại khi nhích chuột / chạm
   const [zen, setZen] = useState(false)
+  // "Thử ngay" bàn nhóm → mở màn tạo bàn / menu bàn nhóm trong GroupTable
+  const [tableSignal, setTableSignal] = useState(0)
   const [panelTab, setPanelTab] = useState<PanelTab>('music')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
@@ -583,6 +585,11 @@ export function ChillRoom({
       setPanelOpen(true)
     } else if (kind === 'chat') setChatOpen(true)
     else if (kind === 'zen' && !zen) toggleZen()
+    else if (kind === 'table') {
+      // Bàn nhóm chỉ có ở quán cà phê
+      setTheme('cafe')
+      setTableSignal((n) => n + 1)
+    }
   }
 
   const togglePlay = useCallback(() => {
@@ -1093,7 +1100,7 @@ export function ChillRoom({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {/* Bàn nhóm (thử nghiệm) — Studio tắt thì không hiện gì */}
-          <GroupTable visible={theme === 'cafe'} onTable={onTable} onView={() => setGroupView(true)} />
+          <GroupTable visible={theme === 'cafe'} onTable={onTable} onView={() => setGroupView(true)} openSignal={tableSignal} />
           <ShareButton />
           {updates.length > 0 && (
             <WhatsNewButton
