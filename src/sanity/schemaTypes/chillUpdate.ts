@@ -27,7 +27,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Mở Wishlist', value: 'wishlist'},
   {title: 'Mở phòng chat', value: 'chat'},
   {title: 'Mở bảng cài đặt', value: 'settings'},
-  {title: 'Bật "Ẩn nút" (chỉ cảnh + nhạc)', value: 'zen'},
+  {title: 'Bật "Ngắm cảnh" (ẩn bảng điều khiển)', value: 'zen'},
   {title: 'Mời bạn vào bàn nhóm', value: 'table'},
 ]
 

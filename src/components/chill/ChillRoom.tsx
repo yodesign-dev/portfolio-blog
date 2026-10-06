@@ -945,10 +945,10 @@ export function ChillRoom({
             idle && !zenTip ? 'pointer-events-none opacity-0' : 'opacity-100'
           }`}
         >
-          <ZenToggle on onToggle={toggleZen} />
+          <ZenToggle on onToggle={toggleZen} floating />
           {zenTip && (
             <p role="status" className="rounded-md bg-black/55 px-2.5 py-1.5 text-[11px] text-[#f6dcbd] backdrop-blur">
-              Nhích chuột hoặc chạm màn hình để hiện lại công tắc “Ẩn nút” · phím H
+              Chạm màn hình hoặc nhích chuột để hiện lại · phím H
             </p>
           )}
         </div>
@@ -1113,7 +1113,8 @@ export function ChillRoom({
               onHoldToast={updatesSeen.holdToast}
             />
           )}
-          <ZenToggle on={false} onToggle={toggleZen} fresh={!zenSeen} hint={zenHint} onCloseHint={() => setZenHint(false)} />
+          {/* Điện thoại: thanh trên đã chật → công tắc nằm trong Settings › Atmosphere */}
+          <ZenToggle on={false} onToggle={toggleZen} fresh={!zenSeen} hint={zenHint} onCloseHint={() => setZenHint(false)} className="hidden sm:block" />
           <span className="pointer-events-none flex h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
             {clock}
           </span>
@@ -1581,6 +1582,7 @@ export function ChillRoom({
 
           {panelTab === 'atmosphere' && (
             <div className="space-y-4">
+              <ZenRow on={zen} onToggle={toggleZen} />
               <Field label="Time">
                 <Segmented options={TIMES} value={time} onChange={setTime} />
               </Field>
@@ -1721,42 +1723,64 @@ function RoundButton({label, onClick, children}: {label: string; onClick: () => 
   )
 }
 
-// Công tắc Zen: viền cam như nút "What's new", bấm là bật / tắt (role="switch").
-// `fresh` = chưa bật lần nào → chấm cam + vòng sáng; `hint` = bong bóng giới thiệu 1 lần
+// Rãnh gạt dùng chung: tắt = rãnh nâu tối viền mảnh + núm be; bật = rãnh hổ phách (cùng
+// tông nút Play) + núm tối. Màu rãnh và vị trí núm đổi CÙNG lúc — không có khoảnh khắc
+// rãnh đã sáng mà núm còn nằm bên trái. sm: 36×20 núm 14 · lg: 44×26 núm 20
+function SwitchTrack({on, size = 'sm'}: {on: boolean; size?: 'sm' | 'lg'}) {
+  const lg = size === 'lg'
+  return (
+    <span
+      aria-hidden
+      className={`relative inline-flex shrink-0 items-center rounded-full border transition-colors duration-200 ${lg ? 'h-[26px] w-11' : 'h-5 w-9'} ${
+        on ? 'border-[#e8b27d] bg-[#e8b27d]' : 'border-white/20 bg-[#3a2a1e]'
+      }`}
+    >
+      <span
+        className={`absolute left-[2px] rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-[transform,background-color] duration-200 ${lg ? 'h-5 w-5' : 'h-3.5 w-3.5'} ${
+          on ? `bg-[#2a1a10] ${lg ? 'translate-x-[18px]' : 'translate-x-4'}` : 'translate-x-0 bg-[#e8dccb]'
+        }`}
+      />
+    </span>
+  )
+}
+
+// Công tắc "Ngắm cảnh" (chế độ Zen) trên thanh trên: cả khung là một công tắc
+// (role="switch"), bấm chữ hay rãnh đều gạt được. `fresh` = chưa bật lần nào → chấm cam +
+// vòng sáng; `hint` = bong bóng giới thiệu 1 lần; `floating` = bản nổi trong Zen (điện
+// thoại cao 44px cho dễ chạm)
 function ZenToggle({
   on,
   onToggle,
   fresh = false,
   hint = false,
   onCloseHint,
+  floating = false,
+  className = '',
 }: {
   on: boolean
   onToggle: () => void
   fresh?: boolean
   hint?: boolean
   onCloseHint?: () => void
+  floating?: boolean
+  className?: string
 }) {
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <button
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label={fresh ? 'Ẩn nút (mới): chỉ còn cảnh và nhạc, phím H' : 'Ẩn nút: chỉ còn cảnh và nhạc, phím H'}
-        title="Ẩn hết nút, chỉ còn cảnh và nhạc (phím H)"
+        aria-label="Ngắm cảnh: ẩn bảng điều khiển, nhạc vẫn phát (phím H)"
+        title={on ? 'Chạm màn hình để hiện lại (phím H)' : 'Ẩn bảng điều khiển, nhạc vẫn phát (phím H)'}
         onClick={onToggle}
-        className={`relative flex h-9 items-center gap-2 rounded-md border px-2.5 text-xs font-medium shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-          on
-            ? 'border-[#e8b27d] bg-[#e8b27d]/90 text-[#2a1a10] hover:bg-[#f0c08f]'
-            : 'border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white'
+        className={`relative flex items-center gap-2.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 pl-3 pr-2 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+          floating ? 'h-11 sm:h-9' : 'h-9'
         }`}
       >
         {fresh && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-md border-2 border-[#e8b27d]" />}
-        <EyeOffIcon />
-        <span className="hidden sm:inline">Ẩn nút</span>
-        <span aria-hidden className={`relative h-4 w-7 rounded-full transition-colors ${on ? 'bg-[#2a1a10]/35' : 'bg-white/20'}`}>
-          <span className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${on ? 'left-3.5 bg-[#2a1a10]' : 'left-0.5 bg-[#f6dcbd]'}`} />
-        </span>
+        <span>Ngắm cảnh</span>
+        <SwitchTrack on={on} />
         {fresh && (
           <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
@@ -1778,8 +1802,8 @@ function ZenToggle({
               🍃
             </span>
             <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Ẩn nút</span>
-              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Gạt công tắc là ẩn hết nút, chỉ còn cảnh và nhạc</span>
+              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Ngắm cảnh</span>
+              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Ẩn bảng điều khiển, nhạc vẫn phát</span>
               <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">Bật thử → (phím H)</span>
             </button>
             <button
@@ -1799,13 +1823,23 @@ function ZenToggle({
   )
 }
 
-function EyeOffIcon() {
+// Dòng "Ngắm cảnh" trong bảng cài đặt (chủ yếu cho điện thoại — thanh trên đã chật):
+// cả dòng cao 56px là một công tắc, rãnh 44×26
+function ZenRow({on, onToggle}: {on: boolean; onToggle: () => void}) {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M3 13L13 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className="flex min-h-14 w-full items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-left transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium text-[#ede6dd]">Ngắm cảnh</span>
+        <span className="block text-xs text-[#a79e94]">{on ? 'Chạm màn hình để hiện lại' : 'Ẩn bảng điều khiển, nhạc vẫn phát'}</span>
+      </span>
+      <SwitchTrack on={on} size="lg" />
+    </button>
   )
 }
 
