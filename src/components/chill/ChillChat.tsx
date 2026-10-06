@@ -13,6 +13,7 @@
 import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 
 type Message = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number}
 type Room = {open: boolean; online: number; messages: Message[]; reactions: Record<string, Record<string, number>>}
@@ -224,30 +225,29 @@ export function ChillChat({
       {/* Nút mở: ô cuối trong hàng nút góc phải dưới (Wishlist · Mời bạn · Chat) */}
       {slot &&
         createPortal(
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-        aria-controls="chill-chat"
-        aria-label={`Trò chuyện ở quán — ${online} người online${unread ? `, ${unread} tin chưa đọc` : ''} (C)`}
-        title="Trò chuyện ở quán (C)"
-        className={`relative flex h-11 items-center gap-2 rounded-full border border-white/15 bg-[#1e2030]/90 pl-3 pr-3.5 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-500 hover:border-white/30 hover:bg-[#262a3d]/95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-          hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
-        }`}
-      >
-        <span aria-hidden className="text-base leading-none">
-          💬
-        </span>
-        <span className="flex items-center gap-1.5 text-sm tabular-nums text-[#d8e9dc]">
-          <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-          {online}
-        </span>
-        {unread > 0 && (
-          <span className="absolute -right-1 -top-1.5 min-w-5 rounded-full bg-gradient-to-b from-[#f59a6c] to-[#d9603b] px-1.5 text-center text-[11px] font-bold leading-5 text-white shadow-[0_0_12px_rgba(240,120,80,0.6)]">
-            {unread > 9 ? '9+' : unread}
-          </span>
-        )}
-      </button>,
+          <button
+            type="button"
+            onClick={() => onOpenChange(!open)}
+            aria-expanded={open}
+            aria-controls="chill-chat"
+            aria-label={`Trò chuyện ở quán — ${online} người online${unread ? `, ${unread} tin chưa đọc` : ''} (C)`}
+            title="Trò chuyện ở quán (C)"
+            className={`${TOKEN_CLASS} border-white/[0.13] ${
+              hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
+            }`}
+          >
+            {/* Có tin chưa đọc: bong bóng sau đổi cam + số cam; không thì chấm xanh + số người online */}
+            <PixelIcon name={unread > 0 ? 'chatUnread' : 'chat'} />
+            {unread > 0 ? (
+              <TokenChip hot>{unread > 9 ? '9+' : unread}</TokenChip>
+            ) : (
+              <TokenChip>
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                {online}
+              </TokenChip>
+            )}
+            <TokenLabel>Chat · {online} online</TokenLabel>
+          </button>,
           slot,
         )}
 

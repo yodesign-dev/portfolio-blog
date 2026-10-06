@@ -1405,7 +1405,7 @@ export function ChillRoom({
           Điện thoại / màn dọc: hàng ngang nút tròn gọn ngay trên thanh nhạc.
           Màn ngang ≥1024px: cột dọc sát mép phải, đáy ngang đáy thanh nhạc (khoảng trống
           bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi */}
-      <div className="absolute right-3 z-30 flex items-center gap-2 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end">
+      <div className="absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end">
         <div ref={setWishSlot} className="contents" />
         <div ref={setInviteSlot} className="contents" />
         <div ref={setChatSlot} className="contents" />

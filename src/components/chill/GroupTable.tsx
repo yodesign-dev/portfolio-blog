@@ -2,6 +2,7 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
 import {CHARACTERS, SEATS, STATUS_LABEL, arrangeFriends, type TableMember} from './table-view'
 
@@ -289,34 +290,14 @@ export function GroupTable({
               aria-label={tableId ? `Bàn nhóm: ${friends.length} người bạn đang ở đây` : 'Mời bạn ngồi cùng'}
               aria-expanded={tableId ? open : undefined}
               title={tableId ? 'Bàn nhóm' : 'Mời bạn ngồi cùng'}
-              // Cùng kiểu viên thuốc với nút Chat bên cạnh
-              className={`relative flex h-11 items-center gap-2 rounded-full border bg-[#1e2030]/90 pl-3 pr-3.5 text-sm text-[#ede6dd] shadow-[0_12px_40px_-10px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-500 hover:bg-[#262a3d]/95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-                inviteSeen ? 'border-white/15 hover:border-white/30' : 'border-[#e8b27d]/55 hover:border-[#e8b27d]/80'
-              } ${hidden ? 'pointer-events-none translate-y-2 opacity-0' : dimmed && !open ? 'opacity-60 hover:opacity-100' : 'opacity-100'}`}
+              className={`${TOKEN_CLASS} ${inviteSeen && !open ? 'border-white/[0.13]' : 'border-[#e8b27d]/60'} ${
+                hidden ? 'pointer-events-none translate-y-2 opacity-0' : dimmed && !open ? 'opacity-60 hover:opacity-100' : 'opacity-100'
+              }`}
             >
-              {tableId && friends.length > 0 ? (
-                <>
-                  <span className="flex -space-x-1.5" aria-hidden>
-                    {friends.slice(0, 3).map((f, i) => (
-                      <Avatar key={i} character={f.character} size={20} ring />
-                    ))}
-                  </span>
-                  <span className="tabular-nums text-[#f3cfa8]">{friends.length}</span>
-                </>
-              ) : (
-                <>
-                  <span aria-hidden className="text-base leading-none">
-                    👥
-                  </span>
-                  <span className="hidden lg:inline">{tableId ? 'Bàn nhóm' : 'Mời bạn'}</span>
-                </>
-              )}
-              {!inviteSeen && (
-                <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d]" />
-                </span>
-              )}
+              <PixelIcon name="cups" />
+              {tableId && friends.length > 0 && <TokenChip>{friends.length}</TokenChip>}
+              {!inviteSeen && <TokenNewDot />}
+              <TokenLabel>{tableId ? `Bàn nhóm · ${friends.length} người bạn` : 'Mời bạn'}</TokenLabel>
             </button>
 
             {open && tableId && (

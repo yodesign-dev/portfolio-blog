@@ -10,6 +10,7 @@
 import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
 import {Donate} from './Donate'
 import {hasDonate, loadIntent, saveIntent} from './donate-config'
@@ -248,27 +249,25 @@ export function Wishlist({
       {/* Nút mở: pill trong hàng nút góc phải dưới (ChillRoom: dock xã hội), luôn thấy */}
       {slot &&
         createPortal(
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-        aria-controls="chill-wishlist"
-        aria-label={`Wishlist — ${count} ideas`}
-        title="Suggest something for the café (W)"
-        className={`group relative flex h-11 items-center gap-2.5 rounded-full border py-2 pl-3 pr-2 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.85)] backdrop-blur-md transition-all duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-          open ? 'border-[#e8b27d]/60 bg-[#2a2320]/95' : 'border-white/15 bg-[#1e2030]/90 hover:border-white/30 hover:bg-[#262a3d]/95'
-        } ${hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'}`}
-      >
-        {/* Lần đầu: vòng sáng lan ra để mắt chú ý tới */}
-        {hint && !open && <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full motion-safe:animate-ping motion-safe:[animation-duration:2.2s] border-2 border-[#f08a5d]/60" />}
-        <span aria-hidden className="text-lg leading-none">
-          💡
-        </span>
-        <span className="hidden text-[15px] font-semibold tracking-tight text-[#f3ece4] lg:inline">Wishlist</span>
-        <span className="min-w-7 rounded-full bg-gradient-to-b from-[#f59a6c] to-[#d9603b] px-2 py-0.5 text-center text-sm font-bold tabular-nums text-white shadow-[0_0_18px_rgba(240,120,80,0.55)]">
-          {loaded ? count : '·'}
-        </span>
-      </button>,
+          <button
+            type="button"
+            onClick={() => onOpenChange(!open)}
+            aria-expanded={open}
+            aria-controls="chill-wishlist"
+            aria-label={`Wishlist — ${count} ideas`}
+            title="Suggest something for the café (W)"
+            className={`${TOKEN_CLASS} ${open ? 'border-[#e8b27d]/60' : 'border-white/[0.13]'} ${
+              hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
+            }`}
+          >
+            {/* Lần đầu: vòng sáng lan ra để mắt chú ý tới */}
+            {hint && !open && (
+              <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#f08a5d]/60 motion-safe:animate-ping motion-safe:[animation-duration:2.2s]" />
+            )}
+            <PixelIcon name="bulb" />
+            {loaded && count > 0 && <TokenChip>{count}</TokenChip>}
+            <TokenLabel>Wishlist</TokenLabel>
+          </button>,
           slot,
         )}
 
@@ -277,7 +276,7 @@ export function Wishlist({
         <p
           aria-hidden
           className={`pointer-events-none absolute right-3 z-30 transition-opacity duration-500 ${hint ? 'opacity-100' : 'opacity-0'} rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
-            'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+160px)] sm:right-5 sm:bottom-[180px] lg:bottom-[176px]'
+            'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+160px)] sm:right-5 sm:bottom-[180px] lg:bottom-[196px]'
           }`}
         >
           Got an idea for the café? Tell us ☕
