@@ -96,23 +96,104 @@ const GLASS = {
   mullions: [0, 158, 316, 474, 634],
   transom: 64,
 }
-// Cảnh nhỏ sau vách kính: anh shipper áo cam chạy tới, tấp vào lề, nghe điện thoại,
-// nói, cười ngả đầu rồi chạy tiếp. shipper.webp: 4 khung 56×87 cùng tỉ lệ atlas phố
-// (chạy · dừng chống chân · nghe điện thoại · cười). frontX = tâm bánh trước tính từ
-// mép trái khung — giữ bánh trước đứng yên khi đổi khung.
-const SHIPPER = {src: '/chill/scenes/group/shipper.webp', w: 56, h: 87, frontX: 47.5}
-// Chỗ tấp vào lề (tâm bánh trước, lưới phố 320): những khoảng kính không bị đầu các bạn
-// ngồi bàn lẫn song cửa của group-bg-glass.webp che (đo trên màn 1280×720)
-// (bỏ mép trái: bị chậu cây che + bị cắt trên màn 4:3)
-const SHIPPER_STOPS = [97, 216]
-// Mốc thời gian lúc dừng (giây): khung nào, đến khi nào
-const SHIPPER_BEATS: [number, 'stop' | 'talk' | 'laugh'][] = [
-  [0.9, 'stop'],
-  [4.4, 'talk'],
-  [6.0, 'laugh'],
-  [8.4, 'talk'],
-  [9.2, 'stop'],
-]
+// Cảnh nhỏ sau vách kính: mỗi lần 1 cảnh, cách nhau 30–50 giây, chỉ khi đang nhìn
+// vách kính và trời không mưa. Sprite AI cùng tỉ lệ atlas phố (1 ô lưới = 4 px ảnh),
+// tất cả hướng sang PHẢI (đi sang trái thì lật).
+//   src/w/h: sheet + kích thước 1 khung · anchor: x trong khung giữ đứng yên khi đổi
+//   khung (bánh trước / giữa người) · walk: khung khi di chuyển, đổi theo quãng đường
+//   `stride` (0 = không đổi) · stops: chỗ dừng (anchor, lưới phố 320) — những khoảng
+//   kính không bị đầu các bạn ngồi bàn lẫn song cửa group-bg-glass.webp che (đo trên
+//   màn 1280×720; bỏ 2 mép: chậu cây che + bị cắt trên màn 4:3) · beats: lúc dừng,
+//   khung nào tới giây nào (`alt` = xen kẽ với khung này, `fps` nhịp xen kẽ; `bob` =
+//   nhún lên 1/4 ô theo nhịp đó)
+type VignetteBeat = {until: number; frame: number; alt?: number; fps?: number; bob?: boolean}
+type VignetteSpec = {
+  src: string
+  w: number
+  h: number
+  anchor: number
+  walk: number[]
+  stride: number
+  speed: number
+  exitSpeed: number
+  brake: number
+  dir: 1 | -1
+  ground: number
+  ride?: boolean
+  stops: number[]
+  beats: VignetteBeat[]
+}
+const VIGNETTES = {
+  // Anh shipper áo cam chạy làn xa (phải → trái), tấp vào lề, nghe điện thoại, cười ngả
+  // đầu rồi chạy tiếp. 4 khung: chạy · dừng chống chân · nghe điện thoại · cười
+  shipper: {
+    src: '/chill/scenes/group/shipper.webp',
+    w: 56,
+    h: 87,
+    anchor: 47.5,
+    walk: [0],
+    stride: 0,
+    speed: 28,
+    exitSpeed: 30,
+    brake: 18,
+    dir: -1,
+    ground: SIDEWALK_Y + 4,
+    ride: true,
+    stops: [97, 216],
+    beats: [
+      {until: 0.9, frame: 1},
+      {until: 4.4, frame: 2, fps: 1.6, bob: true},
+      {until: 6.0, frame: 3, fps: 5, bob: true},
+      {until: 8.4, frame: 2, fps: 1.6, bob: true},
+      {until: 9.2, frame: 1},
+    ],
+  },
+  // Mẹ dắt bé gái đi ngang; bé đứng lại kéo tay mẹ chỉ về tiệm bánh, nhảy cẫng lên khi mẹ
+  // gật đầu, rồi kéo mẹ đi nhanh. 5 khung: đi ×3 · kéo tay chỉ trỏ · nhảy cẫng
+  mom: {
+    src: '/chill/scenes/group/mom.webp',
+    w: 41,
+    h: 68,
+    anchor: 20.5,
+    walk: [0, 1, 2, 1],
+    stride: 3,
+    speed: 8,
+    exitSpeed: 12,
+    brake: 40,
+    dir: 1,
+    ground: SIDEWALK_Y,
+    stops: [103],
+    beats: [
+      {until: 2.6, frame: 3, alt: 3, fps: 3, bob: true},
+      {until: 4.6, frame: 4, alt: 4, fps: 4, bob: true},
+      {until: 5.4, frame: 3},
+    ],
+  },
+  // Cặp đôi đi ngang (phải → trái), dừng trước bảng menu dựng trên vỉa hè, đọc, nhìn nhau
+  // cười nhún vai, rồi đi tiếp. 6 khung: đi ×4 · chỉ vào menu · nhún vai cười
+  couple: {
+    src: '/chill/scenes/group/couple.webp',
+    w: 66,
+    h: 66,
+    anchor: 33,
+    walk: [0, 1, 2, 3],
+    stride: 3.2,
+    speed: 7.5,
+    exitSpeed: 7.5,
+    brake: 40,
+    dir: -1,
+    ground: SIDEWALK_Y,
+    stops: [225],
+    beats: [
+      {until: 3.4, frame: 4},
+      {until: 6.2, frame: 5, fps: 2.5, bob: true},
+      {until: 6.8, frame: 4},
+    ],
+  },
+} satisfies Record<string, VignetteSpec>
+type VignetteKind = keyof typeof VIGNETTES
+// Bảng menu (chữ A) trên vỉa hè bên kia đường, bên trái chỗ cặp đôi dừng lại đọc
+const MENU_BOARD_X = 214
 
 // Hạt giả ngẫu nhiên cố định theo chỉ số (vệt mưa, đèn phố đêm không nhảy chỗ mỗi khung)
 const seeded = (i: number, k = 0) => {
@@ -295,11 +376,11 @@ export class ChillScene {
   // Phố nhoè như tranh màu nước khi mưa (thu nhỏ rồi phóng lại có làm mịn)
   private softStreet: HTMLCanvasElement | null = null
   private softStreetOf: HTMLImageElement | null = null
-  private shipper: {x: number; target: number; speed: number; stopT: number; leaving: boolean} | null = null
-  private nextShipper = 10
-  private shipperImg: HTMLImageElement | null = null
-  private shipperTinted: HTMLCanvasElement | null = null
-  private shipperKey = ''
+  private vignette: {kind: VignetteKind; x: number; target: number; speed: number; step: number; stopT: number; leaving: boolean} | null =
+    null
+  private nextVignette = 10
+  private lastVignette: VignetteKind | null = null
+  private vignetteImgs: Partial<Record<VignetteKind, {img: HTMLImageElement; tinted: HTMLCanvasElement | null; key: string}>> = {}
   private groupChars: HTMLImageElement | null = null
   private groupCharsTinted: HTMLCanvasElement | null = null
   private groupCharsKey = ''
@@ -601,7 +682,7 @@ export class ChillScene {
       const busy = this.time === 'night' ? 2 : 1
       this.nextVehicle = (1.3 + this.rng() * 2.6) * busy * (rainy ? 1.5 : 1)
     }
-    this.updateShipper(dt)
+    this.updateVignette(dt)
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
@@ -1196,9 +1277,10 @@ export class ChillScene {
       gc.drawImage(img, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
       const counter = this.ctx
       this.ctx = gc
-      // Vỉa hè → shipper đỗ ở mép lề → làn xa (xe chạy qua che trước mặt anh ấy)
+      // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
+      this.drawMenuBoard()
       for (const m of this.movers) if (!m.road) this.drawMover(m, t)
-      this.drawShipper(t)
+      this.drawVignette(t)
       for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane)) this.drawMover(m, t)
       this.ctx = counter
       if (rain) {
@@ -1288,88 +1370,115 @@ export class ChillScene {
     return brick
   }
 
-  // Shipper chỉ xuất hiện khi đang nhìn vách kính (không mưa), mỗi 35–65 giây
-  private updateShipper(dt: number) {
-    const sh = this.shipper
-    if (!sh) {
+  private updateVignette(dt: number) {
+    const v = this.vignette
+    if (!v) {
       if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain') return
-      this.shipperLayer()
-      this.nextShipper -= dt
-      if (this.nextShipper > 0) return
-      this.nextShipper = 35 + this.rng() * 30
-      // Chạy làn xa nên đi từ phải sang trái (sprite lật), tấp vào 1 khe ngẫu nhiên
-      this.shipper = {x: SCENE_W + 12, target: pick(this.rng, SHIPPER_STOPS), speed: 28, stopT: -1, leaving: false}
+      for (const kind of Object.keys(VIGNETTES) as VignetteKind[]) this.vignetteLayer(kind)
+      this.nextVignette -= dt
+      if (this.nextVignette > 0) return
+      this.nextVignette = 30 + this.rng() * 20
+      // Không lặp lại cảnh vừa xem
+      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette)
+      const kind = pick(this.rng, kinds)
+      this.lastVignette = kind
+      const spec: VignetteSpec = VIGNETTES[kind]
+      const x = spec.dir > 0 ? -12 : SCENE_W + 12
+      this.vignette = {kind, x, target: pick(this.rng, spec.stops), speed: spec.speed, step: 0, stopT: -1, leaving: false}
       return
     }
-    if (sh.leaving) {
-      sh.speed = Math.min(30, sh.speed + 20 * dt)
-      sh.x -= sh.speed * dt
-      if (sh.x < -30) this.shipper = null
+    const spec: VignetteSpec = VIGNETTES[v.kind]
+    if (v.leaving) {
+      v.speed = Math.min(spec.exitSpeed, v.speed + 20 * dt)
+    } else if (v.stopT >= 0) {
+      v.stopT += dt
+      if (v.stopT >= spec.beats[spec.beats.length - 1].until) v.leaving = true
       return
-    }
-    if (sh.stopT >= 0) {
-      sh.stopT += dt
-      if (sh.stopT >= SHIPPER_BEATS[SHIPPER_BEATS.length - 1][0]) {
-        sh.leaving = true
-        sh.speed = 0
+    } else {
+      // Phanh đều để dừng đúng chỗ
+      const dist = (v.target - v.x) * spec.dir
+      v.speed = Math.min(spec.speed, Math.sqrt(2 * spec.brake * Math.max(0, dist)))
+      if (dist < 0.3 || v.speed < 0.5) {
+        v.x = v.target
+        v.speed = 0
+        v.stopT = 0
+        return
       }
-      return
     }
-    // Phanh đều để dừng đúng chỗ
-    const dist = sh.x - sh.target
-    sh.speed = Math.min(28, Math.sqrt(2 * 18 * Math.max(0, dist)))
-    sh.x -= sh.speed * dt
-    if (dist < 0.3 || sh.speed < 0.5) {
-      sh.x = sh.target
-      sh.speed = 0
-      sh.stopT = 0
-    }
+    v.x += spec.dir * v.speed * dt
+    v.step += v.speed * dt
+    if (v.x < -40 || v.x > SCENE_W + 40) this.vignette = null
   }
 
-  private shipperLayer() {
-    this.shipperImg ??= loadImage(SHIPPER.src, () => (this.shipperKey = ''))
-    if (!ready(this.shipperImg)) return null
+  private vignetteLayer(kind: VignetteKind) {
+    const slot = (this.vignetteImgs[kind] ??= {img: loadImage(VIGNETTES[kind].src, () => (slot.key = '')), tinted: null, key: ''})
+    if (!ready(slot.img)) return null
     const key = this.tint ?? 'none'
-    if (this.shipperTinted && this.shipperKey === key) return this.shipperTinted
-    this.shipperTinted = this.tinted(this.shipperImg, this.shipperTinted)
-    this.shipperKey = key
-    return this.shipperTinted
+    if (slot.tinted && slot.key === key) return slot.tinted
+    slot.tinted = this.tinted(slot.img, slot.tinted)
+    slot.key = key
+    return slot.tinted
   }
 
   // Vẽ trong hệ lưới phố (this.ctx đang là lớp kính, đã phóng theo vùng kính)
-  private drawShipper(t: number) {
-    const sh = this.shipper
-    if (!sh) return
-    const ctx = this.ctx
-    const base = this.groundY(SIDEWALK_Y + 4, sh.x)
-    const snap = SCALE * SPRITE_SCALE
-    const img = this.shipperLayer()
+  private drawVignette(t: number) {
+    const v = this.vignette
+    if (!v) return
+    const spec: VignetteSpec = VIGNETTES[v.kind]
+    const img = this.vignetteLayer(v.kind)
     if (!img) return
-    let frame = 0
+    const ctx = this.ctx
+    const base = this.groundY(spec.ground, v.x)
+    const snap = SCALE * SPRITE_SCALE
+    let frame: number
     let bob = 0
-    if (sh.stopT < 0 || sh.leaving) {
-      if (sh.speed > 1 && (t * 2.5) % 1 < 0.14) bob = 0.5
+    if (v.stopT < 0 || v.leaving) {
+      frame = spec.stride ? spec.walk[Math.floor(v.step / spec.stride) % spec.walk.length] : spec.walk[0]
+      if (spec.ride && v.speed > 1 && (t * 2.5) % 1 < 0.14) bob = 0.5
     } else {
-      const beat = SHIPPER_BEATS.find(([end]) => sh.stopT < end)?.[1] ?? 'stop'
-      frame = beat === 'stop' ? 1 : beat === 'talk' ? 2 : 3
-      // Đang nói: gật gù chậm; cười: người rung nhẹ
-      if (beat === 'talk' && Math.floor(sh.stopT * 1.6) % 2) bob = 0.25
-      if (beat === 'laugh' && Math.floor(sh.stopT * 5) % 2) bob = 0.25
+      const beat = spec.beats.find((b) => v.stopT < b.until) ?? spec.beats[spec.beats.length - 1]
+      const on = beat.fps ? Math.floor(v.stopT * beat.fps) % 2 === 1 : false
+      frame = on && beat.alt !== undefined ? beat.alt : beat.frame
+      if (on && beat.bob) bob = 0.25
     }
-    const src = [frame * SHIPPER.w, 0, SHIPPER.w, SHIPPER.h]
-    const front = SHIPPER.frontX
-    const w = src[2] / snap
-    const h = src[3] / snap
-    // Sprite hướng phải, chạy sang trái → lật; giữ tâm bánh trước tại sh.x
-    const left = Math.round((sh.x - (src[2] - front) / snap) * snap) / snap
+    const w = spec.w / snap
+    const h = spec.h / snap
+    // Giữ điểm neo (bánh trước / giữa người) tại v.x; đi sang trái thì lật
+    const anchor = spec.dir > 0 ? spec.anchor : spec.w - spec.anchor
+    const left = Math.round((v.x - anchor / snap) * snap) / snap
     const y = Math.round((base - h - bob) * snap) / snap
     ctx.fillStyle = this.time === 'night' ? 'rgba(0,0,0,0.14)' : 'rgba(0,0,0,0.2)'
     ctx.fillRect(left + w * 0.1, base - 1, w * 0.8, 1)
     ctx.save()
-    ctx.translate(left * 2 + w, 0)
-    ctx.scale(-1, 1)
-    ctx.drawImage(img, src[0], src[1], src[2], src[3], left, y, w, h)
+    if (spec.dir < 0) {
+      ctx.translate(left * 2 + w, 0)
+      ctx.scale(-1, 1)
+    }
+    ctx.drawImage(img, frame * spec.w, 0, spec.w, spec.h, left, y, w, h)
     ctx.restore()
+  }
+
+  // Bảng menu chữ A bằng gỗ, mặt bảng đen viết phấn (vẽ khối pixel, lưới phố)
+  private drawMenuBoard() {
+    const ctx = this.ctx
+    const o = this.o
+    const x = MENU_BOARD_X
+    const base = this.groundY(SIDEWALK_Y, x)
+    const R = (rx: number, ry: number, rw: number, rh: number, c: string) => {
+      ctx.fillStyle = c
+      ctx.fillRect(rx, ry, rw, rh)
+    }
+    const q = 0.25 // 1 px ảnh atlas
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'
+    ctx.fillRect(x - 2.5, base - 0.5, 6, 0.5)
+    R(x - 2.25, base - 7.5, 0.5, 7.5, o('#5a3820'))
+    R(x + 2.25, base - 7.5, 0.5, 7.5, o('#5a3820'))
+    R(x - 2.25, base - 7.75, 5, 5.5, o('#2a1d15'))
+    R(x - 2, base - 7.5, 4.5, 5, o('#2f3b33'))
+    // Dòng phấn: tiêu đề + 3 món
+    R(x - 1.25, base - 7, 3, q, o('#f1e6cf'))
+    for (let i = 0; i < 3; i++) R(x - 1.5, base - 6 + i * 1.1, 2 + (i % 2) * 1, q, o(i === 1 ? '#f2b8a0' : '#e8dfcf'))
+    R(x - 2.25, base - 2.25, 5, q, o('#2a1d15'))
   }
 
   // Nắng qua vách kính: sáng xiên trắng ngà, chiều vàng mật ong, dài và thấp hơn.

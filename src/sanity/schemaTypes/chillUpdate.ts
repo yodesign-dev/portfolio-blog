@@ -29,6 +29,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Mở bảng cài đặt', value: 'settings'},
   {title: 'Bật "Ngắm cảnh" (ẩn bảng điều khiển)', value: 'zen'},
   {title: 'Mời bạn vào bàn nhóm', value: 'table'},
+  {title: 'Thử vách kính ở bàn nhóm', value: 'glass'},
 ]
 
 export default defineType({

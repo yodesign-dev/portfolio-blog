@@ -216,3 +216,13 @@ text, no frame borders.
 ```
 
 Hậu kỳ: khoét nền xanh, khử ám xanh ở viền, thu cả dải về cao 92 px (bằng sprite `bike-boxes`), alpha cứng.
+
+**Mẹ và bé** (`mom.webp`, 5 khung 41×68: đi ×3 · bé kéo tay chỉ trỏ · bé nhảy cẫng) và **cặp đôi** (`couple.webp`, 6 khung 66×66: đi ×4 · chỉ vào menu · nhún vai cười). Nano Banana 2, 21:9, ảnh tham chiếu atlas phố. Prompt mở đầu giống nhau:
+
+```
+Pixel art sprite sheet in EXACTLY the same style, scale, 1px dark outlines and
+palette as the pedestrians in the reference sprite atlas (the walking people on the
+right side of the reference). Side view, facing RIGHT.
+```
+
+rồi tả nhân vật + 6 khung (1–4 đi bộ, 5–6 hành động), nền xanh chroma, không chữ. Model hay trả khác số khung yêu cầu (mẹ và bé ra 5 khung, cặp đôi ra 2 hàng × 4) → cắt theo ô thực tế (`pack.py` trong ghi chú: khoét nền, khử ám xanh, thu cả bộ về cao 68 / 66 px = người đi bộ trong atlas).

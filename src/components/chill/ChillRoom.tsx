@@ -27,6 +27,12 @@ const ZEN_SEEN_KEY = 'chill:zen-seen'
 const ZEN_HINT_KEY = 'chill:zen-hint'
 const ZEN_HINT_DELAY_MS = 4000
 const ZEN_HINT_MS = 9000
+// Vách kính (bàn nhóm): đã thử đổi tường lần nào chưa (chưa → chấm cam ở tab Atmosphere
+// khi đang ngồi bàn), đã hiện bong bóng gợi ý trong cảnh bàn nhóm chưa
+const WALL_SEEN_KEY = 'chill:wall-seen'
+const WALL_HINT_KEY = 'chill:wall-hint'
+const WALL_HINT_DELAY_MS = 1600
+const WALL_HINT_MS = 9000
 // Gợi ý hiện sau khi bấm Play bao lâu, và tự ẩn sau bao lâu
 const SETTINGS_HINT_DELAY_MS = 3000
 const SETTINGS_HINT_MS = 8000
@@ -82,6 +88,12 @@ const WEATHERS: {value: Weather; label: string; icon: React.ReactNode}[] = [
   {value: 'clear', label: 'Clear', icon: <SunIcon />},
   {value: 'rain', label: 'Rain', icon: <RainIcon />},
   {value: 'mist', label: 'Mist', icon: <MistIcon />},
+]
+
+// Phía sau bàn nhóm (chỉ quán cà phê có bàn nhóm)
+const WALLS: {value: GroupWall; label: string; icon: React.ReactNode}[] = [
+  {value: 'brick', label: 'Brick', icon: <BrickIcon />},
+  {value: 'glass', label: 'Glass', icon: <GlassIcon />},
 ]
 
 const AMBIENCE_FOR: Record<Weather, {kind: Ambience; label: string}> = {
@@ -670,6 +682,13 @@ export function ChillRoom({
       // Bàn nhóm chỉ có ở quán cà phê
       setTheme('cafe')
       setTableSignal((n) => n + 1)
+    } else if (kind === 'glass') {
+      // Đang ngồi bàn → sang bàn nhóm, bật vách kính; chưa có bàn → mở màn tạo bàn
+      setTheme('cafe')
+      if (tableMembers) {
+        chooseWall('glass')
+        setGroupView(true)
+      } else setTableSignal((n) => n + 1)
     }
   }
 
@@ -834,6 +853,60 @@ export function ChillRoom({
     return () => window.clearTimeout(t)
   }, [zenHint])
   const showHintTip = hintTip && !settingsSeen && !panelOpen && !volumeOpen && !otherOverlay
+
+  // Vách kính chỉ thấy ở bàn nhóm → giới thiệu đúng lúc: bong bóng 1 lần khi vừa lia máy
+  // vào bàn nhóm ("Thử ngay"), chấm cam ở tab Atmosphere tới lần đổi tường đầu tiên
+  const [wallSeen, setWallSeen] = useState(true)
+  const [wallHint, setWallHint] = useState(false)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+      setWallSeen(localStorage.getItem(WALL_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → không làm phiền
+    }
+  }, [])
+  const chooseWall = useCallback(
+    (value: GroupWall) => {
+      setWallHint(false)
+      if (!wallSeen) {
+        setWallSeen(true)
+        try {
+          localStorage.setItem(WALL_SEEN_KEY, '1')
+        } catch {
+          // bỏ qua
+        }
+      }
+      if (value === groupWall) return
+      setGroupWall(value)
+      trackEvent({name: 'Chill Table', props: {action: value === 'glass' ? 'wall-glass' : 'wall-brick'}})
+    },
+    [wallSeen, groupWall],
+  )
+  useEffect(() => {
+    if (!groupView || wallSeen || groupWall !== 'brick' || panelOpen || otherOverlay || zen) return
+    try {
+      if (localStorage.getItem(WALL_HINT_KEY) === '1') return
+    } catch {
+      return
+    }
+    // Chờ lia máy xong mới hiện
+    const t = window.setTimeout(() => {
+      setWallHint(true)
+      try {
+        localStorage.setItem(WALL_HINT_KEY, '1')
+      } catch {
+        // bỏ qua
+      }
+    }, WALL_HINT_DELAY_MS)
+    return () => window.clearTimeout(t)
+  }, [groupView, wallSeen, groupWall, panelOpen, otherOverlay, zen])
+  useEffect(() => {
+    if (!wallHint) return
+    const t = window.setTimeout(() => setWallHint(false), WALL_HINT_MS)
+    return () => window.clearTimeout(t)
+  }, [wallHint])
+  const wallFresh = !wallSeen && tableMembers !== null && theme === 'cafe'
   const [idle, setIdle] = useState(false)
   const [zenTip, setZenTip] = useState(false)
   // Thanh nhạc gọn trong Ngắm cảnh: mở danh sách bài (giữ thanh hiện trong lúc chọn)
@@ -1263,7 +1336,7 @@ export function ChillRoom({
       )}
 
       {groupView && (
-        <div className={`absolute left-3 top-28 z-10 flex flex-wrap items-center gap-2 sm:left-5 sm:top-20 ${fade}`}>
+        <div className={`absolute left-3 top-28 z-10 sm:left-5 sm:top-20 ${fade}`}>
           <button
             type="button"
             onClick={() => setGroupView(false)}
@@ -1272,30 +1345,44 @@ export function ChillRoom({
             <ArrowIcon dir="left" />
             Về chỗ cửa sổ
           </button>
-          {/* Phía sau bàn: tường gạch ấm, kín / vách kính nhìn ra phố đang chọn */}
-          <div role="group" aria-label="Phía sau bàn" className="flex h-9 items-center rounded-md border border-white/15 bg-[#2a1f18]/80 p-1 backdrop-blur">
-            {(
-              [
-                ['brick', 'Tường gạch'],
-                ['glass', 'Vách kính'],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={groupWall === value}
-                onClick={() => {
-                  if (groupWall === value) return
-                  setGroupWall(value)
-                  trackEvent({name: 'Chill Table', props: {action: value === 'glass' ? 'wall-glass' : 'wall-brick'}})
-                }}
-                className={`h-full rounded px-2.5 text-xs font-medium transition ${
-                  groupWall === value ? 'bg-[#e8b27d] text-[#2a1d15]' : 'text-[#ede6dd]/80 hover:text-white'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          {/* Gợi ý 1 lần: vách kính (cùng kiểu bong bóng "Ngắm cảnh") */}
+          <div
+            role="status"
+            className={`absolute left-0 top-full mt-2 w-[min(290px,calc(100vw-24px))] transition duration-300 ${
+              wallHint ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
+            }`}
+          >
+            {wallHint && (
+              <div className="flex items-start gap-2 rounded-xl border border-[#e8b27d]/30 bg-[#1b1a21]/95 p-3 text-left shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md">
+                <span aria-hidden className="mt-0.5 text-sm leading-none">
+                  🪟
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Vách kính</span>
+                  <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Đổi tường gạch thành vách kính nhìn ra phố</span>
+                  <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <button
+                      type="button"
+                      onClick={() => chooseWall('glass')}
+                      className="rounded-md bg-[#e8b27d] px-2.5 py-1 text-xs font-medium text-[#2a1d15] transition hover:bg-[#f0c08f]"
+                    >
+                      Thử ngay
+                    </button>
+                    <span className="text-[11px] text-[#a79e94]">Đổi lại trong Cài đặt › Atmosphere</span>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWallHint(false)}
+                  aria-label="Ẩn gợi ý"
+                  className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#a79e94] transition hover:bg-white/10 hover:text-[#ede6dd]"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                    <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1713,6 +1800,7 @@ export function ChillRoom({
               >
                 {t.icon}
                 <span className="truncate">{t.label}</span>
+                {t.id === 'atmosphere' && wallFresh && <NewDot />}
                 <span
                   aria-hidden
                   className={`absolute inset-x-3 -bottom-px h-0.5 rounded-full transition ${on ? 'bg-[#e8b27d]' : 'bg-transparent'}`}
@@ -1915,6 +2003,42 @@ export function ChillRoom({
               <Field label="Weather">
                 <Segmented options={WEATHERS} value={weather} onChange={setWeather} />
               </Field>
+              {theme === 'cafe' && (
+                <Field
+                  label={
+                    <>
+                      Table wall
+                      {wallFresh && <NewDot />}
+                    </>
+                  }
+                >
+                  <div>
+                    <Segmented options={WALLS} value={groupWall} onChange={chooseWall} />
+                    {/* Chỉ thấy ở bàn nhóm → nói rõ tác dụng, dẫn tới chỗ xem được */}
+                    {!groupView && (
+                      <p className="mt-1.5 text-xs text-[#a79e94]">
+                        {tableMembers ? 'Đổi xong xem ngay · ' : 'Cảnh phía sau bàn nhóm · '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tableMembers) {
+                              setGroupView(true)
+                              // Điện thoại: bảng cài đặt che gần hết cảnh → đóng lại để xem
+                              if (!window.matchMedia('(min-width: 1024px)').matches) setPanelOpen(false)
+                            } else {
+                              setPanelOpen(false)
+                              setTableSignal((n) => n + 1)
+                            }
+                          }}
+                          className="text-[#e8b27d] underline-offset-2 transition hover:text-[#f3cfa8] hover:underline"
+                        >
+                          {tableMembers ? 'Sang bàn nhóm →' : 'Mời bạn ngồi chung →'}
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                </Field>
+              )}
               <Field label="Ambience">
                 <div className="flex items-center gap-3">
                   <input
@@ -1998,10 +2122,10 @@ function SectionTitle({index, title}: {index: string; title: string}) {
   )
 }
 
-function Field({label, children}: {label: string; children: React.ReactNode}) {
+function Field({label, children}: {label: React.ReactNode; children: React.ReactNode}) {
   return (
     <div className="grid items-center gap-2 sm:grid-cols-[6rem_minmax(0,1fr)]">
-      <span className="text-sm text-[#a79e94]">{label}</span>
+      <span className="flex items-center gap-1.5 text-sm text-[#a79e94]">{label}</span>
       {children}
     </div>
   )
@@ -2017,7 +2141,7 @@ function Segmented<T extends string>({
   onChange: (v: T) => void
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 p-1">
+    <div className={`grid gap-1 rounded-xl border border-white/10 p-1 ${options.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
       {options.map((o) => (
         <button
           key={o.value}
@@ -2322,6 +2446,32 @@ function RainIcon() {
   return (
     <svg {...iconProps}>
       <path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3M16 14v6M8 14v6M12 16v6" />
+    </svg>
+  )
+}
+
+// Chấm cam "tính năng mới" nhỏ, nằm cạnh chữ
+function NewDot() {
+  return (
+    <span aria-label="Mới" className="relative inline-flex h-2 w-2 shrink-0">
+      <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-[#f08a5d]" />
+    </span>
+  )
+}
+
+function BrickIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M3 5h18v14H3zM3 9.7h18M3 14.3h18M9 5v4.7M15 5v4.7M6 9.7v4.6M12 9.7v4.6M18 9.7v4.6M9 14.3V19M15 14.3V19" />
+    </svg>
+  )
+}
+
+function GlassIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M3 4h18v16H3zM12 4v16M3 9h18M6 17l3-3M14.5 17l4-4" />
     </svg>
   )
 }
