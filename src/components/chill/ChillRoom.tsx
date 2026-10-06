@@ -46,6 +46,7 @@ type Prefs = {
   travel: number
   theme: ThemeId
   panelTab: PanelTab
+  zen: boolean
 }
 
 // Bảng cài đặt chia 3 tab để khỏi cuộn dài — tab cuối cùng mở được nhớ lại
@@ -130,6 +131,9 @@ export function ChillRoom({
   const [destIndex, setDestIndex] = useState(0)
   const [travel, setTravel] = useState(5)
   const [theme, setTheme] = useState<ThemeId>('cafe')
+  // Chế độ Zen: giấu hết nút, chỉ còn cảnh động + nhạc. Bật / tắt bằng công tắc trên
+  // thanh trên (hoặc phím H); trong Zen công tắc chỉ hiện lại khi nhích chuột / chạm
+  const [zen, setZen] = useState(false)
   const [panelTab, setPanelTab] = useState<PanelTab>('music')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
@@ -203,6 +207,7 @@ export function ChillRoom({
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
     if (PANEL_TABS.some((t) => t.id === prefs.panelTab)) setPanelTab(prefs.panelTab!)
+    if (prefs.zen === true) setZen(true)
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setScenePaused(true)
     try {
       setCatPetted(localStorage.getItem(CAT_PETTED_KEY) === '1')
@@ -228,13 +233,14 @@ export function ChillRoom({
       travel,
       theme,
       panelTab,
+      zen,
     }
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme, panelTab])
+  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme, panelTab, zen])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -699,6 +705,27 @@ export function ChillRoom({
   const settingsGlow = hintShown && !settingsSeen
   const showHintTip = hintTip && !settingsSeen && !panelOpen && !volumeOpen && !otherOverlay
   const [idle, setIdle] = useState(false)
+  const [zenTip, setZenTip] = useState(false)
+  const toggleZen = useCallback(() => {
+    const next = !zen
+    if (next) {
+      // Vào Zen: đóng hết bảng đang mở, nhắc cách hiện lại công tắc
+      setPanelOpen(false)
+      setVolumeOpen(false)
+      setChatOpen(false)
+      setWishOpen(false)
+      setBoardOpen(false)
+      setUpdatesOpen(false)
+      setZenTip(true)
+    }
+    setZen(next)
+    trackEvent({name: 'Chill Zen', props: {on: next ? 'on' : 'off'}})
+  }, [zen])
+  useEffect(() => {
+    if (!zenTip) return
+    const t = window.setTimeout(() => setZenTip(false), 3500)
+    return () => window.clearTimeout(t)
+  }, [zenTip])
   const [hovering, setHovering] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [canFullscreen, setCanFullscreen] = useState(false)
@@ -778,7 +805,12 @@ export function ChillRoom({
           setUpdatesOpen(false)
           setWishOpen((o) => !o)
           break
+        case 'h':
+        case 'H':
+          toggleZen()
+          break
         case 'Escape':
+          setZen(false)
           setGroupView(false)
           setVolumeOpen(false)
           setChatOpen(false)
@@ -790,7 +822,7 @@ export function ChillRoom({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [togglePlay, next, prev, toggleFullscreen])
+  }, [togglePlay, next, prev, toggleFullscreen, toggleZen])
 
   // Đang phát nhạc thì giữ màn hình không tự tắt (trình duyệt tự nhả khi tab ẩn)
   useEffect(() => {
@@ -833,7 +865,7 @@ export function ChillRoom({
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
-    <div className={`relative h-dvh w-full select-none overflow-hidden bg-[#16131a] text-[#ede6dd] ${hideUi ? 'cursor-none' : ''}`}>
+    <div className={`relative h-dvh w-full select-none overflow-hidden bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle) ? 'cursor-none' : ''}`}>
       <h1 className="sr-only">Chill for work — slow morning, strong coffee</h1>
 
       {/* Ngang: cảnh phủ kín màn hình · Dọc (điện thoại): giữ nguyên khung, không cắt mất người ngồi */}
@@ -847,6 +879,25 @@ export function ChillRoom({
             : `Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`
         }
       />
+
+      {/* Zen: công tắc nổi một mình ở góc, chỉ hiện khi vừa nhích chuột / chạm */}
+      {zen && (
+        <div
+          className={`absolute right-3 top-3 z-40 flex flex-col items-end gap-2 transition-opacity duration-500 sm:right-5 sm:top-5 ${
+            idle && !zenTip ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
+        >
+          <ZenToggle on onToggle={toggleZen} />
+          {zenTip && (
+            <p role="status" className="rounded-md bg-black/55 px-2.5 py-1.5 text-[11px] text-[#f6dcbd] backdrop-blur">
+              Nhích chuột hoặc chạm màn hình để hiện lại công tắc · phím H
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Mọi nút / bảng nằm trong lớp này — Zen thì giấu cả lớp, cảnh + nhạc vẫn chạy */}
+      <div className={zen ? 'hidden' : 'contents'}>
 
       {/* Bàn nhóm: bảng tên trên đầu từng người + nhãn "+n" + nút quay về quầy.
           Hiện sau khi lia máy xong (~1,2 giây) để không trôi theo cảnh. */}
@@ -1004,6 +1055,7 @@ export function ChillRoom({
               onHoldToast={updatesSeen.holdToast}
             />
           )}
+          <ZenToggle on={false} onToggle={toggleZen} />
           <span className="pointer-events-none flex h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
             {clock}
           </span>
@@ -1511,6 +1563,7 @@ export function ChillRoom({
           <span className="uppercase tracking-[0.2em] text-white/30 sm:basis-full">No rush. Just coffee. · Art &amp; music made with AI.</span>
         </div>
       </aside>
+      </div>
     </div>
   )
 }
@@ -1606,6 +1659,28 @@ function RoundButton({label, onClick, children}: {label: string; onClick: () => 
       className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-[#ede6dd] transition hover:bg-white/[0.06]"
     >
       {children}
+    </button>
+  )
+}
+
+// Công tắc Zen: viên thuốc có nhãn + rãnh gạt, bấm là bật / tắt (role="switch")
+function ZenToggle({on, onToggle}: {on: boolean; onToggle: () => void}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label="Zen mode — chỉ cảnh và nhạc (H)"
+      title="Zen — ẩn hết nút, chỉ còn cảnh và nhạc (H)"
+      onClick={onToggle}
+      className={`flex h-9 items-center gap-2 rounded-md px-2.5 text-xs font-medium backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+        on ? 'bg-[#e8b27d]/90 text-[#2a1a10] hover:bg-[#f0c08f]' : 'bg-black/45 text-white/90 hover:bg-black/65'
+      }`}
+    >
+      <span className="hidden sm:inline">Zen</span>
+      <span aria-hidden className={`relative h-4 w-7 rounded-full transition-colors ${on ? 'bg-[#2a1a10]/35' : 'bg-white/20'}`}>
+        <span className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${on ? 'left-3.5 bg-[#2a1a10]' : 'left-0.5 bg-white/85'}`} />
+      </span>
     </button>
   )
 }

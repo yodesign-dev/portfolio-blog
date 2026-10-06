@@ -18,6 +18,7 @@ export type AnalyticsEvent =
   | {name: 'Chill Updates Open'; props: {from: string}}
   | {name: 'Chill Update Try'; props: {action: string}}
   | {name: 'Chill Table'; props: {action: 'create' | 'join' | 'copy' | 'leave' | 'view'}}
+  | {name: 'Chill Zen'; props: {on: 'on' | 'off'}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {
