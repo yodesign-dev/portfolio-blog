@@ -27,7 +27,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Mở Wishlist', value: 'wishlist'},
   {title: 'Mở phòng chat', value: 'chat'},
   {title: 'Mở bảng cài đặt', value: 'settings'},
-  {title: 'Bật chế độ Zen', value: 'zen'},
+  {title: 'Bật "Ẩn nút" (chỉ cảnh + nhạc)', value: 'zen'},
 ]
 
 export default defineType({

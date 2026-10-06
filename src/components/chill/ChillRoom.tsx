@@ -941,7 +941,7 @@ export function ChillRoom({
           <ZenToggle on onToggle={toggleZen} />
           {zenTip && (
             <p role="status" className="rounded-md bg-black/55 px-2.5 py-1.5 text-[11px] text-[#f6dcbd] backdrop-blur">
-              Nhích chuột hoặc chạm màn hình để hiện lại công tắc · phím H
+              Nhích chuột hoặc chạm màn hình để hiện lại công tắc “Ẩn nút” · phím H
             </p>
           )}
         </div>
@@ -1735,8 +1735,8 @@ function ZenToggle({
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label={fresh ? 'Zen mode, new — chỉ cảnh và nhạc (H)' : 'Zen mode — chỉ cảnh và nhạc (H)'}
-        title="Zen — ẩn hết nút, chỉ còn cảnh và nhạc (H)"
+        aria-label={fresh ? 'Ẩn nút (mới): chỉ còn cảnh và nhạc, phím H' : 'Ẩn nút: chỉ còn cảnh và nhạc, phím H'}
+        title="Ẩn hết nút, chỉ còn cảnh và nhạc (phím H)"
         onClick={onToggle}
         className={`relative flex h-9 items-center gap-2 rounded-md border px-2.5 text-xs font-medium shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
           on
@@ -1745,7 +1745,8 @@ function ZenToggle({
         }`}
       >
         {fresh && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-md border-2 border-[#e8b27d]" />}
-        <span className="hidden sm:inline">Zen</span>
+        <EyeOffIcon />
+        <span className="hidden sm:inline">Ẩn nút</span>
         <span aria-hidden className={`relative h-4 w-7 rounded-full transition-colors ${on ? 'bg-[#2a1a10]/35' : 'bg-white/20'}`}>
           <span className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${on ? 'left-3.5 bg-[#2a1a10]' : 'left-0.5 bg-[#f6dcbd]'}`} />
         </span>
@@ -1770,8 +1771,8 @@ function ZenToggle({
               🍃
             </span>
             <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Zen</span>
-              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Ẩn hết nút, chỉ còn cảnh và nhạc</span>
+              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Ẩn nút</span>
+              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Gạt công tắc là ẩn hết nút, chỉ còn cảnh và nhạc</span>
               <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">Bật thử → (phím H)</span>
             </button>
             <button
@@ -1788,6 +1789,16 @@ function ZenToggle({
         )}
       </div>
     </div>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M2 8s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M3 13L13 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
   )
 }
 
