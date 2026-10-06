@@ -958,11 +958,12 @@ export function ChillRoom({
       )}
 
       {/* Ngắm cảnh: thanh nhạc gọn giữa đáy — lùi / phát / sang bài, tên bài, mở danh sách.
-          Hiện cùng công tắc khi nhích chuột / chạm, để yên thì ẩn cho trọn "tranh động" */}
+          Luôn hiện để đổi nhạc được ngay; để yên thì mờ đi cho đỡ che cảnh, rê chuột /
+          chạm là rõ lại */}
       {zen && (
         <div
-          className={`absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[min(420px,calc(100vw-24px))] -translate-x-1/2 transition-opacity duration-500 ${
-            idle && !zenTip && !zenList ? 'pointer-events-none opacity-0' : 'opacity-100'
+          className={`absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[min(420px,calc(100vw-24px))] -translate-x-1/2 transition-opacity duration-700 ${
+            idle && !zenTip && !zenList ? 'opacity-35 hover:opacity-100 focus-within:opacity-100' : 'opacity-100'
           }`}
         >
           {zenList && (
