@@ -24,9 +24,32 @@ export const K = {
   joinLock: "chill:chat:joinlock",
   typing: "chill:chat:typing", // zset `who` → lần cuối gõ (ms); chỉ người đang ở bàn nhóm gửi
   pass: (p: string) => `chill:chat:pass:${p}`,
+  // Máy này đã qua Turnstile trong 24h → báo cáo của máy mới được tính
+  verified: (ip: string) => `chill:chat:ok:${ip}`,
   last: (ip: string) => `chill:chat:last:${ip}`,
   rate: (ip: string) => `chill:chat:rl:${ip}`,
+  // Giới hạn riêng từng thao tác: hello / react / report / typing
+  act: (action: string, ip: string) => `chill:chat:rl:${action}:${ip}`,
 };
+
+// Đếm số lần trong cửa sổ `seconds`; true = đã vượt `count`. Không có Redis (hoặc Redis
+// lỗi) thì cho qua — mời cà phê / thả tim không được hỏng chỉ vì bộ đếm.
+export async function overLimit(r: Redis | null, key: string, count: number, seconds: number) {
+  if (!r) return false;
+  try {
+    const p = r.pipeline();
+    p.incr(key);
+    p.expire(key, seconds, "NX");
+    const [n] = (await p.exec()) as [number, number];
+    return n > count;
+  } catch (error) {
+    console.error("chill rate limit error:", error);
+    return false;
+  }
+}
+
+// Giữ tối đa bấy nhiêu người trong bộ đếm online — uid giả tạo ồ ạt cũng không phình mãi
+export const MAX_ONLINE = 500;
 
 export const REACTIONS = ["☕", "❤️", "😂", "🐱"];
 export const COLORS = 8;

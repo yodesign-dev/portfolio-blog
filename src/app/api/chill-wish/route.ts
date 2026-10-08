@@ -2,6 +2,7 @@ import {createHash, randomUUID} from "node:crypto";
 import {after, NextRequest, NextResponse} from "next/server";
 import {Resend} from "resend";
 import {writeClient} from "@/sanity/lib/writeClient";
+import {overLimit, redis} from "@/lib/chillChat";
 
 // Wishlist của trang /chill.
 // GET  → danh sách góp ý đã duyệt (không bao giờ trả email / ipHash).
@@ -17,6 +18,9 @@ const CATEGORIES = ["feature", "music", "place", "bug", "other"];
 const ID_RE = /^chillWish\.[0-9a-f-]{36}$/;
 // Mỗi IP tối đa 3 góp ý / 10 phút
 const RATE = {count: 3, minutes: 10};
+// Thả/bỏ ❤️: mỗi IP tối đa 30 lần / 10 phút; mỗi IP chỉ tính 1 tim cho mỗi góp ý
+const HEART_RATE = {count: 30, seconds: 600};
+const HEART_TTL_S = 365 * 24 * 60 * 60;
 
 type Wish = {
   id: string;
@@ -54,7 +58,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    if (body?.action === "heart") return heart(body);
+    if (body?.action === "heart") return heart(request, body);
     if (body?.action === "submit") return submit(request, body);
     return NextResponse.json({error: "Unknown action"}, {status: 400});
   } catch (error) {
@@ -77,9 +81,14 @@ async function mineStatuses(param: string) {
   }
 }
 
-async function heart({id, on}: {id?: unknown; on?: unknown}) {
+async function heart(request: NextRequest, {id, on}: {id?: unknown; on?: unknown}) {
   if (typeof id !== "string" || !ID_RE.test(id)) {
     return NextResponse.json({error: "Invalid id"}, {status: 400});
+  }
+  const r = redis();
+  const ip = hashIp(request);
+  if (await overLimit(r, `chill:wish:rl:heart:${ip}`, HEART_RATE.count, HEART_RATE.seconds)) {
+    return NextResponse.json({error: "Slow down a little ☕"}, {status: 429});
   }
   // Chỉ cho thả ❤️ vào góp ý đang hiện công khai
   const current = await writeClient.fetch<{hearts: number} | null>(
@@ -89,6 +98,14 @@ async function heart({id, on}: {id?: unknown; on?: unknown}) {
   if (!current) return NextResponse.json({error: "Not found"}, {status: 404});
   const delta = on === false ? -1 : 1;
   if (delta < 0 && current.hearts <= 0) return NextResponse.json({hearts: 0});
+  // Cùng 1 IP thả tim lần nữa (hoặc bỏ tim chưa từng thả) → không đổi số
+  if (r) {
+    const key = `chill:wish:hearts:${id}`;
+    const changed = await (delta > 0 ? r.sadd(key, ip) : r.srem(key, ip))
+      .then(async (n) => (await r.expire(key, HEART_TTL_S), n))
+      .catch(() => 1);
+    if (!changed) return NextResponse.json({hearts: current.hearts});
+  }
   const doc = await writeClient.patch(id).setIfMissing({hearts: 0}).inc({hearts: delta}).commit<{hearts: number}>();
   return NextResponse.json({hearts: doc.hearts});
 }
@@ -120,10 +137,7 @@ async function submit(
     return NextResponse.json({error: "Captcha check failed, please try again."}, {status: 400});
   }
 
-  const ipHash = createHash("sha256")
-    .update(`${ip ?? "unknown"}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
+  const ipHash = hashIp(request);
   const since = new Date(Date.now() - RATE.minutes * 60_000).toISOString();
   const recent = await writeClient.fetch<number>(
     `count(*[_type == "chillWish" && ipHash == $ipHash && _createdAt > $since])`,
@@ -173,6 +187,15 @@ async function submit(
   });
 
   return NextResponse.json({success: true, id});
+}
+
+// Cùng công thức băm với bản ghi cũ (ipHash trong Sanity) để giới hạn vẫn khớp
+function hashIp(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  return createHash("sha256")
+    .update(`${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
+    .digest("hex")
+    .slice(0, 24);
 }
 
 async function verifyTurnstile(token: string, ip: string | null) {

@@ -8,11 +8,13 @@ import {
   idTime,
   joinEvent,
   K,
+  MAX_ONLINE,
   ONLINE_WINDOW_MS,
   REACTIONS,
   checkText,
   clean,
   newId,
+  overLimit,
   pushMessage,
   redis,
   sweepExtras,
@@ -35,6 +37,8 @@ import {
 // Studio → "Chill · Cài đặt" → tắt "Mở phòng chat" để đóng chat khẩn cấp.
 
 const RATE = {count: 20, seconds: 600, gap: 3};
+// Mỗi IP / 10 phút. hello ~1 lần/phút/tab → 60 đủ cho vài người chung wifi
+const ACT_RATE = {hello: 60, react: 60, report: 10, seconds: 600};
 const REPORTS_TO_HIDE = 3;
 // Còn "đang gõ" bao lâu sau lần gõ cuối
 const TYPING_MS = 6000;
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
     const uid = typeof body.uid === "string" && UID_RE.test(body.uid) ? body.uid : "";
     switch (body.action) {
       case "hello":
-        return hello(uid);
+        return hello(request, uid);
       case "send":
         return send(request, uid, body);
       case "react":
@@ -108,7 +112,7 @@ export async function POST(request: NextRequest) {
       case "report":
         return report(request, body);
       case "typing":
-        return typing(uid);
+        return typing(request, uid);
     }
     return NextResponse.json({error: "Unknown action"}, {status: 400});
   } catch (error) {
@@ -116,14 +120,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({error: "Chưa gửi được, thử lại nha."}, {status: 500});
   }
 
-  async function hello(uid: string) {
+  async function hello(request: NextRequest, uid: string) {
     if (!uid || !r) return NextResponse.json({ok: true});
+    // Quá nhịp → lặng lẽ bỏ qua (uid giả hàng loạt không bơm được số online)
+    if (await overLimit(r, K.act("hello", ipHash(request)), ACT_RATE.hello, ACT_RATE.seconds)) return NextResponse.json({ok: true});
     const now = Date.now();
     const p = r.pipeline();
     p.zremrangebyscore(K.online, 0, now - ONLINE_WINDOW_MS);
     p.zadd(K.online, {score: now, member: uid});
+    p.zremrangebyrank(K.online, 0, -(MAX_ONLINE + 1));
     p.expire(K.online, 600);
-    const [, added] = (await p.exec()) as [number, number, number];
+    const [, added] = (await p.exec()) as [number, number, number, number];
     // Khách mới vào → dòng sự kiện, tối đa 1 dòng / 3 phút cho cả quán
     if (added === 1 && (await chatOpen()) && (await r.set(K.joinLock, "1", {nx: true, ex: 180}))) {
       const ev = joinEvent();
@@ -148,13 +155,19 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
   // Vé chat còn hạn → khỏi Turnstile; chưa có → xác minh rồi cấp vé 24h
   let pass = typeof body.pass === "string" && /^[0-9a-f]{32}$/.test(body.pass) ? body.pass : "";
   let issued: string | undefined;
-  if (!pass || !(await r.get(K.pass(pass)))) {
+  // Vé chỉ dùng được từ đúng máy (IP) đã qua Turnstile — đổi mạng thì xác minh lại
+  // Lưu dạng "ip:<băm>" để Upstash không tự đọc nhầm thành số; vé cũ lưu băm trần
+  const owner = pass ? await r.get<string>(K.pass(pass)) : null;
+  if (!pass || (owner !== `ip:${ip}` && owner !== ip)) {
     const token = typeof body.captchaToken === "string" ? body.captchaToken : "";
     if (!token || !(await verifyTurnstile(token, request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null))) {
       return NextResponse.json({error: "Xác minh giúp mình bạn không phải robot nha.", needCaptcha: true}, {status: 401});
     }
     pass = randomBytes(16).toString("hex");
-    await r.set(K.pass(pass), ip, {ex: 24 * 60 * 60});
+    const p = r.pipeline();
+    p.set(K.pass(pass), `ip:${ip}`, {ex: 24 * 60 * 60});
+    p.set(K.verified(ip), "1", {ex: 24 * 60 * 60});
+    await p.exec();
     issued = pass;
   }
 
@@ -165,7 +178,8 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
   const p = r.pipeline();
   p.incr(K.rate(ip));
   p.expire(K.rate(ip), RATE.seconds, "NX");
-  const [count] = (await p.exec()) as [number, number];
+  p.set(K.verified(ip), "1", {ex: 24 * 60 * 60});
+  const [count] = (await p.exec()) as [number, number, string];
   if (count > RATE.count) return NextResponse.json({error: "Bạn nhắn hơi nhiều rồi, nghỉ tay chút nha ☕", pass: issued}, {status: 429});
 
   const ts = Date.now();
@@ -177,9 +191,11 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
 
 // "Đang gõ" của người đang ngồi bàn nhóm → bạn cùng bàn thấy "• • •" trên đầu nhân vật.
 // Chỉ lưu mã ẩn danh `who`, sống vài giây; client gửi tối đa 1 lần / 3 giây khi gõ
-async function typing(uid: string) {
+async function typing(request: NextRequest, uid: string) {
   const r = redis()!;
   if (!uid || !(await chatOpen())) return NextResponse.json({ok: true});
+  // Tối đa 1 nhịp "đang gõ" / 2 giây mỗi máy
+  if (!(await r.set(K.act("typing", ipHash(request)), "1", {nx: true, px: 2000}))) return NextResponse.json({ok: true});
   const now = Date.now();
   const p = r.pipeline();
   p.zremrangebyscore(K.typing, 0, now - TYPING_MS);
@@ -194,7 +210,11 @@ async function react(request: NextRequest, uid: string, body: Record<string, unk
   const id = typeof body.id === "string" && ID_RE.test(body.id) ? body.id : "";
   const emoji = typeof body.emoji === "string" && REACTIONS.includes(body.emoji) ? body.emoji : "";
   if (!uid || !id || !emoji || idTime(id) < Date.now() - DAY_MS) return NextResponse.json({error: "Bad reaction"}, {status: 400});
-  const who = `${id}|${emoji}|${ipHash(request)}:${uid}`;
+  const ip = ipHash(request);
+  if (await overLimit(r, K.act("react", ip), ACT_RATE.react, ACT_RATE.seconds)) {
+    return NextResponse.json({error: "Chậm lại chút nha ☕"}, {status: 429});
+  }
+  const who = `${id}|${emoji}|${ip}:${uid}`;
   const changed = body.on === false ? await r.srem(K.rxBy, who) : await r.sadd(K.rxBy, who);
   if (changed) {
     const p = r.pipeline();
@@ -210,7 +230,12 @@ async function report(request: NextRequest, body: Record<string, unknown>) {
   const r = redis()!;
   const id = typeof body.id === "string" && ID_RE.test(body.id) ? body.id : "";
   if (!id) return NextResponse.json({error: "Bad id"}, {status: 400});
-  if (!(await r.sadd(K.reportBy, `${id}|${ipHash(request)}`))) return NextResponse.json({ok: true});
+  const ip = ipHash(request);
+  // Chỉ tính báo cáo từ máy đã qua Turnstile trong 24h (người đã từng gửi tin) —
+  // 3 IP bất kỳ không xoá được tin của người khác. Bin vẫn đóng chat được trong Studio.
+  if (!(await r.get(K.verified(ip)))) return NextResponse.json({ok: true});
+  if (await overLimit(r, K.act("report", ip), ACT_RATE.report, ACT_RATE.seconds)) return NextResponse.json({ok: true});
+  if (!(await r.sadd(K.reportBy, `${id}|${ip}`))) return NextResponse.json({ok: true});
   const p = r.pipeline();
   p.hincrby(K.reports, id, 1);
   p.expire(K.reports, 24 * 60 * 60);

@@ -3,7 +3,7 @@ import {after, NextRequest, NextResponse} from "next/server";
 import {Resend} from "resend";
 import {writeClient} from "@/sanity/lib/writeClient";
 import {drinkFor} from "@/components/chill/donate-config";
-import {pushChatEvent} from "@/lib/chillChat";
+import {overLimit, pushChatEvent, redis} from "@/lib/chillChat";
 
 // Người ủng hộ ở mục "Buy Bin a coffee" trang /chill (Studio: "Chill · Supporters").
 //
@@ -30,6 +30,10 @@ const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const RATE = {count: 6, minutes: 10};
 // "update" chỉ nhận trong 2 giờ sau khi tạo
 const UPDATE_WINDOW_MS = 2 * 60 * 60 * 1000;
+// "sent" / "update" (mỗi lần là 1 mail báo Bin): mỗi IP tối đa 10 lần / 10 phút,
+// mỗi bản ghi tối đa 3 lần "update"
+const NOTIFY_RATE = {count: 10, seconds: 600};
+const UPDATES_PER_DOC = 3;
 
 type Body = Record<string, unknown>;
 
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (body.company) return NextResponse.json({success: true});
     if (body.action === "intent") return intent(request, body);
     if (body.action === "sent") return sent(request, body);
-    if (body.action === "update") return update(body);
+    if (body.action === "update") return update(request, body);
     return NextResponse.json({error: "Unknown action"}, {status: 400});
   } catch (error) {
     console.error("chill-support error:", error);
@@ -113,17 +117,22 @@ async function intent(request: NextRequest, body: Body) {
 }
 
 async function sent(request: NextRequest, body: Body) {
+  if (await overLimit(redis(), `chill:support:rl:${hashIp(request)}`, NOTIFY_RATE.count, NOTIFY_RATE.seconds)) {
+    return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
+  }
   const name = clean(body.name, 40);
   const note = clean(body.note, 40);
   const method = body.method === "momo" ? "momo" : "vcb";
   const amount = money(body.amount);
   const now = new Date().toISOString();
   let id = typeof body.id === "string" && ID_RE.test(body.id) ? body.id : "";
-  let doc: {name?: string; message?: string; code?: string; amount?: number} | null = null;
+  let doc: {name?: string; message?: string; code?: string; amount?: number; status?: string} | null = null;
 
   if (id) {
-    doc = await writeClient.fetch(`*[_id == $id][0]{name, message, code, amount}`, {id});
+    doc = await writeClient.fetch(`*[_id == $id][0]{name, message, code, amount, status}`, {id});
     if (!doc) id = "";
+    // Đã báo chuyển rồi → không gửi mail / dòng chat lần nữa (chặn spam bằng 1 id)
+    else if (doc.status === "sent") return NextResponse.json({id});
   }
   if (id) {
     await writeClient
@@ -180,12 +189,19 @@ async function sent(request: NextRequest, body: Body) {
   return NextResponse.json({id});
 }
 
-async function update(body: Body) {
+async function update(request: NextRequest, body: Body) {
   const id = typeof body.id === "string" && ID_RE.test(body.id) ? body.id : "";
   const name = clean(body.name, 40);
   const message = clean(body.message, 300);
   if (!id || (!name && !message)) return NextResponse.json({error: "Nothing to add."}, {status: 400});
   if (hasLink(`${name} ${message}`)) return NextResponse.json({error: "Please leave out links."}, {status: 400});
+  const r = redis();
+  if (
+    (await overLimit(r, `chill:support:rl:${hashIp(request)}`, NOTIFY_RATE.count, NOTIFY_RATE.seconds)) ||
+    (await overLimit(r, `chill:support:upd:${id}`, UPDATES_PER_DOC, UPDATE_WINDOW_MS / 1000))
+  ) {
+    return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
+  }
   const doc = await writeClient.fetch<{_createdAt: string} | null>(`*[_id == $id][0]{_createdAt}`, {id});
   if (!doc || Date.now() - new Date(doc._createdAt).getTime() > UPDATE_WINDOW_MS) {
     return NextResponse.json({error: "Not found"}, {status: 404});
