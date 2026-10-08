@@ -450,7 +450,9 @@ export class ChillScene {
   private movers: Mover[] = []
   private rain: Rain
   private notes: Note[] = []
-  private birds: {x: number; y: number; p: number} | null = null
+  // Đàn chim bay ngang trời: phố = én nâu xám vỗ nhanh; đồng quê = cò trắng vỗ chậm, lâu
+  // lâu dang cánh lượn. Mỗi con lệch vị trí + nhịp vỗ để không đều tăm tắp
+  private birds: {x: number; y: number; p: number; egret: boolean; flock: {dx: number; dy: number; ph: number}[]} | null = null
   private nextVehicle = 0.5
   private nextWalker = 2
   private nextBirds = 6
@@ -1064,13 +1066,22 @@ export class ChillScene {
 
     this.nextBirds -= dt
     if (this.nextBirds <= 0 && !this.birds && this.time !== 'night' && !rainy) {
-      this.birds = {x: this.theme.view.x - 10, y: this.theme.view.y + 5 + this.rng() * 10, p: 0}
-      this.nextBirds = 14 + this.rng() * 20
+      const egret = this.countryside
+      const n = egret ? 3 + Math.floor(this.rng() * 3) : 2 + Math.floor(this.rng() * 2)
+      // Hình chữ V lỏng: con đầu đi trước, các con sau lùi dần, so le trên / dưới
+      const flock = Array.from({length: n}, (_, i) => ({
+        dx: -i * (egret ? 7 : 6) + this.rng() * 2,
+        dy: (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (egret ? 2.5 : 2) + this.rng(),
+        ph: this.rng(),
+      }))
+      this.birds = {x: this.theme.view.x - 6, y: this.theme.view.y + 8 + this.rng() * 12, p: 0, egret, flock}
+      this.nextBirds = (egret ? 18 : 14) + this.rng() * 20
     }
     if (this.birds) {
-      this.birds.x += dt * 16
+      this.birds.x += dt * (this.birds.egret ? 9 : 16)
+      this.birds.y += Math.sin(this.birds.p * 0.8) * dt * 0.6
       this.birds.p += dt
-      if (this.birds.x > this.theme.view.x + this.theme.view.w + 10) this.birds = null
+      if (this.birds.x - (this.birds.flock.length - 1) * 7 > this.theme.view.x + this.theme.view.w + 6) this.birds = null
     }
 
     // Nốt nhạc bay lên từ tai nghe khi đang phát nhạc
@@ -1631,6 +1642,7 @@ export class ChillScene {
       this.ctx = gc
       // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
       if (!this.countryside) this.drawMenuBoard()
+      if (this.birds) this.drawBirds(this.birds)
       this.drawKids()
       this.drawFisher()
       for (const m of this.movers) if (!m.road) this.drawMover(m, t)
@@ -2172,18 +2184,64 @@ export class ChillScene {
     return canvas!
   }
 
-  private drawBirds(b: {x: number; y: number; p: number}) {
-    const up = Math.floor(b.p * 5) % 2 === 0
-    const col = this.o('#2e3440')
-    for (const [dx, dy] of [
-      [0, 0],
-      [9, 4],
-    ]) {
-      const x = b.x + dx
-      const y = b.y + dy
-      this.rect(x, y, 1, 1, col)
-      this.rect(x - 2, up ? y - 1 : y + 1, 2, 1, col)
-      this.rect(x + 1, up ? y - 1 : y + 1, 2, 1, col)
+  // Chim nhìn ngang, bay sang phải, vẽ bằng "pixel" 0,5 ô lưới (= 1 px ảnh phố) cho cùng độ
+  // mịn với cảnh. Cánh 4 nhịp: giơ cao → ngang → cụp xuống → ngang; cò lâu lâu dang cánh lượn
+  private drawBirds(b: NonNullable<ChillScene['birds']>) {
+    const egret = b.egret
+    // Cò to hơn én (bay thấp, gần hơn): 1 "pixel" = 3 px buffer; én 2 px
+    const q = egret ? 0.75 : 0.5
+    const ctx = this.ctx
+    const body = this.o(egret ? '#f4f1ea' : '#4a4038')
+    const shade = this.o(egret ? '#c9c4b8' : '#2e2824')
+    const beak = this.o(egret ? '#e8b23a' : '#2e2824')
+    const legs = this.o('#3a3530')
+    for (const m of b.flock) {
+      const x = Math.round((b.x + m.dx) / q) * q
+      const y = Math.round((b.y + m.dy + Math.sin(b.p * 2 + m.ph * 6) * 0.4) / q) * q
+      // Vẽ thẳng (this.rect làm tròn về nguyên ô → pixel nửa ô bị hở / chồng)
+      const P = (dx: number, dy: number, c: string) => {
+        ctx.fillStyle = c
+        ctx.fillRect(x + dx * q, y + dy * q, q, q)
+      }
+      const rate = egret ? 2.2 : 5
+      const t = b.p + m.ph * 3
+      // Cò: cứ ~5 giây lại dang cánh lượn chừng 1,5 giây (khung ngang)
+      const glide = egret && t % 5 > 3.5
+      const f = glide ? 1 : Math.floor(t * rate * 4) % 4
+      if (egret) {
+        // Thân, cổ rụt chữ S, đầu + mỏ vàng, chân thả dài phía sau
+        for (let k = -2; k <= 1; k++) P(k, 0, body)
+        P(2, -1, body)
+        P(3, -1, body)
+        P(4, -1, beak)
+        P(-3, 0, legs)
+        P(-4, 0, legs)
+        P(-1, 1, shade)
+      } else {
+        // Én: thân ngắn, đuôi chẻ
+        P(0, 0, body)
+        P(1, 0, body)
+        P(2, 0, beak)
+        P(-1, 0, body)
+        P(-2, -1, shade)
+        P(-2, 1, shade)
+      }
+      // Cánh (thấy 1 bên): giơ cao / ngang / cụp — cò cánh dài, đầu cánh xám
+      const wings = egret
+        ? [
+            [[0, -1], [-1, -1], [-1, -2], [-2, -2], [-2, -3], [-3, -4]],
+            [[1, -1], [0, -1], [-1, -1], [-2, -1], [-3, -1]],
+            [[0, 1], [-1, 1], [-1, 2], [-2, 3]],
+            [[1, -1], [0, -1], [-1, -1], [-2, -1], [-3, -1]],
+          ]
+        : [
+            [[0, -1], [-1, -2], [-1, -3]],
+            [[0, -1], [-1, -1]],
+            [[0, 1], [-1, 2]],
+            [[0, -1], [-1, -1]],
+          ]
+      const wing = wings[f]
+      wing.forEach(([dx, dy], k) => P(dx, dy, k >= wing.length - 1 ? shade : body))
     }
   }
 
