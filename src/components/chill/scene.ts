@@ -92,6 +92,7 @@ const GLASS = {
   // Ảnh phố phủ hết bề ngang kính (giữ đúng tỉ lệ); cropY = phần trên ảnh bị bỏ
   // để vỉa hè + làn xa nằm ngay trên bậu cửa, làn gần khuất sau ốp gỗ
   cropY: 0.22,
+  cropYCountry: 0.08,
   // Song cửa gỗ — chỉ dùng khi ảnh vách kính chưa tải xong (vẽ tạm)
   mullions: [0, 158, 316, 474, 634],
   transom: 64,
@@ -286,6 +287,45 @@ type Note = {x: number; y: number; age: number; drift: number}
 
 const BIKES: SpriteName[] = ['bike-cub', 'bike-vespa', 'bike-flowers', 'bike-boxes', 'bike-duo']
 const CARS = new Set<string>(['car-taxi', 'car-hatch', 'bus'])
+// Đường đất ven đồng (điểm đến "Đồng quê"): chỉ xe máy, xe đạp — không ô tô, xe buýt, xích lô
+const COUNTRY_BIKES: SpriteName[] = ['bike-cub', 'bike-flowers', 'bike-boxes', 'bike-duo', 'cyclist']
+// Lúa lắc lư theo gió: chỉ các pixel "lúa" (vàng / xanh lúa, tự dò trên ảnh) trong dải
+// ruộng giữa chân trời và đường đất, ruộng gần lắc mạnh hơn ruộng xa. Tính lại ~24 lần/giây.
+const WIND = {top: 0.45, bottom: 0.9, fps: 24}
+// Trẻ thả diều chạy qua lại trên bờ ruộng giữa đồng (cảnh đồng quê, trời không mưa,
+// không phải ban đêm; chiều có 2 bé). Sprite: kid-run.webp — n khung chạy cắt từ video
+// Kling, ô w×h px (4 px = 1 ô lưới phố); hand = tay cầm dây trong ô (hướng phải);
+// kid-run-2.webp = cùng bé, đổi màu áo. Diều, dây, đuôi vẽ bằng code.
+const KIDS = {
+  srcs: ['/chill/scenes/kid-run.webp', '/chill/scenes/kid-run-2.webp'],
+  w: 24,
+  h: 40,
+  n: 10,
+  hand: {x: 18.5, y: 3},
+  ground: 86, // chân trên bờ ruộng ngang giữa đồng (lưới phố)
+  minX: 128,
+  maxX: 292,
+  stride: 0.8, // quãng đường (ô lưới) mỗi khung chạy — 10 khung ≈ 12 khung/giây
+}
+// Chú quăng chài trên bờ kênh (cảnh đồng quê, không mưa; đêm thì về nhà).
+// fisher.webp: n khung cắt từ video Kling (quăng → chài xòe → kéo về), ô w×h px;
+// feet = điểm giữa hai bàn chân trong ô (hướng phải). Mặt quay về kênh bên trái → lật.
+// Quăng xong nghỉ 8–16 giây (đứng khung 0) rồi quăng tiếp.
+const FISHER = {
+  src: '/chill/scenes/fisher.webp',
+  w: 84,
+  h: 47,
+  n: 60,
+  fps: 12,
+  feet: {x: 19.4, y: 46.5},
+  x: 92, // trong ô cửa trái ở quầy (x≈104 rơi đúng thanh gỗ giữa 2 ô)
+  ground: 95.3,
+  dir: -1 as 1 | -1,
+}
+const KITE_COLORS = [
+  ['#d9483b', '#f2d24b'],
+  ['#3e7cc9', '#f4f1ea'],
+]
 // Vùng cửa kính (tỉ lệ theo sprite hướng phải) — sáng đèn bên trong lúc đêm
 const WINDOWS: Record<string, [number, number, number, number]> = {
   'car-taxi': [0.28, 0.12, 0.42, 0.28],
@@ -376,6 +416,26 @@ export class ChillScene {
   // Phố nhoè như tranh màu nước khi mưa (thu nhỏ rồi phóng lại có làm mịn)
   private softStreet: HTMLCanvasElement | null = null
   private softStreetOf: HTMLImageElement | null = null
+  // Ảnh phố đồng quê đã "thổi gió" (cùng kích thước ảnh gốc) — vẽ thay cho ảnh gốc
+  private kids: {x: number; dir: 1 | -1; speed: number; step: number}[] = []
+  private kites: {x: number; y: number; vx: number; vy: number; tail: {x: number; y: number}[]}[] = []
+  private fisher = {playing: false, t: 0, wait: 3}
+  private fisherImg: HTMLImageElement | null = null
+  private fisherTinted: HTMLCanvasElement | null = null
+  private fisherKey = ''
+  private kidImgs: (HTMLImageElement | null)[] = [null, null]
+  private kidTinted: (HTMLCanvasElement | null)[] = [null, null]
+  private kidKeys = ['', '']
+  private wind: {
+    of: HTMLImageElement
+    canvas: HTMLCanvasElement
+    base: ImageData | null
+    out: ImageData | null
+    mask: Uint8Array | null
+    rows: [number, number]
+    acc: number
+    t: number
+  } | null = null
   private vignette: {kind: VignetteKind; x: number; target: number; speed: number; step: number; stopT: number; leaving: boolean} | null =
     null
   private nextVignette = 10
@@ -484,6 +544,8 @@ export class ChillScene {
     this.time = time
     this.weather = weather
     this.destination = destination
+    // Sang đồng quê: ô tô, xe buýt, xích lô đang chạy trên phố cũ biến mất luôn
+    if (destination.scenery === 'countryside') this.movers = this.movers.filter((m) => !m.road || COUNTRY_BIKES.includes(m.sprite as SpriteName) || m.sprite === 'bike-poncho')
     this.tilt = destination.tilt ?? 0
     this.laneShift = destination.laneShift ?? 0
     this.dirty = true
@@ -661,8 +723,292 @@ export class ChillScene {
     return this.charFrame
   }
 
+  private get countryside() {
+    return this.destination.scenery === 'countryside'
+  }
+
+  // Ảnh để vẽ phố: cảnh đồng quê đã có lớp gió → dùng bản đã lắc
+  private streetSource(img: HTMLImageElement): CanvasImageSource {
+    const w = this.wind
+    return w && w.of === img && w.out ? w.canvas : img
+  }
+
+  // Chuẩn bị + cập nhật lúa lắc lư. Đọc pixel ảnh cần CORS → tải lại ảnh với
+  // crossOrigin (Sanity CDN cho phép); lỗi thì thôi, ảnh vẫn hiện tĩnh như cũ
+  private updateWind(dt: number) {
+    const img = this.street
+    if (!this.countryside || !ready(img)) {
+      this.wind = null
+      return
+    }
+    let w = this.wind
+    if (!w || w.of !== img) {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      w = this.wind = {of: img, canvas, base: null, out: null, mask: null, rows: [0, 0], acc: 1, t: 0}
+      const slot = w
+      const cors = new Image()
+      cors.crossOrigin = 'anonymous'
+      cors.onload = () => {
+        if (this.wind !== slot) return
+        const c = slot.canvas.getContext('2d', {willReadFrequently: true})!
+        c.drawImage(cors, 0, 0, slot.canvas.width, slot.canvas.height)
+        try {
+          slot.base = c.getImageData(0, 0, slot.canvas.width, slot.canvas.height)
+        } catch {
+          return
+        }
+        const {width, height, data} = slot.base
+        const y0 = Math.round(height * WIND.top)
+        const y1 = Math.round(height * WIND.bottom)
+        slot.rows = [y0, y1]
+        slot.mask = new Uint8Array(width * height)
+        for (let y = y0; y < y1; y++)
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4
+            const r = data[i]
+            const g = data[i + 1]
+            const b = data[i + 2]
+            // Lúa chín (vàng → hổ phách) hoặc lúa non (xanh vàng); bỏ đất, nước, thân cây
+            const golden = r > g && g > b && r - b > 45 && r > 70
+            const green = g > r && g > b + 25 && r > b && g > 70
+            if (golden || green) slot.mask[y * width + x] = 1
+          }
+        slot.out = new ImageData(new Uint8ClampedArray(data), width, height)
+      }
+      cors.src = img.src
+    }
+    if (!w.base || !w.mask || !w.out) return
+    w.t += dt
+    w.acc += dt
+    if (w.acc < 1 / WIND.fps) return
+    w.acc = 0
+    const {width, data} = w.base
+    const out = w.out.data
+    const [y0, y1] = w.rows
+    const t = w.t
+    // Mưa gió mạnh, sương gần như lặng
+    const force = this.weather === 'rain' ? 1.5 : this.weather === 'mist' ? 0.35 : 1
+    const sheen = this.weather === 'clear' && this.time !== 'night'
+    const bx = ((t * 70) % (width + 300)) - 150
+    for (let y = y0; y < y1; y++) {
+      const depth = (y - y0) / (y1 - y0)
+      const amp = (0.4 + 1.8 * depth * depth) * force
+      for (let x = 0; x < width; x++) {
+        const p = y * width + x
+        if (!w.mask[p]) continue
+        const gust = 0.6 + 0.4 * Math.sin(x * 0.013 - t * 0.7)
+        const dx = Math.round(amp * gust * Math.sin(x * 0.09 - t * 2.4 + y * 0.11))
+        const sx = Math.min(width - 1, Math.max(0, x - dx))
+        const q = (w.mask[y * width + sx] ? y * width + sx : p) * 4
+        const k = sheen ? 1 + 0.12 * Math.exp(-(((x - bx - (y - y0) * 0.5) / 38) ** 2)) : 1
+        out[p * 4] = data[q] * k
+        out[p * 4 + 1] = data[q + 1] * k
+        out[p * 4 + 2] = data[q + 2] * k
+      }
+    }
+    w.canvas.getContext('2d')!.putImageData(w.out, 0, 0, 0, y0, width, y1 - y0)
+  }
+
+  private get kidsOut() {
+    return this.countryside && this.weather !== 'rain' && this.time !== 'night'
+  }
+
+  private kidLayer(i: number) {
+    this.kidImgs[i] ??= loadImage(KIDS.srcs[i], () => (this.kidKeys[i] = ''))
+    const img = this.kidImgs[i]!
+    if (!ready(img)) return null
+    const key = this.tint ?? 'none'
+    if (this.kidTinted[i] && this.kidKeys[i] === key) return this.kidTinted[i]
+    this.kidTinted[i] = this.tinted(img, this.kidTinted[i])
+    this.kidKeys[i] = key
+    return this.kidTinted[i]
+  }
+
+  // Bé chạy qua lại trên bờ ruộng, tới mép thì quay đầu; diều đuổi theo một điểm phía
+  // sau – phía trên tay bé, có quán tính + gió nên chao lượn, bị kéo lệch khi bé quay đầu
+  private updateKids(dt: number) {
+    if (!this.kidsOut) {
+      this.kids = []
+      this.kites = []
+      return
+    }
+    const want = this.time === 'afternoon' ? 2 : 1
+    while (this.kids.length < want) {
+      const i = this.kids.length
+      this.kidLayer(i)
+      const x = i === 0 ? 170 : 250
+      this.kids.push({x, dir: i === 0 ? 1 : -1, speed: i === 0 ? 9.5 : 8, step: i * 3})
+      this.kites.push({x: x - 20, y: 24 + i * 8, vx: 0, vy: 0, tail: Array.from({length: 7}, () => ({x: x - 20, y: 30}))})
+    }
+    this.kids.length = want
+    this.kites.length = want
+    const t = this.clock
+    const gust = this.weather === 'mist' ? 0.5 : 1
+    this.kids.forEach((k, i) => {
+      k.x += k.dir * k.speed * dt
+      k.step += k.speed * dt
+      if (k.x > KIDS.maxX) k.dir = -1
+      if (k.x < KIDS.minX) k.dir = 1
+      const kite = this.kites[i]
+      const hand = this.kidHand(k)
+      const tx = hand.x - k.dir * 30 + Math.sin(t * 0.4 + i * 2) * 10
+      const ty = Math.max(18, hand.y - 50 + Math.sin(t * 0.6 + i) * 5 + i * 6)
+      const ax = (tx - kite.x) * 1.4 + Math.sin(t * 1.3 + i) * 12 * gust
+      const ay = (ty - kite.y) * 1.4 + Math.cos(t * 1.7 + i * 1.3) * 7 * gust
+      kite.vx = (kite.vx + ax * dt) * Math.pow(0.4, dt)
+      kite.vy = (kite.vy + ay * dt) * Math.pow(0.4, dt)
+      kite.x += kite.vx * dt
+      kite.y += kite.vy * dt
+      // Đuôi diều: mỗi đốt bám theo đốt trước, gió thổi lệch nhẹ
+      let px = kite.x
+      let py = kite.y + 2.5
+      for (const seg of kite.tail) {
+        seg.x += (px - seg.x + Math.sin(t * 3 + seg.y) * 0.6) * Math.min(1, dt * 9)
+        seg.y += (py + 1.8 - seg.y) * Math.min(1, dt * 9)
+        px = seg.x
+        py = seg.y
+      }
+    })
+  }
+
+  private get fisherOut() {
+    return this.countryside && this.weather !== 'rain' && this.time !== 'night'
+  }
+
+  private fisherLayer() {
+    this.fisherImg ??= loadImage(FISHER.src, () => (this.fisherKey = ''))
+    if (!ready(this.fisherImg)) return null
+    const key = this.tint ?? 'none'
+    if (this.fisherTinted && this.fisherKey === key) return this.fisherTinted
+    this.fisherTinted = this.tinted(this.fisherImg, this.fisherTinted)
+    this.fisherKey = key
+    return this.fisherTinted
+  }
+
+  private updateFisher(dt: number) {
+    if (!this.fisherOut) return
+    this.fisherLayer()
+    const f = this.fisher
+    if (f.playing) {
+      f.t += dt
+      if (f.t >= FISHER.n / FISHER.fps) {
+        f.playing = false
+        f.wait = 8 + this.rng() * 8
+      }
+    } else {
+      f.wait -= dt
+      if (f.wait <= 0) {
+        f.playing = true
+        f.t = 0
+      }
+    }
+  }
+
+  private drawFisher() {
+    if (!this.fisherOut) return
+    const img = this.fisherLayer()
+    if (!img) return
+    const ctx = this.ctx
+    const snap = SCALE * SPRITE_SCALE
+    const f = this.fisher
+    const frame = f.playing ? Math.min(FISHER.n - 1, Math.floor(f.t * FISHER.fps)) : 0
+    const w = FISHER.w / snap
+    const h = FISHER.h / snap
+    const feet = FISHER.dir > 0 ? FISHER.feet.x : FISHER.w - FISHER.feet.x
+    const left = Math.round((FISHER.x - feet / snap) * snap) / snap
+    const top = Math.round((FISHER.ground - FISHER.feet.y / snap) * snap) / snap
+    ctx.save()
+    if (FISHER.dir < 0) {
+      ctx.translate(left * 2 + w, 0)
+      ctx.scale(-1, 1)
+    }
+    ctx.drawImage(img, frame * FISHER.w, 0, FISHER.w, FISHER.h, left, top, w, h)
+    ctx.restore()
+  }
+
+  // Tay cầm dây (lưới phố) — sprite hướng phải, chạy sang trái thì lật
+  private kidHand(k: {x: number; dir: 1 | -1}) {
+    const snap = SCALE * SPRITE_SCALE
+    const hx = (KIDS.hand.x - KIDS.w / 2) / snap
+    return {x: k.x + hx * k.dir, y: KIDS.ground - (KIDS.h - KIDS.hand.y) / snap}
+  }
+
+  // Vẽ trong hệ lưới phố (ctx hiện tại: cửa sổ quầy hoặc lớp kính đã phóng)
+  private drawKids() {
+    if (!this.kids.length) return
+    const ctx = this.ctx
+    const o = this.o
+    const snap = SCALE * SPRITE_SCALE
+    const q = 0.75 // 1 "pixel" diều = 3 px buffer
+    this.kids.forEach((k, i) => {
+      const kite = this.kites[i]
+      const hand = this.kidHand(k)
+      const [c1, c2] = KITE_COLORS[i % KITE_COLORS.length]
+      // Dây: đường cong võng xuống giữa, chấm 1 px buffer, màu sáng để thấy cả trên nền cây
+      ctx.fillStyle = this.time === 'afternoon' ? 'rgba(255,236,214,0.55)' : 'rgba(250,246,236,0.6)'
+      const mx = (kite.x + hand.x) / 2
+      const my = (kite.y + hand.y) / 2 + 6
+      for (let s = 0; s <= 1; s += 0.012) {
+        const x = (1 - s) * (1 - s) * kite.x + 2 * (1 - s) * s * mx + s * s * hand.x
+        const y = (1 - s) * (1 - s) * (kite.y + 1.5) + 2 * (1 - s) * s * my + s * s * hand.y
+        ctx.fillRect(Math.round(x * 4) / 4, Math.round(y * 4) / 4, 0.25, 0.25)
+      }
+      // Đuôi: dải nối liền từ thân diều qua từng đốt, mỗi đốt 1 chiếc nơ xen 2 màu
+      let ax = kite.x
+      let ay = kite.y + 3 * q
+      kite.tail.forEach((seg, j) => {
+        ctx.fillStyle = o('#5a3820')
+        const steps = Math.max(1, Math.ceil(Math.hypot(seg.x - ax, seg.y - ay) / 0.25))
+        for (let k2 = 0; k2 <= steps; k2++) {
+          const f = k2 / steps
+          ctx.fillRect(Math.round((ax + (seg.x - ax) * f) * 4) / 4, Math.round((ay + (seg.y - ay) * f) * 4) / 4, 0.25, 0.25)
+        }
+        ctx.fillStyle = o(j % 2 ? c2 : c1)
+        const bx = Math.round(seg.x / 0.25) * 0.25
+        const by = Math.round(seg.y / 0.25) * 0.25
+        ctx.fillRect(bx - 0.75, by - 0.25, 0.5, 0.5)
+        ctx.fillRect(bx + 0.25, by - 0.25, 0.5, 0.5)
+        ax = seg.x
+        ay = seg.y
+      })
+      // Thân diều hình thoi, nghiêng theo vận tốc ngang
+      const kx = Math.round(kite.x / q) * q
+      const ky = Math.round(kite.y / q) * q
+      const lean = Math.max(-1, Math.min(1, kite.vx / 12))
+      const rows = [1, 3, 5, 7, 5, 3, 1]
+      rows.forEach((wd, r) => {
+        const shift = Math.round(lean * (r - 3) * 0.35) * q
+        for (let c = 0; c < wd; c++) {
+          const left = c < wd / 2
+          ctx.fillStyle = o(left === r < 3 ? c1 : c2)
+          ctx.fillRect(kx + (c - (wd - 1) / 2) * q + shift, ky + (r - 3) * q, q, q)
+        }
+      })
+      ctx.fillStyle = o('#5a3820')
+      ctx.fillRect(kx, ky - 3 * q, q, 7 * q)
+      // Bé chạy
+      const img = this.kidLayer(i)
+      if (!img) return
+      const frame = Math.floor(k.step / KIDS.stride + i * 5) % KIDS.n
+      const w = KIDS.w / snap
+      const h = KIDS.h / snap
+      const left = Math.round((k.x - w / 2) * snap) / snap
+      const top = Math.round((KIDS.ground - h) * snap) / snap
+      ctx.save()
+      if (k.dir < 0) {
+        ctx.translate(left * 2 + w, 0)
+        ctx.scale(-1, 1)
+      }
+      ctx.drawImage(img, frame * KIDS.w, 0, KIDS.w, KIDS.h, left, top, w, h)
+      ctx.restore()
+    })
+  }
+
   private update(dt: number) {
     const rainy = this.weather === 'rain'
+    this.updateWind(dt)
     // Lia máy ~1,2 giây mỗi chiều
     this.pan = Math.max(0, Math.min(1, this.pan + (this.groupOn ? 1 : -1) * (dt / 1.2)))
     // Bóng đèn bạn bè sáng / tắt dần trong ~1 giây
@@ -680,9 +1026,11 @@ export class ChillScene {
     if (this.nextVehicle <= 0) {
       this.spawnVehicle()
       const busy = this.time === 'night' ? 2 : 1
-      this.nextVehicle = (1.3 + this.rng() * 2.6) * busy * (rainy ? 1.5 : 1)
+      this.nextVehicle = (1.3 + this.rng() * 2.6) * busy * (rainy ? 1.5 : 1) * (this.countryside ? 2.5 : 1)
     }
     this.updateVignette(dt)
+    this.updateKids(dt)
+    this.updateFisher(dt)
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
@@ -1039,7 +1387,10 @@ export class ChillScene {
     const roll = r()
     let sprite: SpriteName
     let cruise: number
-    if (roll < 0.6) {
+    if (this.countryside) {
+      sprite = rainy && r() < 0.7 ? 'bike-poncho' : pick(r, COUNTRY_BIKES)
+      cruise = sprite === 'cyclist' ? 12 + r() * 4 : 22 + r() * 12
+    } else if (roll < 0.6) {
       sprite = rainy && r() < 0.7 ? 'bike-poncho' : pick(r, BIKES)
       cruise = 26 + r() * 18
     } else if (roll < 0.8) {
@@ -1066,7 +1417,7 @@ export class ChillScene {
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
     const roll = r()
-    const sprite: Walk = roll < 0.35 ? 'dog' : roll < 0.65 ? 'vendor' : 'walker'
+    const sprite: Walk = roll < (this.countryside ? 0.5 : 0.35) ? 'dog' : roll < (this.countryside ? 0.75 : 0.65) ? 'vendor' : 'walker'
     const cruise = sprite === 'dog' ? 20 + r() * 8 : sprite === 'vendor' ? 5 + r() * 2 : 8 + r() * 3
     this.movers.push({
       ...this.baseMover(),
@@ -1268,17 +1619,20 @@ export class ChillScene {
       // Phóng đúng hệ lưới phố ở quầy (320×180) ra vùng kính → xe, người, chó đang
       // chạy ngoài phố vẽ bằng chính drawMover, khớp vỉa hè / làn đường của ảnh
       const k = w / STREET_IMG.w
-      const top = STREET_IMG.y + GLASS.cropY * STREET_IMG.h
+      // Đồng quê: lấy nhiều trời hơn để thấy diều (đường đất khuất sau ốp gỗ cũng không sao)
+      const top = STREET_IMG.y + (this.countryside ? GLASS.cropYCountry : GLASS.cropY) * STREET_IMG.h
       gc.save()
       gc.beginPath()
       gc.rect(x, y, w, h)
       gc.clip()
       gc.setTransform(RES * k, 0, 0, RES * k, RES * (x - STREET_IMG.x * k), RES * (y - top * k))
-      gc.drawImage(img, STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+      gc.drawImage(this.streetSource(img), STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
       const counter = this.ctx
       this.ctx = gc
       // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
-      this.drawMenuBoard()
+      if (!this.countryside) this.drawMenuBoard()
+      this.drawKids()
+      this.drawFisher()
       for (const m of this.movers) if (!m.road) this.drawMover(m, t)
       this.drawVignette(t)
       for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane)) this.drawMover(m, t)
@@ -1371,9 +1725,11 @@ export class ChillScene {
   }
 
   private updateVignette(dt: number) {
+    // Đổi sang cảnh đồng quê giữa chừng → cảnh nhỏ của phố biến mất
+    if (this.countryside) this.vignette = null
     const v = this.vignette
     if (!v) {
-      if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain') return
+      if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain' || this.countryside) return
       for (const kind of Object.keys(VIGNETTES) as VignetteKind[]) this.vignetteLayer(kind)
       this.nextVignette -= dt
       if (this.nextVignette > 0) return
@@ -1618,6 +1974,8 @@ export class ChillScene {
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)
+    this.drawKids()
+    this.drawFisher()
     // Vỉa hè → làn xa → làn gần (gần hơn vẽ sau, đè lên trên)
     const order = (m: Mover) => (m.road ? m.lane : 0)
     for (const m of [...this.movers].sort((a, b) => order(a) - order(b))) this.drawMover(m, t)
@@ -1754,13 +2112,14 @@ export class ChillScene {
   // nhìn cao hơn ảnh (ban công)
   private drawStreet(img: HTMLImageElement, r: {x: number; y: number; w: number; h: number}, view: {y: number; h: number}) {
     const ctx = this.ctx
+    const src = this.streetSource(img)
     // 1 hàng pixel của ảnh
     const sy = img.naturalHeight / r.h
-    ctx.drawImage(img, r.x, r.y, r.w, r.h)
-    if (view.y < r.y) ctx.drawImage(img, 0, 0, img.naturalWidth, sy, r.x, view.y, r.w, r.y - view.y)
+    ctx.drawImage(src, r.x, r.y, r.w, r.h)
+    if (view.y < r.y) ctx.drawImage(src, 0, 0, img.naturalWidth, sy, r.x, view.y, r.w, r.y - view.y)
     const bottom = r.y + r.h
     if (view.y + view.h > bottom) {
-      ctx.drawImage(img, 0, img.naturalHeight - sy, img.naturalWidth, sy, r.x, bottom, r.w, view.y + view.h - bottom)
+      ctx.drawImage(src, 0, img.naturalHeight - sy, img.naturalWidth, sy, r.x, bottom, r.w, view.y + view.h - bottom)
     }
   }
 

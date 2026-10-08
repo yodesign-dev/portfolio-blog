@@ -38,6 +38,7 @@ const CHILL_QUERY = `{
     timeZone,
     tilt,
     laneShift,
+    scenery,
     "morning": morning.asset->url,
     "afternoon": afternoon.asset->url,
     "night": night.asset->url
@@ -67,6 +68,7 @@ type ChillContent = {
     timeZone?: string
     tilt?: number
     laneShift?: number
+    scenery?: string
     morning: string
     afternoon: string
     night: string
@@ -110,9 +112,22 @@ export default async function ChillPage() {
     timeZone: isTimeZone(d.timeZone) ? d.timeZone : 'Asia/Ho_Chi_Minh',
     tilt: d.tilt,
     laneShift: d.laneShift,
+    scenery: d.scenery === 'countryside' ? 'countryside' : 'street',
     streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
   }))
-  const destinations: Destination[] = fromStudioDest.length ? fromStudioDest : DESTINATIONS
+  const destinations: Destination[] = [...(fromStudioDest.length ? fromStudioDest : DESTINATIONS)]
+  // Chỉ máy dev: thêm cảnh đồng miền Tây (ảnh local, đang làm) để thử trước khi đưa lên Studio
+  if (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MIENTAY === '1') {
+    const img = (t: string) => `/chill/scenes/mientay-${t}.webp`
+    destinations.push({
+      id: 'mientay-dev',
+      name: 'Miền Tây (dev)',
+      region: 'Việt Nam',
+      timeZone: 'Asia/Ho_Chi_Minh',
+      scenery: 'countryside',
+      streets: {morning: img('morning'), afternoon: img('afternoon'), night: img('night')},
+    })
+  }
 
   // Ảnh tĩnh: CDN thu về 800px webp · GIF giữ nguyên để còn chuyển động
   const updates: ChillUpdate[] = (content.updates ?? []).map(({image, ...u}) => ({

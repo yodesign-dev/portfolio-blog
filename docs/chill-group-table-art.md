@@ -226,3 +226,12 @@ right side of the reference). Side view, facing RIGHT.
 ```
 
 rồi tả nhân vật + 6 khung (1–4 đi bộ, 5–6 hành động), nền xanh chroma, không chữ. Model hay trả khác số khung yêu cầu (mẹ và bé ra 5 khung, cặp đôi ra 2 hàng × 4) → cắt theo ô thực tế (`pack.py` trong ghi chú: khoét nền, khử ám xanh, thu cả bộ về cao 68 / 66 px = người đi bộ trong atlas).
+
+---
+
+## 6. Điểm đến "Miền Tây" (kiểu cảnh Đồng quê)
+
+- **Cảnh** (Nano Banana 2, 21:9): sửa từ ảnh phố Hà Nội cho cùng bố cục (trời 40% trên, đường đất 12% dưới, bờ ruộng ngang giữa đồng ≈ 67% chiều cao), rồi sửa lần 2: lúa vàng chín, thêm dừa, chỉ còn 1 mái nhà lá. Chiều / đêm sửa từ ảnh sáng (chỉ đổi ánh sáng). Thu về 560×238.
+- **Lúa lắc lư**: code (`updateWind` trong `scene.ts`) tự dò pixel lúa, không cần ảnh riêng.
+- **Bé thả diều** (`kid-run.webp`, `kid-run-2.webp` đổi màu áo): Nano Banana 2 vẽ 1 ảnh nhìn ngang nền xanh → Kling Video 2.5 Turbo Pro "runs in place like on a treadmill", 5 s → cắt khung bằng AVFoundation (`swift frames.swift`), chọn 1 vòng 20 khung (10 khung khác nhau) khớp đầu–cuối nhất, khoét nền, xoá sợi dây trong video (mở hình thái 9 px), thu về ô 24×40. Diều, dây, đuôi vẽ bằng code.
+- **Chú quăng chài** (`fisher.webp`): tương tự, Kling 16:9 "throws the cast net… pulls it back", 60 khung 12 fps; video có bước tới ~600 px → ghim bàn chân cố định từng khung; ô 84×47.

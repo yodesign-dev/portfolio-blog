@@ -70,6 +70,21 @@ export default defineType({
       description: 'Tạm gỡ điểm đến khỏi danh sách mà không cần xoá.',
     }),
     defineField({
+      name: 'scenery',
+      title: 'Kiểu cảnh',
+      type: 'string',
+      group: 'content',
+      options: {
+        list: [
+          {title: 'Phố (ô tô, xe buýt, shipper, cặp đôi…)', value: 'street'},
+          {title: 'Đồng quê (chỉ xe máy, xe đạp; lúa lắc lư theo gió)', value: 'countryside'},
+        ],
+        layout: 'radio',
+      },
+      initialValue: 'street',
+      description: 'Đồng quê: phần ruộng trong ảnh tự lắc theo gió, đường chỉ có xe máy / xe đạp / chó.',
+    }),
+    defineField({
       name: 'tilt',
       title: 'Độ nghiêng mặt đường',
       type: 'number',

@@ -20,6 +20,9 @@ export type Destination = {
   tilt?: number
   // Dời riêng làn xe lên/xuống (px) nếu lòng đường trong ảnh cao/thấp hơn Hà Nội
   laneShift?: number
+  // "countryside" = cảnh đồng quê: đường đất chỉ có xe máy / xe đạp, lúa lắc lư theo
+  // gió, không có các cảnh nhỏ của phố (shipper, cặp đôi, bảng menu…)
+  scenery?: 'street' | 'countryside'
 }
 
 const local = (id: string): Record<TimeOfDay, string> => ({
