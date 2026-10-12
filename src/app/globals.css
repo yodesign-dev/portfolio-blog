@@ -79,6 +79,12 @@ body {
   100% { opacity: 1; }
 }
 
+/* /chill: xấp giấy ghim trên khung cửa — tờ mới lật lên từ dưới xấp */
+@keyframes chill-note-turn {
+  0% { opacity: 0; transform: translate(6px, 5px) rotate(2.5deg); }
+  100% { opacity: 1; transform: none; }
+}
+
 /* Nút Settings trang /chill: vòng cam lan ra cho người chưa mở cài đặt lần nào.
    Giảm chuyển động → chỉ còn viền cam tĩnh. */
 @keyframes chill-ring {
