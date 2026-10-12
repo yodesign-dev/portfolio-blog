@@ -13,6 +13,8 @@ export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder'
 
 // Thời gian chồng mờ giữa 2 bài (giây)
 const CROSSFADE = 5
+// Đuôi vang dài nhất của delay (feedback 0.3) + reverb 2.6 giây
+const FX_TAIL_MS = 6000
 
 const midiToHz = (note: number) => 440 * Math.pow(2, (note - 69) / 12)
 
@@ -76,6 +78,9 @@ export class ChillAudio {
   private analyser!: AnalyserNode
   private tone!: BiquadFilterNode
   private reverb!: ConvolverNode
+  private reverbGain!: GainNode
+  private fxOn = false
+  private fxTimer: ReturnType<typeof setTimeout> | null = null
   private delay!: DelayNode
   private wobble!: GainNode
   private crackle!: GainNode
@@ -139,9 +144,11 @@ export class ChillAudio {
 
     this.reverb = ctx.createConvolver()
     this.reverb.buffer = impulseResponse(ctx, 2.6)
-    const reverbGain = ctx.createGain()
-    reverbGain.gain.value = 0.35
-    this.reverb.connect(reverbGain).connect(this.master)
+    // Chưa nối vào master: convolver nối ra loa là chạy liên tục kể cả khi không có
+    // tiếng vào (đo ~11% CPU), mà chỉ bài synth mới gửi tiếng qua đây → setFx()
+    this.reverbGain = ctx.createGain()
+    this.reverbGain.gain.value = 0.35
+    this.reverb.connect(this.reverbGain)
 
     this.delay = ctx.createDelay(1)
     const feedback = ctx.createGain()
@@ -251,6 +258,7 @@ export class ChillAudio {
     } else {
       this.offset = this.position()
       this.stopScheduler()
+      this.setFx(false)
       this.crackle.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1)
     }
   }
@@ -262,6 +270,7 @@ export class ChillAudio {
     if (this.track.src) {
       void this.element?.play()
     } else if (this.track.synth) {
+      this.setFx(true)
       this.resumedAt = ctx.currentTime
       this.nextTime = ctx.currentTime + 0.05
       this.startScheduler(this.track.synth)
@@ -568,6 +577,7 @@ export class ChillAudio {
   private stopCurrent(keepDecks = false) {
     this.playing = false
     this.stopScheduler()
+    this.setFx(false)
     if (!keepDecks) for (const d of this.decks) d.el.pause()
     if (this.trackBus && this.ctx) {
       const bus = this.trackBus
@@ -578,7 +588,24 @@ export class ChillAudio {
     if (this.ctx) this.crackle.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1)
   }
 
+  // Reverb + delay chỉ nối ra loa khi đang có bài synth; tắt thì chờ hết đuôi vang
+  private setFx(on: boolean) {
+    if (this.fxTimer) clearTimeout(this.fxTimer)
+    this.fxTimer = null
+    if (on) {
+      if (!this.fxOn) this.reverbGain.connect(this.master)
+      this.fxOn = true
+    } else if (this.fxOn) {
+      this.fxTimer = setTimeout(() => {
+        this.reverbGain.disconnect()
+        this.fxOn = false
+        this.fxTimer = null
+      }, FX_TAIL_MS)
+    }
+  }
+
   private startSynth(ctx: AudioContext, spec: SynthSpec) {
+    this.setFx(true)
     this.trackBus = ctx.createGain()
     this.trackBus.connect(this.tone)
     this.tone.frequency.setTargetAtTime(spec.tone, ctx.currentTime, 0.1)
