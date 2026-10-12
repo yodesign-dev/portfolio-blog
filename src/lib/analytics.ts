@@ -19,6 +19,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Listen'; props: {minutes: number}}
   | {name: 'Chill Look Around'; props?: undefined}
   | {name: 'Chill Lang'; props: {lang: 'en' | 'vi'}}
+  // Đồng hồ phin: bắt đầu / làm xong / dừng giữa chừng
+  | {name: 'Chill Focus'; props: {action: 'start' | 'done' | 'stop'}}
   | {name: 'Chill Play'; props: {track: string}}
   | {name: 'Chill Pet Cat'; props?: undefined}
   | {name: 'Chill Donate Open'; props?: {from: string}}

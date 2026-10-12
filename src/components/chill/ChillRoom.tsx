@@ -17,6 +17,8 @@ import {THEMES, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
 import {ChillChat, type ChatMessage} from './ChillChat'
 import {setLang, useLang, useT, type Lang} from './i18n'
+import {Focus} from './Focus'
+import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -44,6 +46,12 @@ const CAT_SAY_MS = 4500
 const LAST_VISIT_KEY = 'chill:last-visit'
 // Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
 const LISTEN_MINUTES = [1, 5, 15, 30, 60]
+// Màn dọc: đã kéo ngang cảnh lần nào chưa (chưa → gợi ý "kéo để nhìn quanh")
+const PAN_SEEN_KEY = 'chill:pan-seen'
+const PAN_HINT_DELAY_MS = 1500
+const PAN_HINT_MS = 8000
+// Mèo chào khách quen sau khi vào quán bao lâu
+const CAT_GREET_DELAY_MS = 2500
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
 
@@ -130,6 +138,15 @@ export function ChillRoom({
   updates?: ChillUpdate[]
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
+  // cao bằng khung (cắt 2 bên) và kéo ngang được. zoom = đã phóng to · pan = 0 (mép trái)
+  // … 1 (mép phải, chỗ người ngồi) · panMax = quãng kéo tối đa mỗi bên (px)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const zoomRef = useRef(false)
+  const panRef = useRef(1)
+  const panMaxRef = useRef(0)
+  const dragRef = useRef<{id: number; x: number; pan: number} | null>(null)
+  const dragRaf = useRef(0)
   const sceneRef = useRef<ChillScene | null>(null)
   const audioRef = useRef<ChillAudio | null>(null)
   const scenePausedRef = useRef(false)
@@ -148,6 +165,14 @@ export function ChillRoom({
   const [welcomeGone, setWelcomeGone] = useState(false)
   const startFrom = useRef<'welcome' | 'player'>('player')
   const startTracked = useRef(false)
+  const [canPan, setCanPan] = useState(false)
+  const [panSeen, setPanSeen] = useState(true)
+  const [panHint, setPanHint] = useState(false)
+  // Thẻ khách quen + đồng hồ phin
+  const [regular, setRegular] = useState<Regular>({days: [], total: 0, phins: 0})
+  const stamped = useRef(false)
+  const [focusLabel, setFocusLabel] = useState<string | null>(null)
+  const [focusOpen, setFocusOpen] = useState(false)
   const visitTracked = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(0.7)
@@ -255,6 +280,12 @@ export function ChillRoom({
       setCatPetted(false)
     }
     setReturning(hadPrefs)
+    setRegular(loadRegular())
+    try {
+      setPanSeen(localStorage.getItem(PAN_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → không gợi ý
+    }
     // Link mời vào bàn nhóm → vào thẳng màn chọn nhân vật, khỏi qua màn chào
     if (new URLSearchParams(window.location.search).has('table')) setEntered(true)
     setLoaded(true)
@@ -318,19 +349,39 @@ export function ChillRoom({
     raf = requestAnimationFrame(loop)
     // Canvas vẽ ở bội số nguyên của 640×360 vừa đủ phủ khung hiển thị (px thiết bị)
     const canvas = canvasRef.current!
+    const wrap = wrapRef.current!
     const fit = () => {
       const dpr = window.devicePixelRatio || 1
       const portrait = window.matchMedia('(orientation: portrait)').matches
-      const cw = canvas.clientWidth
-      const ch = canvas.clientHeight
-      scene.resize(cw * dpr, ch * dpr, !portrait)
-      // Cùng phép co giãn như object-cover / object-contain của canvas
+      const cw = wrap.clientWidth
+      const ch = wrap.clientHeight
       const bw = SCENE_W * 2
       const bh = SCENE_H * 2
-      const k = (portrait ? Math.min : Math.max)(cw / bw, ch / bh)
+      // Ngang: cảnh phủ kín khung (object-cover). Dọc: canvas rộng bằng màn hình (thấy trọn
+      // cảnh, dùng ở màn chào + bàn nhóm); đã vào quán thì phóng to bằng transform cho cao
+      // bằng khung, phần tràn 2 bên kéo ngang để xem
+      let k = Math.max(cw / bw, ch / bh)
+      let tx = 0
+      if (portrait) {
+        const k0 = cw / bw
+        const kZoom = Math.max(k0, ch / bh)
+        k = zoomRef.current ? kZoom : k0
+        const maxTx = Math.max(0, (bw * k - cw) / 2)
+        tx = (0.5 - panRef.current) * 2 * maxTx
+        panMaxRef.current = maxTx
+        canvas.style.transform = `translateX(${tx}px) scale(${k / k0})`
+        // Luôn giữ độ nét của mức phóng to → lúc phóng không phải cấp lại canvas
+        scene.resize(bw * kZoom * dpr, bh * kZoom * dpr)
+        setCanPan(maxTx > 0)
+      } else {
+        panMaxRef.current = 0
+        canvas.style.transform = ''
+        scene.resize(cw * dpr, ch * dpr)
+        setCanPan(false)
+      }
       const toBox = (hit: {x: number; y: number; w: number; h: number}): Box | null => {
-        const left = (cw - bw * k) / 2 + hit.x * k
-        const top = (ch - bh * k) / 2 + hit.y * k
+        const left = wrap.offsetLeft + cw / 2 + tx - (bw * k) / 2 + hit.x * k
+        const top = wrap.offsetTop + (ch - bh * k) / 2 + hit.y * k
         return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
       }
       setCatBox(toBox(scene.catHitBox))
@@ -343,7 +394,7 @@ export function ChillRoom({
     }
     fitRef.current = fit
     const ro = new ResizeObserver(fit)
-    ro.observe(canvas)
+    ro.observe(wrap)
     fit()
     return () => {
       cancelAnimationFrame(raf)
@@ -359,6 +410,58 @@ export function ChillRoom({
     fitRef.current()
     scene.frame(performance.now())
   }, [theme])
+
+  // Màn dọc: vào quán rồi thì phóng to cảnh; bàn nhóm cần thấy đủ 4 ghế nên thu về như cũ
+  useEffect(() => {
+    zoomRef.current = entered && !groupView
+    fitRef.current()
+  }, [entered, groupView])
+
+  const markPanSeen = () => {
+    setPanHint(false)
+    if (panSeen) return
+    setPanSeen(true)
+    try {
+      localStorage.setItem(PAN_SEEN_KEY, '1')
+    } catch {
+      // bỏ qua
+    }
+  }
+  const onPanDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!panMaxRef.current || !zoomRef.current) return
+    dragRef.current = {id: e.pointerId, x: e.clientX, pan: panRef.current}
+    e.currentTarget.setPointerCapture(e.pointerId)
+    // Đang kéo thì cảnh bám theo ngón tay, không chạy hiệu ứng phóng
+    if (canvasRef.current) canvasRef.current.style.transition = 'none'
+  }
+  const onPanMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current
+    if (!d || d.id !== e.pointerId || !panMaxRef.current) return
+    panRef.current = Math.min(1, Math.max(0, d.pan - (e.clientX - d.x) / (2 * panMaxRef.current)))
+    if (!dragRaf.current) {
+      dragRaf.current = requestAnimationFrame(() => {
+        dragRaf.current = 0
+        fitRef.current()
+      })
+    }
+    if (Math.abs(e.clientX - d.x) > 12) markPanSeen()
+  }
+  const onPanUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.id !== e.pointerId) return
+    dragRef.current = null
+    if (canvasRef.current) canvasRef.current.style.transition = ''
+  }
+  // Gợi ý kéo ngang: hiện 1 lúc sau khi cảnh phóng xong, tới khi người xem kéo thử
+  useEffect(() => {
+    if (!canPan || panSeen || !entered || groupView) return
+    const on = window.setTimeout(() => setPanHint(true), PAN_HINT_DELAY_MS)
+    const off = window.setTimeout(() => setPanHint(false), PAN_HINT_DELAY_MS + PAN_HINT_MS)
+    return () => {
+      window.clearTimeout(on)
+      window.clearTimeout(off)
+      setPanHint(false)
+    }
+  }, [canPan, panSeen, entered, groupView])
 
   useEffect(() => {
     scenePausedRef.current = scenePaused
@@ -570,6 +673,32 @@ export function ChillRoom({
     const id = window.setTimeout(() => sayCat(text), 350)
     return () => clearTimeout(id)
   }, [wishOpen, sayCat])
+
+  // ---------- Khách quen + đồng hồ phin ----------
+
+  // Vào quán (qua màn chào) = 1 dấu cho hôm nay. Khách cũ ghé lần đầu trong ngày thì mèo
+  // ngẩng lên chào (lần ghé đầu tiên trong đời thì chưa quen, không chào)
+  useEffect(() => {
+    if (!entered || !loaded || stamped.current) return
+    stamped.current = true
+    const before = loadRegular()
+    const {regular: next, fresh} = stampToday(before)
+    setRegular(next)
+    if (!fresh || before.total === 0) return
+    const id = window.setTimeout(() => {
+      sceneRef.current?.noticeCat()
+      sayCat(t.room.catBack(streakOf(next)))
+    }, CAT_GREET_DELAY_MS)
+    return () => window.clearTimeout(id)
+  }, [entered, loaded, sayCat, t])
+
+  const primeAudio = useCallback(() => audioRef.current?.prime(), [])
+  const onFocusDone = useCallback(() => {
+    audioRef.current?.chime()
+    sceneRef.current?.noticeCat()
+    sayCat(t.room.catPhin)
+    setRegular((r) => addPhin(r))
+  }, [sayCat, t])
 
   // ---------- Điểm đến ----------
 
@@ -1152,8 +1281,10 @@ export function ChillRoom({
   const baseTitle = useRef('')
   useEffect(() => {
     if (!baseTitle.current) baseTitle.current = document.title
-    if (started) document.title = `${playing ? '▶' : '❚❚'} ${track.title} · Chill`
-  }, [started, playing, track.title])
+    // Đồng hồ phin đang chạy → thời gian còn lại đứng đầu tiêu đề tab
+    const music = started ? `${playing ? '▶' : '❚❚'} ${track.title} · Chill` : baseTitle.current
+    document.title = focusLabel ? `${focusLabel} · ${music}` : music
+  }, [started, playing, track.title, focusLabel])
   useEffect(() => () => void (document.title = baseTitle.current || document.title), [])
 
   // <html lang> theo ngôn ngữ đang chọn (layout gốc là "en")
@@ -1169,18 +1300,28 @@ export function ChillRoom({
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !focusOpen && !hovering
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
-    <div className={`relative h-dvh w-full select-none overflow-hidden bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle && !zenList) ? 'cursor-none' : ''}`}>
+    <div className={`relative h-dvh w-full select-none overflow-clip bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle && !zenList) ? 'cursor-none' : ''}`}>
       <h1 className="sr-only">Chill for work — slow morning, strong coffee</h1>
 
-      {/* Ngang: cảnh phủ kín màn hình · Dọc (điện thoại): giữ nguyên khung, không cắt mất người ngồi */}
+      {/* Ngang: cảnh phủ kín màn hình. Dọc (điện thoại): khung cảnh nằm giữa thanh trên và
+          thanh nhạc; màn chào thấy trọn cảnh, vào quán thì cảnh phóng to cao bằng khung
+          (mở đầu ở chỗ người ngồi), kéo ngang để nhìn sang mèo / cửa sổ — xem `fit` */}
+      <div
+        ref={wrapRef}
+        onPointerDown={onPanDown}
+        onPointerMove={onPanMove}
+        onPointerUp={onPanUp}
+        onPointerCancel={onPanUp}
+        className={`absolute inset-0 overflow-hidden portrait:bottom-[11rem] portrait:top-[6.5rem] portrait:[touch-action:none] ${canPan && entered ? 'portrait:cursor-grab portrait:active:cursor-grabbing' : ''}`}
+      >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full object-cover portrait:object-contain"
+        className="absolute inset-0 h-full w-full object-cover portrait:bottom-auto portrait:top-1/2 portrait:aspect-video portrait:h-auto portrait:-translate-y-1/2 portrait:transition-transform portrait:duration-700 portrait:ease-out"
         role="img"
         aria-label={
           groupView && table
@@ -1188,6 +1329,7 @@ export function ChillRoom({
             : t.room.canvasCounter(dest.name, timeLabel.toLowerCase(), weatherLabel.toLowerCase())
         }
       />
+      </div>
 
       {/* Zen: công tắc nổi một mình ở góc, chỉ hiện khi vừa nhích chuột / chạm */}
       {zen && (
@@ -1301,6 +1443,30 @@ export function ChillRoom({
 
       {/* Mọi nút / bảng nằm trong lớp này — Zen thì giấu cả lớp, cảnh + nhạc vẫn chạy */}
       <div className={zen ? 'hidden' : 'contents'} inert={!entered}>
+
+      {/* Màn dọc: gợi ý kéo ngang cảnh, ngay mép trên khung cảnh */}
+      <p
+        aria-hidden
+        className={`pointer-events-none absolute left-1/2 top-[7.25rem] z-10 hidden -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#e8b27d]/40 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur transition-opacity duration-500 portrait:flex ${
+          panHint && !otherOverlay && !panelOpen ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <span aria-hidden>↔</span>
+        {t.room.panHint}
+      </p>
+
+      {/* Mèo đang nằm ngoài khung (màn dọc đã phóng to / đang xem bàn nhóm) → lời của mèo
+          hiện thành 1 dòng phía trên cảnh thay cho bong bóng cạnh mèo */}
+      {catSay && (!catBox || groupView) && (
+        <p
+          role="status"
+          className={`pointer-events-none absolute left-1/2 top-[10rem] z-10 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-center text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 sm:top-24 ${
+            catSay.show ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <span className="font-normal text-[#7a5a3a]">{t.room.cat}:</span> {catSay.text} 🐾
+        </p>
+      )}
 
       {/* Bàn nhóm: bảng tên trên đầu từng người + nhãn "+n" + nút quay về quầy.
           Hiện sau khi lia máy xong (~1,2 giây) để không trôi theo cảnh. */}
@@ -1555,14 +1721,19 @@ export function ChillRoom({
             <ArrowIcon dir="left" />
             Bin Nguyen
           </Link>
-          {[dest.name, weatherLabel, timeLabel].map((label, i) => (
-            <span
-              key={label}
-              className={`${i > 0 ? 'hidden sm:flex' : 'flex'} pointer-events-none h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:text-[11px]`}
-            >
-              {label}
-            </span>
-          ))}
+          {/* Điện thoại: điểm đến + đồng hồ phin nằm chung 1 hàng riêng dưới hàng nút (chỗ bên
+              trái hẹp, để trong luồng thì mỗi cái rớt 1 dòng); từ sm trở lên nằm cùng hàng */}
+          <div className="absolute left-3 top-14 flex items-center gap-2 sm:contents">
+            {[dest.name, weatherLabel, timeLabel].map((label, i) => (
+              <span
+                key={label}
+                className={`${i > 0 ? 'hidden sm:flex' : 'flex'} pointer-events-none h-9 items-center whitespace-nowrap rounded-md bg-black/45 px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:text-[11px]`}
+              >
+                {label}
+              </span>
+            ))}
+            <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={setFocusOpen} />
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ShareButton />
@@ -2176,7 +2347,7 @@ export function ChillRoom({
           inert={entered}
           onClick={() => enter(true)}
           onTransitionEnd={(e) => entered && e.target === e.currentTarget && setWelcomeGone(true)}
-          className={`absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-end gap-6 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-6 pb-[max(2.5rem,9dvh)] text-center transition-opacity duration-500 portrait:justify-between portrait:from-black/60 portrait:via-transparent portrait:pb-[max(1.5rem,6dvh)] portrait:pt-[14dvh] ${
+          className={`absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-end gap-6 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-6 pb-[max(2.5rem,9dvh)] text-center transition-opacity duration-500 portrait:justify-between portrait:bg-[linear-gradient(to_bottom,rgba(0,0,0,0.85),rgba(0,0,0,0.55)_36%,transparent_48%,transparent_60%,rgba(0,0,0,0.75))] portrait:pb-[max(1.5rem,6dvh)] portrait:pt-[11dvh] ${
             entered ? 'pointer-events-none opacity-0' : 'opacity-100'
           }`}
         >
@@ -2199,6 +2370,12 @@ export function ChillRoom({
             <p className="mx-auto mt-3 max-w-md text-pretty text-sm leading-relaxed text-[#ede6dd] [text-shadow:0_1px_10px_rgba(0,0,0,0.8)] sm:text-base">{t.welcome.sub}</p>
           </div>
           <div className="flex flex-col items-center gap-2">
+            {returning && visitDayOf(regular) >= 2 && (
+              <p className="mb-1 flex items-center gap-1.5 rounded-full border border-[#e8b27d]/40 bg-black/50 px-3 py-1 text-xs text-[#f3cfa8] backdrop-blur">
+                <PawIcon />
+                {t.welcome.visit(visitDayOf(regular), t.regular.levels[levelOf(visitDayOf(regular))])}
+              </p>
+            )}
             <button
               type="button"
               onClick={(e) => {

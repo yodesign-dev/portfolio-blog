@@ -78,6 +78,7 @@ const en = {
     enter: 'Step in & play music',
     look: 'Just look around, no music',
     home: 'Back to Bin Nguyen’s site',
+    visit: (day: number, level: string) => `Visit day ${day} · ${level}`,
   },
   room: {
     canvasCounter: (place: string, time: string, weather: string) =>
@@ -143,6 +144,32 @@ const en = {
     credit: 'No rush. Just coffee. · Art & music made with AI.',
     emojiCredit: 'Animated emoji:',
     playing: 'Playing',
+    panHint: 'Drag to look around the café',
+    cat: 'Café cat',
+    catBack: (streak: number) => (streak >= 2 ? `You again! ${streak} days in a row` : 'Oh, you’re back! Same seat?'),
+    catPhin: 'One phin done! Go stretch a little',
+  },
+  focus: {
+    chip: 'Focus',
+    doneChip: '1 phin done',
+    title: 'Phin timer',
+    open: 'Open the phin timer',
+    runningAria: (left: string) => `Phin timer: ${left} left`,
+    pitch: 'One phin drips through, one focus session done. A little bell rings when it’s finished.',
+    length: 'Session length',
+    minutes: (m: number) => `${m} min`,
+    start: 'Start the drip',
+    stop: 'Stop',
+    dripping: 'The phin is dripping… back to work.',
+    doneBody: 'One phin done! Stand up, stretch, look out the window for a bit.',
+    again: 'Brew another phin',
+  },
+  regular: {
+    card: (n: number) => `Regular’s card${n > 1 ? ` · #${n}` : ''}`,
+    levels: {guest: 'New guest', regular: 'Regular', close: 'Old friend', family: 'Family'},
+    stampsAria: (n: number, of: number) => `${n} of ${of} paw stamps`,
+    summary: (days: number, streak: number, phins: number) =>
+      `One paw stamp per day you drop by. ${plural(days, 'day')} so far · ${streak}-day streak · ${plural(phins, 'phin')} finished`,
   },
   zen: {
     name: 'Zen mode',
@@ -156,9 +183,11 @@ const en = {
   },
   chat: {
     title: 'Café chat',
-    openAria: (online: number, unread: number) => `Café chat — ${online} online${unread ? `, ${unread} unread` : ''} (C)`,
-    label: (online: number) => `Chat · ${online} online`,
+    // online = null: quán đang vắng → không nêu số người
+    openAria: (online: number | null, unread: number) => `Café chat${online ? ` — ${online} online` : ''}${unread ? `, ${unread} unread` : ''} (C)`,
+    label: (online: number | null) => (online ? `Chat · ${online} online` : 'Café chat'),
     online: (n: number) => `${n} online`,
+    visits: (n: number) => `${plural(n, 'guest')} dropped by`,
     close: 'Close chat (Esc)',
     rules: 'Messages disappear after 24 hours · Be kind to each other ☕',
     empty: 'The café is quiet. Say hi',
@@ -361,6 +390,7 @@ const vi: typeof en = {
     enter: 'Bước vào quán & bật nhạc',
     look: 'Chỉ ngắm cảnh, chưa cần nhạc',
     home: 'Về trang của Bin Nguyen',
+    visit: (day, level) => `Ngày ghé thứ ${day} · ${level}`,
   },
   room: {
     canvasCounter: (place, time, weather) =>
@@ -426,6 +456,31 @@ const vi: typeof en = {
     credit: 'Không vội. Chỉ cần cà phê. · Hình & nhạc tạo bằng AI.',
     emojiCredit: 'Emoji động:',
     playing: 'Đang phát',
+    panHint: 'Kéo để nhìn quanh quán',
+    cat: 'Mèo của quán',
+    catBack: (streak) => (streak >= 2 ? `Lại là bạn nè! ${streak} ngày liền rồi đó` : 'A, bạn quay lại rồi! Chỗ cũ nha?'),
+    catPhin: 'Xong một phin rồi! Vươn vai chút đi',
+  },
+  focus: {
+    chip: 'Tập trung',
+    doneChip: 'Xong 1 phin',
+    title: 'Đồng hồ phin',
+    open: 'Mở đồng hồ phin',
+    runningAria: (left) => `Đồng hồ phin: còn ${left}`,
+    pitch: 'Phin nhỏ giọt xong là xong một phiên tập trung. Hết giờ sẽ có tiếng chuông nhỏ.',
+    length: 'Độ dài phiên',
+    minutes: (m) => `${m} phút`,
+    start: 'Bắt đầu nhỏ giọt',
+    stop: 'Dừng',
+    dripping: 'Phin đang nhỏ giọt… làm việc thôi.',
+    doneBody: 'Xong một phin rồi! Đứng dậy vươn vai, nhìn ra cửa sổ một chút nha.',
+    again: 'Pha thêm phin nữa',
+  },
+  regular: {
+    card: (n) => `Thẻ khách quen${n > 1 ? ` · thẻ ${n}` : ''}`,
+    levels: {guest: 'Khách mới', regular: 'Khách quen', close: 'Khách ruột', family: 'Người nhà'},
+    stampsAria: (n, of) => `${n} trên ${of} dấu chân mèo`,
+    summary: (days, streak, phins) => `Mỗi ngày ghé quán được 1 dấu chân mèo. Đã ghé ${days} ngày · chuỗi ${streak} ngày · ${phins} phin đã xong`,
   },
   zen: {
     name: 'Ngắm cảnh',
@@ -439,9 +494,10 @@ const vi: typeof en = {
   },
   chat: {
     title: 'Trò chuyện ở quán',
-    openAria: (online, unread) => `Trò chuyện ở quán — ${online} người online${unread ? `, ${unread} tin chưa đọc` : ''} (C)`,
-    label: (online) => `Chat · ${online} online`,
+    openAria: (online, unread) => `Trò chuyện ở quán${online ? ` — ${online} người online` : ''}${unread ? `, ${unread} tin chưa đọc` : ''} (C)`,
+    label: (online) => (online ? `Chat · ${online} online` : 'Trò chuyện ở quán'),
     online: (n) => `${n} online`,
+    visits: (n) => `${n} lượt khách ghé quán`,
     close: 'Đóng chat (Esc)',
     rules: 'Tin nhắn tự xoá sau 24 giờ · Nhẹ nhàng với nhau nha ☕',
     empty: 'Quán đang yên, chào một câu nhé',
@@ -682,6 +738,10 @@ const SERVER_PAIRS: [vi: string, en: string][] = [
   ['Nhận được rồi — cảm ơn bạn nhiều ☕', 'Got it already — thank you so much ☕'],
   ['Chưa có gì để thêm.', 'Nothing to add.'],
 ]
+// 6 dòng đầu = khách ghé quán / mèo chào khách → phòng chat gom các dòng liền nhau thành 1
+const VISIT_LINES = new Set(SERVER_PAIRS.slice(0, 6).map(([v]) => v))
+export const isVisitLine = (text: string) => VISIT_LINES.has(text)
+
 const SERVER_EN = new Map(SERVER_PAIRS)
 const SERVER_VI = new Map(SERVER_PAIRS.map(([v, e]) => [e, v]))
 

@@ -119,6 +119,8 @@ export function Wishlist({
   const [seen, setSeen] = useState(true)
   const [hint, setHint] = useState(false)
   const [tab, setTab] = useState<Tab>('considering')
+  // Người xem đã tự chọn tab (hoặc vừa gửi góp ý) → thôi tự chuyển
+  const tabPicked = useRef(false)
   const [view, setView] = useState<'wishes' | 'donate'>('wishes')
   const donate = hasDonate()
   const showDonate = () => {
@@ -221,6 +223,16 @@ export function Wishlist({
     return tab === 'considering' ? [...pendingMine, ...sorted] : sorted
   }, [wishes, pendingMine, tab])
   const tabCount = (tb: Tab) => wishes.filter((w) => w.status === tb).length + (tb === 'considering' ? pendingMine.length : 0)
+  // Mở ra ở tab đầu tiên có nội dung (Considering → Planned → Shipped) thay vì 1 tab trống
+  const firstFilled = TABS.find((tb) => wishes.some((w) => w.status === tb) || (tb === 'considering' && pendingMine.length > 0))
+  useEffect(() => {
+    if (!loaded || tabPicked.current || !firstFilled) return
+    setTab(firstFilled)
+  }, [loaded, firstFilled])
+  const pickTab = (tb: Tab) => {
+    tabPicked.current = true
+    setTab(tb)
+  }
 
   const toggleHeart = (w: Wish) => {
     const on = !hearted.includes(w.id)
@@ -239,7 +251,7 @@ export function Wishlist({
     const next = [w, ...mine].slice(0, 20)
     setMine(next)
     save(MINE_KEY, next)
-    setTab('considering')
+    pickTab('considering')
   }
 
   const count = wishes.filter((w) => w.status !== 'shipped').length + pendingMine.length
@@ -350,7 +362,7 @@ export function Wishlist({
                   type="button"
                   role="tab"
                   aria-selected={tab === tb}
-                  onClick={() => setTab(tb)}
+                  onClick={() => pickTab(tb)}
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.15em] outline-none transition focus-visible:ring-2 focus-visible:ring-[#e8b27d]/70 ${
                     tab === tb ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
                   }`}

@@ -479,6 +479,36 @@ export class ChillAudio {
     lfo.stop(now + 2.3)
   }
 
+  // Đồng hồ tập trung: gọi lúc bấm "Bắt đầu" (là thao tác của người dùng) để lúc hết
+  // giờ — không có cú bấm nào — tiếng chuông vẫn phát được dù chưa bật nhạc
+  prime() {
+    const ctx = this.ctx ?? (this.catCtx ??= new AudioContext())
+    if (ctx.state === 'suspended') void ctx.resume()
+  }
+
+  // Hết 1 phin: 3 nốt chuông nhỏ đi lên (thìa gõ nhẹ vào ly), không cắt ngang nhạc
+  chime() {
+    const ctx = this.ctx ?? (this.catCtx ??= new AudioContext())
+    if (ctx.state === 'suspended') void ctx.resume()
+    const now = ctx.currentTime
+    const out = ctx.createGain()
+    out.gain.value = 0.25 + this.volume * 0.35
+    out.connect(ctx.destination)
+    ;[784, 988, 1319].forEach((freq, i) => {
+      const start = now + i * 0.22
+      const o = ctx.createOscillator()
+      o.type = 'sine'
+      o.frequency.value = freq
+      const env = ctx.createGain()
+      env.gain.setValueAtTime(0, start)
+      env.gain.linearRampToValueAtTime(0.22, start + 0.015)
+      env.gain.exponentialRampToValueAtTime(0.001, start + 1.1)
+      o.connect(env).connect(out)
+      o.start(start)
+      o.stop(start + 1.2)
+    })
+  }
+
   // Mức năng lượng theo dải tần cho thanh visualizer
   levels(out: Uint8Array<ArrayBuffer>) {
     if (!this.ctx) return out.fill(0)

@@ -15,7 +15,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 import {NOTO, NotoEmoji, withNoto} from './noto-emoji'
-import {tServer, useLang, useT} from './i18n'
+import {isVisitLine, tServer, useLang, useT} from './i18n'
 
 export type ChatMessage = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number; who?: string}
 type Message = ChatMessage
@@ -37,6 +37,8 @@ const NAMES = [
   'Hạt Mưa', 'Ly Nâu', 'Phố Cổ', 'Sương Sớm', 'Cà Phê Muối', 'Hoàng Hôn', 'Bánh Mì', 'Nắng Nhạt', 'Hẻm Nhỏ', 'Trăng Khuyết',
 ]
 const MAX = 200
+// Dưới ngần này người thì không nêu số online (quán vắng nhìn buồn, chẳng ai muốn vào)
+const BUSY_ONLINE = 3
 
 const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)]
 const timeOf = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})
@@ -171,6 +173,19 @@ export function ChillChat({
   }, [visible, open, lastTs, refresh, fastPoll])
 
   const messages = useMemo(() => room?.messages ?? [], [room])
+  // Các dòng "có khách ghé quán" / mèo chào khách đứng liền nhau gom thành 1 dòng đếm,
+  // để phòng chat không toàn tin hệ thống
+  const rows = useMemo(() => {
+    const out: (Message | {kind: 'visits'; id: string; count: number})[] = []
+    for (const m of messages) {
+      const last = out.at(-1)
+      if (m.kind === 'msg' || !isVisitLine(m.text)) out.push(m)
+      else if (last?.kind === 'visits') out[out.length - 1] = {...last, count: last.count + 1}
+      else if (last && last.kind !== 'msg' && isVisitLine(last.text)) out[out.length - 1] = {kind: 'visits', id: last.id, count: 2}
+      else out.push(m)
+    }
+    return out
+  }, [messages])
   useEffect(() => {
     if (room?.open) onMessages?.(room.messages, room.typing ?? [])
   }, [room, onMessages])
@@ -255,6 +270,7 @@ export function ChillChat({
 
   if (!room?.open || !me) return null
   const online = Math.max(1, room.online)
+  const shownOnline = online >= BUSY_ONLINE ? online : null
 
   return (
     <>
@@ -267,7 +283,7 @@ export function ChillChat({
             onClick={() => onOpenChange(!open)}
             aria-expanded={open}
             aria-controls="chill-chat"
-            aria-label={t.chat.openAria(online, unread)}
+            aria-label={t.chat.openAria(shownOnline, unread)}
             title={`${t.chat.title} (C)`}
             className={`${TOKEN_CLASS} border-white/[0.13] ${
               hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
@@ -278,12 +294,14 @@ export function ChillChat({
             {unread > 0 ? (
               <TokenChip hot>{unread > 9 ? '9+' : unread}</TokenChip>
             ) : (
-              <TokenChip>
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                {online}
-              </TokenChip>
+              shownOnline && (
+                <TokenChip>
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  {shownOnline}
+                </TokenChip>
+              )
             )}
-            <TokenLabel>{t.chat.label(online)}</TokenLabel>
+            <TokenLabel>{t.chat.label(shownOnline)}</TokenLabel>
           </button>,
           slot,
         )}
@@ -301,9 +319,11 @@ export function ChillChat({
           <div className="flex items-center gap-3">
             <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
             <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-[#ede6dd]">{t.chat.title}</h2>
-            <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-xs tabular-nums text-emerald-200">
-              {t.chat.online(online)}
-            </span>
+            {shownOnline && (
+              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-xs tabular-nums text-emerald-200">
+                {t.chat.online(shownOnline)}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => onOpenChange(false)}
@@ -330,8 +350,15 @@ export function ChillChat({
             aria-live="polite"
           >
             <li className="pb-2 text-center text-[11px] text-[#7d756d]">{t.chat.rules}</li>
-            {messages.length === 0 && <li className="py-10 text-center text-sm text-[#a79e94]">{t.chat.empty} {withNoto('👋')}</li>}
-            {messages.map((m, i) => {
+            {!messages.some((m) => m.kind === 'msg') && <li className="py-10 text-center text-sm text-[#a79e94]">{t.chat.empty} {withNoto('👋')}</li>}
+            {rows.map((m, i) => {
+              if (m.kind === 'visits') {
+                return (
+                  <li key={m.id} className="py-1.5 text-center text-xs text-[#8d857c]">
+                    · {t.chat.visits(m.count)} ·
+                  </li>
+                )
+              }
               if (m.kind !== 'msg') {
                 return (
                   <li key={m.id} className="py-1.5 text-center text-xs text-[#8d857c]">
@@ -341,7 +368,7 @@ export function ChillChat({
                   </li>
                 )
               }
-              const prev = messages[i - 1]
+              const prev = rows[i - 1]
               const grouped = prev?.kind === 'msg' && prev.name === m.name && prev.color === m.color && m.ts - prev.ts < 180_000
               return (
                 <Bubble

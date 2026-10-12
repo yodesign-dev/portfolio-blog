@@ -90,6 +90,17 @@ body {
   .chill-ring { animation: none; opacity: 0; }
 }
 
+/* Đồng hồ phin trang /chill: giọt cà phê rơi từ phin xuống ly khi đang đếm giờ */
+@keyframes chill-drip {
+  0% { opacity: 0; transform: translateY(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(5px); }
+}
+.chill-drip { animation: chill-drip 1.4s ease-in infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .chill-drip { animation: none; opacity: 1; }
+}
+
 /* Thanh equalizer nhỏ cạnh bài đang phát ở trang /chill */
 @keyframes chill-eq {
   0%, 100% { height: 25%; }
