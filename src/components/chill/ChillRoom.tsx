@@ -1749,13 +1749,14 @@ export function ChillRoom({
           )}
           {/* Điện thoại: thanh trên đã chật → công tắc nằm trong Settings › Atmosphere */}
           <ZenToggle on={false} onToggle={toggleZen} fresh={!zenSeen} hint={zenHint} onCloseHint={() => setZenHint(false)} className="hidden sm:block" />
-          {/* Giờ ở điểm đến + đồng hồ phin đứng cạnh nhau (cùng là chuyện thời gian). Điện thoại:
-              đang đếm thì giờ còn lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
+          {/* Đồng hồ phin đứng cùng nhóm nút viền cam (Chia sẻ · Có gì mới · Ngắm cảnh); giờ ở
+              điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
+              lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={setFocusOpen} />
           <span className={`pointer-events-none h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur ${focusLabel ? 'hidden sm:flex' : 'flex'}`}>
             {clock}
           </span>
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={setFocusOpen} />
           {canFullscreen && (
             <StageButton label={fullscreen ? t.room.exitFullscreen : t.room.fullscreen} onClick={toggleFullscreen}>
               {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}

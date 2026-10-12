@@ -1,6 +1,6 @@
 'use client'
 
-// Đồng hồ phin + thẻ khách quen trang /chill — nút trên thanh trên, ngay cạnh giờ điểm đến.
+// Đồng hồ phin + thẻ khách quen trang /chill — nút trên thanh trên, ngay trước giờ điểm đến.
 // Điện thoại: chưa chạy thì chỉ hiện biểu tượng phin, đang chạy hiện giờ còn lại.
 //
 // - Đồng hồ: chọn 15 / 25 / 45 phút, phin "nhỏ giọt" tới khi hết giờ thì chuông kêu, mèo
