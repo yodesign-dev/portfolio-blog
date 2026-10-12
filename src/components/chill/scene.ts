@@ -1251,6 +1251,11 @@ export class ChillScene {
     this.cat.notice()
   }
 
+  // Người xem nhấn giữ vào mèo → gừ gừ tới khi thả ra
+  purrCat(on: boolean) {
+    this.cat.setPurring(on)
+  }
+
   // Vùng bấm vào mèo, theo lưới canvas đệm (px thật 640×360)
   // Đỉnh đầu người ngồi ở quầy (px gốc) — để đặt bong bóng lời thoại của chính mình
   get headBox() {

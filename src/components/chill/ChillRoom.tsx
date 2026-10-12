@@ -42,6 +42,8 @@ const SETTINGS_HINT_MS = 8000
 const CAT_HINT_DELAY = 4000
 // Mèo nói cảm ơn (t.room.catThanks) sau khi người xem bấm "I've sent it" ở mục donate
 const CAT_SAY_MS = 4500
+// Giữ tay trên mèo bao lâu thì tính là vuốt ve (gừ gừ) thay vì 1 cú chạm
+const CAT_HOLD_MS = 350
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
 // Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
@@ -626,23 +628,56 @@ export function ChillRoom({
     return () => clearTimeout(id)
   }, [catPetted])
 
+  // Đã chạm vào mèo lần nào (bấm hoặc nhấn giữ) → thôi gợi ý "Pet me"
+  const markPetted = useCallback(() => {
+    setCatHint(false)
+    if (catPetted) return
+    setCatPetted(true)
+    trackEvent({name: 'Chill Pet Cat'})
+    try {
+      localStorage.setItem(CAT_PETTED_KEY, '1')
+    } catch {
+      // Chặn storage — lần sau lại hiện gợi ý, không sao
+    }
+  }, [catPetted])
+
   const petCat = useCallback(() => {
     const kind = sceneRef.current?.petCat()
     if (!kind) return
     audioRef.current?.catSound(kind)
     // Cảnh đang pause vẫn vẽ lại 1 frame cho thấy mèo ngẩng lên
     sceneRef.current?.frame(performance.now())
-    setCatHint(false)
-    if (!catPetted) {
-      setCatPetted(true)
-      trackEvent({name: 'Chill Pet Cat'})
-      try {
-        localStorage.setItem(CAT_PETTED_KEY, '1')
-      } catch {
-        // Chặn storage — lần sau lại hiện gợi ý, không sao
-      }
-    }
-  }, [catPetted])
+    markPetted()
+  }, [markPetted])
+
+  // Nhấn giữ vào mèo → gừ gừ tới khi thả tay (tiếng gừ dài ~2,3 giây nên phát nối nhau).
+  // Cú "click" trình duyệt bắn ra lúc thả tay không được tính thêm 1 lần vuốt
+  const purrTimers = useRef<{wait?: number; loop?: number}>({})
+  const purrHeld = useRef(false)
+  const startPurrHold = (e: React.PointerEvent) => {
+    if (e.button > 0) return
+    purrHeld.current = false
+    window.clearTimeout(purrTimers.current.wait)
+    purrTimers.current.wait = window.setTimeout(() => {
+      purrHeld.current = true
+      sceneRef.current?.purrCat(true)
+      audioRef.current?.catSound('purr')
+      purrTimers.current.loop = window.setInterval(() => audioRef.current?.catSound('purr'), 2100)
+      markPetted()
+    }, CAT_HOLD_MS)
+  }
+  const stopPurrHold = useCallback(() => {
+    window.clearTimeout(purrTimers.current.wait)
+    window.clearInterval(purrTimers.current.loop)
+    if (!purrHeld.current) return
+    sceneRef.current?.purrCat(false)
+    window.setTimeout(() => (purrHeld.current = false), 0)
+  }, [])
+  useEffect(() => stopPurrHold, [stopPurrHold])
+  const onCatClick = () => {
+    if (purrHeld.current) return
+    petCat()
+  }
 
   const sayCat = useCallback((text: string) => {
     catSayTimers.current.forEach(clearTimeout)
@@ -1637,9 +1672,15 @@ export function ChillRoom({
         <button
           type="button"
           aria-label={t.room.petCat}
-          onClick={petCat}
+          onClick={onCatClick}
           onPointerEnter={() => sceneRef.current?.noticeCat()}
-          className="group absolute cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          onPointerDown={startPurrHold}
+          onPointerUp={stopPurrHold}
+          onPointerLeave={stopPurrHold}
+          onPointerCancel={stopPurrHold}
+          // Nhấn giữ trên điện thoại không bật menu ngữ cảnh / khung chọn chữ
+          onContextMenu={(e) => e.preventDefault()}
+          className="group absolute cursor-pointer touch-none rounded-2xl outline-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
           style={catBox}
         >
           {catSay && (
@@ -1652,10 +1693,12 @@ export function ChillRoom({
               {catSay.text} 🐾
             </span>
           )}
+          {/* Nhãn mời vuốt chỉ dành cho người chưa chạm vào mèo lần nào — sau đó ẩn hẳn, vì nó
+              nằm đúng chỗ tim / nốt nhạc / tia lấp lánh bay lên */}
           <span
             aria-hidden
             className={`pointer-events-none absolute bottom-full left-[68%] mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] sm:text-[11px] ${
-              catSay ? 'opacity-0' : catHint && !hideUi && entered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              catSay || catPetted ? 'opacity-0' : catHint && !hideUi && entered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
             }`}
             style={{transform: 'translate(-50%, 0)'}}
           >
