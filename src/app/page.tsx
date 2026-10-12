@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { client } from '@/sanity/lib/client'
 import { urlFor } from '@/sanity/lib/image'
 import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
+import { ChillTeaser } from '@/components/ChillTeaser'
 import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn import sang Hero 31
 
 export const revalidate = 60
@@ -71,6 +72,8 @@ export default async function HomePage() {
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
       <Hero31 study={heroStudy} />
+
+      <ChillTeaser revalidate={revalidate} />
 
       {featuredStudies.length > 0 && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
