@@ -69,6 +69,26 @@ const CUPS = [
   '................',
 ]
 
+// Mẩu giấy kem ghim đinh đỏ, góc dưới gập, vài dòng chữ nâu
+const NOTE = [
+  '................',
+  '.......AA.......',
+  '..ooooAAAAoooo..',
+  '..oCCCCAACCCCo..',
+  '..oCCCCCCCCCCo..',
+  '..oCKKKKKKKCCo..',
+  '..oCCCCCCCCCCo..',
+  '..oCKKKKKCCCCo..',
+  '..oCCCCCCCCCCo..',
+  '..oCKKKKKKCCCo..',
+  '..oCCCCCCCCDDo..',
+  '..oCCCCCCCDDo...',
+  '..oCCCCCCDDo....',
+  '..oooooooooo....',
+  '................',
+  '................',
+]
+
 type Grid = (string | null)[][]
 
 const toGrid = (rows: string[]): Grid => rows.map((r) => [...r].map((ch) => (ch === '.' ? null : (PALETTE[ch] ?? null))))
@@ -116,7 +136,7 @@ function chatGrid(unread: boolean): Grid {
   return g
 }
 
-const GRIDS = {bulb: toGrid(BULB), cups: toGrid(CUPS), chat: chatGrid(false), chatUnread: chatGrid(true)}
+const GRIDS = {bulb: toGrid(BULB), cups: toGrid(CUPS), note: toGrid(NOTE), chat: chatGrid(false), chatUnread: chatGrid(true)}
 export type PixelIconName = keyof typeof GRIDS
 
 // Lệch để đưa tâm phần có hình về giữa khung (tính 1 lần cho mỗi icon)

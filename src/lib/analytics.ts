@@ -30,6 +30,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Update Try'; props: {action: string}}
   | {name: 'Chill Table'; props: {action: 'create' | 'join' | 'copy' | 'leave' | 'view' | 'wall-glass' | 'wall-brick'}}
   | {name: 'Chill Zen'; props: {on: 'on' | 'off'}}
+  // Bảng nhật ký: mở bảng / treo mẩu lên tường / cất mẩu vào sổ / báo cáo mẩu
+  | {name: 'Chill Diary'; props: {action: 'open' | 'pin' | 'keep' | 'report'}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

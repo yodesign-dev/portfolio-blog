@@ -8,6 +8,7 @@ import {DESTINATIONS, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
+import {Diary} from './Diary'
 import {ShareButton} from './ShareButton'
 import {GroupTable} from './GroupTable'
 import {arrangeFriends, type TableMember} from './table-view'
@@ -210,6 +211,7 @@ export function ChillRoom({
   const [seatBoxes, setSeatBoxes] = useState<(Box | null)[]>([])
   const [moreBox, setMoreBox] = useState<Box | null>(null)
   const [wishOpen, setWishOpen] = useState(false)
+  const [diaryOpen, setDiaryOpen] = useState(false)
   // Lọ tip + bảng cảm ơn: số ly Bin đã xác nhận, người đồng ý hiện tên
   const [board, setBoard] = useState<Board | null>(null)
   const [boardOpen, setBoardOpen] = useState(false)
@@ -223,6 +225,7 @@ export function ChillRoom({
   // Số người đang ở quán (tính cả mình), lấy từ nhịp "đang ở quán" của phòng chat
   const [online, setOnline] = useState(0)
   // 3 ô của hàng nút góc phải dưới (Wishlist · Mời bạn · Chat)
+  const [diarySlot, setDiarySlot] = useState<HTMLDivElement | null>(null)
   const [wishSlot, setWishSlot] = useState<HTMLDivElement | null>(null)
   const [inviteSlot, setInviteSlot] = useState<HTMLDivElement | null>(null)
   const [chatSlot, setChatSlot] = useState<HTMLDivElement | null>(null)
@@ -1027,7 +1030,13 @@ export function ChillRoom({
     }
   }, [panelOpen, settingsSeen])
   // Hiện sau khi bấm Play một lúc, nhường thông báo "Có gì mới" hiện trước
-  const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast
+  const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast || diaryOpen
+
+  // Bảng nhật ký phủ gần hết màn hình → mở bảng / khung khác thì nhật ký tự đóng
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (panelOpen || wishOpen || chatOpen || boardOpen || updatesOpen) setDiaryOpen(false)
+  }, [panelOpen, wishOpen, chatOpen, boardOpen, updatesOpen])
   // Bấm phát (kể cả phím Space) hoặc mở bảng nào đó bằng phím tắt → coi như đã vào quán
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1339,7 +1348,7 @@ export function ChillRoom({
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !focusOpen && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !hovering
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -1978,13 +1987,14 @@ export function ChillRoom({
         </div>
       </div>
 
-      {/* Hàng nút góc phải dưới, theo thứ tự Wishlist · Mời bạn · Chat. Mỗi component tự
+      {/* Hàng nút góc phải dưới, theo thứ tự Nhật ký · Wishlist · Mời bạn · Chat. Mỗi component tự
           đặt nút của mình vào đúng ô (portal) nên thứ tự luôn cố định; ô trống (chat bị
           Studio tắt, phòng không phải café) thì hàng tự dồn lại.
           Điện thoại / màn dọc: hàng ngang nút tròn gọn ngay trên thanh nhạc.
           Màn ngang ≥1024px: cột dọc sát mép phải, đáy ngang đáy thanh nhạc (khoảng trống
           bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi */}
       <div className="absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end">
+        <div ref={setDiarySlot} className="contents" />
         <div ref={setWishSlot} className="contents" />
         <div ref={setInviteSlot} className="contents" />
         <div ref={setChatSlot} className="contents" />
@@ -2019,6 +2029,25 @@ export function ChillRoom({
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
         donateRequest={donateRequest}
+      />
+
+      {/* Bảng nhật ký (thử nghiệm) — Studio tắt thì không hiện gì */}
+      <Diary
+        slot={diarySlot}
+        open={diaryOpen}
+        onOpenChange={(o) => {
+          if (o) {
+            setPanelOpen(false)
+            setWishOpen(false)
+            setChatOpen(false)
+            setBoardOpen(false)
+            setUpdatesOpen(false)
+          }
+          setDiaryOpen(o)
+        }}
+        dimmed={hideUi}
+        hidden={!entered || panelOpen || volumeOpen || showHintTip}
+        slipHidden={groupView}
       />
 
       <ChillChat

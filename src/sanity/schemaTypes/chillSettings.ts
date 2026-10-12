@@ -30,6 +30,29 @@ export default defineType({
       validation: (rule) => rule.integer().min(2).max(12),
       description: 'Bàn vẽ 4 ghế; ai vào sau 4 người đầu hiện thành nhãn "+n". Đủ số này thì link mời báo "Bàn đã đủ người".',
     }),
+    defineField({
+      name: 'diaryOpen',
+      title: 'Mở bảng nhật ký (thử nghiệm)',
+      type: 'boolean',
+      initialValue: false,
+      description:
+        'Bật để khách viết mẩu giấy (2 mẩu / ngày) và xem bảng nhật ký của quán. Tắt là /chill trở lại y như trước: không nút, không mẩu giấy, không ai gửi được. Có hiệu lực sau khoảng 30 giây.',
+    }),
+    defineField({
+      name: 'diaryNoteVi',
+      title: 'Mẩu giấy của quán hôm nay (tiếng Việt)',
+      type: 'string',
+      validation: (rule) => rule.max(140),
+      description:
+        'Để trống = quán tự lấy 1 câu trong kho theo ngày. Điền vào để thay bằng câu riêng (vd. ngày Tết) — nhớ xoá đi khi hết dịp.',
+    }),
+    defineField({
+      name: 'diaryNoteEn',
+      title: 'Mẩu giấy của quán hôm nay (tiếng Anh)',
+      type: 'string',
+      validation: (rule) => rule.max(140),
+      description: 'Bản tiếng Anh của câu trên. Để trống thì khách xem tiếng Anh thấy câu tiếng Việt.',
+    }),
   ],
   preview: {prepare: () => ({title: 'Chill · Cài đặt'})},
 })

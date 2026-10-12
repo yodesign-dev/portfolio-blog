@@ -79,6 +79,33 @@ export const structure: StructureResolver = (S) =>
               ),
             ),
         ),
+      // Mẩu giấy khách treo lên bảng nhật ký (tạo qua API; quán tự xoá sau 7 ngày)
+      S.listItem()
+        .title('Chill · Nhật ký')
+        .id('chillNote')
+        .child(
+          S.list()
+            .title('Chill · Nhật ký')
+            .items(
+              [
+                ['shown', '📌 Đang treo', 'hidden != true'],
+                ['reported', '🚩 Bị báo cáo', 'coalesce(reports, 0) > 0'],
+                ['hidden', '🚫 Đã ẩn', 'hidden == true'],
+                ['all', 'Tất cả', 'true'],
+              ].map(([id, title, filter]) =>
+                S.listItem()
+                  .id(id)
+                  .title(title)
+                  .child(
+                    S.documentTypeList('chillNote')
+                      .title(title)
+                      .filter(`_type == "chillNote" && ${filter}`)
+                      .defaultOrdering([{field: '_createdAt', direction: 'desc'}])
+                      .initialValueTemplates([]),
+                  ),
+              ),
+            ),
+        ),
       // Người xem bấm "I've sent it" ở mục Buy Bin a coffee và để lại lời nhắn
       S.listItem()
         .title('Chill · Supporters')
@@ -118,6 +145,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillNote'].includes(listItem.getId() as string),
       ),
     ])
