@@ -4,20 +4,20 @@
 // Điện thoại: chưa chạy thì chỉ hiện biểu tượng phin, đang chạy hiện giờ còn lại.
 //
 // - Đồng hồ: chọn 15 / 25 / 45 phút, phin "nhỏ giọt" tới khi hết giờ thì chuông kêu, mèo
-//   báo xong (ChillRoom: onDone). Giờ kết thúc lưu trên máy nên tải lại trang vẫn chạy
-//   tiếp; hết giờ trong lúc đóng trang thì bỏ qua, không tính phin
+//   báo xong (ChillRoom: onDone) và bảng tự mở với tổng kết: phin vừa xong, hôm nay được
+//   mấy phin / bao nhiêu phút, chuỗi ngày ghé. Tổng kết ở yên tới khi người xem đóng bảng
+//   (đa số đang ở tab khác lúc hết giờ). Giờ kết thúc lưu trên máy nên tải lại trang vẫn
+//   chạy tiếp; hết giờ trong lúc đóng trang thì bỏ qua, không tính phin
 // - Thẻ khách quen: mỗi ngày ghé 1 dấu chân mèo, 10 dấu đầy 1 thẻ (xem regular.ts)
 
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {useT} from './i18n'
-import {CARD_SLOTS, cardOf, levelOf, streakOf, type Regular} from './regular'
+import {CARD_SLOTS, cardOf, levelOf, streakOf, todayOf, type Regular} from './regular'
 
 const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
 const OPTIONS = [15, 25, 45]
-// Sau khi xong, nút giữ chữ "Xong 1 phin" một lúc rồi về bình thường
-const DONE_MS = 60_000
 
 const clock = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
@@ -43,8 +43,8 @@ export function Focus({
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
   onPrime: () => void
-  // Làm xong 1 phin
-  onDone: () => void
+  // Làm xong 1 phin dài `minutes` phút
+  onDone: (minutes: number) => void
   // Thời gian còn lại (mm:ss) cho tiêu đề tab; null = không đếm
   onTick: (label: string | null) => void
   // Bảng đang mở → thanh trên đừng tự ẩn
@@ -55,7 +55,8 @@ export function Focus({
   const [minutes, setMinutes] = useState(25)
   const [session, setSession] = useState<{endsAt: number; minutes: number} | null>(null)
   const [now, setNow] = useState(0)
-  const [doneAt, setDoneAt] = useState(0)
+  // Phin vừa xong (số phút) — còn giữ thì bảng hiện tổng kết; đóng bảng là xoá
+  const [finished, setFinished] = useState<number | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   // Khôi phục sau khi hydrate: phút đã chọn + phiên đang chạy dở
@@ -83,9 +84,10 @@ export function Focus({
       if (at < session.endsAt) return setNow(at)
       setSession(null)
       store(FOCUS_KEY, null)
-      setDoneAt(at)
+      setFinished(session.minutes)
+      setOpen(true)
       trackEvent({name: 'Chill Focus', props: {action: 'done'}})
-      onDone()
+      onDone(session.minutes)
     }
     const id = window.setInterval(tick, 1000)
     document.addEventListener('visibilitychange', tick)
@@ -100,17 +102,16 @@ export function Focus({
   useEffect(() => onTick(label), [label, onTick])
   useEffect(() => () => onTick(null), [onTick])
 
-  useEffect(() => {
-    if (!doneAt) return
-    const id = window.setTimeout(() => setDoneAt(0), DONE_MS)
-    return () => window.clearTimeout(id)
-  }, [doneAt])
+  const close = () => {
+    setOpen(false)
+    setFinished(null)
+  }
 
   useEffect(() => onOpenChange(open), [open, onOpenChange])
   useEffect(() => {
     if (!open) return
-    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && close()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -129,7 +130,7 @@ export function Focus({
     const next = {endsAt: at + minutes * 60_000, minutes}
     onPrime()
     setNow(at)
-    setDoneAt(0)
+    setFinished(null)
     setSession(next)
     store(FOCUS_KEY, next)
     trackEvent({name: 'Chill Focus', props: {action: 'start'}})
@@ -144,14 +145,15 @@ export function Focus({
   const progress = session ? 1 - left / (session.minutes * 60_000) : 0
   const {stamps, card} = cardOf(regular.total)
   const streak = streakOf(regular)
-  const done = doneAt > 0 && !session
+  const done = finished !== null && !session
+  const today = todayOf(regular)
 
   return (
     // Điện thoại: bảng neo theo cả thanh trên (sát mép phải màn hình) cho khỏi tràn mép trái
     <div ref={ref} className="sm:relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         aria-controls="chill-focus"
         aria-label={session ? t.focus.runningAria(clock(left)) : t.focus.open}
@@ -194,9 +196,26 @@ export function Focus({
             </>
           ) : (
             <>
-              <p className="mt-2 text-sm leading-relaxed text-[#ede6dd]" role={done ? 'status' : undefined}>
-                {done ? t.focus.doneBody : t.focus.pitch}
-              </p>
+              {done ? (
+                <div role="status">
+                  <p className="mt-2 text-lg font-semibold tracking-tight text-[#f3ece4]">{t.focus.doneTitle(finished)}</p>
+                  <dl className="mt-3 grid grid-cols-3 gap-1.5">
+                    {[
+                      {value: today.phins, label: t.focus.todayPhins(today.phins)},
+                      {value: today.minutes, label: t.focus.todayMinutes},
+                      {value: streak, label: t.focus.streakDays(streak)},
+                    ].map((s) => (
+                      <div key={s.label} className="flex flex-col-reverse rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2 text-center">
+                        <dt className="mt-0.5 text-[11px] leading-tight text-[#a79e94]">{s.label}</dt>
+                        <dd className="font-mono text-xl tabular-nums text-[#f3cfa8]">{s.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-3 text-sm leading-relaxed text-[#ede6dd]">{t.focus.doneBody}</p>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed text-[#ede6dd]">{t.focus.pitch}</p>
+              )}
               <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl border border-white/10 p-1" role="radiogroup" aria-label={t.focus.length}>
                 {OPTIONS.map((m) => (
                   <button

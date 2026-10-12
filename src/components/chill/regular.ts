@@ -13,6 +13,8 @@ export type Regular = {
   total: number
   // Số phin tập trung đã làm xong
   phins: number
+  // Phin + số phút tập trung của riêng 1 ngày (sang ngày khác thì tính lại từ 0)
+  today?: {day: string; phins: number; minutes: number}
 }
 
 export type RegularLevel = 'guest' | 'regular' | 'close' | 'family'
@@ -26,7 +28,10 @@ export function loadRegular(): Regular {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<Regular> | null
     if (!saved || !Array.isArray(saved.days)) return EMPTY
     const days = saved.days.filter((d) => typeof d === 'string')
-    return {days, total: Math.max(days.length, Number(saved.total) || 0), phins: Math.max(0, Number(saved.phins) || 0)}
+    const t = saved.today
+    const today =
+      t && typeof t.day === 'string' ? {day: t.day, phins: Math.max(0, Number(t.phins) || 0), minutes: Math.max(0, Number(t.minutes) || 0)} : undefined
+    return {days, total: Math.max(days.length, Number(saved.total) || 0), phins: Math.max(0, Number(saved.phins) || 0), today}
   } catch {
     return EMPTY
   }
@@ -49,8 +54,14 @@ export function stampToday(r: Regular, now = new Date()): {regular: Regular; fre
   return {regular, fresh: true}
 }
 
-export function addPhin(r: Regular): Regular {
-  const regular = {...r, phins: r.phins + 1}
+// Phin + phút tập trung đã xong trong hôm nay
+export function todayOf(r: Regular, now = new Date()) {
+  return r.today?.day === dayKey(now) ? {phins: r.today.phins, minutes: r.today.minutes} : {phins: 0, minutes: 0}
+}
+
+export function addPhin(r: Regular, minutes: number, now = new Date()): Regular {
+  const before = todayOf(r, now)
+  const regular = {...r, phins: r.phins + 1, today: {day: dayKey(now), phins: before.phins + 1, minutes: before.minutes + minutes}}
   save(regular)
   return regular
 }

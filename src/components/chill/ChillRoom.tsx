@@ -732,11 +732,11 @@ export function ChillRoom({
   }, [entered, loaded, sayCat, t])
 
   const primeAudio = useCallback(() => audioRef.current?.prime(), [])
-  const onFocusDone = useCallback(() => {
+  const onFocusDone = useCallback((minutes: number) => {
     audioRef.current?.chime()
     sceneRef.current?.noticeCat()
     sayCat(t.room.catPhin)
-    setRegular((r) => addPhin(r))
+    setRegular((r) => addPhin(r, minutes))
   }, [sayCat, t])
 
   // ---------- Điểm đến ----------
