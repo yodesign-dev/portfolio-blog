@@ -73,7 +73,7 @@ export default async function HomePage() {
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
       <Hero31 study={heroStudy} />
 
-      <ChillTeaser revalidate={revalidate} />
+      <ChillTeaser />
 
       {featuredStudies.length > 0 && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
