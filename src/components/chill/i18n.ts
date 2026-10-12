@@ -166,7 +166,7 @@ const en = {
     doneBody: 'Stand up, stretch, look out the window for a bit.',
     doneTitle: (m: number) => `One phin done · ${m} min`,
     todayPhins: (n: number): string => (n === 1 ? 'phin today' : 'phins today'),
-    todayMinutes: 'min focused today',
+    todayMinutes: 'min focused',
     streakDays: (n: number): string => (n === 1 ? 'day in a row' : 'days in a row'),
     again: 'Brew another phin',
   },
