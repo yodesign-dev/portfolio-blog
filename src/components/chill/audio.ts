@@ -252,11 +252,13 @@ export class ChillAudio {
 
   pause() {
     if (!this.playing || !this.ctx) return
+    // Lấy vị trí trước khi tắt cờ: position() của bài synth chỉ cộng thời gian lúc đang phát
+    const at = this.position()
     this.playing = false
     if (this.track?.src) {
       for (const d of this.decks) d.el.pause()
     } else {
-      this.offset = this.position()
+      this.offset = at
       this.stopScheduler()
       this.setFx(false)
       this.crackle.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1)
