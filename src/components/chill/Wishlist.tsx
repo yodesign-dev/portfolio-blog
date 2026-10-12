@@ -304,8 +304,10 @@ export function Wishlist({
           open ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0'
         }`}
       >
-        <header className="flex items-center gap-3 border-b border-white/[0.07] px-5 py-4">
-          <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+        {/* Đầu bảng chỉ có tiêu đề (1 dòng, dài thì cắt "…") + nút ly cà phê + nút đóng — chữ
+            tiếng Việt dài hơn tiếng Anh nên không nhét thêm nhãn / số đếm vào hàng này
+            (số đếm đã có trên từng tab) */}
+        <header className="flex items-center gap-2 border-b border-white/[0.07] px-5 py-4">
           {view === 'donate' ? (
             <>
               <button
@@ -318,24 +320,20 @@ export function Wishlist({
                   <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">{t.wish.buyCoffee} ☕</h2>
+              <h2 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-[#f3ece4]">{t.wish.buyCoffee} ☕</h2>
             </>
           ) : (
-            <>
-              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">{t.wish.title}</h2>
-              <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 font-mono text-xs tabular-nums text-emerald-200">
-                💡 {count}
-              </span>
-            </>
+            <h2 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-[#f3ece4]">{t.wish.title}</h2>
           )}
           {donate && view === 'wishes' && (
             <button
               type="button"
               onClick={showDonate}
+              aria-label={t.wish.buyCoffee}
               title={t.wish.buyCoffee}
-              className="relative ml-auto flex h-9 items-center gap-1.5 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2.5 text-sm font-semibold text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 text-base text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
             >
-              <SteamingCup /> {t.wish.support}
+              <SteamingCup />
               <Sparkles />
             </button>
           )}
@@ -343,7 +341,7 @@ export function Wishlist({
             type="button"
             onClick={() => onOpenChange(false)}
             aria-label={t.wish.close}
-            className={`${donate && view === 'wishes' ? '' : 'ml-auto'} flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/[0.1] focus-visible:outline-2 focus-visible:outline-[#e8b27d]`}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/[0.1] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -355,7 +353,7 @@ export function Wishlist({
           <Donate onThanks={onThanks} context={context} />
         ) : (
           <>
-            <div className="flex items-center gap-1 px-5 pt-3" role="tablist" aria-label={t.wish.tabsAria}>
+            <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap px-5 pt-3 [scrollbar-width:none]" role="tablist" aria-label={t.wish.tabsAria}>
               {TABS.map((tb) => (
                 <button
                   key={tb}
@@ -389,22 +387,6 @@ export function Wishlist({
                 <WishItem key={w.id} wish={w} hearted={hearted.includes(w.id)} onHeart={() => toggleHeart(w)} />
               ))}
             </ol>
-
-            {donate && (
-              <button
-                type="button"
-                onClick={showDonate}
-                className="relative mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-[#e8b27d]/25 bg-gradient-to-r from-[#e8b27d]/12 to-transparent px-4 py-2.5 text-left transition hover:border-[#e8b27d]/50"
-              >
-                <SteamingCup className="text-xl" />
-                <span className="min-w-0 flex-1 text-sm text-[#ede6dd]">
-                  {t.wish.enjoying} <span className="font-semibold text-[#f3cfa8]">{t.wish.buyCoffee}</span>
-                </span>
-                <span aria-hidden className="text-[#e8b27d]">
-                  →
-                </span>
-              </button>
-            )}
 
             <Composer open={open} context={context} onSent={onSent} />
           </>
