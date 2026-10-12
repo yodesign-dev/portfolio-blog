@@ -12,19 +12,25 @@
 import {useEffect, useRef, useState} from 'react'
 import {useLang, useT, type Lang} from './i18n'
 
+// Các ô `…En` là bản tiếng Anh nhập trong Studio (tuỳ chọn) — trống thì dùng bản tiếng Việt
 export type ChillUpdate = {
   id: string
   title: string
+  titleEn?: string
   date: string // YYYY-MM-DD
   kind?: 'new' | 'improved' | 'fixed'
   version?: string
   announce?: boolean
   action?: string
   actionLabel?: string
-  items: {icon?: string; text: string}[]
+  actionLabelEn?: string
+  items: {icon?: string; text: string; textEn?: string}[]
   image: {src: string; w: number; h: number} | null
   imageAlt?: string
+  imageAltEn?: string
 }
+
+const pick = (lang: Lang, vi: string | undefined, en: string | undefined) => (lang === 'en' && en?.trim() ? en : vi)
 
 // Bản đã xem gần nhất trên máy này (id của bản mới nhất lúc mở popup)
 const SEEN_KEY = 'chill:update-seen'
@@ -134,6 +140,7 @@ export function WhatsNewButton({
   onHoldToast: (hold: boolean) => void
 }) {
   const t = useT()
+  const lang = useLang()
   return (
     <div className="relative">
       <button
@@ -174,7 +181,7 @@ export function WhatsNewButton({
               </span>
               <button type="button" onClick={() => onOpen('toast')} className="min-w-0 flex-1 text-left">
                 <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">{t.updates.toastLabel}</span>
-                <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">{latest.title}</span>
+                <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">{pick(lang, latest.title, latest.titleEn)}</span>
                 <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">{t.updates.toastLink}</span>
               </button>
               <button
@@ -286,13 +293,13 @@ export function Changelog({
                     )}
                     {u.version && <span className="ml-auto font-mono text-[11px] text-[#6f6862]">v{u.version.replace(/^v/i, '')}</span>}
                   </div>
-                  <h3 className="mt-2 text-base font-semibold leading-snug text-[#ede6dd]">{u.title}</h3>
+                  <h3 className="mt-2 text-base font-semibold leading-snug text-[#ede6dd]">{pick(lang, u.title, u.titleEn)}</h3>
 
                   {u.image && (
                     // eslint-disable-next-line @next/next/no-img-element -- ảnh / GIF từ Sanity CDN, đã thu nhỏ
                     <img
                       src={u.image.src}
-                      alt={u.imageAlt ?? ''}
+                      alt={pick(lang, u.imageAlt, u.imageAltEn) ?? ''}
                       width={u.image.w}
                       height={u.image.h}
                       loading="lazy"
@@ -306,7 +313,7 @@ export function Changelog({
                         <span aria-hidden className="w-5 shrink-0 text-center">
                           {item.icon || '·'}
                         </span>
-                        <span className="min-w-0">{item.text}</span>
+                        <span className="min-w-0">{pick(lang, item.text, item.textEn)}</span>
                       </li>
                     ))}
                   </ul>
@@ -318,7 +325,7 @@ export function Changelog({
                         onClick={() => onAction(u.action!)}
                         className="rounded-full border border-[#e8b27d]/50 bg-[#e8b27d]/10 px-4 py-1.5 text-sm font-medium text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
                       >
-                        {u.actionLabel || t.common.tryIt} →
+                        {(lang === 'en' ? u.actionLabelEn?.trim() || t.common.tryIt : u.actionLabel || t.common.tryIt)} →
                       </button>
                     </div>
                   )}

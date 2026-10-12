@@ -47,15 +47,18 @@ const CHILL_QUERY = `{
     | order(date desc, _createdAt desc)[0...12] {
     "id": _id,
     title,
+    titleEn,
     date,
     kind,
     version,
     announce,
     action,
     actionLabel,
-    "items": items[defined(text)]{icon, text},
+    actionLabelEn,
+    "items": items[defined(text)]{icon, text, textEn},
     "image": image.asset->{url, mimeType, "w": metadata.dimensions.width, "h": metadata.dimensions.height},
-    "imageAlt": image.alt
+    "imageAlt": image.alt,
+    "imageAltEn": image.altEn
   }
 }`
 

@@ -45,6 +45,13 @@ export default defineType({
       validation: (Rule) => Rule.required().max(70),
     }),
     defineField({
+      name: 'titleEn',
+      title: 'Tiêu đề (tiếng Anh)',
+      type: 'string',
+      description: 'Tuỳ chọn. Khách xem giao diện tiếng Anh sẽ thấy bản này; để trống thì hiện bản tiếng Việt.',
+      validation: (Rule) => Rule.max(70),
+    }),
+    defineField({
       name: 'date',
       title: 'Ngày',
       type: 'date',
@@ -64,7 +71,7 @@ export default defineType({
       name: 'items',
       title: 'Các ý',
       type: 'array',
-      description: 'Tối đa 4 ý, mỗi ý một dòng ngắn.',
+      description: 'Tối đa 4 ý, mỗi ý một dòng ngắn. Mỗi ý có thêm ô tiếng Anh (tuỳ chọn).',
       of: [
         defineArrayMember({
           type: 'object',
@@ -72,6 +79,13 @@ export default defineType({
           fields: [
             defineField({name: 'icon', title: 'Emoji', type: 'string', validation: (Rule) => Rule.max(4)}),
             defineField({name: 'text', title: 'Nội dung', type: 'string', validation: (Rule) => Rule.required().max(140)}),
+            defineField({
+              name: 'textEn',
+              title: 'Nội dung (tiếng Anh)',
+              type: 'string',
+              description: 'Tuỳ chọn. Để trống thì khách xem tiếng Anh thấy bản tiếng Việt.',
+              validation: (Rule) => Rule.max(140),
+            }),
           ],
           preview: {
             select: {icon: 'icon', text: 'text'},
@@ -86,7 +100,10 @@ export default defineType({
       title: 'Ảnh / GIF minh hoạ',
       type: 'image',
       description: 'Tuỳ chọn. Ảnh ngang 16:9, chụp cảnh có thay đổi.',
-      fields: [defineField({name: 'alt', title: 'Mô tả ảnh', type: 'string'})],
+      fields: [
+        defineField({name: 'alt', title: 'Mô tả ảnh', type: 'string'}),
+        defineField({name: 'altEn', title: 'Mô tả ảnh (tiếng Anh)', type: 'string'}),
+      ],
     }),
     defineField({
       name: 'action',
@@ -100,6 +117,14 @@ export default defineType({
       title: 'Chữ trên nút',
       type: 'string',
       initialValue: 'Thử ngay',
+      hidden: ({document}) => !document?.action,
+      validation: (Rule) => Rule.max(24),
+    }),
+    defineField({
+      name: 'actionLabelEn',
+      title: 'Chữ trên nút (tiếng Anh)',
+      type: 'string',
+      description: 'Tuỳ chọn. Để trống thì khách xem tiếng Anh thấy "Try it".',
       hidden: ({document}) => !document?.action,
       validation: (Rule) => Rule.max(24),
     }),
