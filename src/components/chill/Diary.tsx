@@ -6,12 +6,14 @@
 //
 // - Mẩu giấy ghim ở góc trái trên cảnh (từ sm trở lên): câu của quán hôm nay + số mẩu —
 //   bấm vào là mở bảng. Điện thoại chật nên chỉ có nút tròn ở hàng nút góc phải dưới.
-// - Bảng: mỗi ngày 1 sợi dây, giấy kẹp lệch nhau, màu theo tâm trạng, càng cũ càng ngả
-//   vàng. Không tim, không xếp hạng, không cuộn vô tận — cố ý không giống danh sách bài.
-// - Mặc định xem "Hôm nay" (vắng thì kèm sợi dây hôm qua cho đỡ trống), đổi được sang
-//   "Tuần này"; lọc thêm theo tâm trạng.
+// - Bảng = 1 cuốn sổ lò xo mở trên bàn (kiểu bullet journal): giấy kẻ ô, chữ viết tay, mỗi
+//   ngày 1 mục, mỗi mẩu của khách là 1 gạch đầu dòng. Không tim, không xếp hạng, không
+//   cuộn vô tận — cố ý không giống danh sách bài.
+// - Mở ra ở trang hôm nay; nhiều thì lật trang để xem các ngày trước trong tuần. Lọc thêm
+//   theo tâm trạng.
 // - Studio tắt "Mở bảng nhật ký" (mặc định) thì component này không hiện gì.
 
+import {Patrick_Hand} from 'next/font/google'
 import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
@@ -20,19 +22,22 @@ import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
 import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, dayOf, recentDays, type DiaryNote, type Mood} from './diary-shared'
 
+// Chữ viết tay cho cuốn sổ (có dấu tiếng Việt). Chỉ tải khi mở sổ, không preload cho cả trang
+const hand = Patrick_Hand({weight: '400', subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
+
 const STORE_KEY = 'chill:diary'
 // Cùng danh tính với phòng chat (ChillChat tạo lần đầu)
 const ME_KEY = 'chill:chat-me'
 // Sổ riêng giữ tối đa bấy nhiêu mẩu gần nhất
 const BOOK_MAX = 400
-// "Hôm nay" ít hơn ngần này mẩu thì hiện kèm sợi dây hôm qua cho bảng đỡ trống
-const QUIET_DAY = 6
 // Xấp giấy ghim trên khung cửa: lật qua bấy nhiêu mẩu mới nhất, mỗi mẩu hiện chừng này lâu
 const PILE_MAX = 6
 const PILE_MS = 7000
 
 type Kind = 'wall' | 'book'
 type MyNote = DiaryNote & {kind: Kind}
+// Mẩu đang hiện trong sổ: của tường (kind trống), hoặc của mình (mine) — kể cả mẩu cất riêng
+type ShownNote = DiaryNote & {kind?: Kind; mine?: boolean}
 type Store = {mine: MyNote[]; hidden: string[]; seen: number}
 type Room = {open: boolean; notes: DiaryNote[]; cafe: {vi: string; en: string} | null}
 
@@ -47,7 +52,6 @@ const PAPER: Record<Mood, {bg: string; ink: string; soft: string}> = {
   sleepy: {bg: '#e9e4f6', ink: '#2b2350', soft: '#6c62a3'},
   grateful: {bg: '#fbe3e6', ink: '#4b1f2a', soft: '#a15a6a'},
 }
-const KRAFT = {bg: '#dcbd8f', ink: '#3a2412', soft: '#7a5632'}
 // Giấy kem của mẩu mèo quán trên khung cửa
 const PIN_PAPER = {bg: '#fbf1d2', ink: '#2a1a10', soft: '#9a6a45'}
 
@@ -83,13 +87,6 @@ function loadMe(): {uid: string; name: string} {
   return {uid: crypto.randomUUID().replace(/-/g, '').slice(0, 20), name: ''}
 }
 
-// Góc nghiêng cố định theo id (−3°…3°) — mẩu nào cũng lệch 1 kiểu, tải lại không nhảy
-function tiltOf(id: string) {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return ((Math.abs(h) % 61) - 30) / 10
-}
-
 export function Diary({
   slot,
   open,
@@ -114,7 +111,6 @@ export function Diary({
   const [room, setRoom] = useState<Room | null>(null)
   const [store, setStore] = useState<Store>(EMPTY)
   const [now, setNow] = useState(0)
-  const [range, setRange] = useState<'today' | 'week'>('today')
   const [mood, setMood] = useState<Mood | null>(null)
   const [composing, setComposing] = useState(false)
 
@@ -168,7 +164,7 @@ export function Diary({
   // Tường + sổ của mình (mẩu vừa treo có thể chưa kịp có trong bản CDN đang giữ)
   const notes = useMemo(() => {
     const gone = new Set(store.hidden)
-    const byId = new Map<string, DiaryNote & {kind?: Kind; mine?: boolean}>()
+    const byId = new Map<string, ShownNote>()
     for (const n of room?.notes ?? []) if (!gone.has(n.id)) byId.set(n.id, n)
     const fresh = now - 60_000
     for (const n of store.mine) {
@@ -235,9 +231,6 @@ export function Diary({
   const weekCount = notes.filter((n) => n.kind !== 'book').length
   const clock = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
   const shown = notes.filter((n) => !mood || n.mood === mood)
-  const todayShown = shown.filter((n) => n.day === today)
-  const visibleDays = range === 'week' ? days : todayShown.length < QUIET_DAY ? days.slice(0, 2) : days.slice(0, 1)
-  const dayLabel = (i: number) => (i === 0 ? t.diary.dayToday : i === 1 ? t.diary.dayYesterday : t.diary.daysAgo(i))
 
   return (
     <>
@@ -334,22 +327,6 @@ export function Diary({
       >
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/[0.07] px-5 py-3.5">
           <h2 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-[#f3ece4]">{t.diary.title}</h2>
-          <div role="radiogroup" aria-label={t.diary.filterAria} className="flex rounded-full border border-white/10 p-0.5">
-            {(['today', 'week'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                role="radio"
-                aria-checked={range === r}
-                onClick={() => setRange(r)}
-                className={`rounded-full px-3 py-1 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
-                  range === r ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
-                }`}
-              >
-                {t.diary[r]}
-              </button>
-            ))}
-          </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
@@ -378,68 +355,21 @@ export function Diary({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-2 sm:px-7">
-          {visibleDays.map((day, i) => {
-            const list = shown.filter((n) => n.day === day)
-            const isToday = day === today
-            // Hôm qua hiện kèm lúc quán vắng → nhạt hơn để biết không phải của hôm nay
-            const faded = range === 'today' && !isToday
-            if (!isToday && list.length === 0) return null
-            return (
-              <section key={day} aria-label={dayLabel(i)} className={`pt-5 ${faded ? 'opacity-70' : ''}`}>
-                <h3 className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">
-                  {dayLabel(i)}
-                  <span className="text-[#8a8177]">{list.length > 0 ? list.length : ''}</span>
-                </h3>
-                {/* Sợi dây: mẩu giấy kẹp ngay dưới, mỗi mẩu lệch 1 kiểu */}
-                <div aria-hidden className="h-px bg-[#b98a52]/70" />
-                <ul className="flex flex-wrap items-start gap-x-3 gap-y-4 px-1">
-                  {isToday && !mood && (
-                    <li>
-                      <Slip paper={KRAFT} tilt={-1.5} age={0}>
-                        <p className="text-[14px] font-medium leading-snug">{cafeText}</p>
-                        <p className="mt-2 text-[11px]" style={{color: KRAFT.soft}}>
-                          🐾 {t.diary.cat}
-                        </p>
-                      </Slip>
-                    </li>
-                  )}
-                  {list.map((n) => (
-                    <li key={n.id}>
-                      <Slip paper={PAPER[n.mood]} tilt={tiltOf(n.id)} age={i}>
-                        <NoteBody note={n} onReport={report} onRemove={removeMine} />
-                      </Slip>
-                    </li>
-                  ))}
-                  {isToday && (
-                    <li className={composing ? 'w-full sm:w-auto' : ''}>
-                      {composing ? (
-                        <Compose open={open} onDone={addMine} onCancel={() => setComposing(false)} />
-                      ) : left > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => setComposing(true)}
-                          className="relative mt-1.5 flex h-[104px] w-[150px] rotate-1 flex-col items-center justify-center gap-1 border border-dashed border-[#e8b27d]/50 bg-white/[0.03] px-3 text-center text-[#f3cfa8] transition hover:rotate-0 hover:border-[#e8b27d] hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
-                        >
-                          <span className="text-sm font-semibold">✎ {t.diary.write}</span>
-                          <span className="text-[11px] text-[#a79e94]">{t.diary.left(left)}</span>
-                        </button>
-                      ) : (
-                        <p className="mt-1.5 flex h-[104px] w-[170px] items-center border border-dashed border-white/15 px-3 text-center text-xs leading-relaxed text-[#a79e94]">
-                          {t.diary.noneLeft}
-                        </p>
-                      )}
-                    </li>
-                  )}
-                </ul>
-                {isToday && list.length === 0 && mood && <p className="mt-4 px-1 text-sm text-[#a79e94]">{t.diary.emptyMood}</p>}
-              </section>
-            )
-          })}
-          <p className="mt-8 px-1 text-xs leading-relaxed text-[#8a8177]">
-            {t.diary.keeps} {t.diary.care}
-          </p>
-        </div>
+        <Book
+          open={open}
+          notes={shown}
+          days={days}
+          today={today}
+          cafeText={cafeText}
+          left={left}
+          filtered={mood !== null}
+          composing={composing}
+          onCompose={() => setComposing(true)}
+          onDone={addMine}
+          onCancel={() => setComposing(false)}
+          onReport={report}
+          onRemove={removeMine}
+        />
       </section>
     </>
   )
@@ -474,69 +404,331 @@ function Peg() {
   return <span aria-hidden className="absolute left-1/2 top-[-5px] h-[15px] w-[9px] -translate-x-1/2 rounded-[2px] border border-[#6b3f22] bg-[#d9a15c]" />
 }
 
-// 1 mẩu giấy: nghiêng theo `tilt`, càng cũ (age = số ngày) càng ngả vàng
-function Slip({paper, tilt, age, children}: {paper: {bg: string; ink: string}; tilt: number; age: number; children: React.ReactNode}) {
-  return (
-    <div
-      className="group/slip relative mt-1.5 w-[150px] px-3 pb-2.5 pt-4 shadow-[0_8px_18px_-10px_rgba(0,0,0,0.85)] transition-transform duration-200 hover:z-10 hover:scale-[1.04] sm:w-[168px]"
-      style={{background: paper.bg, color: paper.ink, transform: `rotate(${tilt}deg)`, filter: age > 0 ? `sepia(${Math.min(0.6, age * 0.1)}) brightness(${1 - Math.min(0.18, age * 0.03)})` : undefined}}
-    >
-      <Peg />
-      {children}
-    </div>
-  )
-}
-
-function NoteBody({
-  note,
+// Bảng nhật ký = 1 cuốn sổ lò xo mở ra trên mặt bàn (kiểu bullet journal): giấy kẻ ô,
+// chữ viết tay, mỗi ngày 1 mục "▸ Thứ Hai ⑦", mỗi mẩu của khách là 1 gạch đầu dòng.
+// Nội dung tự chảy sang trang kế bằng CSS multi-column (mỗi cột = 1 trang), nhiều thì
+// lật trang: máy tính xem 2 trang 1 lượt, điện thoại 1 trang.
+function Book({
+  open,
+  notes,
+  days,
+  today,
+  cafeText,
+  left,
+  filtered,
+  composing,
+  onCompose,
+  onDone,
+  onCancel,
   onReport,
   onRemove,
 }: {
-  note: DiaryNote & {kind?: Kind; mine?: boolean}
+  open: boolean
+  notes: ShownNote[]
+  days: string[]
+  today: string
+  cafeText: string
+  left: number
+  // Đang lọc theo tâm trạng → ẩn mẩu của mèo quán + báo khi không có mẩu nào khớp
+  filtered: boolean
+  composing: boolean
+  onCompose: () => void
+  onDone: (note: MyNote) => void
+  onCancel: () => void
   onReport: (id: string) => void
   onRemove: (id: string) => void
 }) {
   const t = useT()
-  const [asking, setAsking] = useState(false)
-  const paper = PAPER[note.mood]
-  const time = new Date(note.ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
+  const lang = useLang()
+  const wrap = useRef<HTMLDivElement>(null)
+  const flow = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({w: 0, h: 0})
+  const [pages, setPages] = useState(1)
+  const [spread, setSpread] = useState(0)
+  const swipe = useRef<number | null>(null)
+
+  useEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setBox({w: el.clientWidth, h: el.clientHeight}))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Kích thước sổ: 2 trang khi đủ rộng. Mọi số đo bám theo ô kẻ 24px để chữ nằm trên dòng
+  const two = box.w >= 760
+  const per = two ? 2 : 1
+  const W = Math.floor(Math.min(box.w, two ? 1010 : 470))
+  const H = Math.floor(Math.max(340, Math.min(box.h - (two ? 34 : 6), 672)))
+  const padR = two ? 36 : 22
+  // 1 trang: lò xo nằm mép trái nên lề trái rộng hơn
+  const padL = two ? 36 : 40
+  const gap = two ? 104 : padL + padR
+  const colW = Math.max(160, two ? (W - padL - padR - gap) / 2 : W - padL - padR)
+  const step = colW + gap
+  const padT = 34
+  const padB = 46
+
+  const spreads = Math.max(1, Math.ceil(pages / per))
+  const at = Math.min(spread, spreads - 1)
+
+  // Đếm số trang (cột) sau mỗi lần nội dung / cỡ sổ đổi, và khi font viết tay tải xong
+  useEffect(() => {
+    const el = flow.current
+    if (!el || !box.w) return
+    const measure = () => setPages(Math.max(1, Math.round((el.scrollWidth + gap) / step)))
+    measure()
+    let alive = true
+    void document.fonts?.ready.then(() => alive && measure())
+    return () => {
+      alive = false
+    }
+  }, [notes, composing, filtered, lang, box.w, box.h, gap, step, cafeText, left])
+
+  // Trang chứa 1 phần tử trong sổ (đo theo vị trí thật, không phụ thuộc đang lật tới đâu)
+  const spreadOf = useCallback(
+    (el: Element | null) => {
+      const f = flow.current
+      if (!el || !f) return 0
+      const col = Math.round((el.getBoundingClientRect().left - f.getBoundingClientRect().left) / step)
+      return Math.max(0, Math.floor(col / per))
+    },
+    [step, per],
+  )
+  const jumpTo = (day: string) => setSpread(spreadOf(flow.current?.querySelector(`[data-day="${day}"]`) ?? null))
+
+  // Bấm "Viết vài dòng" → lật tới đúng trang có mẩu đang viết; viết xong (hoặc thôi) → về
+  // trang có dòng mới nhất của hôm nay
+  const wasComposing = useRef(false)
+  useEffect(() => {
+    if (!composing && !wasComposing.current) return
+    wasComposing.current = composing
+    const id = window.setTimeout(() => {
+      const lines = flow.current?.querySelectorAll(`[data-day="${today}"] [data-note]`)
+      setSpread(spreadOf(composing ? (flow.current?.querySelector('form') ?? null) : (lines?.[lines.length - 1] ?? null)))
+    }, 60)
+    return () => window.clearTimeout(id)
+  }, [composing, spreadOf, today])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof Element && e.target.closest('input, textarea')) return
+      if (e.key === 'ArrowRight') setSpread((s) => Math.min(s + 1, spreads - 1))
+      if (e.key === 'ArrowLeft') setSpread((s) => Math.max(s - 1, 0))
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, spreads])
+
+  const locale = lang === 'vi' ? 'vi-VN' : 'en-US'
+  const dateOf = (day: string) => new Date(`${day}T12:00:00+07:00`)
+  const fmt = (day: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, {timeZone: 'Asia/Ho_Chi_Minh', ...opts}).format(dateOf(day))
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+  const clock = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
+  const has = (day: string) => notes.some((n) => n.day === day)
+  const dayList = days.filter((d) => d === today || has(d))
+
+  const grid = {
+    backgroundColor: '#fbf7ea',
+    backgroundImage: 'linear-gradient(rgba(70,96,120,0.13) 1px, transparent 1px), linear-gradient(90deg, rgba(70,96,120,0.13) 1px, transparent 1px)',
+    backgroundSize: '24px 24px',
+    backgroundPosition: `${padL % 24}px ${(padT + 4) % 24}px`,
+  }
+  const rings = Math.max(4, Math.floor((H - 40) / 30))
+
   return (
-    <>
-      <p className="whitespace-pre-wrap break-words text-[14px] leading-snug">{note.text}</p>
-      <p className="mt-2 flex items-center justify-between gap-2 text-[11px]" style={{color: paper.soft}}>
-        <span className="truncate">
-          {MOOD_ICON[note.mood]} {t.diary.moods[note.mood]}
-        </span>
-        <span className="shrink-0 tabular-nums">{time}</span>
-      </p>
-      <p className="mt-0.5 flex min-h-[18px] items-center justify-between gap-2 text-[11px]" style={{color: paper.soft}}>
-        <span className="truncate">{note.kind === 'book' ? `🔒 ${t.diary.onlyHere}` : note.mine ? t.diary.mine : note.name}</span>
-        {note.kind === 'book' ? (
-          <button type="button" onClick={() => onRemove(note.id)} aria-label={t.diary.remove} title={t.diary.remove} className="shrink-0 px-1 opacity-60 hover:opacity-100 focus-visible:opacity-100">
-            ✕
-          </button>
-        ) : note.mine ? null : asking ? (
-          <span className="flex shrink-0 items-center gap-1.5">
-            <button type="button" onClick={() => onReport(note.id)} className="font-semibold underline underline-offset-2">
-              {t.diary.reportYes}
+    <div ref={wrap} className={`flex min-h-0 flex-1 items-center justify-center px-2 pb-2 sm:px-6 ${hand.className}`}>
+      {box.w > 0 && (
+        <div
+          className="relative shrink-0 text-[#2c2a33] drop-shadow-[0_18px_28px_rgba(0,0,0,0.55)]"
+          style={{width: W, height: H}}
+          onPointerDown={(e) => (swipe.current = e.pointerType === 'mouse' ? null : e.clientX)}
+          onPointerUp={(e) => {
+            const from = swipe.current
+            swipe.current = null
+            if (from === null || Math.abs(e.clientX - from) < 56) return
+            setSpread((s) => (e.clientX < from ? Math.min(s + 1, spreads - 1) : Math.max(s - 1, 0)))
+          }}
+        >
+          {/* Cây bút nằm phía trên sổ */}
+          {two && (
+            <div aria-hidden className="absolute -top-[30px] left-[30%] flex h-[18px] w-[320px] -rotate-2 items-center drop-shadow-[0_6px_6px_rgba(0,0,0,0.4)]">
+              <span className="h-full w-[92px] rounded-l-full bg-[#e9655a]" />
+              <span className="h-full flex-1 bg-[#f5f1ea]" />
+              <span className="h-[12px] w-[26px] rounded-r-full bg-[#f5f1ea]" />
+            </div>
+          )}
+
+          {/* Giấy: kẻ ô, bo góc ngoài; 2 trang thì có rãnh gáy sổ ở giữa */}
+          {/* overflow-clip chứ không phải hidden: ô đang gõ nhận focus cũng không kéo lệch trang */}
+          <div className="absolute inset-0 overflow-clip rounded-[14px]" style={grid}>
+            {two && <div aria-hidden className="absolute inset-y-0 left-1/2 w-[70px] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(40,30,20,0.16)_35%,rgba(40,30,20,0.28)_50%,rgba(40,30,20,0.16)_65%,transparent)]" />}
+
+            <div
+              ref={flow}
+              className="absolute transition-transform duration-500 ease-[cubic-bezier(.3,.7,.2,1)]"
+              style={{
+                left: padL,
+                top: padT,
+                height: H - padT - padB,
+                width: two ? colW * 2 + gap : colW,
+                columnWidth: colW,
+                columnGap: gap,
+                columnFill: 'auto',
+                transform: `translateX(${-at * per * step}px)`,
+                fontSize: 19,
+                lineHeight: '24px',
+              }}
+            >
+              {/* Trang bìa trong: tháng, tuần này, 7 ngày, mẩu của mèo quán */}
+              <div className="break-inside-avoid pb-6">
+                <p className="text-[46px] leading-[48px] text-[#e4574c] [-webkit-text-stroke:1px_#2c2a33] [paint-order:stroke_fill]">{cap(fmt(today, {month: 'long'}))}</p>
+                <p className="mt-[10px] inline-block -rotate-1 bg-[#f6b7ae] px-2 text-[18px] leading-[24px] text-[#7a2a23]">{t.diary.week}</p>
+                <ol className="mt-[14px] grid grid-cols-7 gap-1 text-center">
+                  {[...days].reverse().map((d) => (
+                    <li key={d}>
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(dayList.includes(d) ? d : today)}
+                        disabled={!dayList.includes(d)}
+                        aria-label={cap(fmt(d, {weekday: 'long', day: 'numeric', month: 'long'}))}
+                        className="group/day flex w-full flex-col items-center leading-[20px] disabled:opacity-45"
+                      >
+                        <span className="text-[13px] text-[#8b8794]">{cap(fmt(d, {weekday: 'short'}))}</span>
+                        <span className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-[17px] ${d === today ? 'bg-[#e4574c] text-white' : 'group-enabled/day:group-hover/day:bg-[#f6b7ae]/70'}`}>
+                          {Number(d.slice(8, 10))}
+                        </span>
+                        <span aria-hidden className={`mt-0.5 h-[5px] w-[5px] rounded-full ${has(d) ? 'bg-[#e4574c]' : 'bg-transparent'}`} />
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+                {!filtered && (
+                  <div className="relative mx-auto mt-[22px] w-[88%] rotate-[-2.5deg] bg-[#f8c9cf] px-3.5 pb-3 pt-4 text-[#5a2530] shadow-[2px_3px_0_rgba(60,30,30,0.18)]">
+                    <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-14 -translate-x-1/2 rotate-2 bg-[#fff6c9]/85" />
+                    <p className="text-[19px] leading-[24px]">{cafeText}</p>
+                    <p className="mt-1 text-[15px] leading-[20px] text-[#a15a6a]">🐾 {t.diary.cat}</p>
+                  </div>
+                )}
+              </div>
+
+              {dayList.map((day) => {
+                const list = notes.filter((n) => n.day === day)
+                const isToday = day === today
+                return (
+                  <section key={day} data-day={day} className="pb-6">
+                    <h3 className="flex break-after-avoid items-center gap-2 text-[30px] leading-[48px] text-[#e4574c]">
+                      <span aria-hidden className="text-[20px]">▸</span>
+                      {cap(fmt(day, {weekday: 'long'}))}
+                      <span className="flex h-[30px] min-w-[30px] items-center justify-center rounded-full bg-[#f49b8f] px-1 text-[19px] leading-none text-[#5a1c16]">{Number(day.slice(8, 10))}</span>
+                      {isToday && <span className="text-[16px] text-[#8b8794]">· {t.diary.dayToday.toLowerCase()}</span>}
+                    </h3>
+                    <ul>
+                      {list.map((n) => (
+                        <li key={n.id} data-note className="group/line break-inside-avoid pb-[24px]">
+                          <p className="flex gap-2">
+                            <span aria-hidden className="shrink-0 text-[#e4574c]">•</span>
+                            <span className={`min-w-0 whitespace-pre-wrap break-words ${n.kind === 'book' ? 'text-[#6d6a75]' : ''}`}>{n.text}</span>
+                          </p>
+                          <p className="flex items-center gap-2 pl-[18px] text-[15px] text-[#8b8794]">
+                            <span className="px-1.5 text-[14px] leading-[20px]" style={{background: PAPER[n.mood].bg, color: PAPER[n.mood].ink}}>
+                              {MOOD_ICON[n.mood]} {t.diary.moods[n.mood]}
+                            </span>
+                            <span className="min-w-0 truncate">{n.kind === 'book' ? `🔒 ${t.diary.onlyHere}` : n.mine ? t.diary.mine : n.name || t.diary.guest}</span>
+                            <span className="shrink-0 tabular-nums">{clock(n.ts)}</span>
+                            <LineAction note={n} onReport={onReport} onRemove={onRemove} />
+                          </p>
+                        </li>
+                      ))}
+                      {isToday && list.length === 0 && !composing && <li className="pb-[24px] text-[#8b8794]">{filtered ? t.diary.emptyMood : t.diary.emptyDay}</li>}
+                      {isToday && (
+                        <li className="break-inside-avoid pb-[24px]">
+                          {composing ? (
+                            <Compose open={open} onDone={onDone} onCancel={onCancel} />
+                          ) : left > 0 ? (
+                            <button type="button" onClick={onCompose} className="group/write flex w-full items-baseline gap-2 text-left text-[#b9b4c0] transition-colors hover:text-[#e4574c] focus-visible:outline-2 focus-visible:outline-[#e4574c]">
+                              <span aria-hidden className="text-[#e4574c]">•</span>
+                              <span className="border-b-2 border-dashed border-current">✎ {t.diary.write}…</span>
+                              <span className="text-[15px] text-[#8b8794] group-hover/write:text-[#e4574c]">({t.diary.left(left).toLowerCase()})</span>
+                            </button>
+                          ) : (
+                            <p className="text-[16px] text-[#8b8794]">{t.diary.noneLeft}</p>
+                          )}
+                        </li>
+                      )}
+                    </ul>
+                  </section>
+                )
+              })}
+
+              <p className="break-inside-avoid text-[15px] leading-[24px] text-[#a7a2ae]">
+                ☆ {t.diary.keeps}
+                <br />☆ {t.diary.care}
+              </p>
+            </div>
+          </div>
+
+          {/* Lò xo: giữa sổ (2 trang) hoặc mép trái (1 trang) */}
+          <div aria-hidden className="pointer-events-none absolute inset-y-[22px] flex flex-col justify-between" style={two ? {left: W / 2 - 23, width: 46} : {left: -9, width: 34}}>
+            {Array.from({length: rings}).map((_, i) => (
+              <span key={i} className="block h-[11px] w-full rounded-full border-[3px] border-[#2f5d73] bg-[linear-gradient(#5e93ab,#2f5d73)] shadow-[0_2px_2px_rgba(0,0,0,0.35)]" />
+            ))}
+          </div>
+
+          {/* Lật trang */}
+          <div className="absolute inset-x-0 bottom-[10px] flex items-center justify-between px-5 text-[17px] leading-[24px] text-[#e4574c]">
+            <button type="button" onClick={() => setSpread(Math.max(at - 1, 0))} disabled={at === 0} className="px-1 transition-opacity hover:underline disabled:opacity-0 focus-visible:outline-2 focus-visible:outline-[#e4574c]">
+              ← {t.diary.prevPage}
             </button>
-            <button type="button" onClick={() => setAsking(false)} className="opacity-70">
-              {t.diary.cancel}
-            </button>
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAsking(true)}
-            aria-label={t.diary.report}
-            title={t.diary.report}
-            className="shrink-0 px-1 opacity-0 transition group-hover/slip:opacity-60 hover:!opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-50"
-          >
-            ⚑
-          </button>
-        )}
-      </p>
-    </>
+            {/* Số trang nằm cạnh nút lật (giữa sổ là lò xo) */}
+            <span className="flex items-center gap-3">
+              <span aria-live="polite" className="text-[15px] tabular-nums text-[#8b8794]">
+                {t.diary.pageOf(at + 1, spreads)}
+              </span>
+              <button type="button" onClick={() => setSpread(Math.min(at + 1, spreads - 1))} disabled={at >= spreads - 1} className="px-1 transition-opacity hover:underline disabled:opacity-0 focus-visible:outline-2 focus-visible:outline-[#e4574c]">
+                {t.diary.nextPage} →
+              </button>
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Cuối mỗi dòng: báo cáo (mẩu của người khác) hoặc bỏ khỏi sổ (mẩu riêng của mình)
+function LineAction({note, onReport, onRemove}: {note: ShownNote; onReport: (id: string) => void; onRemove: (id: string) => void}) {
+  const t = useT()
+  const [asking, setAsking] = useState(false)
+  if (note.kind === 'book')
+    return (
+      <button type="button" onClick={() => onRemove(note.id)} aria-label={t.diary.remove} title={t.diary.remove} className="shrink-0 px-1 opacity-50 hover:opacity-100 focus-visible:opacity-100">
+        ✕
+      </button>
+    )
+  if (note.mine) return null
+  if (asking)
+    return (
+      <span className="flex shrink-0 items-center gap-2">
+        <button type="button" onClick={() => onReport(note.id)} className="text-[#e4574c] underline underline-offset-2">
+          {t.diary.reportYes}
+        </button>
+        <button type="button" onClick={() => setAsking(false)}>
+          {t.diary.cancel}
+        </button>
+      </span>
+    )
+  return (
+    <button
+      type="button"
+      onClick={() => setAsking(true)}
+      aria-label={t.diary.report}
+      title={t.diary.report}
+      className="shrink-0 px-1 opacity-0 transition group-hover/line:opacity-60 hover:!opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-40"
+    >
+      ⚑
+    </button>
   )
 }
 
@@ -564,7 +756,7 @@ function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote
     setName(me.current.name)
     // Script có thể đã tải sẵn (sổ góp ý, form Contact) → dùng luôn
     if (window.turnstile) setScriptReady(true)
-    area.current?.focus()
+    area.current?.focus({preventScroll: true})
   }, [])
 
   // Chỉ mẩu treo lên tường mới cần xác minh người thật
@@ -629,7 +821,7 @@ function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote
 
   const paper = PAPER[mood]
   return (
-    <form onSubmit={send} className="relative mt-1.5 w-full px-3.5 pb-3 pt-4 shadow-[0_8px_18px_-10px_rgba(0,0,0,0.85)] sm:w-[340px]" style={{background: paper.bg, color: paper.ink}}>
+    <form onSubmit={send} className="relative mt-1.5 w-full rotate-[-0.6deg] px-3.5 pb-3 pt-4 text-[16px] leading-[22px] shadow-[2px_3px_0_rgba(60,30,30,0.18)]" style={{background: paper.bg, color: paper.ink}}>
       {!scriptReady && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
       <Peg />
       <label className="sr-only" htmlFor="chill-diary-text">
