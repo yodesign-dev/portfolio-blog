@@ -13,7 +13,7 @@
 //   theo tâm trạng.
 // - Studio tắt "Mở bảng nhật ký" (mặc định) thì component này không hiện gì.
 
-import {Patrick_Hand} from 'next/font/google'
+import {Mynerve, Sedgwick_Ave} from 'next/font/google'
 import Script from 'next/script'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
@@ -22,8 +22,10 @@ import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
 import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, dayOf, recentDays, type DiaryNote, type Mood} from './diary-shared'
 
-// Chữ viết tay cho cuốn sổ (có dấu tiếng Việt). Chỉ tải khi mở sổ, không preload cho cả trang
-const hand = Patrick_Hand({weight: '400', subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
+// Chữ cho cuốn sổ, đều có dấu tiếng Việt: nét bút bi viết tay cho nội dung, nét bút dạ cho
+// tiêu đề (tháng, thứ). Chỉ tải khi mở sổ, không preload cho cả trang
+const hand = Mynerve({weight: '400', subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
+const marker = Sedgwick_Ave({weight: '400', subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
 
 const STORE_KEY = 'chill:diary'
 // Cùng danh tính với phòng chat (ChillChat tạo lần đầu)
@@ -399,11 +401,6 @@ function PawStamp() {
   )
 }
 
-// Kẹp gỗ giữ mẩu giấy trên dây
-function Peg() {
-  return <span aria-hidden className="absolute left-1/2 top-[-5px] h-[15px] w-[9px] -translate-x-1/2 rounded-[2px] border border-[#6b3f22] bg-[#d9a15c]" />
-}
-
 // Bảng nhật ký = 1 cuốn sổ lò xo mở ra trên mặt bàn (kiểu bullet journal): giấy kẻ ô,
 // chữ viết tay, mỗi ngày 1 mục "▸ Thứ Hai ⑦", mỗi mẩu của khách là 1 gạch đầu dòng.
 // Nội dung tự chảy sang trang kế bằng CSS multi-column (mỗi cột = 1 trang), nhiều thì
@@ -450,7 +447,11 @@ function Book({
   useEffect(() => {
     const el = wrap.current
     if (!el) return
-    const ro = new ResizeObserver(() => setBox({w: el.clientWidth, h: el.clientHeight}))
+    // Chừa lề cho mặt bàn quanh sổ; 2 trang thì chừa thêm phía trên cho cây bút
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth - (el.clientWidth >= 640 ? 72 : 20)
+      setBox({w, h: el.clientHeight - (w >= 760 ? 76 : 30)})
+    })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -459,11 +460,13 @@ function Book({
   const two = box.w >= 760
   const per = two ? 2 : 1
   const W = Math.floor(Math.min(box.w, two ? 1010 : 470))
-  const H = Math.floor(Math.max(340, Math.min(box.h - (two ? 34 : 6), 672)))
-  const padR = two ? 36 : 22
+  const H = Math.floor(Math.max(340, Math.min(box.h, 672)))
+  const padR = two ? 40 : 26
   // 1 trang: lò xo nằm mép trái nên lề trái rộng hơn
-  const padL = two ? 36 : 40
-  const gap = two ? 104 : padL + padR
+  const padL = two ? 40 : 46
+  // Khe giữa 2 trang (chỗ lò xo vắt qua) + lề trong của mỗi trang
+  const spine = 30
+  const gap = two ? spine + 2 * 44 : padL + padR
   const colW = Math.max(160, two ? (W - padL - padR - gap) / 2 : W - padL - padR)
   const step = colW + gap
   const padT = 34
@@ -527,21 +530,52 @@ function Book({
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
   const clock = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
   const has = (day: string) => notes.some((n) => n.day === day)
+  // Lịch tháng, tuần bắt đầu từ Thứ Hai: `lead` ô trống trước ngày 1, rồi từng ngày của tháng
+  // (YYYY-MM-DD). Ngày còn trong hạn 7 ngày thì bấm được để lật tới trang của ngày đó
+  const [yy, mm] = today.split('-').map(Number)
+  const lead = today ? (new Date(Date.UTC(yy, mm - 1, 1)).getUTCDay() + 6) % 7 : 0
+  const month: (string | null)[] = today
+    ? [...Array.from({length: lead}, () => null), ...Array.from({length: new Date(Date.UTC(yy, mm, 0)).getUTCDate()}, (_, i) => `${today.slice(0, 8)}${String(i + 1).padStart(2, '0')}`)]
+    : []
+  const thisRow = Math.floor((month.indexOf(today) < 0 ? 0 : month.indexOf(today)) / 7)
   const dayList = days.filter((d) => d === today || has(d))
 
-  const grid = {
-    backgroundColor: '#fbf7ea',
-    backgroundImage: 'linear-gradient(rgba(70,96,120,0.13) 1px, transparent 1px), linear-gradient(90deg, rgba(70,96,120,0.13) 1px, transparent 1px)',
-    backgroundSize: '24px 24px',
-    backgroundPosition: `${padL % 24}px ${(padT + 4) % 24}px`,
-  }
-  const rings = Math.max(4, Math.floor((H - 40) / 30))
+  // Ô kẻ không chạy sát mép giấy mà nằm trong 1 khung lùi vào `inset` px, như sổ thật
+  const inset = 16
+  const paper = (left: number, width: number, key: string) => (
+    <div
+      key={key}
+      aria-hidden
+      className="absolute inset-y-0 rounded-[20px] bg-[#f8f4e6] shadow-[0_1px_0_#dcd5bf,0_3px_0_#f1ecdc,0_4px_0_#d6cfb8,0_6px_0_#efe9d8,0_7px_0_#cfc7af,1px_0_0_#e3dcc6,3px_0_0_#f1ecdc,4px_0_0_#d9d2bb]"
+      style={{left, width}}
+    >
+      <div
+        className="absolute border border-[#5b6b73]/35"
+        style={{
+          inset,
+          backgroundImage: 'linear-gradient(rgba(70,84,92,0.26) 1px, transparent 1px), linear-gradient(90deg, rgba(70,84,92,0.26) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+          backgroundPosition: `-1px ${((padT + 4 - inset) % 24) - 1}px`,
+        }}
+      />
+    </div>
+  )
+  const pageW = two ? (W - spine) / 2 : W
+  const rings = Math.max(4, Math.floor((H - 56) / 38))
 
   return (
-    <div ref={wrap} className={`flex min-h-0 flex-1 items-center justify-center px-2 pb-2 sm:px-6 ${hand.className}`}>
+    <div
+      ref={wrap}
+      className={`mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#cbeae6] sm:mx-3 sm:mb-3 ${hand.className}`}
+      // Mặt bàn loang màu nước xanh ngọc
+      style={{
+        backgroundImage:
+          'radial-gradient(60% 50% at 12% 18%, rgba(255,255,255,0.8), transparent 70%), radial-gradient(48% 44% at 88% 12%, rgba(160,219,218,0.95), transparent 70%), radial-gradient(55% 60% at 78% 88%, rgba(238,251,248,0.9), transparent 70%), radial-gradient(46% 42% at 22% 86%, rgba(146,209,212,0.8), transparent 70%), radial-gradient(34% 30% at 52% 46%, rgba(220,244,240,0.85), transparent 75%)',
+      }}
+    >
       {box.w > 0 && (
         <div
-          className="relative shrink-0 text-[#2c2a33] drop-shadow-[0_18px_28px_rgba(0,0,0,0.55)]"
+          className="relative shrink-0 text-[#2c2a33] drop-shadow-[0_16px_18px_rgba(40,84,92,0.32)]"
           style={{width: W, height: H}}
           onPointerDown={(e) => (swipe.current = e.pointerType === 'mouse' ? null : e.clientX)}
           onPointerUp={(e) => {
@@ -551,20 +585,22 @@ function Book({
             setSpread((s) => (e.clientX < from ? Math.min(s + 1, spreads - 1) : Math.max(s - 1, 0)))
           }}
         >
-          {/* Cây bút nằm phía trên sổ */}
+          {/* Cây bút nắp cam nằm trên mặt bàn, phía trên sổ */}
           {two && (
-            <div aria-hidden className="absolute -top-[30px] left-[30%] flex h-[18px] w-[320px] -rotate-2 items-center drop-shadow-[0_6px_6px_rgba(0,0,0,0.4)]">
-              <span className="h-full w-[92px] rounded-l-full bg-[#e9655a]" />
-              <span className="h-full flex-1 bg-[#f5f1ea]" />
-              <span className="h-[12px] w-[26px] rounded-r-full bg-[#f5f1ea]" />
+            <div aria-hidden className="absolute -top-[35px] left-[32%] flex h-[24px] w-[380px] -rotate-1 items-center drop-shadow-[0_8px_6px_rgba(40,84,92,0.3)]">
+              <span className="relative h-full w-[118px] rounded-l-[13px] rounded-r-[4px] bg-[linear-gradient(#f58a7c,#ec6a5c_55%,#d9564a)]">
+                <span className="absolute -bottom-[7px] left-[18px] h-[9px] w-[84px] rounded-b-[6px] rounded-tl-[2px] bg-[#e4574c]" />
+              </span>
+              <span className="h-[22px] flex-1 bg-[linear-gradient(#ffffff,#f3f1ec_60%,#dedad2)]" />
+              <span className="h-[16px] w-[30px] rounded-r-[8px] bg-[linear-gradient(#ffffff,#eeebe4_60%,#d8d4cb)]" />
             </div>
           )}
 
-          {/* Giấy: kẻ ô, bo góc ngoài; 2 trang thì có rãnh gáy sổ ở giữa */}
-          {/* overflow-clip chứ không phải hidden: ô đang gõ nhận focus cũng không kéo lệch trang */}
-          <div className="absolute inset-0 overflow-clip rounded-[14px]" style={grid}>
-            {two && <div aria-hidden className="absolute inset-y-0 left-1/2 w-[70px] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(40,30,20,0.16)_35%,rgba(40,30,20,0.28)_50%,rgba(40,30,20,0.16)_65%,transparent)]" />}
+          {/* Giấy: mỗi trang 1 tờ bo góc, mép dưới + mép phải lộ xấp giấy bên dưới */}
+          {two ? [paper(0, pageW, 'l'), paper(W - pageW, pageW, 'r')] : paper(0, pageW, 'p')}
 
+          {/* overflow-clip chứ không phải hidden: ô đang gõ nhận focus cũng không kéo lệch trang */}
+          <div className="absolute inset-0 overflow-clip rounded-[20px]">
             <div
               ref={flow}
               className="absolute transition-transform duration-500 ease-[cubic-bezier(.3,.7,.2,1)]"
@@ -577,53 +613,101 @@ function Book({
                 columnGap: gap,
                 columnFill: 'auto',
                 transform: `translateX(${-at * per * step}px)`,
-                fontSize: 19,
+                fontSize: 20,
                 lineHeight: '24px',
               }}
             >
-              {/* Trang bìa trong: tháng, tuần này, 7 ngày, mẩu của mèo quán */}
+              {/* Trang bìa trong: chữ tháng tô hồng viền đen, nhãn tuần, lịch tháng (hàng của tuần
+                  này tô bút dạ), rồi tới mẩu của mèo quán */}
               <div className="break-inside-avoid pb-6">
-                <p className="text-[46px] leading-[48px] text-[#e4574c] [-webkit-text-stroke:1px_#2c2a33] [paint-order:stroke_fill]">{cap(fmt(today, {month: 'long'}))}</p>
-                <p className="mt-[10px] inline-block -rotate-1 bg-[#f6b7ae] px-2 text-[18px] leading-[24px] text-[#7a2a23]">{t.diary.week}</p>
-                <ol className="mt-[14px] grid grid-cols-7 gap-1 text-center">
-                  {[...days].reverse().map((d) => (
-                    <li key={d}>
-                      <button
-                        type="button"
-                        onClick={() => jumpTo(dayList.includes(d) ? d : today)}
-                        disabled={!dayList.includes(d)}
-                        aria-label={cap(fmt(d, {weekday: 'long', day: 'numeric', month: 'long'}))}
-                        className="group/day flex w-full flex-col items-center leading-[20px] disabled:opacity-45"
-                      >
-                        <span className="text-[13px] text-[#8b8794]">{cap(fmt(d, {weekday: 'short'}))}</span>
-                        <span className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-[17px] ${d === today ? 'bg-[#e4574c] text-white' : 'group-enabled/day:group-hover/day:bg-[#f6b7ae]/70'}`}>
-                          {Number(d.slice(8, 10))}
-                        </span>
-                        <span aria-hidden className={`mt-0.5 h-[5px] w-[5px] rounded-full ${has(d) ? 'bg-[#e4574c]' : 'bg-transparent'}`} />
-                      </button>
-                    </li>
-                  ))}
+                <div className="relative inline-block pr-9">
+                  <p className={`${marker.className} text-[50px] leading-[52px] text-[#f7a79d] [-webkit-text-stroke:5px_#2c2a33] [paint-order:stroke_fill]`}>
+                    {cap(fmt(today, {month: 'long'}))}
+                  </p>
+                  {/* Mấy ngôi sao + chấm bút dạ quanh chữ */}
+                  <span aria-hidden className="absolute -top-1 right-1 text-[18px] leading-none text-[#e4574c]">✦</span>
+                  <span aria-hidden className="absolute right-5 top-5 text-[11px] leading-none text-[#e4574c]">✦</span>
+                  <span aria-hidden className="absolute -left-2 -top-2 h-[6px] w-[6px] rounded-full bg-[#e4574c]" />
+                  <span aria-hidden className="absolute bottom-0 right-0 h-[5px] w-[5px] rounded-full bg-[#f49b8f]" />
+                </div>
+                <p>
+                  <span className={`${marker.className} mt-[8px] inline-block -rotate-1 bg-[#f6b7ae] px-2.5 text-[17px] leading-[24px] text-[#7a2a23]`}>{t.diary.weekN(Math.floor((Number(today.slice(8, 10)) + lead - 1) / 7) + 1)}</span>
+                </p>
+                <ol className="mt-[14px] grid max-w-[250px] grid-cols-7 text-center text-[16px] leading-[24px]" aria-label={cap(fmt(today, {month: 'long', year: 'numeric'}))}>
+                  {month.map((d, i) => {
+                    const row = Math.floor(i / 7)
+                    const inWeek = row === thisRow
+                    // Bút dạ kéo 1 vệt ngang cả hàng: ô đầu / cuối bo góc
+                    const band = inWeek ? `bg-[#f6b7ae]/80 ${i % 7 === 0 ? 'rounded-l-[6px]' : ''} ${i % 7 === 6 ? 'rounded-r-[6px]' : ''}` : ''
+                    if (!d) return <li key={i} aria-hidden className={band} />
+                    const reachable = dayList.includes(d)
+                    return (
+                      <li key={i} className={band}>
+                        {reachable ? (
+                          <button
+                            type="button"
+                            onClick={() => jumpTo(d)}
+                            aria-label={cap(fmt(d, {weekday: 'long', day: 'numeric', month: 'long'}))}
+                            className={`relative w-full hover:text-[#e4574c] focus-visible:outline-2 focus-visible:outline-[#e4574c] ${d === today ? 'font-bold text-[#b3261e]' : ''}`}
+                          >
+                            {Number(d.slice(8, 10))}
+                            {/* Chấm đỏ: ngày có mẩu giấy */}
+                            {has(d) && <span aria-hidden className="absolute bottom-[1px] left-1/2 h-[4px] w-[4px] -translate-x-1/2 rounded-full bg-[#e4574c]" />}
+                          </button>
+                        ) : (
+                          <span className={inWeek ? 'text-[#7a5a5a]' : 'text-[#8b8794]'}>{Number(d.slice(8, 10))}</span>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ol>
-                {!filtered && (
-                  <div className="relative mx-auto mt-[22px] w-[88%] rotate-[-2.5deg] bg-[#f8c9cf] px-3.5 pb-3 pt-4 text-[#5a2530] shadow-[2px_3px_0_rgba(60,30,30,0.18)]">
-                    <span aria-hidden className="absolute -top-2 left-1/2 h-4 w-14 -translate-x-1/2 rotate-2 bg-[#fff6c9]/85" />
-                    <p className="text-[19px] leading-[24px]">{cafeText}</p>
-                    <p className="mt-1 text-[15px] leading-[20px] text-[#a15a6a]">🐾 {t.diary.cat}</p>
-                  </div>
-                )}
               </div>
+
+              {/* Mẩu của mèo quán: khối riêng để cột thấp thì cả tờ note nhảy sang trang kế, không bị cắt đôi */}
+              {!filtered && (
+                <div className="break-inside-avoid">
+                  <div className="relative mx-auto mb-[36px] mt-[6px] w-[88%] -rotate-2">
+                    {/* Giấy note: góc dưới phải cong lên, bóng mềm như đang nằm trên trang */}
+                    <div className="relative rounded-[5px_5px_22px_5px] bg-[linear-gradient(165deg,#ffe6ea_0%,#fbd0d7_70%,#f6c0c9_100%)] px-4 pb-3.5 pt-6 text-[#5a2530] shadow-[0_14px_18px_-12px_rgba(110,50,60,0.6),0_2px_3px_rgba(110,50,60,0.18)]">
+                      <p className="text-[20px] leading-[24px]">{cafeText}</p>
+                      <p className="mt-1.5 text-[16px] leading-[20px] text-[#a15a6a]">🐾 {t.diary.cat}</p>
+                      <span aria-hidden className="absolute bottom-0 right-0 h-[22px] w-[22px] rounded-[14px_0_22px_0] bg-[linear-gradient(315deg,transparent_42%,#eeb0bb_44%,#fde9ec_100%)] shadow-[-2px_-2px_4px_rgba(110,50,60,0.14)]" />
+                    </div>
+                    {/* Sticker mèo mướp của quán (khung "ngủ" trong atlas cat.webp), viền trắng cắt bế */}
+                    <span
+                      aria-hidden
+                      className="absolute -bottom-[34px] -right-[12px] block h-[46px] w-[84px] rotate-[-6deg] bg-no-repeat [filter:drop-shadow(2px_0_0_#fff)_drop-shadow(-2px_0_0_#fff)_drop-shadow(0_2px_0_#fff)_drop-shadow(0_-2px_0_#fff)_drop-shadow(0_3px_3px_rgba(60,40,30,0.3))] [image-rendering:pixelated]"
+                      style={{backgroundImage: 'url(/chill/cat.webp)', backgroundSize: '1492px 84px', backgroundPosition: '0 -38px'}}
+                    />
+                    {/* Băng keo washi sọc, 2 đầu xé răng cưa, hơi trong */}
+                    <span
+                      aria-hidden
+                      className="absolute -top-[10px] left-1/2 h-[22px] w-[92px] -translate-x-1/2 rotate-[4deg] bg-[repeating-linear-gradient(135deg,rgba(255,236,170,0.92)_0,rgba(255,236,170,0.92)_7px,rgba(255,214,140,0.92)_7px,rgba(255,214,140,0.92)_14px)] shadow-[0_1px_2px_rgba(90,60,20,0.25)] [clip-path:polygon(0_0,3%_25%,0_50%,3%_75%,0_100%,100%_100%,97%_75%,100%_50%,97%_25%,100%_0)]"
+                    />
+                  </div>
+                </div>
+              )}
 
               {dayList.map((day) => {
                 const list = notes.filter((n) => n.day === day)
                 const isToday = day === today
                 return (
                   <section key={day} data-day={day} className="pb-6">
-                    <h3 className="flex break-after-avoid items-center gap-2 text-[30px] leading-[48px] text-[#e4574c]">
+                    <h3 className={`${marker.className} flex break-after-avoid items-center gap-2 text-[27px] leading-[48px] text-[#e4574c]`}>
                       <span aria-hidden className="text-[20px]">▸</span>
                       {cap(fmt(day, {weekday: 'long'}))}
                       <span className="flex h-[30px] min-w-[30px] items-center justify-center rounded-full bg-[#f49b8f] px-1 text-[19px] leading-none text-[#5a1c16]">{Number(day.slice(8, 10))}</span>
-                      {isToday && <span className="text-[16px] text-[#8b8794]">· {t.diary.dayToday.toLowerCase()}</span>}
+                      {isToday && <span className={`${hand.className} text-[17px] text-[#8b8794]`}>· {t.diary.dayToday.toLowerCase()}</span>}
                     </h3>
+                    {/* Ảnh "chụp" cảnh quán dán kiểu polaroid, chữ của mục hôm nay chảy vòng quanh */}
+                    {isToday && !filtered && (
+                      <div aria-hidden className="relative float-right mb-3 ml-4 mt-1 w-[44%] max-w-[190px] rotate-[3deg] bg-white p-[7px] pb-[26px] shadow-[0_8px_14px_-8px_rgba(40,60,70,0.55),0_1px_2px_rgba(40,60,70,0.25)]">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- pixel art 320×180 phóng nguyên điểm ảnh */}
+                        <img src="/chill/scenes/room-cafe-thumb.webp" alt="" width={320} height={180} loading="lazy" className="block w-full [image-rendering:pixelated]" />
+                        <span className="absolute inset-x-0 bottom-[3px] text-center text-[15px] leading-[20px] text-[#6d6a75]">{t.diary.photo}</span>
+                        <span className="absolute -top-[9px] left-1/2 h-[18px] w-[58px] -translate-x-1/2 -rotate-3 bg-[rgba(170,222,214,0.85)] shadow-[0_1px_2px_rgba(40,80,80,0.25)]" />
+                      </div>
+                    )}
                     <ul>
                       {list.map((n) => (
                         <li key={n.id} data-note className="group/line break-inside-avoid pb-[24px]">
@@ -632,7 +716,7 @@ function Book({
                             <span className={`min-w-0 whitespace-pre-wrap break-words ${n.kind === 'book' ? 'text-[#6d6a75]' : ''}`}>{n.text}</span>
                           </p>
                           <p className="flex items-center gap-2 pl-[18px] text-[15px] text-[#8b8794]">
-                            <span className="px-1.5 text-[14px] leading-[20px]" style={{background: PAPER[n.mood].bg, color: PAPER[n.mood].ink}}>
+                            <span className="shrink-0 whitespace-nowrap px-1.5 text-[14px] leading-[20px]" style={{background: PAPER[n.mood].bg, color: PAPER[n.mood].ink}}>
                               {MOOD_ICON[n.mood]} {t.diary.moods[n.mood]}
                             </span>
                             <span className="min-w-0 truncate">{n.kind === 'book' ? `🔒 ${t.diary.onlyHere}` : n.mine ? t.diary.mine : n.name || t.diary.guest}</span>
@@ -643,18 +727,30 @@ function Book({
                       ))}
                       {isToday && list.length === 0 && !composing && <li className="pb-[24px] text-[#8b8794]">{filtered ? t.diary.emptyMood : t.diary.emptyDay}</li>}
                       {isToday && (
-                        <li className="break-inside-avoid pb-[24px]">
-                          {composing ? (
-                            <Compose open={open} onDone={onDone} onCancel={onCancel} />
-                          ) : left > 0 ? (
-                            <button type="button" onClick={onCompose} className="group/write flex w-full items-baseline gap-2 text-left text-[#b9b4c0] transition-colors hover:text-[#e4574c] focus-visible:outline-2 focus-visible:outline-[#e4574c]">
-                              <span aria-hidden className="text-[#e4574c]">•</span>
-                              <span className="border-b-2 border-dashed border-current">✎ {t.diary.write}…</span>
-                              <span className="text-[15px] text-[#8b8794] group-hover/write:text-[#e4574c]">({t.diary.left(left).toLowerCase()})</span>
-                            </button>
-                          ) : (
-                            <p className="text-[16px] text-[#8b8794]">{t.diary.noneLeft}</p>
-                          )}
+                        <li className="clear-both break-inside-avoid pb-[24px] pt-1">
+                          {/* Thẻ caro hồng "Ghi chú": chỗ khách viết mẩu của mình */}
+                          <div className="relative rotate-[-1deg] bg-[#fbe4ea] bg-[linear-gradient(rgba(240,160,185,0.38)_50%,transparent_50%),linear-gradient(90deg,rgba(240,160,185,0.38)_50%,transparent_50%)] bg-[length:22px_22px] px-3.5 pb-3.5 pt-2 shadow-[0_8px_14px_-9px_rgba(110,50,70,0.55),0_1px_2px_rgba(110,50,70,0.2)]">
+                            <p className={`${marker.className} text-center text-[17px] uppercase leading-[30px] tracking-[0.08em] text-[#3a2a33]`}>
+                              <span aria-hidden>☆ </span>
+                              {t.diary.noteCard}
+                              <span aria-hidden> ☆</span>
+                            </p>
+                            {composing ? (
+                              <Compose open={open} onDone={onDone} onCancel={onCancel} />
+                            ) : left > 0 ? (
+                              <button
+                                type="button"
+                                onClick={onCompose}
+                                className="group/write block w-full rounded-[10px] border-2 border-[#3a2a33] bg-white/75 px-3 pb-2 pt-1 text-left text-[#8b8794] transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e4574c]"
+                              >
+                                <span className="block border-b-2 border-dashed border-[#3a2a33]/55 leading-[30px] text-[#5d5866] group-hover/write:text-[#e4574c]">✎ {t.diary.write}…</span>
+                                <span aria-hidden className="block h-[26px] border-b-2 border-dashed border-[#3a2a33]/55" />
+                                <span className="mt-1.5 block text-right text-[15px] leading-[20px]">{t.diary.left(left)}</span>
+                              </button>
+                            ) : (
+                              <p className="rounded-[10px] border-2 border-[#3a2a33] bg-white/75 px-3 py-2 text-[17px] text-[#5d5866]">{t.diary.noneLeft}</p>
+                            )}
+                          </div>
                         </li>
                       )}
                     </ul>
@@ -669,10 +765,16 @@ function Book({
             </div>
           </div>
 
-          {/* Lò xo: giữa sổ (2 trang) hoặc mép trái (1 trang) */}
-          <div aria-hidden className="pointer-events-none absolute inset-y-[22px] flex flex-col justify-between" style={two ? {left: W / 2 - 23, width: 46} : {left: -9, width: 34}}>
+          {/* Lò xo đôi vắt qua khe giữa 2 trang (hoặc mép trái nếu 1 trang), mỗi vòng 2 sợi,
+              luồn qua lỗ đục trên giấy */}
+          <div aria-hidden className="pointer-events-none absolute inset-y-[26px] flex flex-col justify-between" style={two ? {left: W / 2 - 31, width: 62} : {left: -13, width: 44}}>
             {Array.from({length: rings}).map((_, i) => (
-              <span key={i} className="block h-[11px] w-full rounded-full border-[3px] border-[#2f5d73] bg-[linear-gradient(#5e93ab,#2f5d73)] shadow-[0_2px_2px_rgba(0,0,0,0.35)]" />
+              <span key={i} className="relative block h-[19px] w-full">
+                {two && <span className="absolute left-[3px] top-[4px] h-[11px] w-[7px] rounded-[2px] bg-[#3a3f44]" />}
+                <span className="absolute right-[3px] top-[4px] h-[11px] w-[7px] rounded-[2px] bg-[#3a3f44]" />
+                <span className="absolute inset-x-[6px] top-0 h-[9px] rounded-full border-[2.5px] border-[#2f6f95] border-b-[#1f5373] shadow-[0_1px_1px_rgba(0,0,0,0.3)]" />
+                <span className="absolute inset-x-[6px] top-[9px] h-[9px] rounded-full border-[2.5px] border-[#3b82ab] border-b-[#1f5373] shadow-[0_2px_2px_rgba(0,0,0,0.3)]" />
+              </span>
             ))}
           </div>
 
@@ -821,9 +923,8 @@ function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote
 
   const paper = PAPER[mood]
   return (
-    <form onSubmit={send} className="relative mt-1.5 w-full rotate-[-0.6deg] px-3.5 pb-3 pt-4 text-[16px] leading-[22px] shadow-[2px_3px_0_rgba(60,30,30,0.18)]" style={{background: paper.bg, color: paper.ink}}>
+    <form onSubmit={send} className="relative w-full rounded-[10px] border-2 border-[#3a2a33] px-3.5 pb-3 pt-3 text-[16px] leading-[22px]" style={{background: paper.bg, color: paper.ink}}>
       {!scriptReady && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
-      <Peg />
       <label className="sr-only" htmlFor="chill-diary-text">
         {t.diary.write}
       </label>
