@@ -450,7 +450,7 @@ function Book({
     // Chừa lề cho mặt bàn quanh sổ; 2 trang thì chừa thêm phía trên cho cây bút
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth - (el.clientWidth >= 640 ? 72 : 20)
-      setBox({w, h: el.clientHeight - (w >= 760 ? 76 : 30)})
+      setBox({w, h: el.clientHeight - (w >= 760 ? 84 : 96)})
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -758,10 +758,6 @@ function Book({
                 )
               })}
 
-              <p className="break-inside-avoid text-[15px] leading-[24px] text-[#a7a2ae]">
-                ☆ {t.diary.keeps}
-                <br />☆ {t.diary.care}
-              </p>
             </div>
           </div>
 
@@ -777,6 +773,12 @@ function Book({
               </span>
             ))}
           </div>
+
+          {/* Ghi chú của quán viết trên mặt bàn, dưới mép sổ — để trong sổ thì nó tự chiếm riêng
+              1 trang gần như trống */}
+          <p className="pointer-events-none absolute inset-x-0 top-full pt-[12px] text-center text-[14px] leading-[18px] text-[#3f6f77] sm:text-[15px]">
+            ☆ {t.diary.keeps} <span className="inline-block">☆ {t.diary.care}</span>
+          </p>
 
           {/* Lật trang */}
           <div className="absolute inset-x-0 bottom-[10px] flex items-center justify-between px-5 text-[17px] leading-[24px] text-[#e4574c]">
