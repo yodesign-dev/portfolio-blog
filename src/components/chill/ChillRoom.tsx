@@ -1721,8 +1721,8 @@ export function ChillRoom({
             <ArrowIcon dir="left" />
             Bin Nguyen
           </Link>
-          {/* Điện thoại: điểm đến + đồng hồ phin nằm chung 1 hàng riêng dưới hàng nút (chỗ bên
-              trái hẹp, để trong luồng thì mỗi cái rớt 1 dòng); từ sm trở lên nằm cùng hàng */}
+          {/* Điện thoại: tên điểm đến nằm hàng riêng dưới hàng nút (chỗ bên trái hẹp); từ sm
+              trở lên nằm cùng hàng. Cụm này chỉ là nhãn thông tin, không có nút bấm */}
           <div className="absolute left-3 top-14 flex items-center gap-2 sm:contents">
             {[dest.name, weatherLabel, timeLabel].map((label, i) => (
               <span
@@ -1732,7 +1732,6 @@ export function ChillRoom({
                 {label}
               </span>
             ))}
-            <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={setFocusOpen} />
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -1750,12 +1749,13 @@ export function ChillRoom({
           )}
           {/* Điện thoại: thanh trên đã chật → công tắc nằm trong Settings › Atmosphere */}
           <ZenToggle on={false} onToggle={toggleZen} fresh={!zenSeen} hint={zenHint} onCloseHint={() => setZenHint(false)} className="hidden sm:block" />
-          <span className="pointer-events-none flex h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
+          {/* Giờ ở điểm đến + đồng hồ phin đứng cạnh nhau (cùng là chuyện thời gian). Điện thoại:
+              đang đếm thì giờ còn lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
+              Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
+          <span className={`pointer-events-none h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur ${focusLabel ? 'hidden sm:flex' : 'flex'}`}>
             {clock}
           </span>
-          <StageButton label={scenePaused ? t.room.resumeScene : t.room.pauseScene} onClick={() => setScenePaused((p) => !p)}>
-            {scenePaused ? <PlayIcon small /> : <PauseIcon small />}
-          </StageButton>
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={setFocusOpen} />
           {canFullscreen && (
             <StageButton label={fullscreen ? t.room.exitFullscreen : t.room.fullscreen} onClick={toggleFullscreen}>
               {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
@@ -2248,7 +2248,7 @@ export function ChillRoom({
 
           {panelTab === 'atmosphere' && (
             <div className="space-y-4">
-              <ZenRow on={zen} onToggle={toggleZen} />
+              <SwitchRow title={t.zen.name} desc={zen ? t.zen.descOn : t.zen.desc} on={zen} onToggle={toggleZen} />
               <Field label={t.room.time}>
                 <Segmented options={TIMES.map((o) => ({...o, label: t.room.times[o.value]}))} value={time} onChange={setTime} />
               </Field>
@@ -2291,6 +2291,7 @@ export function ChillRoom({
                   </div>
                 </Field>
               )}
+              <SwitchRow title={t.room.pauseScene} desc={t.room.pauseSceneDesc} on={scenePaused} onToggle={() => setScenePaused((p) => !p)} />
               <Field label={t.room.ambienceLabel}>
                 <div className="flex items-center gap-3">
                   <input
@@ -2637,10 +2638,9 @@ function ZenToggle({
   )
 }
 
-// Dòng "Ngắm cảnh" trong bảng cài đặt (chủ yếu cho điện thoại — thanh trên đã chật):
-// cả dòng cao 56px là một công tắc, rãnh 44×26
-function ZenRow({on, onToggle}: {on: boolean; onToggle: () => void}) {
-  const t = useT()
+// Dòng công tắc trong bảng cài đặt ("Ngắm cảnh" — chủ yếu cho điện thoại vì thanh trên đã
+// chật — và "Dừng cảnh"): cả dòng cao 56px là một công tắc, rãnh 44×26
+function SwitchRow({title, desc, on, onToggle}: {title: string; desc: string; on: boolean; onToggle: () => void}) {
   return (
     <button
       type="button"
@@ -2650,8 +2650,8 @@ function ZenRow({on, onToggle}: {on: boolean; onToggle: () => void}) {
       className="flex min-h-14 w-full items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-left transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-[#ede6dd]">{t.zen.name}</span>
-        <span className="block text-xs text-[#a79e94]">{on ? t.zen.descOn : t.zen.desc}</span>
+        <span className="block text-sm font-medium text-[#ede6dd]">{title}</span>
+        <span className="block text-xs text-[#a79e94]">{desc}</span>
       </span>
       <SwitchTrack on={on} size="lg" />
     </button>

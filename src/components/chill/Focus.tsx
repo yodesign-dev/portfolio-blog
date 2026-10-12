@@ -1,6 +1,7 @@
 'use client'
 
-// Đồng hồ phin + thẻ khách quen trang /chill — nút nhỏ trên thanh trên, cạnh tên điểm đến.
+// Đồng hồ phin + thẻ khách quen trang /chill — nút trên thanh trên, ngay cạnh giờ điểm đến.
+// Điện thoại: chưa chạy thì chỉ hiện biểu tượng phin, đang chạy hiện giờ còn lại.
 //
 // - Đồng hồ: chọn 15 / 25 / 45 phút, phin "nhỏ giọt" tới khi hết giờ thì chuông kêu, mèo
 //   báo xong (ChillRoom: onDone). Giờ kết thúc lưu trên máy nên tải lại trang vẫn chạy
@@ -146,7 +147,7 @@ export function Focus({
   const done = doneAt > 0 && !session
 
   return (
-    // Điện thoại: bảng neo theo cả hàng nút (sát mép trái màn hình) cho khỏi tràn mép phải
+    // Điện thoại: bảng neo theo cả thanh trên (sát mép phải màn hình) cho khỏi tràn mép trái
     <div ref={ref} className="sm:relative">
       <button
         type="button"
@@ -162,7 +163,7 @@ export function Focus({
         }`}
       >
         <PhinIcon dripping={Boolean(session)} />
-        {session ? <span className="font-mono text-[11px] tabular-nums">{clock(left)}</span> : <span className="font-medium">{done ? t.focus.doneChip : t.focus.chip}</span>}
+        {session ? <span className="font-mono text-[11px] tabular-nums">{clock(left)}</span> : <span className="hidden font-medium sm:inline">{done ? t.focus.doneChip : t.focus.chip}</span>}
       </button>
 
       {open && (
@@ -170,7 +171,7 @@ export function Focus({
           id="chill-focus"
           role="dialog"
           aria-label={t.focus.title}
-          className="absolute left-0 top-full z-40 mt-2 w-[min(300px,calc(100vw-24px))] rounded-2xl border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl"
+          className="absolute right-3 top-full z-40 mt-2 w-[min(300px,calc(100vw-24px))] sm:right-0 rounded-2xl border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.title}</p>
 
