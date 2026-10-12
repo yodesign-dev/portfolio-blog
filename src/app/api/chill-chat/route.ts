@@ -24,10 +24,11 @@ import {
 
 // Phòng chat trang /chill (src/lib/chillChat.ts). Tin tự xoá sau 24 giờ.
 //
-// GET  → {open, online, messages, reactions} — CDN giữ 3s nên dù bao nhiêu người
+// GET  → {open, online, messages, reactions} (chat tắt vẫn có `online`) — CDN giữ 3s nên dù bao nhiêu người
 //        đang mở chat thì Redis cũng chỉ bị đọc ~1 lần / 3s. `?fresh=1` bỏ qua CDN
 //        (chỉ dùng ngay sau khi chính mình gửi).
-// POST {action: "hello", uid}             nhịp "đang ở quán" ~1 phút/lần → đếm online,
+// POST {action: "hello", uid}             nhịp "đang ở quán" ~1 phút/lần (tab đang mở hoặc
+//                                          đang nghe nhạc ở tab nền) → đếm online,
 //                                          khách mới → dòng "Có người vừa ghé quán"
 // POST {action: "send", uid, name, color, text, pass?, captchaToken?}
 //        Tin đầu tiên cần Turnstile → cấp "vé chat" 24h, các tin sau chỉ cần vé.
@@ -66,9 +67,14 @@ export async function GET(request: NextRequest) {
   const fresh = request.nextUrl.searchParams.has("fresh");
   const cache = {"Cache-Control": fresh ? "private, no-store" : "public, s-maxage=3, stale-while-revalidate=10"};
   const open = await chatOpen();
-  if (!r || !open) return NextResponse.json({open: false, online: 0, messages: [], reactions: {}}, {headers: cache});
+  if (!r) return NextResponse.json({open: false, online: 0, messages: [], reactions: {}}, {headers: cache});
   try {
     const now = Date.now();
+    // Chat bị tắt trong Studio → vẫn trả số người đang ở quán (trang hiện ở thanh trên)
+    if (!open) {
+      const online = await r.zcount(K.online, now - ONLINE_WINDOW_MS, "+inf");
+      return NextResponse.json({open: false, online: Math.max(online, 0), messages: [], reactions: {}}, {headers: cache});
+    }
     const p = r.pipeline();
     p.zrange(K.msgs, now - DAY_MS, "+inf", {byScore: true});
     p.hgetall(K.rx);

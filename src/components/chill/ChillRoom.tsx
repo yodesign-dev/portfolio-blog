@@ -27,6 +27,8 @@ const CAT_PETTED_KEY = 'chill:cat-petted'
 const SETTINGS_SEEN_KEY = 'chill:settings-seen'
 // Đã bật Zen lần nào chưa (chưa → công tắc có chấm cam + vòng sáng), đã hiện gợi ý chưa
 const ZEN_SEEN_KEY = 'chill:zen-seen'
+// Từ ngần này người (tính cả mình) mới nêu số người đang ở quán
+const MIN_ONLINE_SHOWN = 2
 const ZEN_HINT_KEY = 'chill:zen-hint'
 const ZEN_HINT_DELAY_MS = 4000
 const ZEN_HINT_MS = 9000
@@ -218,6 +220,8 @@ export function ChillRoom({
   // Phòng chat (góc phải, chung chỗ với Wishlist) — Studio có thể tắt
   const [chatOpen, setChatOpen] = useState(false)
   const [, setChatAvailable] = useState(false)
+  // Số người đang ở quán (tính cả mình), lấy từ nhịp "đang ở quán" của phòng chat
+  const [online, setOnline] = useState(0)
   // 3 ô của hàng nút góc phải dưới (Wishlist · Mời bạn · Chat)
   const [wishSlot, setWishSlot] = useState<HTMLDivElement | null>(null)
   const [inviteSlot, setInviteSlot] = useState<HTMLDivElement | null>(null)
@@ -1775,6 +1779,16 @@ export function ChillRoom({
                 {label}
               </span>
             ))}
+            {/* Có người khác đang ngồi quán → nêu số; chỉ có mình thì thôi (quán vắng nhìn buồn) */}
+            {online >= MIN_ONLINE_SHOWN && (
+              <span
+                className="pointer-events-none flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md bg-black/45 px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:text-[11px]"
+              >
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span className="sr-only">{t.room.onlineTitle(online - 1)}</span>
+                <span aria-hidden className="tabular-nums">{t.room.online(online)}</span>
+              </span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -2024,6 +2038,8 @@ export function ChillRoom({
         fastPoll={Boolean(tableMembers?.some((m) => !m.you))}
         shareTyping={Boolean(tableMembers?.some((m) => !m.you))}
         onSentText={onSentText}
+        listening={playing}
+        onOnline={setOnline}
       />
 
       <SupporterBoard

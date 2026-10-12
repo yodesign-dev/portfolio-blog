@@ -73,6 +73,8 @@ export function ChillChat({
   fastPoll = false,
   shareTyping = false,
   onSentText,
+  listening = false,
+  onOnline,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -93,6 +95,10 @@ export function ChillChat({
   shareTyping?: boolean
   // Mình vừa gửi tin → trang hiện bong bóng trên đầu nhân vật của mình ở quầy
   onSentText?: (text: string) => void
+  // Đang phát nhạc → vẫn tính là "đang ở quán" dù tab chạy nền (đa số người nghe để tab ẩn)
+  listening?: boolean
+  // Số người đang ở quán (tính cả mình) — trang hiện ở thanh trên, kể cả khi chat bị tắt
+  onOnline?: (online: number) => void
 }) {
   const t = useT()
   const lang = useLang()
@@ -150,13 +156,19 @@ export function ChillChat({
   }, [room?.open, onAvailable])
 
   // Nhịp "đang ở quán" mỗi phút (đếm online, báo khách mới)
+  const present = visible || listening
   useEffect(() => {
-    if (!me || !visible) return
+    if (!me || !present) return
     const hello = () => void post({action: 'hello', uid: me.uid}).catch(() => {})
     hello()
     const t = window.setInterval(hello, 60_000)
     return () => window.clearInterval(t)
-  }, [me, visible])
+  }, [me, present])
+
+  const onlineNow = room?.online ?? 0
+  useEffect(() => {
+    onOnline?.(onlineNow)
+  }, [onlineNow, onOnline])
 
   // Hỏi tin mới: nhanh khi đang mở + phòng đang rôm rả, thưa khi im, dừng khi ẩn tab
   const lastTs = room?.messages.at(-1)?.ts ?? 0
