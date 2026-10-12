@@ -9,6 +9,7 @@
 // (dòng "+ N người bạn giấu tên").
 
 import {useEffect, useRef} from 'react'
+import {useLang, useT, type Lang} from './i18n'
 
 export type Supporter = {
   id: string
@@ -20,12 +21,14 @@ export type Supporter = {
 
 export type Board = {cups: number; supporters: Supporter[]}
 
-function ago(iso: string) {
+function ago(iso: string, t: ReturnType<typeof useT>, lang: Lang) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000
-  if (s < 3600) return 'vừa xong'
-  if (s < 86400) return `${Math.floor(s / 3600)} giờ trước`
-  if (s < 86400 * 30) return `${Math.floor(s / 86400)} ngày trước`
-  return new Date(iso).toLocaleDateString('vi-VN', {day: 'numeric', month: 'numeric', year: 'numeric'})
+  if (s < 3600) return t.board.agoNow
+  if (s < 86400) return t.board.agoHour(Math.floor(s / 3600))
+  if (s < 86400 * 30) return t.board.agoDay(Math.floor(s / 86400))
+  return lang === 'vi'
+    ? new Date(iso).toLocaleDateString('vi-VN', {day: 'numeric', month: 'numeric', year: 'numeric'})
+    : new Date(iso).toLocaleDateString('en', {day: 'numeric', month: 'short', year: 'numeric'})
 }
 
 // Giấy note hơi xiêu vẹo, cố định theo id
@@ -47,6 +50,8 @@ export function SupporterBoard({
   myCup: boolean
   onDonate: () => void
 }) {
+  const t = useT()
+  const lang = useLang()
   const closeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (open) closeRef.current?.focus({preventScroll: true})
@@ -60,7 +65,7 @@ export function SupporterBoard({
     <section
       id="chill-board"
       role="dialog"
-      aria-label="Thank-you board"
+      aria-label={t.board.title}
       inert={!open}
       aria-modal="true"
       onKeyDown={(e) => {
@@ -91,16 +96,16 @@ export function SupporterBoard({
           🫙
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold tracking-tight text-[#fbf1d2]">Bảng cảm ơn</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-[#fbf1d2]">{t.board.title}</h2>
           <p className="mt-0.5 text-xs text-[#e6cfae]">
-            {board ? (cups ? `☕ ${cups} ly đã được mời — cảm ơn mọi người!` : 'Chưa có ly nào trong lọ.') : 'Đang đếm ly…'}
+            {board ? (cups ? t.board.cups(cups) : t.board.empty) : t.board.counting}
           </p>
         </div>
         <button
           ref={closeRef}
           type="button"
           onClick={onClose}
-          aria-label="Close thank-you board (Esc)"
+          aria-label={t.board.close}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#fbf1d2]/20 bg-black/15 text-[#fbf1d2] transition hover:bg-black/30 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
@@ -112,12 +117,12 @@ export function SupporterBoard({
       <div className="min-h-40 flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-5">
         {myCup && (
           <p className="rounded-lg border border-[#e8b27d]/40 bg-black/25 px-3 py-2 text-xs leading-relaxed text-[#f3cfa8]">
-            Ly của bạn đang trên bàn rồi ☕ Tên bạn sẽ lên bảng sau khi Bin kiểm tra chuyển khoản.
+            {t.board.myCup}
           </p>
         )}
 
         {board && cups === 0 && (
-          <p className="py-8 text-center text-sm text-[#e6cfae]">Bảng còn trống — bạn muốn là người đầu tiên?</p>
+          <p className="py-8 text-center text-sm text-[#e6cfae]">{t.board.beFirst}</p>
         )}
 
         <ol className="space-y-3">
@@ -125,18 +130,18 @@ export function SupporterBoard({
             <li key={s.id} className={`relative rounded-sm bg-[#fbf1d2] px-4 pb-3 pt-4 text-[#2a1a10] shadow-[0_6px_14px_-6px_rgba(0,0,0,0.7)] ${pick(TILTS, s.id)}`}>
               <span aria-hidden className={`absolute left-1/2 top-1.5 h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-[0_1px_0_rgba(0,0,0,0.4)] ${pick(PINS, s.id)}`} />
               <div className="flex items-baseline justify-between gap-2">
-                <p className="truncate font-semibold">{s.name || 'Một người bạn'}</p>
-                <p className="shrink-0 text-[11px] text-[#8a6a4a]">{ago(s.at)}</p>
+                <p className="truncate font-semibold">{s.name || t.board.friend}</p>
+                <p className="shrink-0 text-[11px] text-[#8a6a4a]">{ago(s.at, t, lang)}</p>
               </div>
               <p className="mt-0.5 text-xs text-[#7a5a3a]">
-                mời Bin {s.drink.icon} {s.drink.label.toLowerCase()}
+                {t.board.treated(s.drink.icon, s.drink.label)}
               </p>
               {s.message && <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed">“{s.message}”</p>}
             </li>
           ))}
         </ol>
 
-        {hidden > 0 && <p className="pt-1 text-center text-xs text-[#e6cfae]">+ {hidden} người bạn giấu tên ☕</p>}
+        {hidden > 0 && <p className="pt-1 text-center text-xs text-[#e6cfae]">{t.board.hidden(hidden)}</p>}
       </div>
 
       <div className="border-t-2 border-[#3a2414] bg-[#6b4527] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
@@ -145,7 +150,7 @@ export function SupporterBoard({
           onClick={onDonate}
           className="w-full rounded-full bg-[#e8b27d] py-3 font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
         >
-          Mời Bin 1 ly cà phê ☕
+          {t.board.cta}
         </button>
       </div>
     </section>

@@ -10,12 +10,13 @@ import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
 import {ShareButton} from './ShareButton'
 import {GroupTable} from './GroupTable'
-import {STATUS_LABEL, arrangeFriends, type TableMember} from './table-view'
+import {arrangeFriends, type TableMember} from './table-view'
 import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
 import {THEMES, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
 import {ChillChat, type ChatMessage} from './ChillChat'
+import {setLang, useLang, useT, type Lang} from './i18n'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -37,9 +38,12 @@ const WALL_HINT_MS = 9000
 const SETTINGS_HINT_DELAY_MS = 3000
 const SETTINGS_HINT_MS = 8000
 const CAT_HINT_DELAY = 4000
-// Mèo nói cảm ơn sau khi người xem bấm "I've sent it" ở mục donate
-const CAT_THANKS = 'Cám ơn bạn đã mời cafe Meo!'
+// Mèo nói cảm ơn (t.room.catThanks) sau khi người xem bấm "I've sent it" ở mục donate
 const CAT_SAY_MS = 4500
+// Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
+const LAST_VISIT_KEY = 'chill:last-visit'
+// Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
+const LISTEN_MINUTES = [1, 5, 15, 30, 60]
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
 
@@ -131,12 +135,20 @@ export function ChillRoom({
   const scenePausedRef = useRef(false)
   // Tính lại vùng bấm (mèo, cuốn sổ) — gán trong effect dựng cảnh
   const fitRef = useRef<() => void>(() => {})
+  const t = useT()
+  const lang = useLang()
 
   const [loaded, setLoaded] = useState(false)
   const [time, setTime] = useState<TimeOfDay>('morning')
   const [weather, setWeather] = useState<Weather>('clear')
   const [index, setIndex] = useState(0)
   const [started, setStarted] = useState(false)
+  // Màn chào: chưa "bước vào quán" thì chỉ có cảnh + 1 nút lớn, mọi nút khác ẩn
+  const [entered, setEntered] = useState(false)
+  const [welcomeGone, setWelcomeGone] = useState(false)
+  const startFrom = useRef<'welcome' | 'player'>('player')
+  const startTracked = useRef(false)
+  const visitTracked = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(0.7)
   const [ambience, setAmbience] = useState(0.35)
@@ -193,7 +205,7 @@ export function ChillRoom({
 
   const track = tracks[index]
   // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
-  const stationList = tracks.map((t, i) => ({t, i})).filter(({t}) => stationOf(t) === station)
+  const stationList = tracks.map((tr, i) => ({tr, i})).filter(({tr}) => stationOf(tr) === station)
   const stationPos = stationList.findIndex(({i}) => i === index)
   const dest = destinations[destIndex]
   const nextDest = destinations[(destIndex + 1) % destinations.length]
@@ -243,8 +255,25 @@ export function ChillRoom({
       setCatPetted(false)
     }
     setReturning(hadPrefs)
+    // Link mời vào bàn nhóm → vào thẳng màn chọn nhân vật, khỏi qua màn chào
+    if (new URLSearchParams(window.location.search).has('table')) setEntered(true)
     setLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
+    if (!visitTracked.current) {
+      visitTracked.current = true
+      let visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later' = hadPrefs ? 'returning' : 'new'
+      try {
+        const last = Number(localStorage.getItem(LAST_VISIT_KEY))
+        if (last) {
+          const days = (Date.now() - last) / 86_400_000
+          visitor = days < 1 ? 'same-day' : days < 7 ? 'within-week' : 'later'
+        }
+        localStorage.setItem(LAST_VISIT_KEY, String(Date.now()))
+      } catch {
+        // Chặn storage → chỉ biết khách mới / cũ theo prefs
+      }
+      trackEvent({name: 'Chill Visit', props: {visitor}})
+    }
   }, [tracks, destinations])
 
   useEffect(() => {
@@ -464,7 +493,8 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [groupWall])
 
-  const updatesSeen = useUpdatesSeen(updates, returning)
+  // Chưa qua màn chào thì chưa báo "Có gì mới" (nút đang ẩn)
+  const updatesSeen = useUpdatesSeen(updates, entered ? returning : null)
 
   const openUpdates = (from: 'button' | 'toast') => {
     setPanelOpen(false)
@@ -528,9 +558,9 @@ export function ChillRoom({
     sceneRef.current?.dropCoin()
     setMyCup(true)
     petCat()
-    if (window.matchMedia('(min-width: 1024px)').matches) sayCat(CAT_THANKS)
-    else catSayQueued.current = CAT_THANKS
-  }, [petCat, sayCat])
+    if (window.matchMedia('(min-width: 1024px)').matches) sayCat(t.room.catThanks)
+    else catSayQueued.current = t.room.catThanks
+  }, [petCat, sayCat, t])
 
   useEffect(() => {
     if (wishOpen || !catSayQueued.current) return
@@ -611,6 +641,10 @@ export function ChillRoom({
     setPosition(0)
     setDuration(next.duration)
     trackEvent({name: 'Chill Play', props: {track: next.id}})
+    if (!startTracked.current) {
+      startTracked.current = true
+      trackEvent({name: 'Chill Start', props: {from: startFrom.current}})
+    }
   }, [tracks])
 
   // Bài kế tiếp trong CÙNG trạm (vòng lại đầu trạm khi hết)
@@ -725,6 +759,30 @@ export function ChillRoom({
     return () => clearInterval(id)
   }, [playing])
 
+  // Mốc thời gian nghe (cộng dồn lúc đang phát, tính theo đồng hồ thật vì timer bị
+  // bóp khi tab chạy nền; máy ngủ thì mỗi nhịp tính tối đa ~1 phút)
+  const listenedMs = useRef(0)
+  const listenMark = useRef(0)
+  useEffect(() => {
+    if (!playing) return
+    let last = Date.now()
+    const tick = () => {
+      const now = Date.now()
+      listenedMs.current += Math.min(now - last, 65_000)
+      last = now
+      const minutes = LISTEN_MINUTES[listenMark.current]
+      if (minutes && listenedMs.current >= minutes * 60_000) {
+        listenMark.current += 1
+        trackEvent({name: 'Chill Listen', props: {minutes}})
+      }
+    }
+    const id = setInterval(tick, 5000)
+    return () => {
+      clearInterval(id)
+      tick()
+    }
+  }, [playing])
+
   // Phím media trên bàn phím / màn hình khoá điều khiển được nhạc
   useEffect(() => {
     if (!('mediaSession' in navigator) || !started) return
@@ -802,6 +860,18 @@ export function ChillRoom({
   }, [panelOpen, settingsSeen])
   // Hiện sau khi bấm Play một lúc, nhường thông báo "Có gì mới" hiện trước
   const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast
+  // Bấm phát (kể cả phím Space) hoặc mở bảng nào đó bằng phím tắt → coi như đã vào quán
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (started || panelOpen || wishOpen || chatOpen || boardOpen || updatesOpen) setEntered(true)
+  }, [started, panelOpen, wishOpen, chatOpen, boardOpen, updatesOpen])
+  const enter = (music: boolean) => {
+    if (entered) return
+    setEntered(true)
+    if (!music) return trackEvent({name: 'Chill Look Around'})
+    startFrom.current = 'welcome'
+    if (!started) playAt(index)
+  }
   useEffect(() => {
     if (settingsSeen || hintShown || !started || panelOpen || otherOverlay) return
     const t = window.setTimeout(() => {
@@ -831,7 +901,7 @@ export function ChillRoom({
     }
   }, [])
   useEffect(() => {
-    if (zenSeen || !settingsSeen || hintTip || panelOpen || otherOverlay) return
+    if (!entered || zenSeen || !settingsSeen || hintTip || panelOpen || otherOverlay) return
     try {
       if (localStorage.getItem(ZEN_HINT_KEY) === '1') return
     } catch {
@@ -846,7 +916,7 @@ export function ChillRoom({
       }
     }, ZEN_HINT_DELAY_MS)
     return () => window.clearTimeout(t)
-  }, [zenSeen, settingsSeen, hintTip, panelOpen, otherOverlay])
+  }, [entered, zenSeen, settingsSeen, hintTip, panelOpen, otherOverlay])
   useEffect(() => {
     if (!zenHint) return
     const t = window.setTimeout(() => setZenHint(false), ZEN_HINT_MS)
@@ -1086,12 +1156,21 @@ export function ChillRoom({
   }, [started, playing, track.title])
   useEffect(() => () => void (document.title = baseTitle.current || document.title), [])
 
-  const timeLabel = TIMES.find((t) => t.value === time)!.label
-  const weatherLabel = WEATHERS.find((w) => w.value === weather)!.label
+  // <html lang> theo ngôn ngữ đang chọn (layout gốc là "en")
+  useEffect(() => {
+    document.documentElement.lang = lang
+    return () => {
+      document.documentElement.lang = 'en'
+    }
+  }, [lang])
+
+  const timeLabel = t.room.times[time]
+  const weatherLabel = t.room.weathers[weather]
+  const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
   const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !updatesSeen.toast && !hovering
-  const fade = `transition-opacity duration-700 ${hideUi ? 'pointer-events-none opacity-0' : 'opacity-100'}`
+  const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
@@ -1105,8 +1184,8 @@ export function ChillRoom({
         role="img"
         aria-label={
           groupView && table
-            ? `Pixel art: friends at a long table inside the café — ${table.seated.map((f) => `${f.name} ${STATUS_LABEL[f.status] ?? ''}`).join(', ') || 'empty chairs'}${table.rest.length ? `, and ${table.rest.length} more` : ''}`
-            : `Pixel art: a person with headphones sipping phin coffee by a café window, ${dest.name} street outside, ${timeLabel.toLowerCase()}, ${weatherLabel.toLowerCase()}`
+            ? t.room.canvasTable(table.seated.map((f) => `${f.name} ${t.room.status[f.status] ?? ''}`).join(', '), table.rest.length)
+            : t.room.canvasCounter(dest.name, timeLabel.toLowerCase(), weatherLabel.toLowerCase())
         }
       />
 
@@ -1120,7 +1199,7 @@ export function ChillRoom({
           <ZenToggle on onToggle={toggleZen} floating />
           {zenTip && (
             <p role="status" className="rounded-md bg-black/55 px-2.5 py-1.5 text-[11px] text-[#f6dcbd] backdrop-blur">
-              Chạm màn hình hoặc nhích chuột để hiện lại · phím H
+              {t.zen.tip}
             </p>
           )}
         </div>
@@ -1138,7 +1217,7 @@ export function ChillRoom({
         >
           {zenList && (
             <div className="mb-2 max-h-[min(55dvh,420px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md">
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Music station">
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.room.stationAria}>
                 {STATIONS.map((st) => {
                   const count = tracks.filter((t) => stationOf(t) === st.id).length
                   const on = st.id === station
@@ -1160,10 +1239,10 @@ export function ChillRoom({
                 })}
               </div>
               <ol className="mt-2 divide-y divide-white/[0.06]">
-                {stationList.map(({t, i}, pos) => {
+                {stationList.map(({tr, i}, pos) => {
                   const active = i === index
                   return (
-                    <li key={t.id}>
+                    <li key={tr.id}>
                       <button
                         type="button"
                         onClick={() => (active && started ? togglePlay() : playAt(i))}
@@ -1175,8 +1254,8 @@ export function ChillRoom({
                         <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
                           {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
                         </span>
-                        <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{t.title}</span>
-                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{t.duration ? formatTime(t.duration) : '–:––'}</span>
+                        <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
                       </button>
                     </li>
                   )
@@ -1185,18 +1264,18 @@ export function ChillRoom({
             </div>
           )}
           <div className="flex h-14 items-center gap-1 rounded-2xl border border-white/10 bg-[#16131a]/80 px-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.9)] backdrop-blur-md">
-            <button type="button" onClick={prev} aria-label="Previous track (P)" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
+            <button type="button" onClick={prev} aria-label={t.room.prev} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
               <PrevIcon />
             </button>
             <button
               type="button"
               onClick={togglePlay}
-              aria-label={playing ? 'Pause (Space)' : 'Play (Space)'}
+              aria-label={`${playing ? t.room.pause : t.room.play} (Space)`}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c08f]"
             >
               {playing ? <PauseIcon small /> : <PlayIcon small />}
             </button>
-            <button type="button" onClick={next} aria-label="Next track (N)" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
+            <button type="button" onClick={next} aria-label={t.room.next} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
               <NextIcon />
             </button>
             <span className="min-w-0 flex-1 px-1.5">
@@ -1206,7 +1285,7 @@ export function ChillRoom({
             <button
               type="button"
               onClick={() => setZenList((o) => !o)}
-              aria-label="Danh sách nhạc"
+              aria-label={t.room.trackList}
               aria-expanded={zenList}
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition ${zenList ? 'bg-[#e8b27d]/20 text-[#f3cfa8]' : 'text-[#ede6dd] hover:bg-white/10'}`}
             >
@@ -1221,7 +1300,7 @@ export function ChillRoom({
       )}
 
       {/* Mọi nút / bảng nằm trong lớp này — Zen thì giấu cả lớp, cảnh + nhạc vẫn chạy */}
-      <div className={zen ? 'hidden' : 'contents'}>
+      <div className={zen ? 'hidden' : 'contents'} inert={!entered}>
 
       {/* Bàn nhóm: bảng tên trên đầu từng người + nhãn "+n" + nút quay về quầy.
           Hiện sau khi lia máy xong (~1,2 giây) để không trôi theo cảnh. */}
@@ -1263,7 +1342,7 @@ export function ChillRoom({
               return (
                 <span
                   key={`t-${f.display}`}
-                  aria-label={`${f.name} đang gõ`}
+                  aria-label={t.room.typing(f.name)}
                   className="absolute -translate-x-1/2 -translate-y-full pb-2 motion-safe:animate-[chill-pop_0.25s_ease-out]"
                   style={{left: box.left + box.width / 2, top: box.top}}
                 >
@@ -1288,10 +1367,10 @@ export function ChillRoom({
                 key={f.display}
                 className="absolute flex -translate-x-1/2 -translate-y-full items-center gap-1 whitespace-nowrap rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] text-[#f6dcbd] backdrop-blur"
                 style={{left: box.left + box.width / 2, top: box.top, maxWidth: roomy ? undefined : box.width - 4}}
-                title={`${f.name} · ${STATUS_LABEL[f.status] ?? ''}`}
+                title={`${f.name} · ${t.room.status[f.status] ?? ''}`}
               >
                 <span className="truncate">{f.name}</span>
-                {roomy && <span className="text-[#a79e94]">· {STATUS_LABEL[f.status] ?? ''}</span>}
+                {roomy && <span className="text-[#a79e94]">· {t.room.status[f.status] ?? ''}</span>}
               </span>
             )
           })}
@@ -1314,7 +1393,7 @@ export function ChillRoom({
           style={{left: headBox.left + headBox.width / 2, top: headBox.top}}
         >
           <span className="relative block max-w-[min(240px,70vw)] rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1.5 text-[12px] leading-snug text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)]" style={{width: 'max-content'}}>
-            <span className="block text-[10px] font-medium text-[#9a6a45]">Bạn</span>
+            <span className="block text-[10px] font-medium text-[#9a6a45]">{t.common.you}</span>
             <span className="line-clamp-2">{clip(myBubble.text)}</span>
             <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-[#2a1d15] bg-[#fbf6ec]" />
           </span>
@@ -1329,7 +1408,7 @@ export function ChillRoom({
           type="button"
           onClick={() => setGroupView(true)}
           className="absolute left-1/2 top-[64px] z-10 max-w-[min(360px,calc(100vw-24px))] -translate-x-1/2 truncate rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1 text-[12px] text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:top-[76px]"
-          title="Xem bàn nhóm"
+          title={t.room.seeTable}
         >
           <span className="font-medium text-[#9a6a45]">{latestBubble.name}:</span> {clip(latestBubble.text, 48)}
         </button>
@@ -1343,7 +1422,7 @@ export function ChillRoom({
             className="flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 px-3 text-xs font-medium text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white"
           >
             <ArrowIcon dir="left" />
-            Về chỗ cửa sổ
+            {t.room.backToWindow}
           </button>
           {/* Gợi ý 1 lần: vách kính (cùng kiểu bong bóng "Ngắm cảnh") */}
           <div
@@ -1358,23 +1437,23 @@ export function ChillRoom({
                   🪟
                 </span>
                 <div className="min-w-0 flex-1">
-                  <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Vách kính</span>
-                  <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Đổi tường gạch thành vách kính nhìn ra phố</span>
+                  <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">{t.room.wallTipTitle}</span>
+                  <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">{t.room.wallTipBody}</span>
                   <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <button
                       type="button"
                       onClick={() => chooseWall('glass')}
                       className="rounded-md bg-[#e8b27d] px-2.5 py-1 text-xs font-medium text-[#2a1d15] transition hover:bg-[#f0c08f]"
                     >
-                      Thử ngay
+                      {t.common.tryIt}
                     </button>
-                    <span className="text-[11px] text-[#a79e94]">Đổi lại trong Cài đặt › Atmosphere</span>
+                    <span className="text-[11px] text-[#a79e94]">{t.room.wallTipWhere}</span>
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setWallHint(false)}
-                  aria-label="Ẩn gợi ý"
+                  aria-label={t.common.hideTip}
                   className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#a79e94] transition hover:bg-white/10 hover:text-[#ede6dd]"
                 >
                   <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
@@ -1391,7 +1470,7 @@ export function ChillRoom({
       {catBox && !groupView && (
         <button
           type="button"
-          aria-label="Pet the cat"
+          aria-label={t.room.petCat}
           onClick={petCat}
           onPointerEnter={() => sceneRef.current?.noticeCat()}
           className="group absolute cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
@@ -1410,12 +1489,12 @@ export function ChillRoom({
           <span
             aria-hidden
             className={`pointer-events-none absolute bottom-full left-[68%] mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] sm:text-[11px] ${
-              catSay ? 'opacity-0' : catHint && !hideUi ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              catSay ? 'opacity-0' : catHint && !hideUi && entered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
             }`}
             style={{transform: 'translate(-50%, 0)'}}
           >
             <PawIcon />
-            Pet me
+            {t.room.petMe}
             <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
           </span>
         </button>
@@ -1425,7 +1504,7 @@ export function ChillRoom({
       {bookBox && !groupView && (
         <button
           type="button"
-          aria-label="Open the café wishlist"
+          aria-label={t.room.openWishlist}
           onClick={() => {
             setPanelOpen(false)
             setChatOpen(false)
@@ -1438,7 +1517,7 @@ export function ChillRoom({
             aria-hidden
             className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
           >
-            💡 Wishlist
+            💡 {t.room.wishlist}
           </span>
         </button>
       )}
@@ -1447,7 +1526,7 @@ export function ChillRoom({
       {jarBox && !groupView && (
         <button
           type="button"
-          aria-label={`Tip jar — thank-you board${board?.cups ? `, ${board.cups} coffees` : ''}`}
+          aria-label={t.room.tipJar(board?.cups ?? 0)}
           aria-expanded={boardOpen}
           aria-controls="chill-board"
           onClick={openBoard}
@@ -1458,7 +1537,7 @@ export function ChillRoom({
             aria-hidden
             className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
           >
-            🫙 Thank-you board{board?.cups ? ` · ${board.cups}` : ''}
+            🫙 {t.room.board}{board?.cups ? ` · ${board.cups}` : ''}
           </span>
         </button>
       )}
@@ -1503,11 +1582,11 @@ export function ChillRoom({
           <span className="pointer-events-none flex h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur">
             {clock}
           </span>
-          <StageButton label={scenePaused ? 'Resume scene' : 'Pause scene'} onClick={() => setScenePaused((p) => !p)}>
+          <StageButton label={scenePaused ? t.room.resumeScene : t.room.pauseScene} onClick={() => setScenePaused((p) => !p)}>
             {scenePaused ? <PlayIcon small /> : <PauseIcon small />}
           </StageButton>
           {canFullscreen && (
-            <StageButton label={fullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'} onClick={toggleFullscreen}>
+            <StageButton label={fullscreen ? t.room.exitFullscreen : t.room.fullscreen} onClick={toggleFullscreen}>
               {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
             </StageButton>
           )}
@@ -1517,7 +1596,7 @@ export function ChillRoom({
       {/* Nền tối sau bảng cảm ơn / nhật ký — bấm ra ngoài để đóng */}
       <button
         type="button"
-        aria-label={updatesOpen ? 'Close updates' : 'Close thank-you board'}
+        aria-label={updatesOpen ? t.room.closeUpdates : t.room.closeBoard}
         tabIndex={-1}
         onClick={() => {
           setBoardOpen(false)
@@ -1530,7 +1609,7 @@ export function ChillRoom({
 
       {/* Bấm ra ngoài để đóng bảng cài đặt */}
       {panelOpen && (
-        <button type="button" aria-label="Close settings" onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
+        <button type="button" aria-label={t.room.closeSettings} onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
       )}
 
       {/* Dock nhạc nổi phía dưới */}
@@ -1545,19 +1624,19 @@ export function ChillRoom({
         >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              <RoundButton label="Previous track (P)" onClick={prev}>
+              <RoundButton label={t.room.prev} onClick={prev}>
                 <PrevIcon />
               </RoundButton>
               <button
                 type="button"
                 onClick={togglePlay}
-                aria-label={playing ? 'Pause' : 'Play'}
-                title={`${playing ? 'Pause' : 'Play'} (Space)`}
+                aria-label={playing ? t.room.pause : t.room.play}
+                title={`${playing ? t.room.pause : t.room.play} (Space)`}
                 className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
               >
                 {playing ? <PauseIcon /> : <PlayIcon />}
               </button>
-              <RoundButton label="Next track (N)" onClick={next}>
+              <RoundButton label={t.room.next} onClick={next}>
                 <NextIcon />
               </RoundButton>
             </div>
@@ -1575,7 +1654,7 @@ export function ChillRoom({
               step={0.01}
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
-              aria-label="Volume"
+              aria-label={t.room.volume}
               className="hidden w-24 accent-[#e8b27d] md:block"
             />
             {/* Điện thoại không đủ chỗ cho thanh volume — nút loa mở thanh trượt nổi phía trên */}
@@ -1583,7 +1662,7 @@ export function ChillRoom({
               <button
                 type="button"
                 onClick={() => setVolumeOpen((o) => !o)}
-                aria-label="Volume"
+                aria-label={t.room.volume}
                 aria-expanded={volumeOpen}
                 aria-controls="chill-volume"
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition ${
@@ -1604,7 +1683,7 @@ export function ChillRoom({
                     step={0.01}
                     value={volume}
                     onChange={(e) => setVolume(Number(e.target.value))}
-                    aria-label="Volume"
+                    aria-label={t.room.volume}
                     className="w-full accent-[#e8b27d]"
                   />
                   <span className="w-8 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#a79e94]">{Math.round(volume * 100)}</span>
@@ -1621,11 +1700,11 @@ export function ChillRoom({
                   setChatOpen(false)
                   setPanelOpen((o) => !o)
                 }}
-                aria-label="Settings"
+                aria-label={t.room.settings}
                 aria-expanded={panelOpen}
                 aria-controls="chill-panel"
                 aria-describedby={showHintTip ? 'chill-settings-hint' : undefined}
-                title="Settings (S)"
+                title={`${t.room.settings} (S)`}
                 className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition ${
                   panelOpen || settingsGlow
                     ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
@@ -1645,7 +1724,7 @@ export function ChillRoom({
                   }}
                   className="absolute bottom-full right-0 mb-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:right-4 after:top-full after:border-[6px] after:border-transparent after:border-t-[#e8b27d] after:content-['']"
                 >
-                  Đổi nhạc, phòng, thời tiết ở đây
+                  {t.room.settingsTip}
                 </button>
               )}
             </div>
@@ -1655,7 +1734,7 @@ export function ChillRoom({
             <div
               role="slider"
               tabIndex={-1}
-              aria-label="Seek"
+              aria-label={t.room.seek}
               aria-valuemin={0}
               aria-valuemax={Math.round(duration)}
               aria-valuenow={Math.round(position)}
@@ -1687,7 +1766,7 @@ export function ChillRoom({
         visible={theme === 'cafe'}
         slot={inviteSlot}
         dimmed={hideUi}
-        hidden={panelOpen || volumeOpen || showHintTip}
+        hidden={!entered || panelOpen || volumeOpen || showHintTip}
         onTable={onTable}
         onView={() => setGroupView(true)}
         openSignal={tableSignal}
@@ -1706,7 +1785,8 @@ export function ChillRoom({
           setWishOpen(o)
         }}
         dimmed={hideUi}
-        hidden={panelOpen || volumeOpen || showHintTip}
+        hidden={!entered || panelOpen || volumeOpen || showHintTip}
+        ready={entered}
         context={`${dest.name} · ${timeLabel} · ${weatherLabel} · ${track.title}`}
         onThanks={thankCat}
         donateRequest={donateRequest}
@@ -1721,7 +1801,7 @@ export function ChillRoom({
           }
           setChatOpen(o)
         }}
-        hidden={panelOpen || volumeOpen || showHintTip}
+        hidden={!entered || panelOpen || volumeOpen || showHintTip}
         dimmed={hideUi}
         onAvailable={setChatAvailable}
         slot={chatSlot}
@@ -1755,7 +1835,7 @@ export function ChillRoom({
           Chia 3 tab (Music · Scene · Atmosphere) để mỗi tab vừa 1 màn hình, không phải cuộn dài */}
       <aside
         id="chill-panel"
-        aria-label="Chill settings"
+        aria-label={t.room.panel}
         inert={!panelOpen}
         className={`absolute inset-x-0 bottom-0 z-30 flex h-[75dvh] flex-col rounded-t-2xl border-t border-white/10 bg-[#16131a]/95 backdrop-blur-md transition-transform duration-300 ease-out sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-auto sm:w-[420px] sm:rounded-none sm:border-l sm:border-t-0 ${
           panelOpen ? 'translate-x-0 translate-y-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'
@@ -1763,7 +1843,8 @@ export function ChillRoom({
       >
         <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-4">
           <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
-          <RoundButton label="Close settings (Esc)" onClick={() => setPanelOpen(false)}>
+          <LangSwitch className="ml-auto" />
+          <RoundButton label={`${t.room.closeSettings} (Esc)`} onClick={() => setPanelOpen(false)}>
             <CloseIcon />
           </RoundButton>
         </div>
@@ -1771,7 +1852,7 @@ export function ChillRoom({
         {/* Tab chính kiểu gạch chân — khác hẳn chip chọn trạm nhạc bên trong tab Music */}
         <div
           role="tablist"
-          aria-label="Settings"
+          aria-label={t.room.settings}
           className="grid grid-cols-3 border-b border-white/[0.08] px-3"
           onKeyDown={(e) => {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
@@ -1782,25 +1863,25 @@ export function ChillRoom({
             document.getElementById(`chill-tab-${nextTab.id}`)?.focus()
           }}
         >
-          {PANEL_TABS.map((t) => {
-            const on = t.id === panelTab
+          {PANEL_TABS.map((tab) => {
+            const on = tab.id === panelTab
             return (
               <button
-                key={t.id}
-                id={`chill-tab-${t.id}`}
+                key={tab.id}
+                id={`chill-tab-${tab.id}`}
                 type="button"
                 role="tab"
                 aria-selected={on}
-                aria-controls={`chill-tabpanel-${t.id}`}
+                aria-controls={`chill-tabpanel-${tab.id}`}
                 tabIndex={on ? 0 : -1}
-                onClick={() => setPanelTab(t.id)}
+                onClick={() => setPanelTab(tab.id)}
                 className={`relative flex min-w-0 items-center justify-center gap-2 px-2 py-3 text-sm transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#e8b27d] ${
                   on ? 'font-semibold text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
                 }`}
               >
-                {t.icon}
-                <span className="truncate">{t.label}</span>
-                {t.id === 'atmosphere' && wallFresh && <NewDot />}
+                {tab.icon}
+                <span className="truncate">{t.room.tabs[tab.id]}</span>
+                {tab.id === 'atmosphere' && wallFresh && <NewDot />}
                 <span
                   aria-hidden
                   className={`absolute inset-x-3 -bottom-px h-0.5 rounded-full transition ${on ? 'bg-[#e8b27d]' : 'bg-transparent'}`}
@@ -1819,7 +1900,7 @@ export function ChillRoom({
           {panelTab === 'music' && (
             <>
               {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Music station">
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.room.stationAria}>
                 {STATIONS.map((st) => {
                   const count = tracks.filter((t) => stationOf(t) === st.id).length
                   const on = st.id === station
@@ -1854,15 +1935,15 @@ export function ChillRoom({
                   }`}
                 >
                   <ShuffleIcon />
-                  Shuffle
+                  {t.room.shuffle}
                 </button>
               </div>
 
               <ol className="mt-3 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-                {stationList.map(({t, i}, pos) => {
+                {stationList.map(({tr, i}, pos) => {
                   const active = i === index
                   return (
-                    <li key={t.id}>
+                    <li key={tr.id}>
                       <button
                         type="button"
                         onClick={() => (active && started ? togglePlay() : playAt(i))}
@@ -1875,10 +1956,10 @@ export function ChillRoom({
                           {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
                         </span>
                         <span className="min-w-0">
-                          <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{t.title}</span>
-                          <span className="block truncate text-xs text-[#a79e94]">{t.mood}</span>
+                          <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
+                          <span className="block truncate text-xs text-[#a79e94]">{tr.mood}</span>
                         </span>
-                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{t.duration ? formatTime(t.duration) : '–:––'}</span>
+                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
                       </button>
                     </li>
                   )
@@ -1891,29 +1972,29 @@ export function ChillRoom({
             <div className="space-y-8">
               {/* Căn phòng người xem ngồi — phố, giờ, thời tiết bên ngoài giữ nguyên */}
               <section>
-                <SectionTitle index="01" title="Room" />
-                <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Room">
-                  {THEMES.map((t) => {
-                    const active = t.id === theme
+                <SectionTitle index="01" title={t.room.roomTitle} />
+                <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t.room.roomTitle}>
+                  {THEMES.map((th) => {
+                    const active = th.id === theme
                     return (
                       <button
-                        key={t.id}
+                        key={th.id}
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        onClick={() => setTheme(t.id)}
+                        onClick={() => setTheme(th.id)}
                         className={`group overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
                           active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
                         }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
                         <img
-                          src={t.thumb}
+                          src={th.thumb}
                           alt=""
                           loading="lazy"
                           className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
                         />
-                        <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.name}</span>
+                        <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.room.themes[th.id]}</span>
                       </button>
                     )
                   })}
@@ -1921,9 +2002,9 @@ export function ChillRoom({
               </section>
 
               <section>
-                <SectionTitle index="02" title="Destination" />
+                <SectionTitle index="02" title={t.room.destination} />
                 {/* Chọn điểm đến bằng thẻ có ảnh phố (đúng giờ đang chọn) thay cho <select> gốc */}
-                <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Destination">
+                <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t.room.destination}>
                   {destinations.map((d, i) => {
                     const active = i === destIndex
                     return (
@@ -1946,7 +2027,7 @@ export function ChillRoom({
                         />
                         {active && (
                           <span className="absolute right-1.5 top-1.5 rounded bg-[#e8b27d] px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#2a1a10]">
-                            Now
+                            {t.room.now}
                           </span>
                         )}
                         <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{d.name}</span>
@@ -1956,7 +2037,7 @@ export function ChillRoom({
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <span id="chill-travel" className="text-sm text-[#a79e94]">
-                    Auto travel
+                    {t.room.autoTravel}
                   </span>
                   <div role="radiogroup" aria-labelledby="chill-travel" className="flex rounded-full border border-white/10 bg-black/20 p-0.5">
                     {TRAVEL_OPTIONS.map((o) => (
@@ -1974,7 +2055,7 @@ export function ChillRoom({
                           travel === o.value ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
                         }`}
                       >
-                        {o.label}
+                        {o.value ? t.room.travelMin(o.value) : t.room.travelOff}
                       </button>
                     ))}
                   </div>
@@ -1988,7 +2069,7 @@ export function ChillRoom({
                   />
                 </div>
                 <p className="mt-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
-                  {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · Next: {nextDest.name}
+                  {String(destIndex + 1).padStart(2, '0')} / {String(destinations.length).padStart(2, '0')} · {t.room.nextStop(nextDest.name)}
                 </p>
               </section>
             </div>
@@ -1997,27 +2078,27 @@ export function ChillRoom({
           {panelTab === 'atmosphere' && (
             <div className="space-y-4">
               <ZenRow on={zen} onToggle={toggleZen} />
-              <Field label="Time">
-                <Segmented options={TIMES} value={time} onChange={setTime} />
+              <Field label={t.room.time}>
+                <Segmented options={TIMES.map((o) => ({...o, label: t.room.times[o.value]}))} value={time} onChange={setTime} />
               </Field>
-              <Field label="Weather">
-                <Segmented options={WEATHERS} value={weather} onChange={setWeather} />
+              <Field label={t.room.weather}>
+                <Segmented options={WEATHERS.map((o) => ({...o, label: t.room.weathers[o.value]}))} value={weather} onChange={setWeather} />
               </Field>
               {theme === 'cafe' && (
                 <Field
                   label={
                     <>
-                      Table wall
+                      {t.room.tableWall}
                       {wallFresh && <NewDot />}
                     </>
                   }
                 >
                   <div>
-                    <Segmented options={WALLS} value={groupWall} onChange={chooseWall} />
+                    <Segmented options={WALLS.map((o) => ({...o, label: t.room.walls[o.value]}))} value={groupWall} onChange={chooseWall} />
                     {/* Chỉ thấy ở bàn nhóm → nói rõ tác dụng, dẫn tới chỗ xem được */}
                     {!groupView && (
                       <p className="mt-1.5 text-xs text-[#a79e94]">
-                        {tableMembers ? 'Đổi xong xem ngay · ' : 'Cảnh phía sau bàn nhóm · '}
+                        {tableMembers ? t.room.wallSeeNow : t.room.wallBehind}
                         <button
                           type="button"
                           onClick={() => {
@@ -2032,14 +2113,14 @@ export function ChillRoom({
                           }}
                           className="text-[#e8b27d] underline-offset-2 transition hover:text-[#f3cfa8] hover:underline"
                         >
-                          {tableMembers ? 'Sang bàn nhóm →' : 'Mời bạn ngồi chung →'}
+                          {tableMembers ? t.room.goToTable : t.room.inviteFriends}
                         </button>
                       </p>
                     )}
                   </div>
                 </Field>
               )}
-              <Field label="Ambience">
+              <Field label={t.room.ambienceLabel}>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -2048,10 +2129,10 @@ export function ChillRoom({
                     step={0.01}
                     value={ambience}
                     onChange={(e) => changeAmbience(Number(e.target.value))}
-                    aria-label={`Ambience volume: ${AMBIENCE_FOR[weather].label}`}
+                    aria-label={t.room.ambienceAria(ambienceLabel)}
                     className="w-full accent-[#e8b27d]"
                   />
-                  <span className="w-28 shrink-0 text-right text-xs text-[#a79e94]">{AMBIENCE_FOR[weather].label}</span>
+                  <span className="w-28 shrink-0 text-right text-xs text-[#a79e94]">{ambienceLabel}</span>
                 </div>
               </Field>
             </div>
@@ -2061,18 +2142,18 @@ export function ChillRoom({
         {/* Đáy cố định: phím tắt (desktop) + credit */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.06] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] font-mono text-[11px] text-[#a79e94]">
           {[
-            ['Space', 'Play'],
-            ['N / P', 'Next / prev'],
-            ['F', 'Fullscreen'],
-            ['S', 'Settings'],
+            ['Space', t.room.keys.play],
+            ['N / P', t.room.keys.nextPrev],
+            ['F', t.room.keys.fullscreen],
+            ['S', t.room.keys.settings],
           ].map(([key, label]) => (
             <span key={key} className="hidden sm:inline">
               <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
             </span>
           ))}
-          <span className="uppercase tracking-[0.2em] text-white/30 sm:basis-full">No rush. Just coffee. · Art &amp; music made with AI.</span>
+          <span className="uppercase tracking-[0.2em] text-white/30 sm:basis-full">{t.room.credit}</span>
           <span className="text-white/30 sm:basis-full">
-            Animated emoji:{' '}
+            {t.room.emojiCredit}{' '}
             <a
               href="https://googlefonts.github.io/noto-emoji-animation/"
               target="_blank"
@@ -2086,6 +2167,99 @@ export function ChillRoom({
         </div>
       </aside>
       </div>
+
+      {/* Màn chào: cảnh + 1 lời mời + 1 nút lớn. Bấm bất kỳ đâu là vào quán và nhạc chạy
+          (trình duyệt chỉ cho phát tiếng sau 1 cú bấm). Mọi nút khác chờ sau bước này.
+          Màn dọc: chữ nằm trên cảnh, nút nằm dưới cảnh — không che người ngồi */}
+      {!welcomeGone && (
+        <div
+          inert={entered}
+          onClick={() => enter(true)}
+          onTransitionEnd={(e) => entered && e.target === e.currentTarget && setWelcomeGone(true)}
+          className={`absolute inset-0 z-50 flex cursor-pointer flex-col items-center justify-end gap-6 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-6 pb-[max(2.5rem,9dvh)] text-center transition-opacity duration-500 portrait:justify-between portrait:from-black/60 portrait:via-transparent portrait:pb-[max(1.5rem,6dvh)] portrait:pt-[14dvh] ${
+            entered ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
+        >
+          <div className="absolute inset-x-0 top-0 flex cursor-default items-center justify-between gap-3 p-3 sm:p-5" onClick={(e) => e.stopPropagation()}>
+            <Link
+              href="/"
+              aria-label={t.welcome.home}
+              className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            >
+              <ArrowIcon dir="left" />
+              Bin Nguyen
+            </Link>
+            <LangSwitch />
+          </div>
+          <div className="max-w-xl">
+            <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#e8b27d]">Chill for work</p>
+            <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.7)] sm:text-4xl">
+              {returning ? t.welcome.titleBack : t.welcome.title}
+            </h2>
+            <p className="mx-auto mt-3 max-w-md text-pretty text-sm leading-relaxed text-[#ede6dd] [text-shadow:0_1px_10px_rgba(0,0,0,0.8)] sm:text-base">{t.welcome.sub}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                enter(true)
+              }}
+              // Trang chưa tải xong script thì bấm chưa có tác dụng → nút mờ + con trỏ chờ
+              aria-busy={!loaded}
+              className={`flex min-h-14 items-center gap-3 rounded-full bg-[#e8b27d] py-2 pl-5 pr-7 text-base font-semibold text-[#2a1a10] shadow-[0_16px_40px_-12px_rgba(232,178,125,0.7)] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d] motion-safe:hover:scale-[1.03] ${
+                loaded ? '' : 'cursor-progress opacity-60'
+              }`}
+            >
+              <PlayIcon />
+              {t.welcome.enter}
+            </button>
+            <p className="mt-1 max-w-[80vw] truncate font-mono text-[10px] uppercase tracking-[0.2em] text-white/70">
+              ♪ {stationLabel} · {track.title}
+            </p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                enter(false)
+              }}
+              className="flex min-h-11 items-center px-3 text-xs text-white/75 underline underline-offset-4 transition hover:text-white focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            >
+              {t.welcome.look}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Công tắc ngôn ngữ EN / VI (màn chào + đầu bảng cài đặt)
+function LangSwitch({className = ''}: {className?: string}) {
+  const lang = useLang()
+  const t = useT()
+  const choose = (next: Lang) => {
+    if (next === lang) return
+    setLang(next)
+    trackEvent({name: 'Chill Lang', props: {lang: next}})
+  }
+  return (
+    <div role="radiogroup" aria-label={t.common.language} className={`flex shrink-0 rounded-md border border-white/15 bg-black/45 p-0.5 backdrop-blur ${className}`}>
+      {(['en', 'vi'] as const).map((l) => (
+        <button
+          key={l}
+          type="button"
+          role="radio"
+          aria-checked={lang === l}
+          aria-label={l === 'en' ? 'English' : 'Tiếng Việt'}
+          onClick={() => choose(l)}
+          className={`h-8 min-w-9 rounded px-2 font-mono text-[11px] uppercase tracking-[0.12em] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+            lang === l ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-white/80 hover:text-white'
+          }`}
+        >
+          {l}
+        </button>
+      ))}
     </div>
   )
 }
@@ -2227,21 +2401,22 @@ function ZenToggle({
   floating?: boolean
   className?: string
 }) {
+  const t = useT()
   return (
     <div className={`relative ${className}`}>
       <button
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label="Ngắm cảnh: ẩn bảng điều khiển, nhạc vẫn phát (phím H)"
-        title={on ? 'Chạm màn hình để hiện lại (phím H)' : 'Ẩn bảng điều khiển, nhạc vẫn phát (phím H)'}
+        aria-label={t.zen.aria}
+        title={on ? t.zen.titleOn : `${t.zen.desc} (H)`}
         onClick={onToggle}
         className={`relative flex items-center gap-2.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 pl-3 pr-2 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
           floating ? 'h-11 sm:h-9' : 'h-9'
         }`}
       >
         {fresh && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-md border-2 border-[#e8b27d]" />}
-        <span>Ngắm cảnh</span>
+        <span>{t.zen.name}</span>
         <SwitchTrack on={on} />
         {fresh && (
           <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
@@ -2264,14 +2439,14 @@ function ZenToggle({
               🍃
             </span>
             <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
-              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới · Ngắm cảnh</span>
-              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">Ẩn bảng điều khiển, nhạc vẫn phát</span>
-              <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">Bật thử → (phím H)</span>
+              <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">{t.zen.newLabel}</span>
+              <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">{t.zen.desc}</span>
+              <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">{t.zen.tryIt}</span>
             </button>
             <button
               type="button"
               onClick={onCloseHint}
-              aria-label="Ẩn gợi ý"
+              aria-label={t.common.hideTip}
               className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#a79e94] transition hover:bg-white/10 hover:text-[#ede6dd]"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
@@ -2288,6 +2463,7 @@ function ZenToggle({
 // Dòng "Ngắm cảnh" trong bảng cài đặt (chủ yếu cho điện thoại — thanh trên đã chật):
 // cả dòng cao 56px là một công tắc, rãnh 44×26
 function ZenRow({on, onToggle}: {on: boolean; onToggle: () => void}) {
+  const t = useT()
   return (
     <button
       type="button"
@@ -2297,8 +2473,8 @@ function ZenRow({on, onToggle}: {on: boolean; onToggle: () => void}) {
       className="flex min-h-14 w-full items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-left transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-[#ede6dd]">Ngắm cảnh</span>
-        <span className="block text-xs text-[#a79e94]">{on ? 'Chạm màn hình để hiện lại' : 'Ẩn bảng điều khiển, nhạc vẫn phát'}</span>
+        <span className="block text-sm font-medium text-[#ede6dd]">{t.zen.name}</span>
+        <span className="block text-xs text-[#a79e94]">{on ? t.zen.descOn : t.zen.desc}</span>
       </span>
       <SwitchTrack on={on} size="lg" />
     </button>
@@ -2464,8 +2640,9 @@ function RainIcon() {
 
 // Chấm cam "tính năng mới" nhỏ, nằm cạnh chữ
 function NewDot() {
+  const t = useT()
   return (
-    <span aria-label="Mới" className="relative inline-flex h-2 w-2 shrink-0">
+    <span aria-label={t.common.isNew} className="relative inline-flex h-2 w-2 shrink-0">
       <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
       <span className="relative inline-flex h-2 w-2 rounded-full bg-[#f08a5d]" />
     </span>
@@ -2533,8 +2710,9 @@ function CloudIcon() {
 }
 
 function EqualizerIcon() {
+  const t = useT()
   return (
-    <span className="flex h-3 items-end gap-[2px]" aria-label="Playing">
+    <span className="flex h-3 items-end gap-[2px]" aria-label={t.room.playing}>
       {[0, 150, 300].map((delay) => (
         <span
           key={delay}

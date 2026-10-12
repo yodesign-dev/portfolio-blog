@@ -4,7 +4,8 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
-import {CHARACTERS, SEATS, STATUS_LABEL, arrangeFriends, type TableMember} from './table-view'
+import {CHARACTERS, SEATS, arrangeFriends, type TableMember} from './table-view'
+import {tServer, useLang, useT} from './i18n'
 
 // Bàn nhóm (thử nghiệm) — phía quầy cửa sổ: nút "Mời bạn" trên thanh trên,
 // chọn nhân vật, danh sách bạn đang ở bàn. Backend: /api/chill-table.
@@ -20,6 +21,9 @@ const INVITE_SEEN_KEY = 'chill:invite-seen'
 const TABLE_KEY = 'chill:table-id'
 const CHAT_ME_KEY = 'chill:chat-me'
 const POLL_MS = 20_000
+// Thông báo nhỏ: mã (dịch theo t.table) hoặc nguyên văn câu lỗi server trả về
+const NOTICES = ['gone', 'full', 'joinFailed', 'createFailed', 'disbanded'] as const
+type NoticeKey = (typeof NOTICES)[number]
 const BEAT_MS = 60_000
 
 const NAMES = ['Mây Chiều', 'Phin Đen', 'Bạc Xỉu', 'Hoa Sữa', 'Mưa Phùn', 'Lá Me', 'Trà Đá', 'Sương Sớm', 'Hẻm Nhỏ', 'Nắng Nhạt']
@@ -73,6 +77,8 @@ export function GroupTable({
   // đang ở bàn → menu bàn nhóm
   openSignal?: number
 }) {
+  const t = useT()
+  const lang = useLang()
   const [available, setAvailable] = useState(false)
   const [me, setMe] = useState<Me | null>(null)
   const [tableId, setTableId] = useState<string | null>(null)
@@ -126,8 +132,8 @@ export function GroupTable({
       if (invited && /^[a-z0-9]{8}$/.test(invited) && invited !== current) {
         const peek = await fetch(`/api/chill-table?id=${invited}`).then((r) => r.json()).catch(() => null)
         if (!alive) return
-        if (!peek?.members) return setNotice('Bàn này đã giải tán rồi.')
-        if (peek.members.length >= peek.max) return setNotice('Bàn đã đủ người.')
+        if (!peek?.members) return setNotice('gone')
+        if (peek.members.length >= peek.max) return setNotice('full')
         setPicker({mode: 'join', id: invited, host: peek.members[0]?.name})
       } else if (current) {
         setTableId(current)
@@ -154,7 +160,7 @@ export function GroupTable({
         setMembers(data.members as TableMember[])
         return true
       }
-      leaveLocal(typeof data.error === 'string' ? data.error : 'Chưa vào được bàn, thử lại nha.')
+      leaveLocal(typeof data.error === 'string' ? data.error : 'joinFailed')
       return false
     },
     [leaveLocal],
@@ -168,7 +174,7 @@ export function GroupTable({
       const res = await fetch(`/api/chill-table?id=${tableId}&uid=${me.uid}`).then((r) => r.json()).catch(() => null)
       if (!alive || !res) return
       if (!res.open) return leaveLocal()
-      if (res.gone) return leaveLocal('Bàn đã giải tán.')
+      if (res.gone) return leaveLocal('disbanded')
       if (Array.isArray(res.members)) setMembers(res.members)
     }
     const beat = async () => {
@@ -256,7 +262,7 @@ export function GroupTable({
         setMembers(data.members as TableMember[])
         setOpen(true)
         trackEvent({name: 'Chill Table', props: {action: 'create'}})
-      } else setNotice(typeof data.error === 'string' ? data.error : 'Chưa tạo được bàn, thử lại nha.')
+      } else setNotice(typeof data.error === 'string' ? data.error : 'createFailed')
     } else {
       // Đang ngồi bàn khác mà mở link mời mới → rời bàn cũ cho khỏi giữ ghế
       if (tableId && tableId !== picker.id) void post({action: 'leave', id: tableId, uid: next.uid}).catch(() => {})
@@ -298,9 +304,9 @@ export function GroupTable({
             <button
               type="button"
               onClick={onButton}
-              aria-label={tableId ? `Bàn nhóm: ${friends.length} người bạn đang ở đây` : 'Mời bạn ngồi cùng'}
+              aria-label={tableId ? t.table.tableAria(friends.length) : t.table.invite}
               aria-expanded={tableId ? open : undefined}
-              title={tableId ? 'Bàn nhóm' : 'Mời bạn ngồi cùng'}
+              title={tableId ? t.table.title : t.table.invite}
               className={`${TOKEN_CLASS} ${inviteSeen && !open ? 'border-white/[0.13]' : 'border-[#e8b27d]/60'} ${
                 hidden ? 'pointer-events-none translate-y-2 opacity-0' : dimmed && !open ? 'opacity-60 hover:opacity-100' : 'opacity-100'
               }`}
@@ -308,7 +314,7 @@ export function GroupTable({
               <PixelIcon name="cups" />
               {tableId && friends.length > 0 && <TokenChip>{friends.length}</TokenChip>}
               {!inviteSeen && <TokenNewDot />}
-              <TokenLabel>{tableId ? `Bàn nhóm · ${friends.length} người bạn` : 'Mời bạn'}</TokenLabel>
+              <TokenLabel>{tableId ? t.table.label(friends.length) : t.table.inviteLabel}</TokenLabel>
             </button>
 
             {open && tableId && (
@@ -316,20 +322,20 @@ export function GroupTable({
               // (Wishlist ở trên) → menu bung sang trái, đáy ngang đáy nút
               <div className="absolute bottom-full right-0 z-50 mb-2 w-[min(16rem,calc(100vw-24px))] lg:bottom-0 lg:right-full lg:mb-0 lg:mr-2 rounded-xl border border-white/10 bg-[#1b1a21]/95 p-3 text-sm text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-[#a79e94]">
-                  {friends.length ? `${friends.length} người bạn đang ở bàn` : 'Bàn đang chờ bạn bè'}
+                  {friends.length ? t.table.friendsHere(friends.length) : t.table.waiting}
                 </p>
-                {friends.length === 0 && <p className="mt-2 text-[13px] text-[#a79e94]">Gửi link cho bạn bè. Ai mở link sẽ ngồi vào bàn trong quán.</p>}
+                {friends.length === 0 && <p className="mt-2 text-[13px] text-[#a79e94]">{t.table.sendLink}</p>}
                 <ul className="mt-2 space-y-1.5">
                   {[...seated, ...rest].map((f, i) => (
                     <li key={i} className="flex items-center gap-2">
                       <Avatar character={f.character} size={22} />
                       <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                      <span className="text-[11px] text-[#a79e94]">{i >= seated.length ? 'bàn bên' : STATUS_LABEL[f.status] ?? ''}</span>
+                      <span className="text-[11px] text-[#a79e94]">{i >= seated.length ? t.table.nextTable : t.room.status[f.status] ?? ''}</span>
                     </li>
                   ))}
                 </ul>
                 {rest.length > 0 && (
-                  <p className="mt-2 text-[11px] text-[#a79e94]">Bàn có {SEATS} ghế, {rest.length} người còn lại hiện thành “+{rest.length}”.</p>
+                  <p className="mt-2 text-[11px] text-[#a79e94]">{t.table.overflow(SEATS, rest.length)}</p>
                 )}
                 {friends.length > 0 && onView && (
                   <button
@@ -341,7 +347,7 @@ export function GroupTable({
                     }}
                     className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-[#e8b27d]/45 px-3 py-2 text-xs font-medium text-[#f6dcbd] transition hover:border-[#e8b27d]/80 hover:bg-white/[0.06]"
                   >
-                    Xem bàn nhóm <span aria-hidden>→</span>
+                    {t.table.view} <span aria-hidden>→</span>
                   </button>
                 )}
                 <div className="mt-2 flex gap-2">
@@ -350,10 +356,10 @@ export function GroupTable({
                     onClick={copy}
                     className="flex-1 rounded-md bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] transition hover:bg-[#f0c08f]"
                   >
-                    {copied ? 'Đã copy link ✓' : 'Copy link mời'}
+                    {copied ? t.table.copied : t.table.copy}
                   </button>
                   <button type="button" onClick={leave} className="rounded-md px-3 py-2 text-xs text-[#a79e94] transition hover:bg-white/[0.08] hover:text-white">
-                    Rời bàn
+                    {t.table.leave}
                   </button>
                 </div>
               </div>
@@ -365,8 +371,8 @@ export function GroupTable({
       {picker && (
         <CharacterPicker
           key={picker.mode}
-          title={picker.mode === 'join' ? (picker.host ? `${picker.host} mời bạn vào bàn` : 'Bạn được mời vào bàn') : 'Tạo bàn cho nhóm bạn'}
-          action={picker.mode === 'join' ? 'Vào bàn' : 'Tạo bàn'}
+          title={picker.mode === 'join' ? (picker.host ? t.table.invitedBy(picker.host) : t.table.invited) : t.table.createTitle}
+          action={picker.mode === 'join' ? t.table.join : t.table.create}
           name={me.name}
           character={me.character}
           busy={busy}
@@ -377,7 +383,7 @@ export function GroupTable({
 
       {notice && (
         <div role="status" className="pointer-events-none fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-lg bg-black/75 px-4 py-2 text-sm text-[#f6dcbd] backdrop-blur">
-          {notice}
+          {NOTICES.includes(notice as NoticeKey) ? t.table[notice as NoticeKey] : tServer(notice, lang)}
         </div>
       )}
     </>
@@ -416,6 +422,7 @@ function CharacterPicker({
   onConfirm: (name: string, character: number) => void
   onClose: () => void
 }) {
+  const t = useT()
   const [name, setName] = useState(initialName)
   const [character, setCharacter] = useState(() => initialCharacter ?? Math.floor(Math.random() * CHARACTERS.length))
   const [error, setError] = useState('')
@@ -429,7 +436,7 @@ function CharacterPicker({
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const n = name.replace(/\s+/g, ' ').trim()
-    if (!n) return setError('Bạn đặt tên trước nha.')
+    if (!n) return setError(t.table.nameFirst)
     onConfirm(n.slice(0, 24), character)
   }
 
@@ -449,22 +456,22 @@ function CharacterPicker({
         className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#1b1a21] p-5 text-[#ede6dd] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)]"
       >
         <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">{title}</h2>
-        <p className="mt-1 text-[13px] text-[#a79e94]">Bạn vẫn ngồi ở quầy cửa sổ. Bạn bè sẽ thấy nhân vật này ngồi ở bàn nhóm trong quán.</p>
+        <p className="mt-1 text-[13px] text-[#a79e94]">{t.table.pickerHint}</p>
 
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-[11px] uppercase tracking-[0.14em] text-[#a79e94]">Nhân vật</span>
+          <span className="text-[11px] uppercase tracking-[0.14em] text-[#a79e94]">{t.table.character}</span>
           <button type="button" onClick={random} className="rounded-md px-2 py-1 text-xs text-[#f6dcbd] transition hover:bg-white/[0.08]">
-            🎲 Ngẫu nhiên
+            {t.table.random}
           </button>
         </div>
-        <div className="mt-2 grid grid-cols-6 gap-2" role="radiogroup" aria-label="Nhân vật">
+        <div className="mt-2 grid grid-cols-6 gap-2" role="radiogroup" aria-label={t.table.character}>
           {CHARACTERS.map((c, i) => (
             <button
               key={i}
               type="button"
               role="radio"
               aria-checked={character === i}
-              aria-label={c.name}
+              aria-label={t.table.characters[i] ?? c.name}
               onClick={() => setCharacter(i)}
               className={`flex aspect-square items-center justify-center rounded-lg border transition ${
                 character === i ? 'border-[#e8b27d] bg-[#e8b27d]/15' : 'border-white/10 hover:border-white/30'
@@ -476,7 +483,7 @@ function CharacterPicker({
         </div>
 
         <label className="mt-4 block text-[11px] uppercase tracking-[0.14em] text-[#a79e94]" htmlFor="table-name">
-          Tên hiển thị
+          {t.table.displayName}
         </label>
         <input
           id="table-name"
@@ -492,7 +499,7 @@ function CharacterPicker({
 
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-md px-3 py-2 text-sm text-[#a79e94] transition hover:bg-white/[0.08] hover:text-white">
-            Để sau
+            {t.table.later}
           </button>
           <button
             type="submit"

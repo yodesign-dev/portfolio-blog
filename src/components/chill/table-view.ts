@@ -14,8 +14,6 @@ export const CHARACTERS = [
   {name: 'Áo hồng', shirt: '#9a4e78', hair: '#3a2618', skin: '#d9a77c'},
 ]
 
-export const STATUS_LABEL: Record<string, string> = {work: 'đang làm', coffee: 'uống cà phê', sleep: 'ngủ gật', away: 'đi vắng'}
-
 export type TableMember = {name: string; character: number; status: string; seat: number; you: boolean; who?: string}
 export type SeatedFriend = TableMember & {display: number}
 

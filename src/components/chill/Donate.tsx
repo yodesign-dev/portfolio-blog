@@ -17,6 +17,7 @@
 
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
+import {tServer, useLang, useT} from './i18n'
 import {DONATE, DONATE_TIERS, hasMomo, hasVcb, loadIntent, saveCup, saveIntent, shortVnd, vietQrUrl, type DonateIntent} from './donate-config'
 
 type Method = 'vcb' | 'momo'
@@ -96,7 +97,8 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
 // ---------- Bước 1: lời nhắn (không bắt buộc) ----------
 
 function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; context: string; onNext: (i: DonateIntent) => void}) {
-  const preset = DONATE_TIERS.some((t) => t.amount === initial?.amount)
+  const t = useT()
+  const preset = DONATE_TIERS.some((d) => d.amount === initial?.amount)
   const [tier, setTier] = useState(preset ? initial!.amount : DONATE_TIERS[0].amount)
   const [custom, setCustom] = useState(initial && !preset && initial.amount ? String(initial.amount / 1000) : '')
   const [otherOpen, setOtherOpen] = useState(Boolean(custom))
@@ -108,7 +110,7 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
   const otherRef = useRef<HTMLInputElement>(null)
 
   const amount = otherOpen ? Number(custom || 0) * 1000 : tier
-  const invite = otherOpen ? (amount ? `Mời Bin ${shortVnd(amount)}` : '') : (DONATE_TIERS.find((t) => t.amount === tier)?.invite ?? '')
+  const invite = otherOpen ? (amount ? t.donate.inviteAmount(shortVnd(amount)) : '') : (t.donate.invites[tier] ?? DONATE_TIERS.find((d) => d.amount === tier)?.invite ?? '')
 
   const next = async (withNote: boolean) => {
     const base = {name: withNote ? name.trim() : '', message: withNote ? message.trim() : '', amount, board: withNote && board, at: Date.now()}
@@ -130,26 +132,26 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
-      <p className="text-[15px] leading-relaxed text-[#ede6dd]">Enjoying the café? Mời Bin một ly — every cup keeps the music playing and new features brewing. Scan with any Vietnamese bank app or MoMo, no card needed.</p>
+      <p className="text-[15px] leading-relaxed text-[#ede6dd]">{t.donate.intro}</p>
 
-      <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">Step 1 of 2 · Mời Bin 1 ly</p>
-      <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Amount">
-        {DONATE_TIERS.map((t) => {
-          const on = !otherOpen && tier === t.amount
+      <p className="mt-5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.donate.step1}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.donate.amountAria}>
+        {DONATE_TIERS.map((d) => {
+          const on = !otherOpen && tier === d.amount
           return (
             <button
-              key={t.amount}
+              key={d.amount}
               type="button"
               role="radio"
               aria-checked={on}
               onClick={() => {
-                setTier(t.amount)
+                setTier(d.amount)
                 setOtherOpen(false)
               }}
               className={`rounded-full border px-3 py-1.5 text-sm transition ${on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#c9c0b6] hover:text-[#ede6dd]'}`}
             >
-              {t.icon} {t.label}
-              {t.amount ? ` · ${shortVnd(t.amount)}` : ''}
+              {d.icon} {t.donate.tiers[d.amount] ?? d.label}
+              {d.amount ? ` · ${shortVnd(d.amount)}` : ''}
             </button>
           )
         })}
@@ -161,7 +163,7 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
               value={custom}
               onChange={(e) => setCustom(e.target.value.replace(/\D/g, '').slice(0, 5))}
               placeholder="0"
-              aria-label="Other amount, in thousand đồng"
+              aria-label={t.donate.otherAria}
               className="w-12 bg-transparent py-1.5 text-right text-[#f3cfa8] placeholder:text-[#8d857c] focus:outline-none"
             />
             <span className="text-[#c9c0b6]">.000đ</span>
@@ -177,21 +179,21 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
             }}
             className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-[#c9c0b6] transition hover:text-[#ede6dd]"
           >
-            ✏️ Other
+            ✏️ {t.donate.other}
           </button>
         )}
       </div>
 
-      <p className="mt-5 text-sm font-semibold text-[#f3ece4]">Leave Bin a note?</p>
-      <p className="mt-0.5 text-[11px] leading-relaxed text-[#8d857c]">Optional. Your name goes into the transfer note so Bin knows who to thank.</p>
+      <p className="mt-5 text-sm font-semibold text-[#f3ece4]">{t.donate.noteTitle}</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[#8d857c]">{t.donate.noteHint}</p>
       <div className="mt-2 space-y-2">
-        <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder="Your name" aria-label="Your name (optional)" className={field} />
+        <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder={t.donate.yourName} aria-label={t.donate.yourNameAria} className={field} />
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value.slice(0, 300))}
           rows={2}
-          placeholder="A few words for Bin"
-          aria-label="Message (optional)"
+          placeholder={t.donate.words}
+          aria-label={t.donate.messageAria}
           className={`${field} resize-none`}
         />
         {(name.trim() || message.trim()) && <BoardCheck checked={board} onChange={setBoard} />}
@@ -200,11 +202,11 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
       </div>
 
       <button type="button" onClick={() => next(true)} disabled={busy} className={`mt-4 ${primary}`}>
-        {busy ? 'One sec…' : invite ? `${invite} →` : 'Show the QR →'}
+        {busy ? t.donate.oneSec : invite ? `${invite} →` : t.donate.showQr}
       </button>
       {(name || message) && (
         <button type="button" onClick={() => next(false)} className="mt-2 w-full text-center text-xs text-[#8d857c] underline-offset-4 hover:underline">
-          Skip the note, just show the QR
+          {t.donate.skip}
         </button>
       )}
     </div>
@@ -228,6 +230,7 @@ function PayStep({
   onBack: () => void
   onSent: (id?: string) => void
 }) {
+  const t = useT()
   const [method, setMethod] = useState<Method>(methods[0] ?? 'vcb')
   const [copied, setCopied] = useState('')
   const [nudge, setNudge] = useState(resumed)
@@ -270,20 +273,22 @@ function PayStep({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
       <div className="flex items-center justify-between">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">Step 2 of 2 · Scan to send</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.donate.step2}</p>
         <button type="button" onClick={onBack} className="text-xs text-[#c9c0b6] underline-offset-4 hover:underline">
-          ← Edit
+          {t.donate.edit}
         </button>
       </div>
 
       {nudge && (
         <p role="status" className="mt-3 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-3 py-2 text-sm text-[#f3cfa8]">
-          Back from your bank app? Tap <span className="font-semibold">“I&apos;ve sent it”</span> so Bin can thank you 💛
+          {t.donate.nudgeBefore}
+          <span className="font-semibold">{t.donate.nudgeButton}</span>
+          {t.donate.nudgeAfter}
         </p>
       )}
 
       {methods.length > 1 && (
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/20 p-1" role="tablist" aria-label="Payment method">
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/20 p-1" role="tablist" aria-label={t.donate.methodAria}>
           {methods.map((m) => (
             <button
               key={m}
@@ -303,16 +308,16 @@ function PayStep({
 
       {method === 'vcb' && hasVcb() && (
         <div className="mt-4 flex gap-4">
-          <a href={qr} target="_blank" rel="noopener" title="Open the QR (to save it on your phone)" className="shrink-0 rounded-2xl bg-white p-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
+          <a href={qr} target="_blank" rel="noopener" title={t.donate.openQr} className="shrink-0 rounded-2xl bg-white p-2 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]">
             {/* eslint-disable-next-line @next/next/no-img-element -- ảnh QR động từ img.vietqr.io */}
             <img src={qr} alt={`Vietcombank VietQR${intent.amount ? `, ${vnd(intent.amount)}` : ''}`} width={148} height={148} className="h-[148px] w-[148px]" />
           </a>
           <dl className="min-w-0 flex-1 space-y-1.5 text-sm">
-            <Row label="Bank" value="Vietcombank" />
-            <Row label="Account" value={DONATE.vcb.account} onCopy={() => copy('account', DONATE.vcb.account)} copied={copied === 'account'} mono />
-            <Row label="Name" value={DONATE.vcb.name} />
-            <Row label="Amount" value={intent.amount ? vnd(intent.amount) : 'You choose'} />
-            <Row label="Note" value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
+            <Row label={t.donate.rows.bank} value="Vietcombank" />
+            <Row label={t.donate.rows.account} value={DONATE.vcb.account} onCopy={() => copy('account', DONATE.vcb.account)} copied={copied === 'account'} mono />
+            <Row label={t.donate.rows.name} value={DONATE.vcb.name} />
+            <Row label={t.donate.rows.amount} value={intent.amount ? vnd(intent.amount) : t.donate.youChoose} />
+            <Row label={t.donate.rows.note} value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
           </dl>
         </div>
       )}
@@ -325,23 +330,23 @@ function PayStep({
           </div>
           <div className="min-w-0 flex-1 space-y-2 text-sm">
             <dl className="space-y-1.5">
-              {DONATE.momo.name && <Row label="Name" value={DONATE.momo.name} />}
-              <Row label="Note" value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
+              {DONATE.momo.name && <Row label={t.donate.rows.name} value={DONATE.momo.name} />}
+              <Row label={t.donate.rows.note} value={note} onCopy={() => copy('note', note)} copied={copied === 'note'} mono />
             </dl>
-            <p className="text-[11px] leading-relaxed text-[#8d857c]">Type the amount{intent.amount ? ` (${vnd(intent.amount)})` : ''} and paste the note into the MoMo message.</p>
+            <p className="text-[11px] leading-relaxed text-[#8d857c]">{t.donate.momoHint(intent.amount ? vnd(intent.amount) : '')}</p>
             <a href={DONATE.momo.qr} download="bin-momo-qr.webp" className="inline-block text-xs text-[#f3cfa8] underline-offset-4 hover:underline">
-              Save QR
+              {t.donate.saveQr}
             </a>
           </div>
         </div>
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-[#8d857c]">
-        Works with any Vietnamese banking app. On your phone? Tap the QR to open it, save it, then pick it from your bank app&apos;s QR scanner — come back here after.
+        {t.donate.bankHint}
       </p>
 
       <button type="button" onClick={sent} disabled={busy} className={`mt-4 ${primary} ${nudge ? 'ring-2 ring-[#e8b27d]/60 ring-offset-2 ring-offset-[#1b1a21]' : ''}`}>
-        I&apos;ve sent it 💛
+        {t.donate.sent}
       </button>
     </div>
   )
@@ -350,6 +355,8 @@ function PayStep({
 // ---------- Bước 3: cảm ơn ----------
 
 function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}) {
+  const t = useT()
+  const lang = useLang()
   const askName = !intent.name && Boolean(intent.id)
   const [name, setName] = useState('')
   const [message, setMessage] = useState('')
@@ -365,7 +372,7 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
       await post({action: 'update', id: intent.id, name, message, board})
       setState('done')
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't send, please try again.")
+      setError(err instanceof Error ? tServer(err.message, lang) : t.donate.sendError)
       setState('idle')
     }
   }
@@ -375,23 +382,22 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
       <p className="text-4xl" aria-hidden>
         ☕💛
       </p>
-      <p className="mt-3 text-xl font-semibold tracking-tight text-[#f3ece4]">Cảm ơn {intent.name || 'bạn'} nhiều!</p>
-      <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">Your coffee keeps the lights on and new things brewing at the café. The cat says thanks too 🐾</p>
+      <p className="mt-3 text-xl font-semibold tracking-tight text-[#f3ece4]">{t.donate.thanksTitle(intent.name)}</p>
+      <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">{t.donate.thanksBody}</p>
       <p className="mt-2 text-sm leading-relaxed text-[#a79e94]">
-        Your cup is on the table next to the tip jar ☕{' '}
-        {intent.board && intent.name ? 'Your name goes up on the thank-you board once Bin checks the transfer.' : ''}
+        {t.donate.cupOnTable} {intent.board && intent.name ? t.donate.boardSoon : ''}
       </p>
 
       {askName && state !== 'done' && (
         <form onSubmit={submit} className="mt-6 space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left">
-          <p className="text-sm font-semibold text-[#f3ece4]">Want Bin to know it was you?</p>
-          <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder="Your name" aria-label="Your name (optional)" className={field} />
+          <p className="text-sm font-semibold text-[#f3ece4]">{t.donate.knowTitle}</p>
+          <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} placeholder={t.donate.yourName} aria-label={t.donate.yourNameAria} className={field} />
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value.slice(0, 300))}
             rows={2}
-            placeholder="A few words for Bin"
-            aria-label="Message (optional)"
+            placeholder={t.donate.words}
+            aria-label={t.donate.messageAria}
             className={`${field} resize-none`}
           />
           <BoardCheck checked={board} onChange={setBoard} />
@@ -401,32 +407,33 @@ function ThanksStep({intent, onBack}: {intent: DonateIntent; onBack: () => void}
             </p>
           )}
           <button type="submit" disabled={state === 'sending' || (!name.trim() && !message.trim())} className={`${primary} py-2.5 text-sm`}>
-            {state === 'sending' ? 'Sending…' : 'Send note'}
+            {state === 'sending' ? t.donate.sending : t.donate.sendNote}
           </button>
         </form>
       )}
       {state === 'done' && (
         <p role="status" className="mt-6 rounded-2xl bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-          Note sent — Bin will see it with his coffee ☕
+          {t.donate.noteSent}
         </p>
       )}
 
       <button type="button" onClick={onBack} className="mt-4 text-xs text-[#8d857c] underline-offset-4 hover:underline">
-        Back to the QR
+        {t.donate.backToQr}
       </button>
     </div>
   )
 }
 
 function Row({label, value, onCopy, copied, mono}: {label: string; value: string; onCopy?: () => void; copied?: boolean; mono?: boolean}) {
+  const t = useT()
   return (
     <div className="flex items-baseline justify-between gap-2">
       <dt className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-[#8d857c]">{label}</dt>
       <dd className="flex min-w-0 items-baseline gap-1.5">
         <span className={`truncate text-[#ede6dd] ${mono ? 'font-mono text-[13px]' : ''}`}>{value}</span>
         {onCopy && (
-          <button type="button" onClick={onCopy} className="shrink-0 text-[11px] text-[#e8b27d] hover:underline" aria-label={`Copy ${label.toLowerCase()}`}>
-            {copied ? 'Copied' : 'Copy'}
+          <button type="button" onClick={onCopy} className="shrink-0 text-[11px] text-[#e8b27d] hover:underline" aria-label={t.donate.copyAria(label)}>
+            {copied ? t.common.copied : t.common.copy}
           </button>
         )}
       </dd>
@@ -436,12 +443,13 @@ function Row({label, value, onCopy, copied, mono}: {label: string; value: string
 
 // Đồng ý hiện tên + lời nhắn trên bảng cảm ơn (tấm bảng gỗ cạnh lọ tip trong quán)
 function BoardCheck({checked, onChange}: {checked: boolean; onChange: (v: boolean) => void}) {
+  const t = useT()
   return (
     <label className="flex cursor-pointer items-start gap-2 pt-1 text-left text-xs leading-relaxed text-[#c9c0b6]">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#e8b27d]" />
       <span>
-        Pin my name &amp; note on the café&apos;s thank-you board
-        <span className="block text-[11px] text-[#8d857c]">Goes up after Bin confirms the transfer. The amount is never shown.</span>
+        {t.donate.pin}
+        <span className="block text-[11px] text-[#8d857c]">{t.donate.pinHint}</span>
       </span>
     </label>
   )

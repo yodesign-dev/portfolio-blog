@@ -15,6 +15,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 import {NOTO, NotoEmoji, withNoto} from './noto-emoji'
+import {tServer, useLang, useT} from './i18n'
 
 export type ChatMessage = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number; who?: string}
 type Message = ChatMessage
@@ -91,6 +92,8 @@ export function ChillChat({
   // Mình vừa gửi tin → trang hiện bong bóng trên đầu nhân vật của mình ở quầy
   onSentText?: (text: string) => void
 }) {
+  const t = useT()
+  const lang = useLang()
   const [me, setMe] = useState<Me | null>(null)
   const [room, setRoom] = useState<Room | null>(null)
   const [mine, setMine] = useState<string[]>([])
@@ -238,7 +241,7 @@ export function ChillChat({
   }
 
   const reportMessage = (id: string) => {
-    if (!window.confirm('Báo cáo tin này? 3 người báo cáo thì tin sẽ tự ẩn.')) return
+    if (!window.confirm(t.chat.reportConfirm)) return
     void post({action: 'report', id}).catch(() => {})
     setRoom((r) => (r ? {...r, messages: r.messages.filter((m) => m.id !== id)} : r))
   }
@@ -264,8 +267,8 @@ export function ChillChat({
             onClick={() => onOpenChange(!open)}
             aria-expanded={open}
             aria-controls="chill-chat"
-            aria-label={`Trò chuyện ở quán — ${online} người online${unread ? `, ${unread} tin chưa đọc` : ''} (C)`}
-            title="Trò chuyện ở quán (C)"
+            aria-label={t.chat.openAria(online, unread)}
+            title={`${t.chat.title} (C)`}
             className={`${TOKEN_CLASS} border-white/[0.13] ${
               hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
             }`}
@@ -280,7 +283,7 @@ export function ChillChat({
                 {online}
               </TokenChip>
             )}
-            <TokenLabel>Chat · {online} online</TokenLabel>
+            <TokenLabel>{t.chat.label(online)}</TokenLabel>
           </button>,
           slot,
         )}
@@ -288,7 +291,7 @@ export function ChillChat({
       <section
         id="chill-chat"
         role="dialog"
-        aria-label="Trò chuyện ở quán"
+        aria-label={t.chat.title}
         inert={!open}
         className={`absolute inset-x-0 bottom-0 z-40 flex h-[78dvh] flex-col overflow-hidden rounded-t-3xl border border-white/12 bg-[#1b1a21]/95 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl transition-all duration-300 ease-out lg:inset-x-auto lg:bottom-5 lg:right-5 lg:h-[min(620px,calc(100dvh-96px))] lg:w-[400px] lg:rounded-3xl ${
           open ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0'
@@ -297,14 +300,14 @@ export function ChillChat({
         <header className="border-b border-white/[0.07] px-5 pb-3 pt-4">
           <div className="flex items-center gap-3">
             <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
-            <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-[#ede6dd]">Trò chuyện ở quán</h2>
+            <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-[#ede6dd]">{t.chat.title}</h2>
             <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-xs tabular-nums text-emerald-200">
-              {online} online
+              {t.chat.online(online)}
             </span>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              aria-label="Đóng chat (Esc)"
+              aria-label={t.chat.close}
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/10"
             >
               <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden>
@@ -326,14 +329,14 @@ export function ChillChat({
             className="h-full space-y-1 overflow-y-auto overscroll-contain px-4 py-4"
             aria-live="polite"
           >
-            <li className="pb-2 text-center text-[11px] text-[#7d756d]">Tin nhắn tự xoá sau 24 giờ · Nhẹ nhàng với nhau nha ☕</li>
-            {messages.length === 0 && <li className="py-10 text-center text-sm text-[#a79e94]">Quán đang yên, chào một câu nhé {withNoto('👋')}</li>}
+            <li className="pb-2 text-center text-[11px] text-[#7d756d]">{t.chat.rules}</li>
+            {messages.length === 0 && <li className="py-10 text-center text-sm text-[#a79e94]">{t.chat.empty} {withNoto('👋')}</li>}
             {messages.map((m, i) => {
               if (m.kind !== 'msg') {
                 return (
                   <li key={m.id} className="py-1.5 text-center text-xs text-[#8d857c]">
                     {m.kind === 'cat' ? withNoto('🐱 ', 16) : '· '}
-                    {withNoto(m.text, 16)}
+                    {withNoto(tServer(m.text, lang), 16)}
                     {m.kind === 'event' ? ' ·' : ''}
                   </li>
                 )
@@ -360,7 +363,7 @@ export function ChillChat({
               onClick={scrollDown}
               className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-[#e8b27d]/40 bg-[#2a2320]/95 px-3 py-1 text-xs text-[#f3cfa8] shadow-lg"
             >
-              Tin mới ↓
+              {t.chat.newBelow}
             </button>
           )}
         </div>
@@ -372,6 +375,7 @@ export function ChillChat({
 }
 
 function NameRow({me, onRename}: {me: Me; onRename: (name: string) => void}) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(me.name)
   if (editing) {
@@ -390,18 +394,18 @@ function NameRow({me, onRename}: {me: Me; onRename: (name: string) => void}) {
           value={value}
           maxLength={24}
           onChange={(e) => setValue(e.target.value)}
-          aria-label="Tên của bạn"
+          aria-label={t.chat.yourName}
           className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2.5 py-1 text-sm text-[#ede6dd] outline-none focus:border-[#e8b27d]/60"
         />
         <button type="submit" className="rounded-lg bg-[#e8b27d] px-2.5 py-1 text-xs font-semibold text-[#2a1a10]">
-          Lưu
+          {t.chat.save}
         </button>
       </form>
     )
   }
   return (
     <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[#a79e94]">
-      Bạn là
+      {t.chat.youAre}
       <span className="font-semibold" style={{color: COLORS[me.color] ?? COLORS[0]}}>
         {me.name}
       </span>
@@ -413,7 +417,7 @@ function NameRow({me, onRename}: {me: Me; onRename: (name: string) => void}) {
         }}
         className="text-[#f3cfa8] underline-offset-2 hover:underline"
       >
-        đổi tên
+        {t.chat.rename}
       </button>
     </p>
   )
@@ -436,6 +440,7 @@ function Bubble({
   onReact: (id: string, emoji: string) => void
   onReport: (id: string) => void
 }) {
+  const t = useT()
   // Điện thoại: chạm vào tin để hiện thanh cảm xúc
   const [active, setActive] = useState(false)
   const color = COLORS[m.color ?? 0] ?? COLORS[0]
@@ -454,7 +459,7 @@ function Bubble({
         {!grouped && (
           <p className="mb-1 flex items-baseline gap-2 text-xs">
             <span className="font-semibold" style={{color}}>
-              {own ? 'Bạn' : m.name}
+              {own ? t.common.you : m.name}
             </span>
             <time dateTime={new Date(m.ts).toISOString()} className="font-mono text-[10px] text-[#7d756d]">
               {timeOf(m.ts)}
@@ -484,7 +489,7 @@ function Bubble({
                   onReact(m.id, e)
                   setActive(false)
                 }}
-                aria-label={`Thả ${e}`}
+                aria-label={t.chat.react(e)}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-sm transition hover:scale-125 hover:bg-white/10"
               >
                 <NotoEmoji char={e} size={20} />
@@ -494,8 +499,8 @@ function Bubble({
               <button
                 type="button"
                 onClick={() => onReport(m.id)}
-                aria-label="Báo cáo tin này"
-                title="Báo cáo"
+                aria-label={t.chat.report}
+                title={t.chat.reportShort}
                 className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-full text-xs text-[#a79e94] transition hover:bg-white/10 hover:text-[#f08a5d]"
               >
                 ⚑
@@ -512,7 +517,7 @@ function Bubble({
                   key={e}
                   type="button"
                   onClick={() => onReact(m.id, e)}
-                  aria-label={`${e} ${n}${on ? ', bạn đã thả' : ''}`}
+                  aria-label={`${e} ${n}${on ? t.chat.reacted : ''}`}
                   aria-pressed={!!on}
                   className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums transition ${
                     on ? 'border-[#e8b27d]/50 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 bg-white/[0.04] text-[#c9c0b6] hover:bg-white/10'
@@ -531,6 +536,8 @@ function Bubble({
 }
 
 function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: (m: Message) => void; onTyping: () => void}) {
+  const t = useT()
+  const lang = useLang()
   const [text, setText] = useState('')
   const [company, setCompany] = useState('')
   const [sending, setSending] = useState(false)
@@ -563,7 +570,7 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
       },
       'error-callback': () => {
         setToken(null)
-        setError('Chưa xác minh được — tải lại trang rồi thử lại nha.')
+        setError(t.chat.verifyFailed)
       },
     })
     return () => {
@@ -571,7 +578,7 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
       widget.current = undefined
       setToken(null)
     }
-  }, [wantCaptcha, scriptReady])
+  }, [wantCaptcha, scriptReady, t])
 
   const insert = (emoji: string) => {
     const el = input.current
@@ -590,7 +597,7 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
     const body = text.trim()
     if (!body || sending) return
     if (needCaptcha && !token) {
-      setError('Đợi xác minh xong một chút nha…')
+      setError(t.chat.verifyWait)
       return
     }
     setSending(true)
@@ -616,11 +623,11 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
         save(PASS_KEY, null)
         setNeedCaptcha(true)
       }
-      if (!res.ok || !data.message) throw new Error(data.error ?? 'Chưa gửi được, thử lại nha.')
+      if (!res.ok || !data.message) throw new Error(data.error ? tServer(data.error, lang) : t.chat.sendFailed)
       setText('')
       onSent(data.message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Chưa gửi được, thử lại nha.')
+      setError(err instanceof Error ? err.message : t.chat.sendFailed)
       if (window.turnstile && widget.current) window.turnstile.reset(widget.current)
       setToken(null)
     } finally {
@@ -638,13 +645,13 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
       className="border-t border-white/[0.07] bg-black/20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5"
     >
       {wantCaptcha && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
-      <div className="mb-2 flex gap-0.5 overflow-x-auto" role="group" aria-label="Chèn emoji">
+      <div className="mb-2 flex gap-0.5 overflow-x-auto" role="group" aria-label={t.chat.insertEmoji}>
         {QUICK.map((e) => (
           <button
             key={e}
             type="button"
             onClick={() => insert(e)}
-            aria-label={`Chèn ${e}`}
+            aria-label={t.chat.insert(e)}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base transition hover:scale-110 hover:bg-white/10"
           >
             <NotoEmoji char={e} size={22} />
@@ -679,14 +686,14 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
               void send()
             }
           }}
-          placeholder="Nhắn gì đó cho cả quán…"
-          aria-label="Tin nhắn"
+          placeholder={t.chat.placeholder}
+          aria-label={t.chat.message}
           className="max-h-28 min-h-11 flex-1 resize-none rounded-2xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-[#ede6dd] outline-none placeholder:text-[#7d756d] focus:border-[#e8b27d]/60"
         />
         <button
           type="submit"
           disabled={!text.trim() || sending}
-          aria-label="Gửi"
+          aria-label={t.chat.send}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c294] disabled:opacity-40"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>

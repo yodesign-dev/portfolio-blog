@@ -10,6 +10,7 @@
 //   Mỗi bản có nút "Thử ngay" đưa thẳng tới tính năng (ChillRoom: runAction)
 
 import {useEffect, useRef, useState} from 'react'
+import {useLang, useT, type Lang} from './i18n'
 
 export type ChillUpdate = {
   id: string
@@ -34,13 +35,18 @@ const TOAST_MS = 8000
 // Lúc đầu chỉ hiện vài bản gần nhất
 const FIRST = 3
 
-const KIND: Record<string, {label: string; className: string}> = {
-  new: {label: 'Mới', className: 'border-[#e8b27d]/50 bg-[#e8b27d]/15 text-[#f3cfa8]'},
-  improved: {label: 'Cải thiện', className: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200'},
-  fixed: {label: 'Sửa lỗi', className: 'border-sky-400/40 bg-sky-400/10 text-sky-200'},
+// Nhãn từng loại: t.updates.kinds
+const KIND: Record<string, string> = {
+  new: 'border-[#e8b27d]/50 bg-[#e8b27d]/15 text-[#f3cfa8]',
+  improved: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200',
+  fixed: 'border-sky-400/40 bg-sky-400/10 text-sky-200',
 }
 
-const formatDate = (d: string) => d.split('-').reverse().join('/')
+// Việt: 08/10/2026 · Anh: Oct 8, 2026 (dd/mm dễ bị đọc nhầm thành mm/dd)
+const formatDate = (d: string, lang: Lang) =>
+  lang === 'vi'
+    ? d.split('-').reverse().join('/')
+    : new Date(`${d}T00:00:00Z`).toLocaleDateString('en', {day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'})
 
 function read(key: string) {
   try {
@@ -127,19 +133,20 @@ export function WhatsNewButton({
   onCloseToast: () => void
   onHoldToast: (hold: boolean) => void
 }) {
+  const t = useT()
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => onOpen('button')}
-        aria-label={dot ? "What's new — unseen update" : "What's new"}
+        aria-label={dot ? t.updates.unseenAria : t.updates.button}
         aria-expanded={open}
         aria-controls="chill-updates"
-        title="What's new"
+        title={t.updates.button}
         className="relative flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 px-2.5 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
       >
         <SparkIcon />
-        <span className="hidden sm:inline">What&apos;s new</span>
+        <span className="hidden sm:inline">{t.updates.button}</span>
         {dot && (
           <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
@@ -166,14 +173,14 @@ export function WhatsNewButton({
                 ✨
               </span>
               <button type="button" onClick={() => onOpen('toast')} className="min-w-0 flex-1 text-left">
-                <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">Mới ở quán</span>
+                <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">{t.updates.toastLabel}</span>
                 <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">{latest.title}</span>
-                <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">Xem có gì mới →</span>
+                <span className="mt-1 block text-xs text-[#f3cfa8] underline-offset-2 hover:underline">{t.updates.toastLink}</span>
               </button>
               <button
                 type="button"
                 onClick={onCloseToast}
-                aria-label="Ẩn thông báo"
+                aria-label={t.updates.hideToast}
                 className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#a79e94] transition hover:bg-white/10 hover:text-[#ede6dd]"
               >
                 <CloseIcon size={10} />
@@ -199,6 +206,8 @@ export function Changelog({
   unseen: Set<string>
   onAction: (action: string) => void
 }) {
+  const t = useT()
+  const lang = useLang()
   const closeRef = useRef<HTMLButtonElement>(null)
   const [all, setAll] = useState(false)
   useEffect(() => {
@@ -234,17 +243,17 @@ export function Changelog({
     >
       <header className="flex items-start gap-3 border-b border-white/[0.07] px-5 pb-4 pt-5 sm:px-6">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#e8b27d]">Nhật ký thay đổi</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#e8b27d]">{t.updates.eyebrow}</p>
           <h2 id="chill-updates-title" className="mt-1.5 text-xl font-semibold tracking-tight text-[#ede6dd]">
-            Có gì mới ở quán
+            {t.updates.title}
           </h2>
-          <p className="mt-1 text-sm text-[#a79e94]">Những thay đổi gần đây ở góc chill này.</p>
+          <p className="mt-1 text-sm text-[#a79e94]">{t.updates.sub}</p>
         </div>
         <button
           ref={closeRef}
           type="button"
           onClick={onClose}
-          aria-label="Đóng nhật ký (Esc)"
+          aria-label={t.updates.close}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
         >
           <CloseIcon size={14} />
@@ -253,11 +262,11 @@ export function Changelog({
 
       <div className="min-h-40 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
         {updates.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[#a79e94]">Chưa có cập nhật nào.</p>
+          <p className="py-10 text-center text-sm text-[#a79e94]">{t.updates.empty}</p>
         ) : (
           <ol className="space-y-4">
             {shown.map((u, i) => {
-              const kind = KIND[u.kind ?? 'new'] ?? KIND.new
+              const kind = u.kind && KIND[u.kind] ? u.kind : 'new'
               const fresh = unseen.has(u.id)
               return (
                 <li
@@ -266,13 +275,13 @@ export function Changelog({
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <time dateTime={u.date} className="font-mono text-xs tabular-nums text-[#a79e94]">
-                      {formatDate(u.date)}
+                      {formatDate(u.date, lang)}
                     </time>
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${kind.className}`}>{kind.label}</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${KIND[kind]}`}>{t.updates.kinds[kind]}</span>
                     {fresh && (
                       <span className="flex items-center gap-1 text-[11px] text-[#f08a5d]">
                         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#f08a5d]" />
-                        Chưa xem
+                        {t.updates.unseen}
                       </span>
                     )}
                     {u.version && <span className="ml-auto font-mono text-[11px] text-[#6f6862]">v{u.version.replace(/^v/i, '')}</span>}
@@ -309,7 +318,7 @@ export function Changelog({
                         onClick={() => onAction(u.action!)}
                         className="rounded-full border border-[#e8b27d]/50 bg-[#e8b27d]/10 px-4 py-1.5 text-sm font-medium text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
                       >
-                        {u.actionLabel || 'Thử ngay'} →
+                        {u.actionLabel || t.common.tryIt} →
                       </button>
                     </div>
                   )}
@@ -325,7 +334,7 @@ export function Changelog({
             onClick={() => setAll(true)}
             className="mt-4 w-full rounded-xl border border-white/[0.07] py-2.5 text-sm text-[#a79e94] transition hover:bg-white/[0.04] hover:text-[#ede6dd]"
           >
-            Xem {updates.length - FIRST} bản cũ hơn
+            {t.updates.older(updates.length - FIRST)}
           </button>
         )}
       </div>

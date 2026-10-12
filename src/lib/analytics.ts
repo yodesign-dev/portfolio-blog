@@ -10,6 +10,15 @@ export type AnalyticsEvent =
   | {name: 'CTA Click'; props: {cta: string}}
   | {name: 'Social Click'; props: {network: string}}
   | {name: 'Share'; props: {platform: string}}
+  // Phễu /chill (trang 1 màn hình nên bounce rate của Vercel không nói lên gì):
+  //   Chill Visit → Chill Start (lần bấm phát đầu tiên) → Chill Listen (mốc phút đã nghe)
+  // `visitor`: new = lần đầu · same-day / within-week / later = khoảng cách từ lần ghé trước
+  // · returning = khách cũ từ trước khi có mốc này
+  | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'}}
+  | {name: 'Chill Start'; props: {from: 'welcome' | 'player'}}
+  | {name: 'Chill Listen'; props: {minutes: number}}
+  | {name: 'Chill Look Around'; props?: undefined}
+  | {name: 'Chill Lang'; props: {lang: 'en' | 'vi'}}
   | {name: 'Chill Play'; props: {track: string}}
   | {name: 'Chill Pet Cat'; props?: undefined}
   | {name: 'Chill Donate Open'; props?: {from: string}}

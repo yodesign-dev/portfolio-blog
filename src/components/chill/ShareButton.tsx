@@ -6,10 +6,10 @@
 
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
-
-const TITLE = 'Chill for work — a pixel café by a window in Vietnam, with lo-fi music'
+import {useT} from './i18n'
 
 export function ShareButton() {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -32,7 +32,7 @@ export function ShareButton() {
     const touch = window.matchMedia('(pointer: coarse)').matches
     if (touch && navigator.share) {
       try {
-        await navigator.share({title: TITLE, url: url()})
+        await navigator.share({title: t.share.title, url: url()})
         trackEvent({name: 'Share', props: {platform: 'native'}})
       } catch {
         // Người dùng đóng menu chia sẻ
@@ -52,11 +52,11 @@ export function ShareButton() {
 
   const links = () => {
     const u = encodeURIComponent(url())
-    const t = encodeURIComponent(TITLE)
+    const title = encodeURIComponent(t.share.title)
     return [
       {id: 'facebook', label: 'Facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${u}`},
-      {id: 'reddit', label: 'Reddit', href: `https://www.reddit.com/submit?url=${u}&title=${t}`},
-      {id: 'x', label: 'X', href: `https://x.com/intent/post?url=${u}&text=${t}`},
+      {id: 'reddit', label: 'Reddit', href: `https://www.reddit.com/submit?url=${u}&title=${title}`},
+      {id: 'x', label: 'X', href: `https://x.com/intent/post?url=${u}&text=${title}`},
     ]
   }
 
@@ -68,22 +68,22 @@ export function ShareButton() {
       <button
         type="button"
         onClick={onClick}
-        aria-label="Share"
+        aria-label={t.share.share}
         aria-expanded={open}
-        title="Share"
+        title={t.share.share}
         className="flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 px-2.5 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
           <path d="M8 10V2M8 2L5 5M8 2l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M3 8.5V13a1 1 0 001 1h8a1 1 0 001-1V8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
-        <span className="hidden sm:inline">Share</span>
+        <span className="hidden sm:inline">{t.share.share}</span>
       </button>
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-white/10 bg-[#1b1a21]/95 p-1.5 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl">
           <button type="button" onClick={copy} className={item}>
-            {copied ? 'Link copied ✓' : 'Copy link'}
+            {copied ? t.share.copied : t.share.copy}
           </button>
           {links().map((l) => (
             <a

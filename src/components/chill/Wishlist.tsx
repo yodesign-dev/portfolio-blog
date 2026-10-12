@@ -14,6 +14,7 @@ import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
 import {Donate} from './Donate'
 import {hasDonate, loadIntent, saveIntent} from './donate-config'
+import {tServer, useLang, useT, type Lang} from './i18n'
 
 type Wish = {
   id: string
@@ -27,24 +28,19 @@ type Wish = {
 }
 
 const CATEGORIES = [
-  {value: 'feature', label: 'Feature', icon: '💡'},
-  {value: 'music', label: 'Music', icon: '🎵'},
-  {value: 'place', label: 'Place', icon: '📍'},
-  {value: 'bug', label: 'Bug', icon: '🐞'},
-  {value: 'other', label: 'Other', icon: '💬'},
+  {value: 'feature', icon: '💡'},
+  {value: 'music', icon: '🎵'},
+  {value: 'place', icon: '📍'},
+  {value: 'bug', icon: '🐞'},
+  {value: 'other', icon: '💬'},
 ]
 
-const STATUS: Record<string, {label: string; className: string}> = {
-  pending: {label: 'Awaiting review', className: 'border-white/15 text-[#a79e94]'},
-}
+// Nhãn "chờ duyệt" (t.wish.pending) cho góp ý của chính mình
+const PENDING_CLASS = 'border-white/15 text-[#a79e94]'
 
 // Tab = trạng thái Bin đặt trong Studio; trong mỗi tab xếp theo ❤️ rồi mới nhất
 type Tab = 'considering' | 'planned' | 'shipped'
-const TABS: {value: Tab; label: string}[] = [
-  {value: 'considering', label: 'Considering'},
-  {value: 'planned', label: 'Planned'},
-  {value: 'shipped', label: 'Shipped'},
-]
+const TABS: Tab[] = ['considering', 'planned', 'shipped']
 
 const AVATAR_BG = ['#f6d2bd', '#f7e2a0', '#fbf1d2', '#d5e8d4', '#d7dcf5', '#f4c7d0']
 const HEARTS_KEY = 'chill:wish-hearts'
@@ -76,13 +72,13 @@ function save(key: string, value: unknown) {
   }
 }
 
-function ago(iso: string) {
+function ago(iso: string, t: ReturnType<typeof useT>, lang: Lang) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000
-  if (s < 60) return 'now'
-  if (s < 3600) return `${Math.floor(s / 60)}m`
-  if (s < 86400) return `${Math.floor(s / 3600)}h`
-  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d`
-  return new Date(iso).toLocaleDateString('en', {month: 'short', day: 'numeric'})
+  if (s < 60) return t.wish.agoNow
+  if (s < 3600) return t.wish.agoMin(Math.floor(s / 60))
+  if (s < 86400) return t.wish.agoHour(Math.floor(s / 3600))
+  if (s < 86400 * 30) return t.wish.agoDay(Math.floor(s / 86400))
+  return new Date(iso).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en', lang === 'vi' ? {month: 'numeric', day: 'numeric'} : {month: 'short', day: 'numeric'})
 }
 
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
@@ -96,6 +92,7 @@ export function Wishlist({
   onThanks,
   donateRequest,
   slot,
+  ready = true,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -111,7 +108,10 @@ export function Wishlist({
   donateRequest: number
   // Ô trong hàng nút góc phải dưới (Wishlist · Mời bạn · Chat) — nút mở được đặt vào đây
   slot: HTMLElement | null
+  // Chưa qua màn chào → chưa hiện lời mời lần đầu (nút còn đang ẩn)
+  ready?: boolean
 }) {
+  const t = useT()
   const [wishes, setWishes] = useState<Wish[]>([])
   const [loaded, setLoaded] = useState(false)
   const [mine, setMine] = useState<Wish[]>([])
@@ -181,7 +181,7 @@ export function Wishlist({
 
   // Lời mời: hiện sau 2s, tự ẩn sau 7s, tối đa 3 lần vào trang (chưa từng mở Wishlist)
   useEffect(() => {
-    if (seen) return
+    if (seen || !ready) return
     const shown = load<number>(HINT_KEY, 0)
     if (shown >= HINT_TIMES) return
     save(HINT_KEY, shown + 1)
@@ -191,7 +191,7 @@ export function Wishlist({
       window.clearTimeout(on)
       window.clearTimeout(off)
     }
-  }, [seen])
+  }, [seen, ready])
 
   useEffect(() => {
     if (!open) return
@@ -220,7 +220,7 @@ export function Wishlist({
     // Góp ý của mình đang chờ duyệt hiện đầu tab Considering
     return tab === 'considering' ? [...pendingMine, ...sorted] : sorted
   }, [wishes, pendingMine, tab])
-  const tabCount = (t: Tab) => wishes.filter((w) => w.status === t).length + (t === 'considering' ? pendingMine.length : 0)
+  const tabCount = (tb: Tab) => wishes.filter((w) => w.status === tb).length + (tb === 'considering' ? pendingMine.length : 0)
 
   const toggleHeart = (w: Wish) => {
     const on = !hearted.includes(w.id)
@@ -254,8 +254,8 @@ export function Wishlist({
             onClick={() => onOpenChange(!open)}
             aria-expanded={open}
             aria-controls="chill-wishlist"
-            aria-label={`Wishlist — ${count} ideas`}
-            title="Suggest something for the café (W)"
+            aria-label={t.wish.openAria(count)}
+            title={t.wish.openTitle}
             className={`${TOKEN_CLASS} ${open ? 'border-[#e8b27d]/60' : 'border-white/[0.13]'} ${
               hidden || open ? 'pointer-events-none translate-y-2 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
             }`}
@@ -266,7 +266,7 @@ export function Wishlist({
             )}
             <PixelIcon name="bulb" />
             {loaded && count > 0 && <TokenChip>{count}</TokenChip>}
-            <TokenLabel>Wishlist</TokenLabel>
+            <TokenLabel>{t.wish.label}</TokenLabel>
           </button>,
           slot,
         )}
@@ -279,14 +279,14 @@ export function Wishlist({
             'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+160px)] sm:right-5 sm:bottom-[180px] lg:bottom-[196px]'
           }`}
         >
-          Got an idea for the café? Tell us ☕
+          {t.wish.invite}
         </p>
       )}
 
       <section
         id="chill-wishlist"
         role="dialog"
-        aria-label="Café wishlist"
+        aria-label={t.wish.title}
         inert={!open}
         className={`absolute inset-x-0 bottom-0 z-40 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-3xl border border-white/12 bg-[#1b1a21]/95 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl transition-all duration-300 ease-out lg:inset-x-auto lg:bottom-5 lg:right-5 lg:max-h-[min(680px,calc(100dvh-96px))] lg:w-[410px] lg:rounded-3xl ${
           open ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-6 opacity-0'
@@ -299,18 +299,18 @@ export function Wishlist({
               <button
                 type="button"
                 onClick={() => setView('wishes')}
-                aria-label="Back to wishlist"
+                aria-label={t.wish.backAria}
                 className="-ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-[#c9c0b6] hover:bg-white/[0.06] hover:text-[#ede6dd]"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
                   <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Mời Bin 1 ly cà phê ☕</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">{t.wish.buyCoffee} ☕</h2>
             </>
           ) : (
             <>
-              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">Café wishlist</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-[#f3ece4]">{t.wish.title}</h2>
               <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 font-mono text-xs tabular-nums text-emerald-200">
                 💡 {count}
               </span>
@@ -320,17 +320,17 @@ export function Wishlist({
             <button
               type="button"
               onClick={showDonate}
-              title="Buy Bin a coffee"
+              title={t.wish.buyCoffee}
               className="relative ml-auto flex h-9 items-center gap-1.5 rounded-xl border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2.5 text-sm font-semibold text-[#f3cfa8] transition hover:bg-[#e8b27d]/20 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
             >
-              <SteamingCup /> Support
+              <SteamingCup /> {t.wish.support}
               <Sparkles />
             </button>
           )}
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            aria-label="Close wishlist (Esc)"
+            aria-label={t.wish.close}
             className={`${donate && view === 'wishes' ? '' : 'ml-auto'} flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-[#ede6dd] transition hover:bg-white/[0.1] focus-visible:outline-2 focus-visible:outline-[#e8b27d]`}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
@@ -343,20 +343,20 @@ export function Wishlist({
           <Donate onThanks={onThanks} context={context} />
         ) : (
           <>
-            <div className="flex items-center gap-1 px-5 pt-3" role="tablist" aria-label="Sort wishes">
-              {TABS.map((t) => (
+            <div className="flex items-center gap-1 px-5 pt-3" role="tablist" aria-label={t.wish.tabsAria}>
+              {TABS.map((tb) => (
                 <button
-                  key={t.value}
+                  key={tb}
                   type="button"
                   role="tab"
-                  aria-selected={tab === t.value}
-                  onClick={() => setTab(t.value)}
+                  aria-selected={tab === tb}
+                  onClick={() => setTab(tb)}
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[11px] uppercase tracking-[0.15em] outline-none transition focus-visible:ring-2 focus-visible:ring-[#e8b27d]/70 ${
-                    tab === t.value ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
+                    tab === tb ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
                   }`}
                 >
-                  {t.label}
-                  {tabCount(t.value) > 0 && <span className="tabular-nums opacity-70">{tabCount(t.value)}</span>}
+                  {t.wish.tabs[tb]}
+                  {tabCount(tb) > 0 && <span className="tabular-nums opacity-70">{tabCount(tb)}</span>}
                 </button>
               ))}
             </div>
@@ -365,12 +365,12 @@ export function Wishlist({
               {list.length === 0 && (
                 <li className="py-10 text-center text-sm text-[#a79e94]">
                   {!loaded
-                    ? 'Brewing…'
+                    ? t.wish.brewing
                     : tab === 'shipped'
-                      ? 'Nothing shipped yet — soon!'
+                      ? t.wish.emptyShipped
                       : tab === 'planned'
-                        ? 'Nothing planned yet — heart the ideas you want most.'
-                        : 'No wishes yet. Be the first ☕'}
+                        ? t.wish.emptyPlanned
+                        : t.wish.emptyConsidering}
                 </li>
               )}
               {list.map((w) => (
@@ -386,7 +386,7 @@ export function Wishlist({
               >
                 <SteamingCup className="text-xl" />
                 <span className="min-w-0 flex-1 text-sm text-[#ede6dd]">
-                  Enjoying the café? <span className="font-semibold text-[#f3cfa8]">Buy Bin a coffee</span>
+                  {t.wish.enjoying} <span className="font-semibold text-[#f3cfa8]">{t.wish.buyCoffee}</span>
                 </span>
                 <span aria-hidden className="text-[#e8b27d]">
                   →
@@ -433,9 +433,10 @@ function Sparkles() {
 }
 
 function WishItem({wish: w, hearted, onHeart}: {wish: Wish; hearted: boolean; onHeart: () => void}) {
+  const t = useT()
+  const lang = useLang()
   const cat = CATEGORIES.find((c) => c.value === w.category) ?? CATEGORIES[0]
-  const name = w.name || 'Guest'
-  const status = STATUS[w.status]
+  const name = w.name || t.wish.guest
   const pending = w.status === 'pending'
   return (
     <li className="flex gap-3">
@@ -450,9 +451,9 @@ function WishItem({wish: w, hearted, onHeart}: {wish: Wish; hearted: boolean; on
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <span className="font-semibold text-[#f3cf7a]">{name}</span>
           <span className="rounded border border-white/15 px-1.5 font-mono text-[10px] uppercase tracking-wider text-[#c9c0b6]">
-            {cat.icon} {cat.label}
+            {cat.icon} {t.wish.categories[cat.value]}
           </span>
-          <span className="font-mono text-[11px] text-[#8d857c]">{ago(w.createdAt)}</span>
+          <span className="font-mono text-[11px] text-[#8d857c]">{ago(w.createdAt, t, lang)}</span>
         </p>
         <p className={`mt-1.5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-[15px] leading-relaxed text-[#ede6dd] ${pending ? 'border-dashed opacity-80' : ''}`}>
           {w.text}
@@ -469,7 +470,7 @@ function WishItem({wish: w, hearted, onHeart}: {wish: Wish; hearted: boolean; on
               type="button"
               onClick={onHeart}
               aria-pressed={hearted}
-              aria-label={`${hearted ? 'Remove heart' : 'I want this too'} — ${w.hearts} hearts`}
+              aria-label={t.wish.heartAria(hearted, w.hearts)}
               className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs tabular-nums transition ${
                 hearted ? 'border-rose-400/50 bg-rose-400/15 text-rose-200' : 'border-white/10 text-[#c9c0b6] hover:border-rose-300/40 hover:text-rose-200'
               }`}
@@ -479,7 +480,7 @@ function WishItem({wish: w, hearted, onHeart}: {wish: Wish; hearted: boolean; on
             </button>
           )}
           {/* Trạng thái đã thể hiện qua tab — chỉ còn nhãn "chờ duyệt" cho góp ý của chính mình */}
-          {pending && status && <span className={`rounded-full border px-2 py-0.5 text-[11px] ${status.className}`}>{status.label}</span>}
+          {pending && <span className={`rounded-full border px-2 py-0.5 text-[11px] ${PENDING_CLASS}`}>{t.wish.pending}</span>}
         </div>
       </div>
     </li>
@@ -488,6 +489,8 @@ function WishItem({wish: w, hearted, onHeart}: {wish: Wish; hearted: boolean; on
 
 // Ô nhập góp ý: gõ vào thì mới mở thêm tên / email (không bắt buộc) + captcha
 function Composer({open, context, onSent}: {open: boolean; context: string; onSent: (w: Wish) => void}) {
+  const t = useT()
+  const lang = useLang()
   const [text, setText] = useState('')
   const [category, setCategory] = useState('feature')
   const [name, setName] = useState('')
@@ -519,7 +522,7 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
       },
       'error-callback': () => {
         setToken(null)
-        setError("Couldn't verify you're human — refresh the page and try again.")
+        setError(t.wish.captchaError)
       },
     })
     return () => {
@@ -527,7 +530,7 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
       widget.current = undefined
       setToken(null)
     }
-  }, [open, expanded, scriptReady])
+  }, [open, expanded, scriptReady, t])
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -541,14 +544,14 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
         body: JSON.stringify({action: 'submit', text, category, name, email, context, captchaToken: token, company}),
       })
       const data = (await res.json()) as {id?: string | null; error?: string}
-      if (!res.ok) throw new Error(data.error ?? 'Could not send, please try again.')
+      if (!res.ok) throw new Error(data.error ? tServer(data.error, lang) : t.wish.sendError)
       if (data.id) {
         onSent({id: data.id, text: text.trim(), category, name: name.trim(), createdAt: new Date().toISOString(), hearts: 0, status: 'pending'})
       }
       setText('')
       setState('sent')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send, please try again.')
+      setError(err instanceof Error ? err.message : t.wish.sendError)
       setState('idle')
       if (window.turnstile && widget.current) window.turnstile.reset(widget.current)
       setToken(null)
@@ -564,10 +567,10 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
       )}
       {state === 'sent' && !expanded && (
         <p role="status" className="mb-2 rounded-xl bg-emerald-400/10 px-3 py-2 text-sm text-emerald-200">
-          Thanks! Your wish will show up after a quick review ☕
+          {t.wish.thanks}
         </p>
       )}
-      <div className="mb-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="radiogroup" aria-label="Type of wish">
+      <div className="mb-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="radiogroup" aria-label={t.wish.typeAria}>
         {CATEGORIES.map((c) => (
           <button
             key={c.value}
@@ -579,13 +582,13 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
               category === c.value ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
             }`}
           >
-            {c.icon} {c.label}
+            {c.icon} {t.wish.categories[c.value]}
           </button>
         ))}
       </div>
       <div className="flex items-end gap-2">
         <label className="relative flex-1">
-          <span className="sr-only">Your wish</span>
+          <span className="sr-only">{t.wish.yourWish}</span>
           <textarea
             value={text}
             onChange={(e) => {
@@ -599,7 +602,7 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
               }
             }}
             rows={expanded ? 3 : 1}
-            placeholder="What should the café add next?"
+            placeholder={t.wish.placeholder}
             className="block w-full resize-none rounded-3xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[15px] text-[#ede6dd] placeholder:text-[#8d857c] focus:border-[#e8b27d]/50 focus:outline-none"
           />
           {expanded && <span className="pointer-events-none absolute bottom-2 right-4 font-mono text-[10px] text-[#8d857c]">{text.length}/{MAX}</span>}
@@ -607,7 +610,7 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
         <button
           type="submit"
           disabled={!canSend}
-          aria-label="Send wish"
+          aria-label={t.wish.sendAria}
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#e8b27d] text-[#2a1a10] transition hover:bg-[#f0c294] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
         >
           {state === 'sending' ? (
@@ -625,20 +628,20 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 30))}
-              placeholder="Name (optional)"
-              aria-label="Your name (optional)"
+              placeholder={t.wish.name}
+              aria-label={t.wish.nameAria}
               className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-[#ede6dd] placeholder:text-[#8d857c] focus:border-[#e8b27d]/50 focus:outline-none"
             />
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value.slice(0, 120))}
-              placeholder="Email (optional)"
-              aria-label="Email (optional) — we'll let you know when it ships"
+              placeholder={t.wish.email}
+              aria-label={t.wish.emailAria}
               className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-[#ede6dd] placeholder:text-[#8d857c] focus:border-[#e8b27d]/50 focus:outline-none"
             />
           </div>
-          <p className="text-[11px] text-[#8d857c]">Leave an email to hear back when it ships. It&apos;s never shown publicly.</p>
+          <p className="text-[11px] text-[#8d857c]">{t.wish.emailNote}</p>
           {/* Honeypot: người thật không thấy field này */}
           <input
             tabIndex={-1}
@@ -650,7 +653,7 @@ function Composer({open, context, onSent}: {open: boolean; context: string; onSe
           />
           <div ref={box} className="min-h-[65px]" />
           {!token && !error && text.trim().length >= 5 && (
-            <p className="text-[11px] text-[#8d857c]">Checking you&apos;re human… the send button unlocks in a moment.</p>
+            <p className="text-[11px] text-[#8d857c]">{t.wish.checking}</p>
           )}
           {error && (
             <p role="alert" className="text-sm text-rose-300">
