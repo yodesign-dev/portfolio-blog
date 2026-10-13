@@ -2,8 +2,9 @@
 // file này chỉ còn kiểu dữ liệu, danh sách trạm và vài bài dự phòng.
 //
 // Mỗi bài là 1 trong 2 loại:
-// - `src`: file nhạc thật trong public/chill/music/ (AAC .m4a 128kbps).
-//   Tạo bằng Lyria 3 / CassetteAI / MiniMax Music qua Figma Weave.
+// - `src`: file nhạc thật trên Sanity CDN (AAC .m4a 128kbps), upload trong Studio.
+//   Tạo bằng Lyria 3 / CassetteAI / MiniMax Music qua Figma Weave. Không để file
+//   nhạc trong public/ — mỗi lần deploy Vercel lưu lại nguyên bộ, rất tốn storage.
 // - `synth`: bài lo-fi tạo ngay trên trình duyệt bằng Web Audio — không cần
 //   file, dùng khi muốn thêm bài mà chưa có nhạc (xem audio.ts).
 
@@ -43,14 +44,16 @@ export type Track = {
 export const stationOf = (t: Track): StationId => t.station ?? 'lofi'
 
 // Dự phòng khi Sanity không trả về bài nào — playlist thật quản lý trong Studio
-// ("Chill · Nhạc"). Mỗi trạm 1 bài, file nằm sẵn ở public/chill/music/.
+// ("Chill · Nhạc"). Mỗi trạm 1 bài, trỏ thẳng vào file trên Sanity CDN (CDN vẫn
+// phục vụ file kể cả khi API truy vấn lỗi).
+const CDN = 'https://cdn.sanity.io/files/9os2xcca/production/'
 export const TRACKS: Track[] = [
   {
     id: 'acoustic-morning-letters',
     title: 'Morning Letters',
     mood: 'Acoustic guitar · Warm',
     duration: 178,
-    src: '/chill/music/acoustic-morning-letters.m4a',
+    src: `${CDN}ea7afec31971ded56e57899eead0ad03d36904a5.m4a`,
     station: 'acoustic',
   },
   {
@@ -58,7 +61,7 @@ export const TRACKS: Track[] = [
     title: 'Still Water',
     mood: 'Ambient · Deep focus',
     duration: 176,
-    src: '/chill/music/focus-still-water.m4a',
+    src: `${CDN}2d0e35e5a9487d5c5d4e3fdb77327a51621b709b.m4a`,
     station: 'focus',
   },
   {
@@ -66,7 +69,7 @@ export const TRACKS: Track[] = [
     title: 'Midnight Avenue',
     mood: 'Smooth sax · Lounge',
     duration: 173,
-    src: '/chill/music/sax-midnight-avenue.m4a',
+    src: `${CDN}1c1a8c6175c6859369f036d15e79665b2b3b98a2.m4a`,
     station: 'sax',
   },
   {
@@ -74,14 +77,14 @@ export const TRACKS: Track[] = [
     title: 'Morning Phin',
     mood: 'Rhodes · Warm',
     duration: 180,
-    src: '/chill/music/morning-phin.m4a',
+    src: `${CDN}46858768901ce86bdbb62d716b868f0dfc5f239e.m4a`,
   },
   {
     id: 'study-sunlit-desk',
     title: 'Sunlit Desk',
     mood: 'Rhodes & flute · Bright',
     duration: 174,
-    src: '/chill/music/study-sunlit-desk.m4a',
+    src: `${CDN}58f6295d2eadbbb09309994c28a44b4fd3f59927.m4a`,
     station: 'study',
   },
 ]

@@ -3,10 +3,9 @@ import {defineField, defineType} from 'sanity'
 // Bài nhạc cho trang /chill — toàn bộ playlist quản lý ở đây (Studio: "Chill · Nhạc").
 // src/components/chill/tracks.ts chỉ còn vài bài dự phòng khi Sanity không phản hồi.
 //
-// File nhạc lấy từ 1 trong 2 chỗ:
-// - "File nhạc": upload trong Studio → phát từ Sanity CDN (tính vào băng thông Sanity)
-// - "File có sẵn trên web": bài đã nằm ở public/chill/music/ → phát từ Vercel CDN
-//   (24 bài đầu tiên chuyển từ code sang). Không sửa ô này bằng tay.
+// File nhạc upload ở ô "File nhạc" → phát từ Sanity CDN (tính vào băng thông Sanity).
+// Ô "File có sẵn trên web" (localFile) là của 24 bài đầu từng nằm trong public/ —
+// đã chuyển hết lên Sanity (scripts/chill-music-to-sanity.mjs), giờ không bài nào dùng.
 
 export const STATION_OPTIONS = [
   {title: 'Café Acoustic', value: 'acoustic'},
