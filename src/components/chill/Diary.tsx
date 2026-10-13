@@ -461,7 +461,9 @@ function Book({
   // Kích thước sổ: 2 trang khi đủ rộng. Mọi số đo bám theo ô kẻ 24px để chữ nằm trên dòng
   const two = box.w >= 760
   const per = two ? 2 : 1
-  const W = Math.floor(Math.min(box.w, two ? 1010 : 470))
+  // Bàn đủ rộng thì sổ nhỏ lại 1 chút và lùi sang trái, nhường góc phải cho tách cà phê
+  const roomy = two && box.w >= 1030
+  const W = Math.floor(Math.min(box.w, two ? (roomy ? 940 : 1010) : 470))
   const H = Math.floor(Math.max(340, Math.min(box.h, 672)))
   const padR = two ? 40 : 26
   // 1 trang: lò xo nằm mép trái nên lề trái rộng hơn
@@ -681,18 +683,13 @@ function Book({
       {/* Nắng từ cửa sổ quán hắt chéo qua mặt bàn (3 ô kính), 4 góc tối dần */}
       <div aria-hidden className="pointer-events-none absolute -left-[12%] -top-[30%] h-[170%] w-[70%] -skew-x-[24deg] bg-[linear-gradient(90deg,rgba(255,228,170,0.22)_0,rgba(255,228,170,0.22)_29%,transparent_29%,transparent_35%,rgba(255,228,170,0.2)_35%,rgba(255,228,170,0.2)_64%,transparent_64%,transparent_70%,rgba(255,228,170,0.15)_70%,rgba(255,228,170,0.15)_100%)]" />
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_35%_35%,transparent_45%,rgba(40,14,2,0.5)_100%)]" />
-      {/* Ly cà phê phin nhìn từ trên xuống, ló ra ở góc bàn (chỉ khi đủ rộng) */}
-      <div aria-hidden className="pointer-events-none absolute -right-[38px] -top-[44px] hidden h-[168px] w-[168px] rounded-full bg-[#f4eee2] shadow-[0_10px_18px_rgba(40,14,2,0.5),inset_0_0_0_5px_#d9cfbd,inset_0_0_0_16px_#f8f3e8] lg:block">
-        <span className="absolute inset-[26px] rounded-full bg-[#3a1d0d] shadow-[inset_0_0_0_6px_rgba(255,255,255,0.55),inset_0_0_0_9px_rgba(120,70,30,0.5)]" />
-        <span className="absolute inset-[20px] rounded-full border-[5px] border-[#8f979e] bg-[#c3c9cf] shadow-[0_3px_5px_rgba(0,0,0,0.35)]" />
-        <span className="absolute inset-[38px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#f1f4f6,#cfd5da_60%,#aab1b8)] shadow-[inset_0_0_0_2px_#9aa2a9]" />
-        <span className="absolute left-1/2 top-1/2 h-[20px] w-[20px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,#ffffff,#b9c0c6)] shadow-[0_2px_3px_rgba(0,0,0,0.4)]" />
-      </div>
+      {/* Tách cà phê nhìn từ trên xuống ở góc bàn — chỉ khi 2 bên sổ còn đủ chỗ */}
+      {roomy && <DeskCoffee />}
       {box.w > 0 && (
         <div
           ref={book}
           className="relative z-10 shrink-0 text-[#2c2a33] drop-shadow-[0_18px_18px_rgba(40,14,2,0.55)]"
-          style={{width: W, height: H}}
+          style={{width: W, height: H, marginRight: roomy ? 64 : 0}}
           onPointerDown={(e) => (swipe.current = e.pointerType === 'mouse' ? null : e.clientX)}
           onPointerUp={(e) => {
             const from = swipe.current
@@ -702,15 +699,7 @@ function Book({
           }}
         >
           {/* Cây bút nắp cam nằm trên mặt bàn, phía trên sổ */}
-          {two && (
-            <div aria-hidden className="absolute -top-[35px] left-[32%] flex h-[24px] w-[380px] -rotate-1 items-center drop-shadow-[0_8px_6px_rgba(40,14,2,0.5)]">
-              <span className="relative h-full w-[118px] rounded-l-[13px] rounded-r-[4px] bg-[linear-gradient(#f58a7c,#ec6a5c_55%,#d9564a)]">
-                <span className="absolute -bottom-[7px] left-[18px] h-[9px] w-[84px] rounded-b-[6px] rounded-tl-[2px] bg-[#e4574c]" />
-              </span>
-              <span className="h-[22px] flex-1 bg-[linear-gradient(#ffffff,#f3f1ec_60%,#dedad2)]" />
-              <span className="h-[16px] w-[30px] rounded-r-[8px] bg-[linear-gradient(#ffffff,#eeebe4_60%,#d8d4cb)]" />
-            </div>
-          )}
+          {two && <DeskPen />}
 
           {/* Giấy: mỗi trang 1 tờ bo góc, mép dưới + mép phải lộ xấp giấy bên dưới */}
           {two ? [paper(0, pageW, 'l'), paper(W - pageW, pageW, 'r')] : paper(0, pageW, 'p')}
@@ -818,7 +807,7 @@ function Book({
                     </h3>
                     {/* Ảnh "chụp" cảnh quán dán kiểu polaroid, chữ của mục hôm nay chảy vòng quanh */}
                     {isToday && !filtered && (
-                      <div aria-hidden className="relative float-right mb-3 ml-4 mt-1 w-[44%] max-w-[190px] rotate-[3deg] bg-white p-[7px] pb-[26px] shadow-[0_8px_14px_-8px_rgba(40,60,70,0.55),0_1px_2px_rgba(40,60,70,0.25)]">
+                      <div aria-hidden className="relative float-right mb-3 ml-4 mt-1 w-[44%] max-w-[190px] break-inside-avoid rotate-[3deg] bg-white p-[7px] pb-[26px] shadow-[0_8px_14px_-8px_rgba(40,60,70,0.55),0_1px_2px_rgba(40,60,70,0.25)]">
                         {/* eslint-disable-next-line @next/next/no-img-element -- pixel art 320×180 phóng nguyên điểm ảnh */}
                         <img src="/chill/scenes/room-cafe-thumb.webp" alt="" width={320} height={180} loading="lazy" className="block w-full [image-rendering:pixelated]" />
                         <span className="absolute inset-x-0 bottom-[3px] text-center text-[15px] leading-[20px] text-[#6d6a75]">{t.diary.photo}</span>
@@ -918,6 +907,98 @@ function Book({
         </div>
       )}
     </div>
+  )
+}
+
+// Cây bút dạ thân trắng nắp cam nằm trên bàn: thân trụ có vệt sáng dọc, nắp có kẹp cài
+function DeskPen() {
+  return (
+    <svg
+      aria-hidden
+      width="430"
+      height="40"
+      viewBox="0 0 430 40"
+      className="absolute -top-[42px] left-[30%] -rotate-[2deg] drop-shadow-[0_9px_6px_rgba(40,14,2,0.5)]"
+    >
+      <defs>
+        <linearGradient id="chill-pen-cap" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffa598" />
+          <stop offset="0.35" stopColor="#f47c6d" />
+          <stop offset="0.75" stopColor="#e2584d" />
+          <stop offset="1" stopColor="#b9433a" />
+        </linearGradient>
+        <linearGradient id="chill-pen-body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.45" stopColor="#f6f3ee" />
+          <stop offset="0.8" stopColor="#dedad1" />
+          <stop offset="1" stopColor="#bdb8ad" />
+        </linearGradient>
+      </defs>
+      {/* Thân bút + đuôi bo tròn có nút cam */}
+      <rect x="118" y="9" width="262" height="22" rx="4" fill="url(#chill-pen-body)" />
+      <rect x="372" y="11" width="30" height="18" rx="9" fill="url(#chill-pen-body)" />
+      <rect x="398" y="13" width="14" height="14" rx="7" fill="url(#chill-pen-cap)" />
+      <rect x="128" y="13" width="240" height="2.5" rx="1.25" fill="#ffffff" opacity="0.95" />
+      {/* Vài dòng chữ in trên thân */}
+      <rect x="196" y="19" width="74" height="2" rx="1" fill="#b9b3a7" />
+      <rect x="278" y="19" width="30" height="2" rx="1" fill="#cfc9be" />
+      {/* Nắp: đầu trái bo tròn, vòng nối với thân, kẹp cài nằm trên */}
+      <path d="M22 6 H120 a4 4 0 0 1 4 4 V30 a4 4 0 0 1 -4 4 H22 a14 14 0 0 1 0 -28 Z" fill="url(#chill-pen-cap)" />
+      <rect x="119" y="7" width="6" height="26" rx="2" fill="#a83a32" />
+      <rect x="20" y="11" width="92" height="3" rx="1.5" fill="#ffffff" opacity="0.45" />
+      <path d="M30 3 H108 a4 4 0 0 1 4 4 v3 a2 2 0 0 1 -2 2 H34 a6 6 0 0 1 -6 -6 v-1 a2 2 0 0 1 2 -2 Z" fill="#d94f44" />
+      <rect x="34" y="4.5" width="70" height="2" rx="1" fill="#ffb4a9" opacity="0.8" />
+    </svg>
+  )
+}
+
+// Tách cà phê đen trên đĩa lót, nhìn từ trên xuống: quai tách, thìa nhỏ, mặt cà phê có vệt sáng
+function DeskCoffee() {
+  return (
+    <svg
+      aria-hidden
+      width="150"
+      height="150"
+      viewBox="0 0 170 170"
+      className="pointer-events-none absolute -top-[24px] right-[6px] drop-shadow-[0_12px_10px_rgba(40,14,2,0.55)]"
+    >
+      <defs>
+        <radialGradient id="chill-cup-saucer" cx="0.4" cy="0.35" r="0.75">
+          <stop offset="0" stopColor="#fffdf7" />
+          <stop offset="0.7" stopColor="#f1eadb" />
+          <stop offset="1" stopColor="#d6cbb6" />
+        </radialGradient>
+        <radialGradient id="chill-cup-coffee" cx="0.38" cy="0.34" r="0.8">
+          <stop offset="0" stopColor="#7a4420" />
+          <stop offset="0.55" stopColor="#4a2610" />
+          <stop offset="1" stopColor="#241006" />
+        </radialGradient>
+        <linearGradient id="chill-cup-spoon" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f4f6f7" />
+          <stop offset="1" stopColor="#9aa3aa" />
+        </linearGradient>
+      </defs>
+      {/* Đĩa lót: vành ngoài + lòng đĩa */}
+      <circle cx="82" cy="86" r="72" fill="url(#chill-cup-saucer)" stroke="#c9bea8" strokeWidth="1.5" />
+      <circle cx="82" cy="86" r="54" fill="none" stroke="#e1d8c6" strokeWidth="3" />
+      {/* Thìa gác trên đĩa */}
+      <g transform="rotate(38 40 132)">
+        <rect x="36" y="96" width="6" height="52" rx="3" fill="url(#chill-cup-spoon)" stroke="#8a939a" strokeWidth="0.8" />
+        <ellipse cx="39" cy="92" rx="9" ry="13" fill="url(#chill-cup-spoon)" stroke="#8a939a" strokeWidth="0.8" />
+        <ellipse cx="37" cy="89" rx="3" ry="6" fill="#ffffff" opacity="0.6" />
+      </g>
+      {/* Quai tách chĩa về phía dưới phải */}
+      <g transform="rotate(40 82 86)">
+        <rect x="118" y="74" width="34" height="24" rx="12" fill="none" stroke="#ffffff" strokeWidth="9" />
+        <rect x="118" y="74" width="34" height="24" rx="12" fill="none" stroke="#cfc6b4" strokeWidth="1.2" />
+      </g>
+      {/* Thành tách + mặt cà phê */}
+      <circle cx="82" cy="86" r="45" fill="#ffffff" stroke="#cfc6b4" strokeWidth="1.5" />
+      <circle cx="82" cy="86" r="38" fill="url(#chill-cup-coffee)" stroke="#e9e2d3" strokeWidth="2" />
+      <path d="M58 78 q14 -18 36 -10" fill="none" stroke="#c98d55" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
+      <path d="M66 100 q16 12 34 0" fill="none" stroke="#8a5126" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
+      <ellipse cx="68" cy="72" rx="9" ry="4" fill="#ffffff" opacity="0.35" transform="rotate(-28 68 72)" />
+    </svg>
   )
 }
 
