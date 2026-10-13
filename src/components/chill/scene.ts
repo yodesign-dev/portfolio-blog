@@ -29,6 +29,7 @@ import {drawScreen} from './screen'
 import {themeById, type CharacterVideo, type SheetSpec, type Theme, type ThemeId} from './themes'
 import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
 import {drawCoinDrop, drawIcedCoffee, drawTipJar, jarHitBox} from './tipjar'
+import type {Drink} from './drink'
 import {CHARACTERS, type SeatedFriend} from './table-view'
 import type {StreetSound} from './audio'
 
@@ -356,6 +357,7 @@ export class ChillScene {
   private fade = 1
   private interior: HTMLImageElement
   private interiorLayer: HTMLCanvasElement
+  private drink: Drink | null = null
   private atlas: HTMLImageElement
   private atlasTinted: HTMLCanvasElement
   private buffer: HTMLCanvasElement
@@ -657,6 +659,7 @@ export class ChillScene {
     if (!ready(this.interior)) return
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
+    this.paintDrink(ctx)
     // Theme ảnh tĩnh: khoét vùng người ngồi theo ô mặt nạ, tư thế vẽ vào lúc draw
     const frames = this.theme.character
     if (frames.kind === 'frames' && ready(this.poseSheet)) {
@@ -674,6 +677,31 @@ export class ChillScene {
       ctx.drawImage(this.charSheet, sx, sy, sw, sh, at.x * RES, at.y * RES, at.w * RES, at.h * RES)
     }
     this.wash(ctx, this.interiorLayer.width, this.interiorLayer.height)
+  }
+
+  // Tô lại nước trong ly dưới phin theo món khách chọn, ngay trên tranh nội thất (trước khi
+  // phủ màu theo giờ nên sáng / chiều / tối đều khớp). Tranh gốc là cà phê sữa: đen ở trên,
+  // sữa đặc dưới đáy → "sua" để nguyên; "den" tô đen lớp sữa; "bacxiu" tô sữa lên gần hết
+  // phần cà phê, chừa 1 lớp cà phê mỏng trên mặt.
+  private paintDrink(ctx: CanvasRenderingContext2D) {
+    const glass = this.theme.drink
+    if (!glass || !this.drink || this.drink === 'sua') return
+    const {coffee, milk} = glass
+    const fill = (color: string, x: number, y: number, w: number, h: number) => {
+      ctx.fillStyle = color
+      ctx.fillRect(x * RES, y * RES, w * RES, h * RES)
+    }
+    if (this.drink === 'den') {
+      fill('#120c0a', milk.x, milk.y, milk.w, milk.h)
+      // Vệt sáng dọc thành ly chạy tiếp xuống đáy
+      fill('#2f1d13', milk.x + milk.w - 5, milk.y, 2, milk.h)
+    } else {
+      fill('#ddbf70', coffee.x, coffee.y, coffee.w, coffee.h)
+      fill('#ddbf70', milk.x, milk.y, milk.w, 2)
+      // Chỗ cà phê loang vào sữa + vệt sáng thành ly
+      fill('#a67c45', coffee.x, coffee.y - 2, coffee.w, 2)
+      fill('#ecdba6', coffee.x + coffee.w - 3, coffee.y, 2, coffee.h + 2)
+    }
   }
 
   // Phủ màu theo giờ/thời tiết lên phần không trong suốt
@@ -1388,6 +1416,18 @@ export class ChillScene {
   get tipJarHitBox() {
     const {x, y} = this.theme.tipJar
     return jarHitBox(x, y)
+  }
+
+  // Món khách chọn cho ly dưới phin (null / "sua" = như tranh gốc)
+  setDrink(drink: Drink | null) {
+    if (drink === this.drink) return
+    this.drink = drink
+    this.dirty = true
+  }
+
+  // Phin + ly trên quầy → bấm để đổi món (phòng không có ly trong → null)
+  get drinkHitBox() {
+    return this.theme.drink?.hit ?? null
   }
 
   // Cuốn sổ mở trên bàn → mở Wishlist (theme không có sổ → null)

@@ -214,3 +214,59 @@ export function TokenNewDot() {
     </span>
   )
 }
+
+// Phin trên ly thuỷ tinh, nhìn ngang (16×25 ô): 3 món khác nhau ở các lớp màu trong ly —
+// đen (cả ly đen), sữa (đen trên, sữa đặc dưới), bạc xỉu (sữa là chính, lớp cà phê mỏng trên mặt)
+const GLASS_LAYERS: Record<'den' | 'sua' | 'bacxiu', [y: number, h: number, color: string][]> = {
+  den: [
+    [11, 1, '#4E2A18'],
+    [12, 9, '#1F0E05'],
+  ],
+  sua: [
+    [11, 1, '#4E2A18'],
+    [12, 5, '#1F0E05'],
+    [17, 1, '#8A5A3A'],
+    [18, 3, '#E8D5A8'],
+  ],
+  bacxiu: [
+    [11, 2, '#6B3F22'],
+    [13, 1, '#B58B5E'],
+    [14, 7, '#EFDCB8'],
+  ],
+}
+
+export function PixelGlass({drink}: {drink: 'den' | 'sua' | 'bacxiu'}) {
+  // [x, y, rộng, cao, màu]
+  const frame: [number, number, number, number, string][] = [
+    // Nắp + thân phin + 2 tai
+    [5, 0, 6, 1, '#E8ECEE'],
+    [4, 1, 8, 1, '#B9C0C6'],
+    [5, 2, 6, 5, '#AAB1B8'],
+    [6, 2, 1, 5, '#E3E7EA'],
+    [9, 2, 1, 5, '#8F979E'],
+    [3, 3, 2, 2, '#3A3F44'],
+    [11, 3, 2, 2, '#3A3F44'],
+    // Đĩa phin + giọt đang rơi
+    [2, 7, 12, 1, '#CFD5DA'],
+    [3, 8, 10, 1, '#8F979E'],
+    [7, 9, 1, 2, '#1F0E05'],
+    // Ly: 2 thành, đáy, khoảng trống trên mặt nước
+    [3, 9, 1, 12, '#CFE3E8'],
+    [12, 9, 1, 12, '#A9C6CE'],
+    [3, 21, 10, 1, '#A9C6CE'],
+    [4, 9, 3, 2, '#F4F6F6'],
+    [8, 9, 4, 2, '#F4F6F6'],
+  ]
+  return (
+    <svg width={32} height={50} viewBox="0 0 16 25" shapeRendering="crispEdges" aria-hidden className="block">
+      {frame.map(([x, y, w, h, c], i) => (
+        <rect key={i} x={x} y={y} width={w} height={h} fill={c} />
+      ))}
+      {GLASS_LAYERS[drink].map(([y, h, c]) => (
+        <rect key={y} x={4} y={y} width={8} height={h} fill={c} />
+      ))}
+      <rect x={4} y={11} width={1} height={10} fill="#ffffff" opacity={0.35} />
+      <rect x={1} y={22} width={14} height={1} fill="#2a1a10" opacity={0.3} />
+    </svg>
+  )
+}

@@ -20,6 +20,7 @@ import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
+import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, dayOf, recentDays, type DiaryNote, type Mood} from './diary-shared'
 
 // Chữ cho cuốn sổ, đều có dấu tiếng Việt: nét bút bi viết tay cho nội dung, nét bút dạ cho
@@ -953,27 +954,13 @@ function DeskPen() {
   )
 }
 
-// Món cà phê khách chọn cho ly trên bàn (lưu trên máy). Chưa chọn thì là tách đen nóng.
-const DRINK_KEY = 'chill:drink'
-const DRINKS = ['den', 'sua', 'bacxiu'] as const
-type Drink = (typeof DRINKS)[number]
-
 // Ly cà phê của khách ở góc bàn: bấm vào thì hiện 3 món để chọn, chọn xong ly đổi theo
 function DeskCoffee({size, top, right}: {size: number; top: number; right: number}) {
   const t = useT()
-  const [drink, setDrink] = useState<Drink | null>(null)
+  // Cùng 1 món với ly dưới phin ngoài cảnh quán (drink.ts)
+  const drink = useDrink()
   const [picking, setPicking] = useState(false)
   const menu = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DRINK_KEY) as Drink | null
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved && DRINKS.includes(saved)) setDrink(saved)
-    } catch {
-      // Chặn storage → ly mặc định
-    }
-  }, [])
 
   useEffect(() => {
     if (!picking) return
@@ -983,13 +970,8 @@ function DeskCoffee({size, top, right}: {size: number; top: number; right: numbe
   }, [picking])
 
   const choose = (d: Drink) => {
-    setDrink(d)
+    chooseDrink(d)
     setPicking(false)
-    try {
-      localStorage.setItem(DRINK_KEY, d)
-    } catch {
-      // Chặn storage — món chỉ giữ trong lần xem này
-    }
     trackEvent({name: 'Chill Drink', props: {drink: d}})
   }
 

@@ -68,6 +68,10 @@ export type Theme = {
   // đặt cạnh lọ, lệch `cupDx`. Tránh vùng mèo (cat.x - 6 … cat.x + 90)
   tipJar: Pt & {cupDx: number}
   steam: Pt | null
+  // Ly thuỷ tinh dưới phin (px gốc 640×360): `hit` = vùng bấm để đổi món (cả phin lẫn ly),
+  // `coffee` / `milk` = phần cà phê đen ở trên / lớp sữa đặc ở đáy trong tranh, để scene tô
+  // lại theo món khách chọn. null = phòng không có ly trong (cốc sứ không thấy nước bên trong)
+  drink: {hit: Rect; coffee: Rect; milk: Rect} | null
   lamp: Pt
   // Đèn luôn sáng (đèn bàn, đèn lồng) hay chỉ bật khi chiều/tối/mưa (đèn thả của quán)
   lampAlways: boolean
@@ -104,6 +108,7 @@ export const THEMES: Theme[] = [
     // Cạnh trái cuốn sổ, ly của người mời đứng giữa phin và lọ
     tipJar: {x: 310, y: 294, cupDx: -22},
     steam: {x: 127, y: 113},
+    drink: {hit: {x: 230, y: 226, w: 44, h: 72}, coffee: {x: 241, y: 274, w: 20, h: 9}, milk: {x: 242, y: 283, w: 21, h: 7}},
     lamp: {x: 63, y: 42},
     lampAlways: false,
     laptop: {x: 235, y: 119},
@@ -134,6 +139,7 @@ export const THEMES: Theme[] = [
     // Trên bàn nhỏ, giữa ly cà phê đá và quyển sách; ly của người mời đứng mép trái bàn
     tipJar: {x: 440, y: 293, cupDx: -46},
     steam: null,
+    drink: null,
     lamp: {x: 44, y: 28},
     lampAlways: false,
     laptop: null,
@@ -167,6 +173,7 @@ export const THEMES: Theme[] = [
     // Mép trước bàn, giữa sổ mở và cốc cà phê nóng — ngay dưới ánh đèn bàn
     tipJar: {x: 222, y: 304, cupDx: 24},
     steam: {x: 124, y: 126},
+    drink: null,
     lamp: {x: 33, y: 106},
     lampAlways: true,
     laptop: {x: 233, y: 117},

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, type Destination} from './destinations'
@@ -18,6 +18,8 @@ import {THEMES, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
 import {ChillChat, type ChatMessage} from './ChillChat'
 import {setLang, useLang, useT, type Lang} from './i18n'
+import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
+import {PixelGlass} from './pixel-icons'
 import {Focus} from './Focus'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
@@ -43,6 +45,8 @@ const WALL_HINT_MS = 9000
 const SETTINGS_HINT_DELAY_MS = 3000
 const SETTINGS_HINT_MS = 8000
 const CAT_HINT_DELAY = 4000
+// Nhãn mời chọn món hiện sau nhãn mời vuốt mèo 1 nhịp, để 2 nhãn không bật lên cùng lúc
+const DRINK_HINT_DELAY = 7000
 // Mèo nói cảm ơn (t.room.catThanks) sau khi người xem bấm "I've sent it" ở mục donate
 const CAT_SAY_MS = 4500
 // Giữ tay trên mèo bao lâu thì tính là vuốt ve (gừ gừ) thay vì 1 cú chạm
@@ -203,6 +207,15 @@ export function ChillRoom({
   const [headBox, setHeadBox] = useState<Box | null>(null)
   const [bookBox, setBookBox] = useState<Box | null>(null)
   const [jarBox, setJarBox] = useState<Box | null>(null)
+  // Phin + ly trên quầy: bấm để chọn món, nước trong ly đổi theo (xem drink.ts)
+  const [drinkBox, setDrinkBox] = useState<Box | null>(null)
+  const [drinkOpen, setDrinkOpen] = useState(false)
+  const [drinkHint, setDrinkHint] = useState(false)
+  const drinkRef = useRef<HTMLDivElement>(null)
+  const drinkMenuRef = useRef<HTMLDivElement>(null)
+  // Ly nằm sát mép màn hình (mobile kéo cảnh) → đẩy bảng chọn món vào trong, mũi tên vẫn chỉ vào ly
+  const [drinkShift, setDrinkShift] = useState(0)
+  const drink = useDrink()
   // Bàn nhóm (thử nghiệm): thành viên bàn mình đang ngồi + đang xem bàn nhóm hay quầy
   const [tableMembers, setTableMembers] = useState<TableMember[] | null>(null)
   const [groupView, setGroupView] = useState(false)
@@ -398,6 +411,8 @@ export function ChillRoom({
       const book = scene.notebookHitBox
       setBookBox(book ? toBox(book) : null)
       setJarBox(hasDonate() ? toBox(scene.tipJarHitBox) : null)
+      const glass = scene.drinkHitBox
+      setDrinkBox(glass ? toBox(glass) : null)
       setSeatBoxes([0, 1, 2, 3].map((i) => toBox(scene.groupSeatBox(i))))
       setMoreBox(toBox(scene.groupMoreBox))
     }
@@ -508,6 +523,45 @@ export function ChillRoom({
     scene.setTipJar(board?.cups ?? 0, myCup)
     scene.frame(performance.now())
   }, [board, myCup])
+
+  // Món khách chọn → nước trong ly dưới phin
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setDrink(drink)
+    scene.frame(performance.now())
+  }, [drink])
+
+  // Chưa chọn món lần nào → mời bấm vào ly (như nhãn mời vuốt mèo); chọn rồi thì thôi hẳn
+  useEffect(() => {
+    if (drink) return
+    const id = setTimeout(() => setDrinkHint(true), DRINK_HINT_DELAY)
+    return () => clearTimeout(id)
+  }, [drink])
+
+  useEffect(() => {
+    if (!drinkOpen) return
+    const onDown = (e: PointerEvent) => !drinkRef.current?.contains(e.target as Node) && setDrinkOpen(false)
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [drinkOpen])
+
+  useLayoutEffect(() => {
+    const anchor = drinkRef.current
+    const menu = drinkMenuRef.current
+    if (!drinkOpen || !anchor || !menu) return
+    const r = anchor.getBoundingClientRect()
+    const center = r.left + r.width / 2
+    const half = menu.offsetWidth / 2
+    const edge = 8
+    setDrinkShift(Math.max(edge + half - center, Math.min(0, window.innerWidth - edge - half - center)))
+  }, [drinkOpen, drinkBox])
+
+  const pickDrink = (d: Drink) => {
+    chooseDrink(d)
+    setDrinkOpen(false)
+    trackEvent({name: 'Chill Drink', props: {drink: d}})
+  }
 
   // Bàn nhóm: mỗi người bạn đang ở bàn sáng 1 bóng trên dây đèn của quán,
   // bạn bè ngồi vào 4 ghế ở cảnh bàn nhóm
@@ -1348,7 +1402,7 @@ export function ChillRoom({
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !hovering
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -1720,6 +1774,65 @@ export function ChillRoom({
             <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
           </span>
         </button>
+      )}
+
+      {/* Phin + ly trên quầy: bấm để chọn món mình thích — nước trong ly đổi theo, ly trong sổ
+          nhật ký cũng đổi theo. Người chưa chọn lần nào thấy nhãn mời như nhãn "vuốt mèo" */}
+      {drinkBox && !groupView && (
+        <div ref={drinkRef} className="absolute" style={drinkBox}>
+          <button
+            type="button"
+            aria-label={drink ? `${t.diary.drinkAria}: ${t.diary.drinks[drink]}` : t.diary.drinkAria}
+            aria-expanded={drinkOpen}
+            onClick={() => setDrinkOpen((o) => !o)}
+            className="group absolute inset-0 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          >
+            <span
+              aria-hidden
+              className={`pointer-events-none absolute bottom-full left-1/2 mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] ${
+                drink || drinkOpen ? 'opacity-0' : drinkHint && !hideUi && entered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              }`}
+              style={{transform: 'translate(-50%, 0)'}}
+            >
+              <span aria-hidden>☕</span>
+              {t.room.drinkHint}
+              <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
+            </span>
+          </button>
+          {drinkOpen && (
+            <div
+              ref={drinkMenuRef}
+              role="dialog"
+              aria-label={t.diary.drinkTitle}
+              style={{marginLeft: drinkShift}}
+              className="absolute bottom-full left-1/2 z-20 mb-2 w-max -translate-x-1/2 rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] px-2.5 pb-2 pt-1.5 text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] motion-safe:animate-[chill-pop_0.25s_ease-out]"
+            >
+              <p className="text-center text-sm font-semibold leading-snug">{t.diary.drinkTitle}</p>
+              <div role="radiogroup" aria-label={t.diary.drinkTitle} className="mt-1 flex gap-1">
+                {DRINKS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    role="radio"
+                    aria-checked={drink === d}
+                    onClick={() => pickDrink(d)}
+                    className={`flex w-[68px] flex-col items-center rounded-xl border-2 px-1 pb-1 pt-1.5 transition focus-visible:outline-2 focus-visible:outline-[#9a6a45] ${
+                      drink === d ? 'border-[#9a6a45] bg-[#e8b27d]/45' : 'border-transparent hover:bg-[#e8b27d]/30'
+                    }`}
+                  >
+                    <PixelGlass drink={d} />
+                    <span className="mt-1 text-xs font-semibold leading-tight">{t.diary.drinks[d]}</span>
+                  </button>
+                ))}
+              </div>
+              <span
+                aria-hidden
+                className="absolute left-1/2 top-full border-x-[6px] border-t-[6px] border-x-transparent border-t-[#2a1a10]"
+                style={{marginLeft: -6 - drinkShift}}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {/* Cuốn sổ trên bàn: mở Wishlist (lối vào thứ 2, cạnh nút pill) */}
