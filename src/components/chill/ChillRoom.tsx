@@ -19,6 +19,7 @@ import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Cha
 import {ChillChat, type ChatMessage} from './ChillChat'
 import {setLang, useLang, useT, type Lang} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
+import {GUIDE_FIRST_MS, GUIDE_GAP_MS, GUIDE_HOLD_MS, GUIDE_ORDER, GUIDE_PER_VISIT, GUIDE_POINT_MS, GUIDE_SHOW_MS, loadTried, saveTried, type GuideStep} from './guide'
 import {PixelGlass} from './pixel-icons'
 import {Focus} from './Focus'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
@@ -42,11 +43,6 @@ const WALL_HINT_KEY = 'chill:wall-hint'
 const WALL_HINT_DELAY_MS = 1600
 const WALL_HINT_MS = 9000
 // Gợi ý hiện sau khi bấm Play bao lâu, và tự ẩn sau bao lâu
-const SETTINGS_HINT_DELAY_MS = 3000
-const SETTINGS_HINT_MS = 8000
-const CAT_HINT_DELAY = 4000
-// Nhãn mời chọn món hiện sau nhãn mời vuốt mèo 1 nhịp, để 2 nhãn không bật lên cùng lúc
-const DRINK_HINT_DELAY = 7000
 // Mèo nói cảm ơn (t.room.catThanks) sau khi người xem bấm "I've sent it" ở mục donate
 const CAT_SAY_MS = 4500
 // Giữ tay trên mèo bao lâu thì tính là vuốt ve (gừ gừ) thay vì 1 cú chạm
@@ -210,7 +206,8 @@ export function ChillRoom({
   // Phin + ly trên quầy: bấm để chọn món, nước trong ly đổi theo (xem drink.ts)
   const [drinkBox, setDrinkBox] = useState<Box | null>(null)
   const [drinkOpen, setDrinkOpen] = useState(false)
-  const [drinkHint, setDrinkHint] = useState(false)
+  // Phòng này có ly trên quầy không (drinkBox còn là null khi ly nằm ngoài khung ở màn dọc)
+  const [hasGlass, setHasGlass] = useState(false)
   const drinkRef = useRef<HTMLDivElement>(null)
   const drinkMenuRef = useRef<HTMLDivElement>(null)
   // Ly nằm sát mép màn hình (mobile kéo cảnh) → đẩy bảng chọn món vào trong, mũi tên vẫn chỉ vào ly
@@ -244,7 +241,6 @@ export function ChillRoom({
   const [chatSlot, setChatSlot] = useState<HTMLDivElement | null>(null)
   const [returning, setReturning] = useState<boolean | null>(null)
   const [catPetted, setCatPetted] = useState(true)
-  const [catHint, setCatHint] = useState(false)
   // Bong bóng lời nói của mèo: chờ hiện (khung donate đang che mèo trên điện thoại) → hiện → mờ dần
   const [catSay, setCatSay] = useState<{text: string; show: boolean} | null>(null)
   const catSayQueued = useRef<string | null>(null)
@@ -413,6 +409,7 @@ export function ChillRoom({
       setJarBox(hasDonate() ? toBox(scene.tipJarHitBox) : null)
       const glass = scene.drinkHitBox
       setDrinkBox(glass ? toBox(glass) : null)
+      setHasGlass(glass !== null)
       setSeatBoxes([0, 1, 2, 3].map((i) => toBox(scene.groupSeatBox(i))))
       setMoreBox(toBox(scene.groupMoreBox))
     }
@@ -475,6 +472,35 @@ export function ChillRoom({
     dragRef.current = null
     if (canvasRef.current) canvasRef.current.style.transition = ''
   }
+  // Màn dọc: tự lia cảnh tới 1 chỗ (lời mời chỉ vào thứ đang nằm ngoài khung)
+  const panTo = useCallback((hit: {x: number; w: number}) => {
+    const canvas = canvasRef.current
+    const wrap = wrapRef.current
+    const maxTx = panMaxRef.current
+    if (!canvas || !wrap || !maxTx || !zoomRef.current || dragRef.current) return
+    // Đưa tâm vùng `hit` (px gốc của cảnh) ra giữa khung, trong giới hạn kéo được
+    const f = (hit.x + hit.w / 2) / (SCENE_W * 2) - 0.5
+    const to = Math.min(1, Math.max(0, 0.5 + (f * (2 * maxTx + wrap.clientWidth)) / (2 * maxTx)))
+    const from = panRef.current
+    if (Math.abs(from - to) < 0.05) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      panRef.current = to
+      return fitRef.current()
+    }
+    const t0 = performance.now()
+    canvas.style.transition = 'none'
+    const step = (now: number) => {
+      // Khách tự kéo giữa chừng → nhường
+      if (dragRef.current) return
+      const p = Math.min(1, (now - t0) / 1100)
+      panRef.current = from + (to - from) * (p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2)
+      fitRef.current()
+      if (p < 1) requestAnimationFrame(step)
+      else canvas.style.transition = ''
+    }
+    requestAnimationFrame(step)
+  }, [])
+
   // Gợi ý kéo ngang: hiện 1 lúc sau khi cảnh phóng xong, tới khi người xem kéo thử
   useEffect(() => {
     if (!canPan || panSeen || !entered || groupView) return
@@ -530,13 +556,6 @@ export function ChillRoom({
     if (!scene) return
     scene.setDrink(drink)
     scene.frame(performance.now())
-  }, [drink])
-
-  // Chưa chọn món lần nào → mời bấm vào ly (như nhãn mời vuốt mèo); chọn rồi thì thôi hẳn
-  useEffect(() => {
-    if (drink) return
-    const id = setTimeout(() => setDrinkHint(true), DRINK_HINT_DELAY)
-    return () => clearTimeout(id)
   }, [drink])
 
   useEffect(() => {
@@ -682,16 +701,8 @@ export function ChillRoom({
 
   // ---------- Mèo ----------
 
-  // Chưa bấm vào mèo lần nào → sau vài giây hiện bong bóng "Pet me"
-  useEffect(() => {
-    if (catPetted) return
-    const id = setTimeout(() => setCatHint(true), CAT_HINT_DELAY)
-    return () => clearTimeout(id)
-  }, [catPetted])
-
   // Đã chạm vào mèo lần nào (bấm hoặc nhấn giữ) → thôi gợi ý "Pet me"
   const markPetted = useCallback(() => {
-    setCatHint(false)
     if (catPetted) return
     setCatPetted(true)
     trackEvent({name: 'Chill Pet Cat'})
@@ -1062,8 +1073,6 @@ export function ChillRoom({
   // Người chưa mở cài đặt lần nào: nút Settings có vòng cam lan + gợi ý ngắn.
   // Mặc định coi như đã thấy để server render không nháy hiệu ứng
   const [settingsSeen, setSettingsSeen] = useState(true)
-  const [hintShown, setHintShown] = useState(false)
-  const [hintTip, setHintTip] = useState(false)
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
@@ -1076,7 +1085,6 @@ export function ChillRoom({
     if (!panelOpen || settingsSeen) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- mở cài đặt lần đầu thì tắt hẳn gợi ý
     setSettingsSeen(true)
-    setHintTip(false)
     try {
       localStorage.setItem(SETTINGS_SEEN_KEY, '1')
     } catch {
@@ -1103,20 +1111,105 @@ export function ChillRoom({
     startFrom.current = 'welcome'
     if (!started) playAt(index)
   }
+  // Lời mời làm quen với quán (xem guide.ts): mỗi lúc 1 món, làm rồi thì thôi mời
+  const [guide, setGuide] = useState<{step: GuideStep; forced: boolean} | null>(null)
+  const [guideShown, setGuideShown] = useState<GuideStep[]>([])
+  const [guideTried, setGuideTried] = useState<GuideStep[]>([])
+  const guideLeft = useRef(0)
+  // Lời mời vừa hiện thì giữ giao diện lại 1 lúc (khách ngồi yên thì giao diện tự ẩn sau 3,5s,
+  // lời mời sẽ không ai thấy)
+  const [guideHold, setGuideHold] = useState(false)
+  const [diaryAvailable, setDiaryAvailable] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   useEffect(() => {
-    if (settingsSeen || hintShown || !started || panelOpen || otherOverlay) return
-    const t = window.setTimeout(() => {
-      setHintShown(true)
-      setHintTip(true)
-    }, SETTINGS_HINT_DELAY_MS)
-    return () => window.clearTimeout(t)
-  }, [settingsSeen, hintShown, started, panelOpen, otherOverlay])
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+    setGuideTried(loadTried())
+  }, [])
+  const markTried = useCallback((step: GuideStep) => {
+    setGuideTried((tried) => {
+      if (tried.includes(step)) return tried
+      const next = [...tried, step]
+      saveTried(next)
+      return next
+    })
+  }, [])
+  const onFocusOpen = useCallback(
+    (open: boolean) => {
+      setFocusOpen(open)
+      if (open) markTried('phin')
+    },
+    [markTried],
+  )
+  const guideDone: Record<GuideStep, boolean> = {
+    phin: regular.phins > 0 || guideTried.includes('phin'),
+    drink: drink !== null,
+    cat: catPetted,
+    diary: guideTried.includes('diary'),
+    settings: settingsSeen,
+  }
+  // Phòng không có ly, đang xem bàn nhóm, Studio tắt nhật ký → bỏ qua món đó
+  const guideCan: Record<GuideStep, boolean> = {
+    phin: true,
+    drink: hasGlass && !groupView,
+    cat: !groupView,
+    diary: diaryAvailable,
+    settings: true,
+  }
+  const guideNext = guideShown.length < GUIDE_PER_VISIT ? (GUIDE_ORDER.find((s) => guideCan[s] && !guideDone[s] && !guideShown.includes(s)) ?? null) : null
+  const activeGuide = guide && guideCan[guide.step] && (guide.forced || !guideDone[guide.step]) ? guide.step : null
+  const guideBusy = panelOpen || volumeOpen || otherOverlay || focusOpen || drinkOpen || menuOpen
   useEffect(() => {
-    if (!hintTip) return
-    const t = window.setTimeout(() => setHintTip(false), SETTINGS_HINT_MS)
-    return () => window.clearTimeout(t)
-  }, [hintTip])
-  const settingsGlow = hintShown && !settingsSeen
+    // Đang chạy 1 phin → khách đang tập trung, không mời thêm gì
+    if (!entered || zen || activeGuide || !guideNext || focusLabel) return
+    const id = window.setTimeout(
+      () => {
+        guideLeft.current = GUIDE_SHOW_MS
+        setGuideShown((shown) => [...shown, guideNext])
+        setGuide({step: guideNext, forced: false})
+        setGuideHold(true)
+        trackEvent({name: 'Chill Guide', props: {action: 'hint', step: guideNext}})
+      },
+      guideShown.length ? GUIDE_GAP_MS : GUIDE_FIRST_MS,
+    )
+    return () => window.clearTimeout(id)
+  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel])
+  useEffect(() => {
+    if (!guideHold) return
+    const id = window.setTimeout(() => setGuideHold(false), GUIDE_HOLD_MS)
+    return () => window.clearTimeout(id)
+  }, [guideHold, guide])
+  // Chỉ chỗ từ thực đơn: khách mở bảng nào đó là coi như đã thấy
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (guide?.forced && guideBusy) setGuide(null)
+  }, [guide, guideBusy])
+  // Màn dọc mặc định đứng ở phía người ngồi; mèo + phin thường nằm ngoài khung → lia cảnh tới
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    const hit = activeGuide === 'drink' ? scene.drinkHitBox : activeGuide === 'cat' ? scene.catHitBox : null
+    if (hit) panTo(hit)
+  }, [activeGuide, panTo])
+  const pointAt = (step: GuideStep) => {
+    setMenuOpen(false)
+    guideLeft.current = GUIDE_POINT_MS
+    setGuide({step, forced: true})
+    setGuideHold(true)
+    trackEvent({name: 'Chill Guide', props: {action: 'menu', step}})
+  }
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: PointerEvent) => !(e.target as Element).closest('[data-chill-menu]') && setMenuOpen(false)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+  const hintTip = activeGuide === 'settings'
+  const settingsGlow = guideShown.includes('settings') && !settingsSeen
 
   // Zen là tính năng mới: công tắc có chấm cam + vòng sáng tới khi bật thử lần đầu.
   // Người đã quen quán (đã mở cài đặt) thì thêm 1 bong bóng gợi ý — nhường thông báo
@@ -1153,7 +1246,7 @@ export function ChillRoom({
     const t = window.setTimeout(() => setZenHint(false), ZEN_HINT_MS)
     return () => window.clearTimeout(t)
   }, [zenHint])
-  const showHintTip = hintTip && !settingsSeen && !panelOpen && !volumeOpen && !otherOverlay
+  const showHintTip = hintTip && !panelOpen && !volumeOpen && !otherOverlay
 
   // Vách kính chỉ thấy ở bàn nhóm → giới thiệu đúng lúc: bong bóng 1 lần khi vừa lia máy
   // vào bàn nhóm ("Thử ngay"), chấm cam ở tab Atmosphere tới lần đổi tường đầu tiên
@@ -1402,7 +1495,20 @@ export function ChillRoom({
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
+  // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
+  // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
+  const guideVisible = entered && !zen && !guideBusy && (activeGuide === 'settings' || !hideUi)
+  const guideOn = (step: GuideStep) => activeGuide === step && guideVisible
+  useEffect(() => {
+    if (!guide || !guideVisible) return
+    const t0 = performance.now()
+    const id = window.setTimeout(() => setGuide(null), Math.max(0, guideLeft.current))
+    return () => {
+      window.clearTimeout(id)
+      guideLeft.current -= performance.now() - t0
+    }
+  }, [guide, guideVisible])
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -1765,7 +1871,7 @@ export function ChillRoom({
           <span
             aria-hidden
             className={`pointer-events-none absolute bottom-full left-[68%] mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] sm:text-[11px] ${
-              catSay || catPetted ? 'opacity-0' : catHint && !hideUi && entered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              catSay ? 'opacity-0' : guideOn('cat') ? 'opacity-100' : catPetted ? 'opacity-0' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
             }`}
             style={{transform: 'translate(-50%, 0)'}}
           >
@@ -1790,7 +1896,7 @@ export function ChillRoom({
             <span
               aria-hidden
               className={`pointer-events-none absolute bottom-full left-1/2 mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite] ${
-                drink || drinkOpen ? 'opacity-0' : drinkHint && !hideUi && entered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+                drinkOpen ? 'opacity-0' : guideOn('drink') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
               }`}
               style={{transform: 'translate(-50%, 0)'}}
             >
@@ -1911,7 +2017,69 @@ export function ChillRoom({
                 <span aria-hidden className="tabular-nums">{t.room.online(online)}</span>
               </span>
             )}
+            {/* Thực đơn của quán: ở đây có gì — bấm 1 dòng thì quán chỉ chỗ (xem guide.ts) */}
+            <button
+              data-chill-menu
+              type="button"
+              onClick={() => {
+                if (!menuOpen) {
+                  setPanelOpen(false)
+                  setVolumeOpen(false)
+                  trackEvent({name: 'Chill Guide', props: {action: 'menu', step: 'open'}})
+                }
+                setMenuOpen((o) => !o)
+              }}
+              aria-expanded={menuOpen}
+              aria-controls="chill-menu"
+              className={`flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white focus-visible:outline-2 focus-visible:outline-[#e8b27d] sm:text-[11px] ${
+                menuOpen ? 'border-[#e8b27d]/80 bg-[#2a1f18]/90' : 'border-[#e8b27d]/45 bg-[#2a1f18]/75'
+              }`}
+            >
+              <MenuCardIcon />
+              {t.room.menu}
+            </button>
           </div>
+          {menuOpen && (
+            <div
+              data-chill-menu
+              id="chill-menu"
+              role="dialog"
+              aria-label={t.room.menuTitle}
+              className="absolute left-3 top-[6.75rem] z-40 w-[min(21rem,calc(100vw-1.5rem))] rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] p-3 text-[#2a1a10] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.85)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:left-5 sm:top-[4.25rem]"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menu}</p>
+              <p className="mt-0.5 text-base font-semibold leading-snug">{t.room.menuTitle}</p>
+              <ul className="mt-2 divide-y divide-dashed divide-[#2a1a10]/25">
+                {GUIDE_ORDER.filter((s) => guideCan[s]).map((s) => (
+                  <li key={s}>
+                    <button
+                      type="button"
+                      onClick={() => pointAt(s)}
+                      className="flex w-full items-start gap-2.5 rounded-lg px-1.5 py-2 text-left transition hover:bg-[#e8b27d]/30 focus-visible:outline-2 focus-visible:outline-[#9a6a45]"
+                    >
+                      <span
+                        aria-hidden
+                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border-2 border-[#2a1a10] text-[11px] font-bold leading-none ${guideDone[s] ? 'bg-[#e8b27d]' : ''}`}
+                      >
+                        {guideDone[s] ? '✓' : ''}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold leading-snug">
+                          {t.room.menuItems[s].title}
+                          {guideDone[s] && <span className="sr-only"> ({t.room.menuDone})</span>}
+                        </span>
+                        <span className="block text-xs leading-snug text-[#2a1a10]/70">{t.room.menuItems[s].desc}</span>
+                      </span>
+                      <span aria-hidden className="mt-0.5 text-sm text-[#9a6a45]">
+                        →
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] leading-snug text-[#2a1a10]/60">{t.room.menuNote}</p>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ShareButton />
@@ -1932,7 +2100,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={setFocusOpen} />
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} />
           <span className={`pointer-events-none h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur ${focusLabel ? 'hidden sm:flex' : 'flex'}`}>
             {clock}
           </span>
@@ -2156,11 +2324,14 @@ export function ChillRoom({
             setBoardOpen(false)
             setUpdatesOpen(false)
           }
+          if (o) markTried('diary')
           setDiaryOpen(o)
         }}
         dimmed={hideUi}
         hidden={!entered || panelOpen || volumeOpen || showHintTip}
         slipHidden={groupView}
+        hint={guideOn('diary') ? t.room.guideDiary : null}
+        onAvailable={setDiaryAvailable}
       />
 
       <ChillChat
@@ -3111,6 +3282,15 @@ function PawIcon() {
       <circle cx="6.2" cy="3.8" r="1.6" />
       <circle cx="9.8" cy="3.8" r="1.6" />
       <circle cx="12.6" cy="6.6" r="1.6" />
+    </svg>
+  )
+}
+
+function MenuCardIcon() {
+  return (
+    <svg width="12" height="14" viewBox="0 0 12 14" fill="none" aria-hidden shapeRendering="crispEdges">
+      <rect x="1" y="1" width="10" height="12" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M3.5 4.5h5M3.5 7h5M3.5 9.5h3" stroke="currentColor" strokeWidth="1.2" />
     </svg>
   )
 }

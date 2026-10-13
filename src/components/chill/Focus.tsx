@@ -39,6 +39,7 @@ export function Focus({
   onDone,
   onTick,
   onOpenChange,
+  hint,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -49,6 +50,8 @@ export function Focus({
   onTick: (label: string | null) => void
   // Bảng đang mở → thanh trên đừng tự ẩn
   onOpenChange: (open: boolean) => void
+  // Lời mời pha phin cho người chưa thử (xem guide.ts) — bong bóng ngay dưới nút
+  hint?: string | null
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -151,6 +154,7 @@ export function Focus({
   return (
     // Điện thoại: bảng neo theo cả thanh trên (sát mép phải màn hình) cho khỏi tràn mép trái
     <div ref={ref} className="sm:relative">
+      <div className="relative">
       <button
         type="button"
         onClick={() => (open ? close() : setOpen(true))}
@@ -167,6 +171,16 @@ export function Focus({
         <PhinIcon dripping={Boolean(session)} />
         {session ? <span className="font-mono text-[11px] tabular-nums">{clock(left)}</span> : <span className="hidden font-medium sm:inline">{done ? t.focus.doneChip : t.focus.chip}</span>}
       </button>
+      {hint && !open && !session && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="absolute right-0 top-full z-10 mt-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:bottom-full after:right-3 after:border-[6px] after:border-transparent after:border-b-[#e8b27d] after:content-['']"
+        >
+          {hint}
+        </button>
+      )}
+      </div>
 
       {open && (
         <div

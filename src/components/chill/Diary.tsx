@@ -97,6 +97,8 @@ export function Diary({
   hidden,
   dimmed,
   slipHidden,
+  hint,
+  onAvailable,
 }: {
   // Ô trong hàng nút góc phải dưới — nút mở được đặt vào đây
   slot: HTMLElement | null
@@ -108,6 +110,10 @@ export function Diary({
   dimmed: boolean
   // Chỗ góc trái trên đang có thứ khác (nút "Về chỗ cửa sổ" của bàn nhóm)
   slipHidden: boolean
+  // Lời mời viết nhật ký cho người chưa mở sổ lần nào (xem guide.ts) — bong bóng cạnh nút
+  hint?: string | null
+  // Studio có đang mở bảng nhật ký không
+  onAvailable?: (available: boolean) => void
 }) {
   const t = useT()
   const lang = useLang()
@@ -204,6 +210,10 @@ export function Diary({
     return () => window.clearInterval(id)
   }, [pile.length, held, open, hidden, slipHidden])
 
+  useEffect(() => {
+    onAvailable?.(room?.open ?? false)
+  }, [room?.open, onAvailable])
+
   const setOpen = (next: boolean) => {
     if (next) update((s) => ({...s, seen: Date.now()}))
     else setComposing(false)
@@ -253,7 +263,13 @@ export function Diary({
             <PixelIcon name="note" />
             {unseen && <TokenNewDot />}
             {todayCount > 0 && <TokenChip>{todayCount > 99 ? '99+' : todayCount}</TokenChip>}
-            <TokenLabel>{t.diary.label}</TokenLabel>
+            {hint ? (
+              <span className="pointer-events-none absolute bottom-full right-0 mb-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:right-4 after:top-full after:border-[6px] after:border-transparent after:border-t-[#e8b27d] after:content-[''] lg:bottom-auto lg:right-full lg:top-1/2 lg:mb-0 lg:mr-3 lg:-translate-y-1/2 lg:after:hidden">
+                {hint}
+              </span>
+            ) : (
+              <TokenLabel>{t.diary.label}</TokenLabel>
+            )}
           </button>,
           slot,
         )}
