@@ -32,6 +32,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Zen'; props: {on: 'on' | 'off'}}
   // Bảng nhật ký: mở bảng / treo mẩu lên tường / cất mẩu vào sổ / báo cáo mẩu
   | {name: 'Chill Diary'; props: {action: 'open' | 'pin' | 'keep' | 'report'}}
+  // Khách chọn món cà phê cho ly trên bàn nhật ký
+  | {name: 'Chill Drink'; props: {drink: 'den' | 'sua' | 'bacxiu'}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

@@ -683,8 +683,9 @@ function Book({
       {/* Nắng từ cửa sổ quán hắt chéo qua mặt bàn (3 ô kính), 4 góc tối dần */}
       <div aria-hidden className="pointer-events-none absolute -left-[12%] -top-[30%] h-[170%] w-[70%] -skew-x-[24deg] bg-[linear-gradient(90deg,rgba(255,228,170,0.22)_0,rgba(255,228,170,0.22)_29%,transparent_29%,transparent_35%,rgba(255,228,170,0.2)_35%,rgba(255,228,170,0.2)_64%,transparent_64%,transparent_70%,rgba(255,228,170,0.15)_70%,rgba(255,228,170,0.15)_100%)]" />
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_35%_35%,transparent_45%,rgba(40,14,2,0.5)_100%)]" />
-      {/* Tách cà phê nhìn từ trên xuống ở góc bàn — chỉ khi 2 bên sổ còn đủ chỗ */}
-      {roomy && <DeskCoffee />}
+      {/* Ly cà phê của khách ở góc bàn, nhìn từ trên xuống — bấm vào để chọn món. Bàn rộng thì ly
+          nằm trọn trong khung; hẹp hơn thì ly nhỏ lại và ló ra ở góc */}
+      {box.w > 0 && <DeskCoffee size={roomy ? 150 : two ? 116 : 80} top={roomy ? -24 : two ? -30 : -18} right={roomy ? 6 : two ? -24 : -8} />}
       {box.w > 0 && (
         <div
           ref={book}
@@ -952,52 +953,203 @@ function DeskPen() {
   )
 }
 
-// Tách cà phê đen trên đĩa lót, nhìn từ trên xuống: quai tách, thìa nhỏ, mặt cà phê có vệt sáng
-function DeskCoffee() {
+// Món cà phê khách chọn cho ly trên bàn (lưu trên máy). Chưa chọn thì là tách đen nóng.
+const DRINK_KEY = 'chill:drink'
+const DRINKS = ['den', 'sua', 'bacxiu'] as const
+type Drink = (typeof DRINKS)[number]
+
+// Ly cà phê của khách ở góc bàn: bấm vào thì hiện 3 món để chọn, chọn xong ly đổi theo
+function DeskCoffee({size, top, right}: {size: number; top: number; right: number}) {
+  const t = useT()
+  const [drink, setDrink] = useState<Drink | null>(null)
+  const [picking, setPicking] = useState(false)
+  const menu = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRINK_KEY) as Drink | null
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved && DRINKS.includes(saved)) setDrink(saved)
+    } catch {
+      // Chặn storage → ly mặc định
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!picking) return
+    const onDown = (e: PointerEvent) => !menu.current?.contains(e.target as Node) && setPicking(false)
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [picking])
+
+  const choose = (d: Drink) => {
+    setDrink(d)
+    setPicking(false)
+    try {
+      localStorage.setItem(DRINK_KEY, d)
+    } catch {
+      // Chặn storage — món chỉ giữ trong lần xem này
+    }
+    trackEvent({name: 'Chill Drink', props: {drink: d}})
+  }
+
   return (
-    <svg
-      aria-hidden
-      width="150"
-      height="150"
-      viewBox="0 0 170 170"
-      className="pointer-events-none absolute -top-[24px] right-[6px] drop-shadow-[0_12px_10px_rgba(40,14,2,0.55)]"
-    >
+    <div ref={menu} className="absolute z-20" style={{top, right}}>
+      <button
+        type="button"
+        onClick={() => setPicking((p) => !p)}
+        aria-expanded={picking}
+        aria-label={drink ? `${t.diary.drinkAria}: ${t.diary.drinks[drink]}` : t.diary.drinkAria}
+        title={t.diary.drinkAria}
+        className="block rounded-full transition-transform duration-200 hover:scale-[1.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fbe6cb]"
+      >
+        <CoffeeArt drink={drink} size={size} />
+      </button>
+      {/* Chưa chọn món: mẩu nhắc viết tay cạnh ly (chỉ khi bàn rộng) */}
+      {!drink && !picking && size >= 150 && (
+        <p aria-hidden className="pointer-events-none absolute right-full top-[58%] mr-1 w-max -rotate-6 text-[15px] leading-[18px] text-[#fbe6cb] [text-shadow:0_1px_2px_rgba(40,14,2,0.8)]">
+          {t.diary.drinkHint} →
+        </p>
+      )}
+      {picking && (
+        <div
+          role="dialog"
+          aria-label={t.diary.drinkTitle}
+          className="absolute right-5 top-full mt-1 w-[min(292px,calc(100vw-48px))] rotate-[1deg] rounded-[6px] bg-[#fbf3e0] p-3 text-[#3a2412] shadow-[0_14px_22px_-8px_rgba(40,14,2,0.7),0_0_0_2px_#2a1a10] motion-safe:animate-[chill-pop_0.2s_ease-out]"
+        >
+          <p className={`${marker.className} text-center text-[19px] leading-[26px] text-[#e4574c]`}>{t.diary.drinkTitle}</p>
+          <div role="radiogroup" aria-label={t.diary.drinkTitle} className="mt-1 grid grid-cols-3 gap-1">
+            {DRINKS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                role="radio"
+                aria-checked={drink === d}
+                onClick={() => choose(d)}
+                className={`flex flex-col items-center rounded-[10px] border-2 px-1 pb-1.5 pt-1 transition focus-visible:outline-2 focus-visible:outline-[#e4574c] ${
+                  drink === d ? 'border-[#e4574c] bg-[#f6b7ae]/45' : 'border-transparent hover:bg-[#f6b7ae]/30'
+                }`}
+              >
+                <CoffeeArt drink={d} size={76} />
+                <span className="mt-0.5 text-[17px] leading-[20px]">{t.diary.drinks[d]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Hình ly nhìn từ trên xuống. null = tách đen nóng trên đĩa lót (mặc định); còn lại là ly đá
+// trên đế lót tre: đen đá (nước đen, ống hút xanh), sữa đá (nâu có vệt sữa, thìa khuấy),
+// bạc xỉu (sữa kem, vệt cà phê chưa khuấy, ống hút cam)
+function CoffeeArt({drink, size}: {drink: Drink | null; size: number}) {
+  const shadow = 'drop-shadow-[0_10px_8px_rgba(40,14,2,0.5)]'
+  if (!drink)
+    return (
+      <svg aria-hidden width={size} height={size} viewBox="0 0 170 170" className={`block ${shadow}`}>
+        <defs>
+          <radialGradient id="chill-cup-saucer" cx="0.4" cy="0.35" r="0.75">
+            <stop offset="0" stopColor="#fffdf7" />
+            <stop offset="0.7" stopColor="#f1eadb" />
+            <stop offset="1" stopColor="#d6cbb6" />
+          </radialGradient>
+          <radialGradient id="chill-cup-coffee" cx="0.38" cy="0.34" r="0.8">
+            <stop offset="0" stopColor="#7a4420" />
+            <stop offset="0.55" stopColor="#4a2610" />
+            <stop offset="1" stopColor="#241006" />
+          </radialGradient>
+          <linearGradient id="chill-cup-spoon" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#f4f6f7" />
+            <stop offset="1" stopColor="#9aa3aa" />
+          </linearGradient>
+        </defs>
+        {/* Đĩa lót: vành ngoài + lòng đĩa */}
+        <circle cx="82" cy="86" r="72" fill="url(#chill-cup-saucer)" stroke="#c9bea8" strokeWidth="1.5" />
+        <circle cx="82" cy="86" r="54" fill="none" stroke="#e1d8c6" strokeWidth="3" />
+        {/* Thìa gác trên đĩa */}
+        <g transform="rotate(38 40 132)">
+          <rect x="36" y="96" width="6" height="52" rx="3" fill="url(#chill-cup-spoon)" stroke="#8a939a" strokeWidth="0.8" />
+          <ellipse cx="39" cy="92" rx="9" ry="13" fill="url(#chill-cup-spoon)" stroke="#8a939a" strokeWidth="0.8" />
+          <ellipse cx="37" cy="89" rx="3" ry="6" fill="#ffffff" opacity="0.6" />
+        </g>
+        {/* Quai tách chĩa về phía dưới phải */}
+        <g transform="rotate(40 82 86)">
+          <rect x="118" y="74" width="34" height="24" rx="12" fill="none" stroke="#ffffff" strokeWidth="9" />
+          <rect x="118" y="74" width="34" height="24" rx="12" fill="none" stroke="#cfc6b4" strokeWidth="1.2" />
+        </g>
+        {/* Thành tách + mặt cà phê */}
+        <circle cx="82" cy="86" r="45" fill="#ffffff" stroke="#cfc6b4" strokeWidth="1.5" />
+        <circle cx="82" cy="86" r="38" fill="url(#chill-cup-coffee)" stroke="#e9e2d3" strokeWidth="2" />
+        <path d="M58 78 q14 -18 36 -10" fill="none" stroke="#c98d55" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
+        <path d="M66 100 q16 12 34 0" fill="none" stroke="#8a5126" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
+        <ellipse cx="68" cy="72" rx="9" ry="4" fill="#ffffff" opacity="0.35" transform="rotate(-28 68 72)" />
+      </svg>
+    )
+
+  const look = {
+    den: {from: '#5a3218', to: '#1c0c04', ice: 'rgba(255,255,255,0.2)', edge: 'rgba(255,255,255,0.5)', straw: ['#3fbf99', '#157a5c']},
+    sua: {from: '#cf975d', to: '#8a5326', ice: 'rgba(255,244,226,0.34)', edge: 'rgba(255,250,240,0.75)', straw: null},
+    bacxiu: {from: '#f8ead0', to: '#dcc097', ice: 'rgba(255,255,255,0.55)', edge: '#ffffff', straw: ['#ff8f6b', '#c94f2c']},
+  }[drink]
+  const id = `chill-drink-${drink}`
+  // Viên đá: [x, y, cạnh, góc xoay]
+  const cubes: [number, number, number, number][] = drink === 'bacxiu' ? [[52, 84, 26, -12], [96, 96, 24, 20], [92, 54, 22, 34]] : [[54, 58, 27, -14], [90, 54, 24, 18], [68, 92, 27, 9], [100, 90, 22, -22]]
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 170 170" className={`block ${shadow}`}>
       <defs>
-        <radialGradient id="chill-cup-saucer" cx="0.4" cy="0.35" r="0.75">
-          <stop offset="0" stopColor="#fffdf7" />
-          <stop offset="0.7" stopColor="#f1eadb" />
-          <stop offset="1" stopColor="#d6cbb6" />
+        <radialGradient id={`${id}-coaster`} cx="0.4" cy="0.35" r="0.8">
+          <stop offset="0" stopColor="#ecd3a6" />
+          <stop offset="0.7" stopColor="#d6b480" />
+          <stop offset="1" stopColor="#b48d58" />
         </radialGradient>
-        <radialGradient id="chill-cup-coffee" cx="0.38" cy="0.34" r="0.8">
-          <stop offset="0" stopColor="#7a4420" />
-          <stop offset="0.55" stopColor="#4a2610" />
-          <stop offset="1" stopColor="#241006" />
+        <radialGradient id={`${id}-liquid`} cx="0.38" cy="0.34" r="0.85">
+          <stop offset="0" stopColor={look.from} />
+          <stop offset="1" stopColor={look.to} />
         </radialGradient>
-        <linearGradient id="chill-cup-spoon" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f4f6f7" />
-          <stop offset="1" stopColor="#9aa3aa" />
-        </linearGradient>
+        {look.straw && (
+          <linearGradient id={`${id}-straw`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor={look.straw[0]} />
+            <stop offset="1" stopColor={look.straw[1]} />
+          </linearGradient>
+        )}
       </defs>
-      {/* Đĩa lót: vành ngoài + lòng đĩa */}
-      <circle cx="82" cy="86" r="72" fill="url(#chill-cup-saucer)" stroke="#c9bea8" strokeWidth="1.5" />
-      <circle cx="82" cy="86" r="54" fill="none" stroke="#e1d8c6" strokeWidth="3" />
-      {/* Thìa gác trên đĩa */}
-      <g transform="rotate(38 40 132)">
-        <rect x="36" y="96" width="6" height="52" rx="3" fill="url(#chill-cup-spoon)" stroke="#8a939a" strokeWidth="0.8" />
-        <ellipse cx="39" cy="92" rx="9" ry="13" fill="url(#chill-cup-spoon)" stroke="#8a939a" strokeWidth="0.8" />
-        <ellipse cx="37" cy="89" rx="3" ry="6" fill="#ffffff" opacity="0.6" />
-      </g>
-      {/* Quai tách chĩa về phía dưới phải */}
-      <g transform="rotate(40 82 86)">
-        <rect x="118" y="74" width="34" height="24" rx="12" fill="none" stroke="#ffffff" strokeWidth="9" />
-        <rect x="118" y="74" width="34" height="24" rx="12" fill="none" stroke="#cfc6b4" strokeWidth="1.2" />
-      </g>
-      {/* Thành tách + mặt cà phê */}
-      <circle cx="82" cy="86" r="45" fill="#ffffff" stroke="#cfc6b4" strokeWidth="1.5" />
-      <circle cx="82" cy="86" r="38" fill="url(#chill-cup-coffee)" stroke="#e9e2d3" strokeWidth="2" />
-      <path d="M58 78 q14 -18 36 -10" fill="none" stroke="#c98d55" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
-      <path d="M66 100 q16 12 34 0" fill="none" stroke="#8a5126" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
-      <ellipse cx="68" cy="72" rx="9" ry="4" fill="#ffffff" opacity="0.35" transform="rotate(-28 68 72)" />
+      {/* Đế lót tre */}
+      <circle cx="85" cy="88" r="74" fill={`url(#${id}-coaster)`} stroke="#9c774a" strokeWidth="1.5" />
+      <circle cx="85" cy="88" r="64" fill="none" stroke="#c19c66" strokeWidth="2" />
+      <circle cx="85" cy="88" r="57" fill="none" stroke="#c9a672" strokeWidth="1.2" />
+      {/* Thành ly thuỷ tinh + nước */}
+      <circle cx="85" cy="86" r="53" fill="#f3f7f7" stroke="#b9c5c8" strokeWidth="1.5" />
+      <circle cx="85" cy="86" r="46" fill={`url(#${id}-liquid)`} stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" />
+      {drink === 'sua' && <path d="M52 96 q20 -34 50 -16 q14 10 22 -8" fill="none" stroke="#f3dcb8" strokeWidth="8" strokeLinecap="round" opacity="0.7" />}
+      {drink === 'bacxiu' && (
+        <>
+          <path d="M64 56 q24 -12 38 6 q9 15 -9 22 q-20 7 -30 -6 q-9 -13 1 -22z" fill="#8f5e36" opacity="0.85" />
+          <path d="M56 104 q16 14 38 7 q16 -5 22 -19" fill="none" stroke="#c39664" strokeWidth="6" strokeLinecap="round" opacity="0.7" />
+        </>
+      )}
+      {cubes.map(([x, y, w, r], i) => (
+        <g key={i} transform={`rotate(${r} ${x + w / 2} ${y + w / 2})`}>
+          <rect x={x} y={y} width={w} height={w} rx="6" fill={look.ice} stroke={look.edge} strokeWidth="1.5" />
+          <path d={`M${x + 5} ${y + 6} h${w - 14}`} stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.55" />
+        </g>
+      ))}
+      {look.straw ? (
+        <g transform="rotate(30 85 86)">
+          <rect x="80" y="8" width="11" height="80" rx="5.5" fill={`url(#${id}-straw)`} stroke={look.straw[1]} strokeWidth="1" />
+          <rect x="82.5" y="12" width="2.5" height="70" rx="1.25" fill="#ffffff" opacity="0.45" />
+        </g>
+      ) : (
+        // Thìa khuấy cán dài cắm trong ly
+        <g transform="rotate(-36 85 86)">
+          <rect x="81" y="6" width="7" height="78" rx="3.5" fill="#dfe3e6" stroke="#8a939a" strokeWidth="1" />
+          <ellipse cx="84.5" cy="90" rx="9" ry="12" fill="#cfd5da" stroke="#8a939a" strokeWidth="1" />
+          <rect x="83" y="10" width="2" height="68" rx="1" fill="#ffffff" opacity="0.7" />
+        </g>
+      )}
+      {/* Vệt sáng trên vành ly */}
+      <path d="M46 70 q8 -22 28 -28" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" opacity="0.5" />
     </svg>
   )
 }
