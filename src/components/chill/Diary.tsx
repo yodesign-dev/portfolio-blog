@@ -15,7 +15,7 @@
 
 import {Mynerve, Sedgwick_Ave} from 'next/font/google'
 import Script from 'next/script'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
@@ -438,6 +438,8 @@ function Book({
   const t = useT()
   const lang = useLang()
   const wrap = useRef<HTMLDivElement>(null)
+  const book = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
   const flow = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({w: 0, h: 0})
   const [pages, setPages] = useState(1)
@@ -469,6 +471,8 @@ function Book({
   const gap = two ? spine + 2 * 44 : padL + padR
   const colW = Math.max(160, two ? (W - padL - padR - gap) / 2 : W - padL - padR)
   const step = colW + gap
+  // Bề rộng 1 tờ giấy
+  const pageW = two ? (W - spine) / 2 : W
   const padT = 34
   const padB = 46
 
@@ -524,20 +528,117 @@ function Book({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, spreads])
 
+  // Lật trang như lật giấy thật: tờ giấy xoay quanh gáy lò xo, mặt trước là trang cũ, mặt sau
+  // là trang mới. Nội dung thật (flow) nhảy thẳng tới trang mới và tạm ẩn; trong lúc lật, các
+  // trang cũ / mới là bản chụp (cloneNode) của flow đặt vào từng ô trang. Người bật "giảm
+  // chuyển động" thì đổi trang tức thì.
+  const layoutKey = `${W}x${H}x${per}`
+  const turned = useRef({at: 0, key: ''})
+  useLayoutEffect(() => {
+    const prev = turned.current
+    turned.current = {at, key: layoutKey}
+    const f = flow.current
+    const st = stage.current
+    const bk = book.current
+    if (!f || !st || !bk || prev.key !== layoutKey || prev.at === at) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const fwd = at > prev.at
+    const lo = Math.min(prev.at, at)
+    const hi = Math.max(prev.at, at)
+    const div = (css: string) => {
+      const el = document.createElement('div')
+      el.style.cssText = css
+      return el
+    }
+    // Bản chụp của flow, đẩy sao cho cột `col` nằm đúng chỗ chữ của ô trang (x = lề trong ô)
+    const snap = (col: number, x: number) => {
+      const c = f.cloneNode(true) as HTMLElement
+      c.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'))
+      c.style.cssText += `;left:${x}px;transform:translateX(${-col * step}px);visibility:visible`
+      c.inert = true
+      return c
+    }
+    const page = (left: number, width: number, col: number, x: number) => {
+      const w = div(`position:absolute;top:0;left:${left}px;width:${width}px;height:${H}px;overflow:clip;border-radius:20px`)
+      w.append(snap(col, x))
+      return w
+    }
+    const sheet = (key: string, left: number) => {
+      const s = bk.querySelector<HTMLElement>(`[data-paper="${key}"]`)?.cloneNode(true) as HTMLElement | undefined
+      if (s) s.style.left = `${left}px`
+      return s ?? div('')
+    }
+    const shade = (gradient: string) => div(`position:absolute;inset:0;border-radius:20px;background:${gradient};opacity:0`)
+    const timing = {duration: 640, easing: 'cubic-bezier(.45,.05,.3,1)', fill: 'both' as const}
+    const fade = (el: HTMLElement, frames: number[]) => el.animate(frames.map((opacity) => ({opacity})), timing)
+    const order = <T,>(frames: T[]) => (fwd ? frames : [...frames].reverse())
+    const face = 'position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden'
+    let turn: Animation
+
+    if (two) {
+      // Lề chữ của trang phải, tính từ mép trái tờ giấy bên phải
+      const xr = padL + step - (W + spine) / 2
+      const under = [page(0, pageW, lo * 2, padL), page(W - pageW, pageW, hi * 2 + 1, xr)]
+      const dim = [shade('linear-gradient(270deg, rgba(40,25,10,0.38), transparent 70%)'), shade('linear-gradient(90deg, rgba(40,25,10,0.38), transparent 70%)')]
+      under[0].append(dim[0])
+      under[1].append(dim[1])
+      // Tờ đang lật: chiếm nửa phải, xoay quanh gáy (mép trái của nó)
+      const leaf = div(`position:absolute;top:0;left:${W / 2}px;width:${W / 2}px;height:${H}px;transform-origin:left center;transform-style:preserve-3d`)
+      const front = div(face)
+      const frontShade = shade('linear-gradient(90deg, rgba(40,25,10,0.3), transparent 45%)')
+      front.append(sheet('r', spine / 2), page(spine / 2, pageW, lo * 2 + 1, xr), frontShade)
+      const back = div(`${face};transform:rotateY(180deg)`)
+      const backShade = shade('linear-gradient(270deg, rgba(40,25,10,0.3), transparent 45%)')
+      back.append(sheet('l', 0), page(0, pageW, hi * 2, padL), backShade)
+      leaf.append(front, back)
+      st.replaceChildren(...under, leaf)
+      turn = leaf.animate(order([{transform: 'rotateY(0deg)'}, {transform: 'rotateY(-180deg)'}]), timing)
+      // Trang bị tờ giấy che thì tối, tờ giấy dựng đứng thì 2 mặt của nó sẫm lại
+      fade(dim[1], order([0.9, 0.35, 0]))
+      fade(dim[0], order([0, 0.35, 0.9]))
+      fade(frontShade, order([0, 1, 1]))
+      fade(backShade, order([1, 1, 0]))
+    } else {
+      // 1 trang (điện thoại): tờ giấy xoay quanh lò xo ở mép trái rồi khuất hẳn; lật lùi thì ngược lại.
+      // Lật tới: trang mới chính là flow nằm bên dưới. Lật lùi: bên dưới là bản chụp trang cũ.
+      const under = fwd ? [] : [page(0, pageW, prev.at, padL)]
+      const leaf = div(`position:absolute;top:0;left:0;width:${W}px;height:${H}px;transform-origin:left center;backface-visibility:hidden;-webkit-backface-visibility:hidden`)
+      const leafShade = shade('linear-gradient(90deg, rgba(40,25,10,0.35), transparent 60%)')
+      leaf.append(sheet('p', 0), page(0, pageW, fwd ? prev.at : at, padL), leafShade)
+      st.replaceChildren(...under, leaf)
+      turn = leaf.animate(order([{transform: 'rotateY(0deg)', opacity: 1}, {transform: 'rotateY(-78deg)', opacity: 1, offset: 0.85}, {transform: 'rotateY(-90deg)', opacity: 0}]), timing)
+      fade(leafShade, order([0, 1, 1]))
+    }
+    if (two || !fwd) f.style.visibility = 'hidden'
+
+    const done = () => {
+      st.replaceChildren()
+      f.style.visibility = ''
+    }
+    turn.onfinish = done
+    return () => {
+      turn.cancel()
+      done()
+    }
+    // Chỉ lật khi đổi trang; đổi cỡ sổ (layoutKey) thì bỏ qua lượt đó
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [at, layoutKey])
+
   const locale = lang === 'vi' ? 'vi-VN' : 'en-US'
   const dateOf = (day: string) => new Date(`${day}T12:00:00+07:00`)
   const fmt = (day: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, {timeZone: 'Asia/Ho_Chi_Minh', ...opts}).format(dateOf(day))
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
   const clock = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
   const has = (day: string) => notes.some((n) => n.day === day)
-  // Lịch tháng, tuần bắt đầu từ Thứ Hai: `lead` ô trống trước ngày 1, rồi từng ngày của tháng
-  // (YYYY-MM-DD). Ngày còn trong hạn 7 ngày thì bấm được để lật tới trang của ngày đó
-  const [yy, mm] = today.split('-').map(Number)
+  // Tuần này theo lịch, Thứ Hai → Chủ nhật (YYYY-MM-DD). Ngày còn trong hạn 7 ngày và có mẩu
+  // thì bấm được để lật tới trang của ngày đó; các ngày của tuần trước còn hạn thì lật trang là thấy
+  const [yy, mm, dd] = today.split('-').map(Number)
+  const noon = today ? Date.UTC(yy, mm - 1, dd, 5) : 0
+  const mondayOffset = today ? (new Date(noon).getUTCDay() + 6) % 7 : 0
+  const week = today ? Array.from({length: 7}, (_, i) => dayOf(noon + (i - mondayOffset) * 86_400_000)) : []
+  // Tuần thứ mấy của tháng (tuần tính từ Thứ Hai)
   const lead = today ? (new Date(Date.UTC(yy, mm - 1, 1)).getUTCDay() + 6) % 7 : 0
-  const month: (string | null)[] = today
-    ? [...Array.from({length: lead}, () => null), ...Array.from({length: new Date(Date.UTC(yy, mm, 0)).getUTCDate()}, (_, i) => `${today.slice(0, 8)}${String(i + 1).padStart(2, '0')}`)]
-    : []
-  const thisRow = Math.floor((month.indexOf(today) < 0 ? 0 : month.indexOf(today)) / 7)
   const dayList = days.filter((d) => d === today || has(d))
 
   // Ô kẻ không chạy sát mép giấy mà nằm trong 1 khung lùi vào `inset` px, như sổ thật
@@ -545,6 +646,7 @@ function Book({
   const paper = (left: number, width: number, key: string) => (
     <div
       key={key}
+      data-paper={key}
       aria-hidden
       className="absolute inset-y-0 rounded-[20px] bg-[#f8f4e6] shadow-[0_1px_0_#dcd5bf,0_3px_0_#f1ecdc,0_4px_0_#d6cfb8,0_6px_0_#efe9d8,0_7px_0_#cfc7af,1px_0_0_#e3dcc6,3px_0_0_#f1ecdc,4px_0_0_#d9d2bb]"
       style={{left, width}}
@@ -560,22 +662,36 @@ function Book({
       />
     </div>
   )
-  const pageW = two ? (W - spine) / 2 : W
   const rings = Math.max(4, Math.floor((H - 56) / 38))
 
   return (
     <div
       ref={wrap}
-      className={`mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#cbeae6] sm:mx-3 sm:mb-3 ${hand.className}`}
-      // Mặt bàn loang màu nước xanh ngọc
+      className={`relative mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#b9682f] sm:mx-3 sm:mb-3 ${hand.className}`}
+      // Mặt quầy gỗ của quán nhìn từ trên xuống (màu lấy từ mặt quầy trong tranh cảnh): ván chạy
+      // ngang, mỗi tấm 1 khe tối + 1 mép sáng, vân gỗ là các vệt mảnh — tô nét cứng kiểu pixel
       style={{
-        backgroundImage:
-          'radial-gradient(60% 50% at 12% 18%, rgba(255,255,255,0.8), transparent 70%), radial-gradient(48% 44% at 88% 12%, rgba(160,219,218,0.95), transparent 70%), radial-gradient(55% 60% at 78% 88%, rgba(238,251,248,0.9), transparent 70%), radial-gradient(46% 42% at 22% 86%, rgba(146,209,212,0.8), transparent 70%), radial-gradient(34% 30% at 52% 46%, rgba(220,244,240,0.85), transparent 75%)',
+        backgroundImage: [
+          'repeating-linear-gradient(180deg, #4d1c08 0 3px, #e6944b 3px 6px, transparent 6px 132px)',
+          'repeating-linear-gradient(180deg, transparent 0 23px, rgba(93,41,13,0.16) 23px 26px, transparent 26px 61px, rgba(230,148,75,0.2) 61px 63px, transparent 63px 97px, rgba(93,41,13,0.12) 97px 99px, transparent 99px 132px)',
+          'repeating-linear-gradient(180deg, #cd7b35 0 66px, #b96a2e 66px 132px)',
+        ].join(', '),
       }}
     >
+      {/* Nắng từ cửa sổ quán hắt chéo qua mặt bàn (3 ô kính), 4 góc tối dần */}
+      <div aria-hidden className="pointer-events-none absolute -left-[12%] -top-[30%] h-[170%] w-[70%] -skew-x-[24deg] bg-[linear-gradient(90deg,rgba(255,228,170,0.22)_0,rgba(255,228,170,0.22)_29%,transparent_29%,transparent_35%,rgba(255,228,170,0.2)_35%,rgba(255,228,170,0.2)_64%,transparent_64%,transparent_70%,rgba(255,228,170,0.15)_70%,rgba(255,228,170,0.15)_100%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_35%_35%,transparent_45%,rgba(40,14,2,0.5)_100%)]" />
+      {/* Ly cà phê phin nhìn từ trên xuống, ló ra ở góc bàn (chỉ khi đủ rộng) */}
+      <div aria-hidden className="pointer-events-none absolute -right-[38px] -top-[44px] hidden h-[168px] w-[168px] rounded-full bg-[#f4eee2] shadow-[0_10px_18px_rgba(40,14,2,0.5),inset_0_0_0_5px_#d9cfbd,inset_0_0_0_16px_#f8f3e8] lg:block">
+        <span className="absolute inset-[26px] rounded-full bg-[#3a1d0d] shadow-[inset_0_0_0_6px_rgba(255,255,255,0.55),inset_0_0_0_9px_rgba(120,70,30,0.5)]" />
+        <span className="absolute inset-[20px] rounded-full border-[5px] border-[#8f979e] bg-[#c3c9cf] shadow-[0_3px_5px_rgba(0,0,0,0.35)]" />
+        <span className="absolute inset-[38px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#f1f4f6,#cfd5da_60%,#aab1b8)] shadow-[inset_0_0_0_2px_#9aa2a9]" />
+        <span className="absolute left-1/2 top-1/2 h-[20px] w-[20px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_35%_30%,#ffffff,#b9c0c6)] shadow-[0_2px_3px_rgba(0,0,0,0.4)]" />
+      </div>
       {box.w > 0 && (
         <div
-          className="relative shrink-0 text-[#2c2a33] drop-shadow-[0_16px_18px_rgba(40,84,92,0.32)]"
+          ref={book}
+          className="relative z-10 shrink-0 text-[#2c2a33] drop-shadow-[0_18px_18px_rgba(40,14,2,0.55)]"
           style={{width: W, height: H}}
           onPointerDown={(e) => (swipe.current = e.pointerType === 'mouse' ? null : e.clientX)}
           onPointerUp={(e) => {
@@ -587,7 +703,7 @@ function Book({
         >
           {/* Cây bút nắp cam nằm trên mặt bàn, phía trên sổ */}
           {two && (
-            <div aria-hidden className="absolute -top-[35px] left-[32%] flex h-[24px] w-[380px] -rotate-1 items-center drop-shadow-[0_8px_6px_rgba(40,84,92,0.3)]">
+            <div aria-hidden className="absolute -top-[35px] left-[32%] flex h-[24px] w-[380px] -rotate-1 items-center drop-shadow-[0_8px_6px_rgba(40,14,2,0.5)]">
               <span className="relative h-full w-[118px] rounded-l-[13px] rounded-r-[4px] bg-[linear-gradient(#f58a7c,#ec6a5c_55%,#d9564a)]">
                 <span className="absolute -bottom-[7px] left-[18px] h-[9px] w-[84px] rounded-b-[6px] rounded-tl-[2px] bg-[#e4574c]" />
               </span>
@@ -603,7 +719,7 @@ function Book({
           <div className="absolute inset-0 overflow-clip rounded-[20px]">
             <div
               ref={flow}
-              className="absolute transition-transform duration-500 ease-[cubic-bezier(.3,.7,.2,1)]"
+              className="absolute"
               style={{
                 left: padL,
                 top: padT,
@@ -617,8 +733,8 @@ function Book({
                 lineHeight: '24px',
               }}
             >
-              {/* Trang bìa trong: chữ tháng tô hồng viền đen, nhãn tuần, lịch tháng (hàng của tuần
-                  này tô bút dạ), rồi tới mẩu của mèo quán */}
+              {/* Trang bìa trong: chữ tháng tô hồng viền đen, nhãn tuần, dải 7 ngày của tuần này,
+                  rồi tới mẩu của mèo quán */}
               <div className="break-inside-avoid pb-6">
                 <div className="relative inline-block pr-9">
                   <p className={`${marker.className} text-[50px] leading-[52px] text-[#f7a79d] [-webkit-text-stroke:5px_#2c2a33] [paint-order:stroke_fill]`}>
@@ -633,29 +749,30 @@ function Book({
                 <p>
                   <span className={`${marker.className} mt-[8px] inline-block -rotate-1 bg-[#f6b7ae] px-2.5 text-[17px] leading-[24px] text-[#7a2a23]`}>{t.diary.weekN(Math.floor((Number(today.slice(8, 10)) + lead - 1) / 7) + 1)}</span>
                 </p>
-                <ol className="mt-[14px] grid max-w-[250px] grid-cols-7 text-center text-[16px] leading-[24px]" aria-label={cap(fmt(today, {month: 'long', year: 'numeric'}))}>
-                  {month.map((d, i) => {
-                    const row = Math.floor(i / 7)
-                    const inWeek = row === thisRow
-                    // Bút dạ kéo 1 vệt ngang cả hàng: ô đầu / cuối bo góc
-                    const band = inWeek ? `bg-[#f6b7ae]/80 ${i % 7 === 0 ? 'rounded-l-[6px]' : ''} ${i % 7 === 6 ? 'rounded-r-[6px]' : ''}` : ''
-                    if (!d) return <li key={i} aria-hidden className={band} />
+                {/* Tuần này, Thứ 2 → CN: 1 vệt bút dạ kéo ngang, hôm nay khoanh tròn, chấm đỏ = ngày có mẩu */}
+                <ol className="mt-[16px] grid grid-cols-7 rounded-[8px] bg-[#f6b7ae]/55 px-1 py-[5px] text-center" aria-label={t.diary.week}>
+                  {week.map((d) => {
                     const reachable = dayList.includes(d)
+                    const label = cap(fmt(d, {weekday: 'long', day: 'numeric', month: 'long'}))
+                    const cell = (
+                      <>
+                        <span className="block text-[14px] leading-[18px] text-[#8a5f5a]">{cap(fmt(d, {weekday: 'short'}))}</span>
+                        <span className={`mx-auto flex h-[28px] w-[28px] items-center justify-center rounded-full text-[18px] leading-none ${d === today ? 'bg-[#e4574c] text-white' : ''}`}>
+                          {Number(d.slice(8, 10))}
+                        </span>
+                        <span aria-hidden className={`mx-auto mt-[2px] block h-[5px] w-[5px] rounded-full ${has(d) ? 'bg-[#e4574c]' : 'bg-transparent'}`} />
+                      </>
+                    )
                     return (
-                      <li key={i} className={band}>
+                      <li key={d}>
                         {reachable ? (
-                          <button
-                            type="button"
-                            onClick={() => jumpTo(d)}
-                            aria-label={cap(fmt(d, {weekday: 'long', day: 'numeric', month: 'long'}))}
-                            className={`relative w-full hover:text-[#e4574c] focus-visible:outline-2 focus-visible:outline-[#e4574c] ${d === today ? 'font-bold text-[#b3261e]' : ''}`}
-                          >
-                            {Number(d.slice(8, 10))}
-                            {/* Chấm đỏ: ngày có mẩu giấy */}
-                            {has(d) && <span aria-hidden className="absolute bottom-[1px] left-1/2 h-[4px] w-[4px] -translate-x-1/2 rounded-full bg-[#e4574c]" />}
+                          <button type="button" onClick={() => jumpTo(d)} aria-label={label} className="w-full rounded-[6px] hover:bg-white/50 focus-visible:outline-2 focus-visible:outline-[#e4574c]">
+                            {cell}
                           </button>
                         ) : (
-                          <span className={inWeek ? 'text-[#7a5a5a]' : 'text-[#8b8794]'}>{Number(d.slice(8, 10))}</span>
+                          <span aria-label={label} className="block opacity-45">
+                            {cell}
+                          </span>
                         )}
                       </li>
                     )
@@ -761,6 +878,9 @@ function Book({
             </div>
           </div>
 
+          {/* Sân khấu cho tờ giấy đang lật (xem effect lật trang) — nằm trên trang, dưới lò xo */}
+          <div ref={stage} aria-hidden className="pointer-events-none absolute inset-0" style={{perspective: W * 2.4}} />
+
           {/* Lò xo đôi vắt qua khe giữa 2 trang (hoặc mép trái nếu 1 trang), mỗi vòng 2 sợi,
               luồn qua lỗ đục trên giấy */}
           <div aria-hidden className="pointer-events-none absolute inset-y-[26px] flex flex-col justify-between" style={two ? {left: W / 2 - 31, width: 62} : {left: -13, width: 44}}>
@@ -776,7 +896,7 @@ function Book({
 
           {/* Ghi chú của quán viết trên mặt bàn, dưới mép sổ — để trong sổ thì nó tự chiếm riêng
               1 trang gần như trống */}
-          <p className="pointer-events-none absolute inset-x-0 top-full pt-[12px] text-center text-[14px] leading-[18px] text-[#3f6f77] sm:text-[15px]">
+          <p className="pointer-events-none absolute inset-x-0 top-full pt-[12px] text-center text-[14px] leading-[18px] text-[#fbe6cb] [text-shadow:0_1px_2px_rgba(40,14,2,0.7)] sm:text-[15px]">
             ☆ {t.diary.keeps} <span className="inline-block">☆ {t.diary.care}</span>
           </p>
 
