@@ -55,3 +55,31 @@ export function cafeNoteOf(day: string) {
   const days = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86_400_000)
   return CAFE_NOTES[((days % CAFE_NOTES.length) + CAFE_NOTES.length) % CAFE_NOTES.length]
 }
+
+// Câu hỏi của quán: mỗi ngày quán hỏi cả quán 1 câu, mẩu giấy của ngày đó là câu trả lời.
+// Trang giấy trắng thì khó viết, 1 câu hỏi cụ thể thì dễ — và đọc mẩu của người khác cũng
+// có ngữ cảnh. Câu phải trả lời được bằng 1–2 câu, không cần suy nghĩ lâu. Hết kho thì quay
+// vòng; thêm câu ở cuối để không đổi câu của những ngày đã qua.
+export const CAFE_QUESTIONS: {vi: string; en: string}[] = [
+  {vi: 'Tâm trạng bạn lúc này thế nào? Bực, vui hay khó chịu, cứ để lại đây cho nhẹ.', en: 'How are you feeling right now? Fed up, happy or on edge, leave it here and breathe.'},
+  {vi: 'Hôm nay bạn đang né việc gì?', en: 'What are you putting off today?'},
+  {vi: 'Việc nhỏ nào hôm nay làm bạn thấy dễ chịu?', en: 'What small thing felt good today?'},
+  {vi: 'Bạn ngồi xuống đây để làm xong việc gì?', en: 'What did you sit down here to finish?'},
+  {vi: 'Điều gì đang ở trong đầu bạn mà chưa nói với ai?', en: 'What’s on your mind that you haven’t told anyone?'},
+  {vi: 'Hôm nay bạn muốn cảm ơn ai?', en: 'Who do you want to thank today?'},
+  {vi: 'Nếu hôm nay chỉ làm được một việc, đó là việc gì?', en: 'If you could get only one thing done today, what would it be?'},
+  {vi: 'Lần gần nhất bạn thấy mình làm tốt là khi nào?', en: 'When did you last feel you did well?'},
+  {vi: 'Bạn muốn nói gì với chính mình của sáng nay?', en: 'What would you tell this morning’s you?'},
+  {vi: 'Điều gì đang làm bạn chậm lại?', en: 'What’s slowing you down?'},
+  {vi: 'Xong việc hôm nay, bạn thưởng cho mình cái gì?', en: 'What’s your treat once today’s work is done?'},
+]
+
+// Quán bắt đầu hỏi từ ngày này — mẩu của những ngày trước đó không phải câu trả lời cho câu nào
+const QUESTIONS_FROM = '2026-10-14'
+
+// Câu hỏi của 1 ngày (YYYY-MM-DD), null = ngày đó quán chưa hỏi. Ngày đầu tiên hỏi câu đầu kho.
+export function cafeQuestionOf(day: string) {
+  if (!day || day < QUESTIONS_FROM) return null
+  const since = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${QUESTIONS_FROM}T00:00:00Z`)) / 86_400_000)
+  return CAFE_QUESTIONS[since % CAFE_QUESTIONS.length]
+}

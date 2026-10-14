@@ -21,7 +21,7 @@ import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixe
 import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
-import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, dayOf, recentDays, type DiaryNote, type Mood} from './diary-shared'
+import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, dayOf, recentDays, type DiaryNote, type Mood} from './diary-shared'
 
 // Chữ cho cuốn sổ, đều có dấu tiếng Việt: nét bút bi viết tay cho nội dung, nét bút dạ cho
 // tiêu đề (tháng, thứ). Chỉ tải khi mở sổ, không preload cho cả trang
@@ -34,17 +34,22 @@ const ME_KEY = 'chill:chat-me'
 // Sổ riêng giữ tối đa bấy nhiêu mẩu gần nhất
 const BOOK_MAX = 400
 // Xấp giấy ghim trên khung cửa: lật qua bấy nhiêu mẩu mới nhất, mỗi mẩu hiện chừng này lâu
-const PILE_MAX = 6
-const PILE_MS = 7000
+// Mẩu "người trước để lại" đã chọn cho lần ghé này (tải lại trang vẫn giữ mẩu đó)
+const PICK_KEY = 'chill:diary-pick'
+// Chọn trong bấy nhiêu mẩu mới nhất mà khách chưa đọc
+const PICK_POOL = 5
+// Mẩu chưa từng thấy thì lấp lánh bấy lâu từ lúc mẩu giấy hiện ra
+const SPARKLE_MS = 9000
 
 type Kind = 'wall' | 'book'
 type MyNote = DiaryNote & {kind: Kind}
 // Mẩu đang hiện trong sổ: của tường (kind trống), hoặc của mình (mine) — kể cả mẩu cất riêng
 type ShownNote = DiaryNote & {kind?: Kind; mine?: boolean}
-type Store = {mine: MyNote[]; hidden: string[]; seen: number}
+// `read` = id các mẩu quán đã đưa cho khách này đọc (mẩu "người trước để lại")
+type Store = {mine: MyNote[]; hidden: string[]; seen: number; read: string[]}
 type Room = {open: boolean; notes: DiaryNote[]; cafe: {vi: string; en: string} | null}
 
-const EMPTY: Store = {mine: [], hidden: [], seen: 0}
+const EMPTY: Store = {mine: [], hidden: [], seen: 0, read: []}
 
 const MOOD_ICON: Record<Mood, string> = {calm: '☕', drive: '🔥', heavy: '🌧', sleepy: '😴', grateful: '✨'}
 // Giấy theo tâm trạng: nền · chữ · chữ phụ
@@ -66,6 +71,7 @@ function loadStore(): Store {
       mine: Array.isArray(raw.mine) ? raw.mine.filter((n) => n && typeof n.id === 'string' && typeof n.text === 'string') : [],
       hidden: Array.isArray(raw.hidden) ? raw.hidden.filter((id) => typeof id === 'string').slice(-200) : [],
       seen: Number(raw.seen) || 0,
+      read: Array.isArray(raw.read) ? raw.read.filter((id) => typeof id === 'string').slice(-400) : [],
     }
   } catch {
     return EMPTY
@@ -188,27 +194,51 @@ export function Diary({
   const todayCount = notes.filter((n) => n.day === today && n.kind !== 'book').length
   const unseen = (room?.notes ?? []).some((n) => n.ts > store.seen && !store.mine.some((m) => m.id === n.id))
 
-  // Xấp giấy ghim: mẩu khách treo gần nhất nằm trên cùng, rồi tới các mẩu trước đó, cuối
-  // cùng là câu của mèo quán (null). Mẩu "cất vào sổ" không lên đây.
-  const pile = useMemo<(DiaryNote | null)[]>(
-    () => [
-      ...notes
-        .filter((n) => n.kind !== 'book')
-        .sort((a, b) => b.ts - a.ts)
-        .slice(0, PILE_MAX),
-      null,
-    ],
-    [notes],
-  )
-  const [turn, setTurn] = useState(0)
-  const [held, setHeld] = useState(false)
-  // Tự lật sang mẩu kế; rê chuột vào thì dừng để đọc. Giảm chuyển động → đứng yên ở mẩu mới nhất
+  // Mẩu "người ngồi trước để lại cho bạn": mỗi lần ghé quán đưa đúng 1 mẩu, không phải mẩu
+  // của chính mình. Ưu tiên mẩu khách chưa đọc (bốc ngẫu nhiên trong vài mẩu mới nhất), đọc
+  // hết rồi thì bốc ngẫu nhiên trong cả tuần; quán chưa có mẩu nào → câu của mèo quán (null).
+  // Mẩu "cất vào sổ" không lên đây.
+  const others = useMemo(() => notes.filter((n) => n.kind !== 'book' && !n.mine).sort((a, b) => b.ts - a.ts), [notes])
+  const [pick, setPick] = useState<{id: string | null; fresh: boolean} | null>(null)
   useEffect(() => {
-    if (pile.length < 2 || held || open || hidden || slipHidden) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const id = window.setInterval(() => document.visibilityState === 'visible' && setTurn((n) => n + 1), PILE_MS)
-    return () => window.clearInterval(id)
-  }, [pile.length, held, open, hidden, slipHidden])
+    if (!room?.open) return
+    if (pick && (pick.id === null ? others.length === 0 : others.some((n) => n.id === pick.id))) return
+    let id: string | null = null
+    let fresh = false
+    try {
+      const kept = sessionStorage.getItem(PICK_KEY)
+      if (kept && others.some((n) => n.id === kept)) id = kept
+    } catch {
+      // Chặn storage → mỗi lần tải lại bốc mẩu khác, không sao
+    }
+    if (!id && others.length) {
+      const unread = others.filter((n) => !store.read.includes(n.id)).slice(0, PICK_POOL)
+      const from = unread.length ? unread : others
+      id = from[Math.floor(Math.random() * from.length)].id
+      fresh = unread.length > 0
+      try {
+        sessionStorage.setItem(PICK_KEY, id)
+      } catch {
+        // bỏ qua
+      }
+      const picked = id
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- ghi nhớ mẩu đã đưa cho khách đọc
+      update((s) => (s.read.includes(picked) ? s : {...s, read: [...s.read, picked].slice(-400)}))
+    }
+    setPick({id, fresh})
+  }, [room?.open, others, pick, store.read, update])
+  // Mẩu chưa từng thấy → lấp lánh 1 lúc kể từ khi mẩu giấy hiện ra trước mắt khách
+  const [sparkle, setSparkle] = useState(false)
+  const slipShown = Boolean(pick?.fresh) && !hidden && !slipHidden && !open
+  useEffect(() => {
+    if (!slipShown) return
+    const on = window.setTimeout(() => setSparkle(true), 600)
+    const off = window.setTimeout(() => setSparkle(false), 600 + SPARKLE_MS)
+    return () => {
+      window.clearTimeout(on)
+      window.clearTimeout(off)
+    }
+  }, [slipShown, pick?.id])
 
   useEffect(() => {
     onAvailable?.(room?.open ?? false)
@@ -237,10 +267,12 @@ export function Diary({
 
   const cafe = room.cafe ?? cafeNoteOf(today)
   const cafeText = cafe[lang] || cafe.vi
-  const top = pile[turn % pile.length]
+  const top = others.find((n) => n.id === pick?.id) ?? null
   const topPaper = top ? PAPER[top.mood] : PIN_PAPER
-  // 2 tờ ló ra phía sau = 2 mẩu kế tiếp trong xấp (màu theo tâm trạng của chính mẩu đó)
-  const behind = [1, 2].filter((i) => i < pile.length).map((i) => pile[(turn + i) % pile.length])
+  // Câu hỏi của quán mà mẩu này trả lời (mẩu của những ngày quán chưa hỏi thì không có)
+  const topQuestion = top ? cafeQuestionOf(top.day) : null
+  // Tờ ló ra phía sau = trong sổ còn mẩu khác (màu theo tâm trạng của chính mẩu đó)
+  const behind = others.filter((n) => n.id !== top?.id).slice(0, 2)
   const weekCount = notes.filter((n) => n.kind !== 'book').length
   const clock = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
   const shown = notes.filter((n) => !mood || n.mood === mood)
@@ -274,31 +306,31 @@ export function Diary({
           slot,
         )}
 
-      {/* Xấp giấy ghim trên khung cửa — lối vào bảng. Tờ trên cùng là mẩu khách treo gần nhất,
-          cứ vài giây lật sang mẩu trước đó, cuối xấp là câu của mèo quán; các tờ ló ra phía sau
-          + hàng chấm cho biết trong xấp còn mấy mẩu. Vẽ cùng kiểu với đồ vật trong cảnh: viền
-          nâu đậm 2px, bóng đổ cứng, đinh ghim pixel; giấy có dòng kẻ, góc dưới gập lên */}
+      {/* Mẩu giấy ghim trên khung cửa: mẩu "người ngồi trước để lại cho bạn" — mỗi lần ghé 1 mẩu,
+          kèm câu hỏi của quán mà mẩu đó trả lời; bấm vào là mở sổ để viết lại cho người sau.
+          Các tờ ló ra phía sau cho biết trong sổ còn mẩu khác. Vẽ cùng kiểu với đồ vật trong
+          cảnh: viền nâu đậm 2px, bóng đổ cứng, đinh ghim pixel; giấy có dòng kẻ, góc dưới gập lên */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        onPointerEnter={() => setHeld(true)}
-        onPointerLeave={() => setHeld(false)}
-        onFocus={() => setHeld(true)}
-        onBlur={() => setHeld(false)}
-        aria-label={`${t.diary.title}: ${top ? top.text : cafeText}`}
+        onClick={() => {
+          setOpen(true)
+          if (left > 0) setComposing(true)
+        }}
+        aria-label={`${t.diary.slipAria}: ${top ? top.text : cafeText}`}
         className={`group/pin absolute left-5 top-[4.75rem] z-10 hidden w-[214px] origin-top -rotate-2 text-left drop-shadow-[4px_5px_0_rgba(42,26,16,0.45)] transition duration-300 hover:rotate-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d] sm:block ${
-          hidden || open || slipHidden ? 'pointer-events-none -translate-y-1 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
+          hidden || open || slipHidden || !pick ? 'pointer-events-none -translate-y-1 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
         }`}
       >
         {behind.map((n, i) => (
           <span
-            key={i}
+            key={n.id}
             aria-hidden
-            className="absolute inset-0 border-2 border-[#2a1a10] transition-colors duration-500"
-            style={{background: n ? PAPER[n.mood].bg : PIN_PAPER.bg, transform: i === 0 ? 'translate(6px, 5px) rotate(2.5deg)' : 'translate(11px, 9px) rotate(5deg)', zIndex: -1 - i}}
+            className="absolute inset-0 border-2 border-[#2a1a10]"
+            style={{background: PAPER[n.mood].bg, transform: i === 0 ? 'translate(6px, 5px) rotate(2.5deg)' : 'translate(11px, 9px) rotate(5deg)', zIndex: -1 - i}}
           />
         ))}
         <PushPin />
+        {sparkle && <Sparkles />}
         <span
           key={top?.id ?? 'cafe'}
           className="relative block border-2 border-[#2a1a10] [clip-path:polygon(0_0,100%_0,100%_calc(100%-16px),calc(100%-16px)_100%,0_100%)] motion-safe:animate-[chill-note-turn_0.45s_ease-out]"
@@ -308,26 +340,29 @@ export function Diary({
             className="flex items-center justify-between gap-2 border-b border-dashed px-3 pb-1.5 pt-3.5 font-mono text-[9px] uppercase tracking-[0.18em]"
             style={{color: topPaper.soft, borderColor: `${topPaper.soft}88`}}
           >
-            <span className="truncate">{top ? `${MOOD_ICON[top.mood]} ${top.name || t.diary.guest}` : t.diary.cat}</span>
+            <span className="truncate">{top ? t.diary.slipFrom : t.diary.slipFromCat}</span>
             <span className="shrink-0 tabular-nums">{top && top.day === today ? clock(top.ts) : `${(top?.day ?? today).slice(8, 10)}.${(top?.day ?? today).slice(5, 7)}`}</span>
           </span>
-          {/* Dòng kẻ cách nhau đúng 1 dòng chữ (20px); luôn cao 4 dòng để lật mẩu không giật khung */}
+          {/* Dòng kẻ cách nhau đúng 1 dòng chữ (20px); luôn cao 4 dòng. Dòng đầu là câu hỏi của
+              quán (nếu mẩu này trả lời 1 câu), phần còn lại là lời người trước */}
           <span className="block h-[83px] bg-[repeating-linear-gradient(transparent_0,transparent_19px,rgba(42,26,16,0.13)_19px,rgba(42,26,16,0.13)_20px)] px-3 pt-[3px]">
-            <span className="line-clamp-4 break-words text-[13px] font-semibold leading-[20px]">{top ? top.text : cafeText}</span>
+            {topQuestion && (
+              <span className="block truncate text-[11px] italic leading-[20px]" style={{color: topPaper.soft}}>
+                {topQuestion[lang] || topQuestion.vi}
+              </span>
+            )}
+            <span className={`${topQuestion ? 'line-clamp-3' : 'line-clamp-4'} break-words text-[13px] font-semibold leading-[20px]`}>{top ? top.text : cafeText}</span>
           </span>
           <span className="flex items-end justify-between gap-2 px-3 pb-3 pt-2">
-            {pile.length > 1 ? (
-              // Mỗi chấm 1 mẩu trong xấp, chấm đậm = mẩu đang hiện
-              <span aria-hidden className="flex items-center gap-[3px] pb-1">
-                {pile.map((_, i) => (
-                  <span key={i} className="h-[5px] w-[5px]" style={{background: topPaper.ink, opacity: i === turn % pile.length ? 0.9 : 0.25}} />
-                ))}
+            {top ? (
+              <span className="min-w-0 truncate pb-0.5 text-[11px] font-semibold" style={{color: topPaper.soft}}>
+                — {top.name || t.diary.guest} {MOOD_ICON[top.mood]}
               </span>
             ) : (
               <PawStamp />
             )}
             <span className="mr-3 shrink-0 whitespace-nowrap border border-[#2a1a10] bg-[#e8b27d] px-2 py-0.5 text-[11px] font-bold text-[#2a1a10] transition-colors group-hover/pin:bg-[#f0c294]">
-              {todayCount > 0 || weekCount === 0 ? t.diary.slipCount(todayCount) : t.diary.slipWeek(weekCount)}
+              {left > 0 ? t.diary.slipLeave : t.diary.slipWeek(weekCount)}
             </span>
           </span>
           {/* Góc giấy gập: ô vuông nhỏ bị cắt chéo cùng với tờ giấy */}
@@ -394,6 +429,29 @@ export function Diary({
   )
 }
 
+// Tia lấp lánh pixel quanh mẩu giấy khách chưa từng thấy (tắt khi giảm chuyển động)
+function Sparkles() {
+  // [trái %, trên %, cỡ px, trễ s]
+  const stars: [number, number, number, number][] = [
+    [-4, 6, 12, 0],
+    [97, -3, 10, 0.5],
+    [103, 52, 14, 1.1],
+    [-6, 70, 10, 1.6],
+    [58, 101, 12, 0.8],
+    [22, -6, 8, 1.9],
+  ]
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0 z-20">
+      {stars.map(([left, top, size, delay], i) => (
+        <svg key={i} className="chill-twinkle absolute" style={{left: `${left}%`, top: `${top}%`, animationDelay: `${delay}s`}} width={size} height={size} viewBox="0 0 5 5" shapeRendering="crispEdges">
+          <path d="M2 0h1v2h2v1H3v2H2V3H0V2h2z" fill="#fff3c4" />
+          <rect x="2" y="2" width="1" height="1" fill="#ffffff" />
+        </svg>
+      ))}
+    </span>
+  )
+}
+
 // Đinh ghim đỏ kiểu pixel (cùng màu với icon nút Nhật ký)
 function PushPin() {
   const O = '#2a1d15'
@@ -454,6 +512,11 @@ function Book({
 }) {
   const t = useT()
   const lang = useLang()
+  // Câu hỏi của quán cho 1 ngày, theo ngôn ngữ đang xem (null = ngày đó quán chưa hỏi)
+  const question = (day: string) => {
+    const q = cafeQuestionOf(day)
+    return q ? q[lang] || q.vi : null
+  }
   const wrap = useRef<HTMLDivElement>(null)
   const book = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
@@ -686,7 +749,7 @@ function Book({
   return (
     <div
       ref={wrap}
-      className={`relative mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#b9682f] sm:mx-3 sm:mb-3 ${hand.className}`}
+      className={`relative mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-clip rounded-2xl bg-[#b9682f] sm:mx-3 sm:mb-3 ${hand.className}`}
       // Mặt quầy gỗ của quán nhìn từ trên xuống (màu lấy từ mặt quầy trong tranh cảnh): ván chạy
       // ngang, mỗi tấm 1 khe tối + 1 mép sáng, vân gỗ là các vệt mảnh — tô nét cứng kiểu pixel
       style={{
@@ -823,6 +886,14 @@ function Book({
                       <span className="flex h-[30px] min-w-[30px] items-center justify-center rounded-full bg-[#f49b8f] px-1 text-[19px] leading-none text-[#5a1c16]">{Number(day.slice(8, 10))}</span>
                       {isToday && <span className={`${hand.className} text-[17px] text-[#8b8794]`}>· {t.diary.dayToday.toLowerCase()}</span>}
                     </h3>
+                    {/* Câu hỏi quán hỏi cả quán ngày hôm đó — các mẩu bên dưới là câu trả lời */}
+                    {question(day) && (
+                      <p className={`${marker.className} break-after-avoid pb-[24px] text-[19px] leading-[24px] text-[#3a6ea5]`}>
+                        <span aria-hidden>“</span>
+                        {question(day)}
+                        <span aria-hidden>”</span>
+                      </p>
+                    )}
                     {/* Ảnh "chụp" cảnh quán dán kiểu polaroid, chữ của mục hôm nay chảy vòng quanh */}
                     {isToday && !filtered && (
                       <div aria-hidden className="relative float-right mb-3 ml-4 mt-1 w-[44%] max-w-[190px] break-inside-avoid rotate-[3deg] bg-white p-[7px] pb-[26px] shadow-[0_8px_14px_-8px_rgba(40,60,70,0.55),0_1px_2px_rgba(40,60,70,0.25)]">
@@ -860,14 +931,14 @@ function Book({
                               <span aria-hidden> ☆</span>
                             </p>
                             {composing ? (
-                              <Compose open={open} onDone={onDone} onCancel={onCancel} />
+                              <Compose open={open} question={question(today)} onDone={onDone} onCancel={onCancel} />
                             ) : left > 0 ? (
                               <button
                                 type="button"
                                 onClick={onCompose}
                                 className="group/write block w-full rounded-[10px] border-2 border-[#3a2a33] bg-white/75 px-3 pb-2 pt-1 text-left text-[#8b8794] transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e4574c]"
                               >
-                                <span className="block border-b-2 border-dashed border-[#3a2a33]/55 leading-[30px] text-[#5d5866] group-hover/write:text-[#e4574c]">✎ {t.diary.write}…</span>
+                                <span className="block border-b-2 border-dashed border-[#3a2a33]/55 leading-[30px] text-[#5d5866] group-hover/write:text-[#e4574c]">✎ {question(today) ?? `${t.diary.write}…`}</span>
                                 <span aria-hidden className="block h-[26px] border-b-2 border-dashed border-[#3a2a33]/55" />
                                 <span className="mt-1.5 block text-right text-[15px] leading-[20px]">{t.diary.left(left)}</span>
                               </button>
@@ -1188,7 +1259,7 @@ function LineAction({note, onReport, onRemove}: {note: ShownNote; onReport: (id:
 }
 
 // Mẩu giấy đang viết: chữ, tâm trạng, treo lên tường hay cất vào sổ
-function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote) => void; onCancel: () => void}) {
+function Compose({open, question, onDone, onCancel}: {open: boolean; question: string | null; onDone: (note: MyNote) => void; onCancel: () => void}) {
   const t = useT()
   const [text, setText] = useState('')
   const [mood, setMood] = useState<Mood>('calm')
@@ -1279,7 +1350,7 @@ function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote
     <form onSubmit={send} className="relative w-full rounded-[10px] border-2 border-[#3a2a33] px-3.5 pb-3 pt-3 text-[16px] leading-[22px]" style={{background: paper.bg, color: paper.ink}}>
       {!scriptReady && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
       <label className="sr-only" htmlFor="chill-diary-text">
-        {t.diary.write}
+        {question ?? t.diary.write}
       </label>
       <textarea
         id="chill-diary-text"
@@ -1288,7 +1359,7 @@ function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote
         onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX))}
         maxLength={NOTE_MAX}
         rows={3}
-        placeholder={t.diary.placeholder}
+        placeholder={question ?? t.diary.placeholder}
         className="block w-full resize-none bg-transparent text-[15px] leading-snug outline-none placeholder:opacity-50"
         style={{color: paper.ink}}
       />
@@ -1339,7 +1410,8 @@ function Compose({open, onDone, onCancel}: {open: boolean; onDone: (note: MyNote
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 24))}
               maxLength={24}
-              className="min-w-0 flex-1 border-b bg-transparent py-0.5 text-[13px] outline-none"
+              placeholder={t.diary.namePlaceholder}
+              className="min-w-0 flex-1 border-b bg-transparent py-0.5 text-[13px] outline-none placeholder:opacity-50"
               style={{borderColor: `${paper.soft}66`, color: paper.ink}}
             />
           </label>
