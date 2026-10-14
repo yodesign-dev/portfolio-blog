@@ -8,6 +8,28 @@ import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {useT} from './i18n'
 
+// Chia sẻ từ chỗ khác (thực đơn trên điện thoại): menu chia sẻ của máy, không có thì copy link.
+// Trả về true nếu đã copy (để nơi gọi báo "Đã copy")
+export async function shareChill(title: string) {
+  const url = `${window.location.origin}/chill`
+  if (navigator.share) {
+    try {
+      await navigator.share({title, url})
+      trackEvent({name: 'Share', props: {platform: 'native'}})
+    } catch {
+      // Người dùng đóng menu chia sẻ
+    }
+    return false
+  }
+  try {
+    await navigator.clipboard?.writeText(url)
+    trackEvent({name: 'Share', props: {platform: 'copy'}})
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function ShareButton() {
   const t = useT()
   const [open, setOpen] = useState(false)

@@ -287,7 +287,8 @@ export function Wishlist({
       {!seen && !open && !hidden && (
         <p
           aria-hidden
-          className={`pointer-events-none absolute right-3 z-30 transition-opacity duration-500 ${hint ? 'opacity-100' : 'opacity-0'} rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
+          // Điện thoại: nút Góp ý nằm trong Thực đơn nên không có gì để lời mời này chỉ vào
+          className={`pointer-events-none absolute right-3 z-30 hidden transition-opacity duration-500 sm:block ${hint ? 'opacity-100' : 'opacity-0'} rounded-lg border border-[#e8b27d]/30 bg-black/65 px-3 py-1.5 text-xs text-[#f3cfa8] backdrop-blur ${
             'bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+160px)] sm:right-5 sm:bottom-[180px] lg:bottom-[196px]'
           }`}
         >

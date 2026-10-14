@@ -169,13 +169,13 @@ export function Focus({
         }`}
       >
         <PhinIcon dripping={Boolean(session)} />
-        {session ? <span className="font-mono text-[11px] tabular-nums">{clock(left)}</span> : <span className="hidden font-medium sm:inline">{done ? t.focus.doneChip : t.focus.chip}</span>}
+        {session ? <span className="font-mono text-[11px] tabular-nums">{clock(left)}</span> : <span className="font-medium">{done ? t.focus.doneChip : t.focus.chip}</span>}
       </button>
       {hint && !open && !session && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="absolute right-0 top-full z-10 mt-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:bottom-full after:right-3 after:border-[6px] after:border-transparent after:border-b-[#e8b27d] after:content-['']"
+          className="absolute -right-10 top-full z-10 mt-3 whitespace-nowrap rounded-lg bg-[#e8b27d] after:right-[3.25rem] sm:right-0 sm:after:right-3 px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:bottom-full after:border-[6px] after:border-transparent after:border-b-[#e8b27d] after:content-['']"
         >
           {hint}
         </button>

@@ -117,6 +117,8 @@ const en = {
     menuTitle: 'What’s at the café',
     menuNote: 'Tap a line and we’ll show you where it is.',
     menuDone: 'tried',
+    menuMore: 'More',
+    menuCopied: 'Link copied',
     menuItems: {
       phin: {title: 'Brew a phin', desc: 'Pick 15, 25 or 45 minutes. The phin drips until time’s up.'},
       drink: {title: 'Pick your coffee', desc: 'Iced black, iced milk or bạc xỉu — tap the glass on the counter.'},
@@ -512,6 +514,8 @@ const vi: typeof en = {
     menuTitle: 'Ở quán có gì',
     menuNote: 'Bấm một dòng, quán chỉ chỗ cho bạn.',
     menuDone: 'đã thử',
+    menuMore: 'Khác',
+    menuCopied: 'Đã copy link',
     menuItems: {
       phin: {title: 'Pha một phin', desc: 'Hẹn 15, 25 hay 45 phút. Phin nhỏ giọt tới khi hết giờ.'},
       drink: {title: 'Chọn món', desc: 'Đen đá, sữa đá hay bạc xỉu — bấm vào ly trên quầy.'},

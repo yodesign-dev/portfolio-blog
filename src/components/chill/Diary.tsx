@@ -21,7 +21,7 @@ import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixe
 import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
-import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, dayOf, recentDays, type DiaryNote, type Mood} from './diary-shared'
+import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, dayOf, isMood, recentDays, type DiaryNote, type Mood} from './diary-shared'
 
 // Chữ cho cuốn sổ, đều có dấu tiếng Việt: nét bút bi viết tay cho nội dung, nét bút dạ cho
 // tiêu đề (tháng, thứ). Chỉ tải khi mở sổ, không preload cho cả trang
@@ -367,6 +367,29 @@ export function Diary({
           </span>
           {/* Góc giấy gập: ô vuông nhỏ bị cắt chéo cùng với tờ giấy */}
           <span aria-hidden className="absolute bottom-0 right-0 h-4 w-4 border-l-2 border-t-2 border-[#2a1a10] bg-black/15" />
+        </span>
+      </button>
+
+      {/* Điện thoại: khung cửa không đủ chỗ cho mẩu giấy lớn → 1 mẩu gọn nằm trên mặt quầy, góc
+          trái dưới khung cảnh (phía trên hàng nút). Cùng mẩu, cùng lối vào sổ */}
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(true)
+          if (left > 0) setComposing(true)
+        }}
+        aria-label={`${t.diary.slipAria}: ${top ? top.text : cafeText}`}
+        className={`absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+204px)] left-3 z-10 w-[188px] origin-bottom-left -rotate-2 text-left drop-shadow-[3px_4px_0_rgba(42,26,16,0.45)] transition duration-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d] sm:hidden ${
+          hidden || open || slipHidden || !pick ? 'pointer-events-none translate-y-1 opacity-0' : dimmed ? 'opacity-60' : 'opacity-100'
+        }`}
+      >
+        {sparkle && <Sparkles />}
+        <span className="relative block border-2 border-[#2a1a10] px-2.5 pb-2 pt-1.5" style={{background: topPaper.bg, color: topPaper.ink}}>
+          <span className="flex items-center justify-between gap-2 font-mono text-[8px] uppercase tracking-[0.16em]" style={{color: topPaper.soft}}>
+            <span className="truncate">{top ? t.diary.slipFrom : t.diary.slipFromCat}</span>
+            <span aria-hidden className="shrink-0 text-[11px] leading-none">→</span>
+          </span>
+          <span className="mt-0.5 line-clamp-2 break-words text-[12px] font-semibold leading-[16px]">{top ? top.text : cafeText}</span>
         </span>
       </button>
 
@@ -1367,7 +1390,48 @@ function Compose({open, question, onDone, onCancel}: {open: boolean; question: s
         {text.length}/{NOTE_MAX}
       </p>
 
-      <div role="radiogroup" aria-label={t.diary.moodAria} className="mt-1 flex flex-wrap gap-1.5">
+      {/* Điện thoại: tâm trạng + nơi để mẩu giấy gom thành 2 ô chọn trên 1 hàng, cho cả ô viết
+          (kèm 2 nút gửi) nằm gọn trong 1 trang sổ. Màn rộng vẫn là hàng nút bấm như cũ */}
+      <div className="mt-1 grid grid-cols-[5fr_6fr] gap-1.5 sm:hidden">
+        <label className="relative block">
+          <span className="sr-only">{t.diary.moodAria}</span>
+          <select
+            value={mood}
+            onChange={(e) => isMood(e.target.value) && setMood(e.target.value)}
+            className="block w-full appearance-none rounded-full border bg-transparent py-1 pl-2 pr-5 text-[13px] outline-none focus-visible:outline-2 focus-visible:outline-current"
+            style={{borderColor: `${paper.soft}88`, color: paper.ink}}
+          >
+            {MOODS.map((m) => (
+              <option key={m} value={m}>
+                {MOOD_ICON[m]} {t.diary.moods[m]}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px]" style={{color: paper.soft}}>
+            ▾
+          </span>
+        </label>
+        <label className="relative block">
+          <span className="sr-only">{t.diary.toWall}</span>
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value === 'book' ? 'book' : 'wall')}
+            className="block w-full appearance-none rounded-full border bg-transparent py-1 pl-2 pr-5 text-[13px] outline-none focus-visible:outline-2 focus-visible:outline-current"
+            style={{borderColor: `${paper.soft}88`, color: paper.ink}}
+          >
+            <option value="wall">{t.diary.toWall}</option>
+            <option value="book">🔒 {t.diary.toBook}</option>
+          </select>
+          <span aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px]" style={{color: paper.soft}}>
+            ▾
+          </span>
+        </label>
+        <p className="col-span-2 text-[11px] leading-tight" style={{color: paper.soft}}>
+          {kind === 'wall' ? t.diary.toWallDesc : t.diary.toBookDesc}
+        </p>
+      </div>
+
+      <div role="radiogroup" aria-label={t.diary.moodAria} className="mt-1 hidden flex-wrap gap-1.5 sm:flex">
         {MOODS.map((m) => (
           <button
             key={m}
@@ -1383,7 +1447,7 @@ function Compose({open, question, onDone, onCancel}: {open: boolean; question: s
         ))}
       </div>
 
-      <div role="radiogroup" aria-label={t.diary.toWall} className="mt-3 grid grid-cols-2 gap-1.5">
+      <div role="radiogroup" aria-label={t.diary.toWall} className="mt-3 hidden grid-cols-2 gap-1.5 sm:grid">
         {(['wall', 'book'] as const).map((k) => (
           <button
             key={k}

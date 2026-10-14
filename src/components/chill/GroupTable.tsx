@@ -64,6 +64,7 @@ export function GroupTable({
   onTable,
   onView,
   openSignal = 0,
+  onAvailable,
 }: {
   visible: boolean
   // Ô giữa trong hàng nút góc phải dưới (Wishlist · Mời bạn · Chat) — nút được đặt vào đây
@@ -76,6 +77,8 @@ export function GroupTable({
   // Tăng lên 1 = mở từ ngoài (nút "Thử ngay" ở Có gì mới): chưa ở bàn → màn tạo bàn,
   // đang ở bàn → menu bàn nhóm
   openSignal?: number
+  // Studio có đang mở bàn nhóm không (để Thực đơn trên điện thoại biết có nên hiện dòng "Mời bạn")
+  onAvailable?: (available: boolean) => void
 }) {
   const t = useT()
   const lang = useLang()
@@ -245,6 +248,10 @@ export function GroupTable({
     const t = window.setTimeout(() => setNotice(null), 4000)
     return () => window.clearTimeout(t)
   }, [notice])
+
+  useEffect(() => {
+    onAvailable?.(available && Boolean(me) && visible)
+  }, [available, me, visible, onAvailable])
 
   if (!available || !me) return null
 

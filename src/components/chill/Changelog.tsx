@@ -142,7 +142,9 @@ export function WhatsNewButton({
   const t = useT()
   const lang = useLang()
   return (
-    <div className="relative">
+    // Điện thoại: nút nằm trong Thực đơn (thanh trên chỉ giữ thứ dùng hằng ngày) — ở đây chỉ còn
+    // cái neo vô hình cho thông báo nhỏ bật ra bên dưới
+    <div className="relative max-sm:-ml-2 max-sm:h-9 max-sm:w-0">
       <button
         type="button"
         onClick={() => onOpen('button')}
@@ -150,7 +152,7 @@ export function WhatsNewButton({
         aria-expanded={open}
         aria-controls="chill-updates"
         title={t.updates.button}
-        className="relative flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 px-2.5 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
+        className="relative hidden h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 px-2.5 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:flex"
       >
         <SparkIcon />
         <span className="hidden sm:inline">{t.updates.button}</span>

@@ -9,7 +9,7 @@ import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
 import {Diary} from './Diary'
-import {ShareButton} from './ShareButton'
+import {ShareButton, shareChill} from './ShareButton'
 import {GroupTable} from './GroupTable'
 import {arrangeFriends, type TableMember} from './table-view'
 import {SupporterBoard, type Board} from './SupporterBoard'
@@ -59,6 +59,9 @@ const PAN_HINT_MS = 8000
 const CAT_GREET_DELAY_MS = 2500
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
+// Điện thoại: hàng thông tin dưới thanh trên là chữ trơn, các mục cách nhau bằng dấu chấm giữa
+const INFO_ROW =
+  'max-sm:text-white/65 max-sm:[&>span]:h-auto max-sm:[&>span]:rounded-none max-sm:[&>span]:bg-transparent max-sm:[&>span]:px-0 max-sm:[&>span]:text-inherit max-sm:[&>span]:backdrop-blur-none max-sm:[&>span+span]:before:mr-2 max-sm:[&>span+span]:before:content-["·"]'
 
 type Box = {left: number; top: number; width: number; height: number}
 
@@ -1208,6 +1211,8 @@ export function ChillRoom({
       document.removeEventListener('keydown', onKey)
     }
   }, [menuOpen])
+  const [tableAvailable, setTableAvailable] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
   const hintTip = activeGuide === 'settings'
   const settingsGlow = guideShown.includes('settings') && !settingsSeen
 
@@ -1509,6 +1514,99 @@ export function ChillRoom({
       guideLeft.current -= performance.now() - t0
     }
   }, [guide, guideVisible])
+  // Điện thoại: nhóm "Khác" trong thực đơn — thay cho các nút đã rút khỏi màn hình
+  const menuMore: {id: string; icon: string; label: string; dot?: boolean; run: () => void}[] = [
+    {
+      id: 'share',
+      icon: '↗',
+      label: shareCopied ? t.room.menuCopied : t.share.share,
+      run: () =>
+        void shareChill(t.share.title).then((copied) => {
+          if (!copied) return setMenuOpen(false)
+          setShareCopied(true)
+          window.setTimeout(() => setShareCopied(false), 1500)
+        }),
+    },
+    ...(updates.length > 0
+      ? [
+          {
+            id: 'updates',
+            icon: '✦',
+            label: t.updates.button,
+            dot: updatesSeen.dot,
+            run: () => {
+              setMenuOpen(false)
+              openUpdates('button')
+            },
+          },
+        ]
+      : []),
+    {
+      id: 'wish',
+      icon: '✎',
+      label: t.wish.label,
+      run: () => {
+        setMenuOpen(false)
+        setPanelOpen(false)
+        setBoardOpen(false)
+        setUpdatesOpen(false)
+        setChatOpen(false)
+        setWishOpen(true)
+      },
+    },
+    ...(tableAvailable && !tableMembers
+      ? [
+          {
+            id: 'table',
+            icon: '☷',
+            label: t.table.inviteLabel,
+            run: () => {
+              setMenuOpen(false)
+              setTableSignal((n) => n + 1)
+            },
+          },
+        ]
+      : []),
+    ...(canFullscreen
+      ? [
+          {
+            id: 'fullscreen',
+            icon: '⛶',
+            // Bỏ phần gợi ý phím tắt "(F)" — điện thoại không có bàn phím
+            label: (fullscreen ? t.room.exitFullscreen : t.room.fullscreen).replace(/\s*\(.*\)$/, ''),
+            run: () => {
+              setMenuOpen(false)
+              toggleFullscreen()
+            },
+          },
+        ]
+      : []),
+  ]
+  // Thực đơn của quán: ở đây có gì — bấm 1 dòng thì quán chỉ chỗ (xem guide.ts). Điện thoại: nút
+  // nằm cuối hàng trên và mang luôn chấm "có gì mới" (nút Có gì mới đã chui vào thực đơn)
+  const menuButton = (
+    <button
+      data-chill-menu
+      type="button"
+      onClick={() => {
+        if (!menuOpen) {
+          setPanelOpen(false)
+          setVolumeOpen(false)
+          trackEvent({name: 'Chill Guide', props: {action: 'menu', step: 'open'}})
+        }
+        setMenuOpen((o) => !o)
+      }}
+      aria-expanded={menuOpen}
+      aria-controls="chill-menu"
+      className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white focus-visible:outline-2 focus-visible:outline-[#e8b27d] sm:text-[11px] ${
+        menuOpen ? 'border-[#e8b27d]/80 bg-[#2a1f18]/90' : 'border-[#e8b27d]/45 bg-[#2a1f18]/75'
+      }`}
+    >
+      <MenuCardIcon />
+      {t.room.menu}
+      {updatesSeen.dot && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d] sm:hidden" />}
+    </button>
+  )
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
@@ -1525,7 +1623,7 @@ export function ChillRoom({
         onPointerMove={onPanMove}
         onPointerUp={onPanUp}
         onPointerCancel={onPanUp}
-        className={`absolute inset-0 overflow-hidden portrait:bottom-[11rem] portrait:top-[6.5rem] portrait:[touch-action:none] ${canPan && entered ? 'portrait:cursor-grab portrait:active:cursor-grabbing' : ''}`}
+        className={`absolute inset-0 overflow-hidden portrait:bottom-[11rem] portrait:top-[6.5rem] max-sm:portrait:top-[5.25rem] portrait:[touch-action:none] ${canPan && entered ? 'portrait:cursor-grab portrait:active:cursor-grabbing' : ''}`}
       >
       <canvas
         ref={canvasRef}
@@ -1994,11 +2092,13 @@ export function ChillRoom({
             className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
           >
             <ArrowIcon dir="left" />
-            Bin Nguyen
+            <span className="max-sm:sr-only">Bin Nguyen</span>
           </Link>
           {/* Điện thoại: tên điểm đến nằm hàng riêng dưới hàng nút (chỗ bên trái hẹp); từ sm
               trở lên nằm cùng hàng. Cụm này chỉ là nhãn thông tin, không có nút bấm */}
-          <div className="absolute left-3 top-14 flex items-center gap-2 sm:contents">
+          {/* Điện thoại: hàng này chỉ là 1 dòng chú thích trơn (điểm đến · giờ · số người), không
+              đóng khung — mọi thứ bấm được nằm ở hàng trên */}
+          <div className={`absolute left-4 top-[3.4rem] flex items-center gap-2 sm:contents ${INFO_ROW}`}>
             {[dest.name, weatherLabel, timeLabel].map((label, i) => (
               <span
                 key={label}
@@ -2007,6 +2107,7 @@ export function ChillRoom({
                 {label}
               </span>
             ))}
+            <span className="pointer-events-none flex font-mono text-[10px] tabular-nums sm:hidden">{clock}</span>
             {/* Có người khác đang ngồi quán → nêu số; chỉ có mình thì thôi (quán vắng nhìn buồn) */}
             {online >= MIN_ONLINE_SHOWN && (
               <span
@@ -2017,27 +2118,7 @@ export function ChillRoom({
                 <span aria-hidden className="tabular-nums">{t.room.online(online)}</span>
               </span>
             )}
-            {/* Thực đơn của quán: ở đây có gì — bấm 1 dòng thì quán chỉ chỗ (xem guide.ts) */}
-            <button
-              data-chill-menu
-              type="button"
-              onClick={() => {
-                if (!menuOpen) {
-                  setPanelOpen(false)
-                  setVolumeOpen(false)
-                  trackEvent({name: 'Chill Guide', props: {action: 'menu', step: 'open'}})
-                }
-                setMenuOpen((o) => !o)
-              }}
-              aria-expanded={menuOpen}
-              aria-controls="chill-menu"
-              className={`flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white focus-visible:outline-2 focus-visible:outline-[#e8b27d] sm:text-[11px] ${
-                menuOpen ? 'border-[#e8b27d]/80 bg-[#2a1f18]/90' : 'border-[#e8b27d]/45 bg-[#2a1f18]/75'
-              }`}
-            >
-              <MenuCardIcon />
-              {t.room.menu}
-            </button>
+            <span className="hidden sm:contents">{menuButton}</span>
           </div>
           {menuOpen && (
             <div
@@ -2045,7 +2126,7 @@ export function ChillRoom({
               id="chill-menu"
               role="dialog"
               aria-label={t.room.menuTitle}
-              className="absolute left-3 top-[6.75rem] z-40 w-[min(21rem,calc(100vw-1.5rem))] rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] p-3 text-[#2a1a10] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.85)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:left-5 sm:top-[4.25rem]"
+              className="absolute left-3 top-[5.25rem] z-40 w-[min(21rem,calc(100vw-1.5rem))] rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] p-3 text-[#2a1a10] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.85)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:left-5 sm:top-[4.25rem]"
             >
               <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menu}</p>
               <p className="mt-0.5 text-base font-semibold leading-snug">{t.room.menuTitle}</p>
@@ -2078,11 +2159,33 @@ export function ChillRoom({
                 ))}
               </ul>
               <p className="mt-2 text-[11px] leading-snug text-[#2a1a10]/60">{t.room.menuNote}</p>
+              {/* Điện thoại: những thứ ít dùng không còn nút riêng trên màn hình → nằm ở đây */}
+              <div className="mt-2.5 border-t-2 border-[#2a1a10]/70 pt-2 sm:hidden">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menuMore}</p>
+                <div className="mt-1 grid grid-cols-2 gap-1">
+                  {menuMore.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={item.run}
+                      className="relative flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-left text-[13px] font-semibold leading-snug transition hover:bg-[#e8b27d]/30 focus-visible:outline-2 focus-visible:outline-[#9a6a45]"
+                    >
+                      <span aria-hidden className="w-4 shrink-0 text-center text-[12px]">
+                        {item.icon}
+                      </span>
+                      <span className="min-w-0 truncate">{item.label}</span>
+                      {item.dot && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-[#d85a30]" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <ShareButton />
+          <div className="hidden sm:block">
+            <ShareButton />
+          </div>
           {updates.length > 0 && (
             <WhatsNewButton
               dot={updatesSeen.dot}
@@ -2101,13 +2204,16 @@ export function ChillRoom({
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
           <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} />
-          <span className={`pointer-events-none h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur ${focusLabel ? 'hidden sm:flex' : 'flex'}`}>
+          <span className="sm:hidden">{menuButton}</span>
+          <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}
           </span>
           {canFullscreen && (
-            <StageButton label={fullscreen ? t.room.exitFullscreen : t.room.fullscreen} onClick={toggleFullscreen}>
-              {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
-            </StageButton>
+            <span className="hidden sm:contents">
+              <StageButton label={fullscreen ? t.room.exitFullscreen : t.room.fullscreen} onClick={toggleFullscreen}>
+                {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+              </StageButton>
+            </span>
           )}
         </div>
       </div>
@@ -2276,8 +2382,9 @@ export function ChillRoom({
           bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi */}
       <div className="absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end">
         <div ref={setDiarySlot} className="contents" />
-        <div ref={setWishSlot} className="contents" />
-        <div ref={setInviteSlot} className="contents" />
+        {/* Điện thoại: Góp ý + Mời bạn nằm trong Thực đơn; đang ngồi bàn nhóm thì nút bàn vẫn ở đây */}
+        <div ref={setWishSlot} className="hidden sm:contents" />
+        <div ref={setInviteSlot} className={tableMembers ? 'contents' : 'hidden sm:contents'} />
         <div ref={setChatSlot} className="contents" />
       </div>
 
@@ -2290,6 +2397,7 @@ export function ChillRoom({
         onTable={onTable}
         onView={() => setGroupView(true)}
         openSignal={tableSignal}
+        onAvailable={setTableAvailable}
       />
 
       <Wishlist
