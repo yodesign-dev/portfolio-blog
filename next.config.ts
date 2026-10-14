@@ -14,7 +14,7 @@ import type { NextConfig } from "next";
 // - fonts.googleapis.com / fonts.gstatic.com: 1 trong 2 script trên tự chèn thêm
 //   stylesheet Google Fonts riêng, không phải do next/font (next/font tự host font
 //   nội bộ nên bình thường không cần dòng này).
-const cspHeader = `
+const csp = (frameAncestors: string) => `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://app.cal.com;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
@@ -23,7 +23,7 @@ const cspHeader = `
   media-src 'self' https://cdn.sanity.io;
   connect-src 'self' https://*.api.sanity.io https://challenges.cloudflare.com https://*.cal.com;
   frame-src https://challenges.cloudflare.com https://app.cal.com;
-  frame-ancestors 'self';
+  frame-ancestors ${frameAncestors};
   form-action 'self';
   base-uri 'self';
 `.replace(/\n/g, " ").trim();
@@ -71,18 +71,28 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          // Chặn clickjacking — trang không thể bị nhúng trong iframe
-          // của domain khác
-          { key: "X-Frame-Options", value: "SAMEORIGIN" },
           // Chặn trình duyệt tự đoán loại file khác với Content-Type khai báo
           { key: "X-Content-Type-Options", value: "nosniff" },
           // Hạn chế thông tin URL nguồn bị lộ khi người dùng click link ra ngoài
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // Tắt truy cập camera/mic/vị trí — site này không cần dùng
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          // Giới hạn nguồn script/ảnh/style được phép load — chống XSS
-          { key: "Content-Security-Policy", value: cspHeader },
         ],
+      },
+      // Mọi trang trừ /chill/embed: chặn clickjacking — không thể bị nhúng trong
+      // iframe của domain khác. CSP giới hạn nguồn script/ảnh/style — chống XSS
+      {
+        source: "/:path((?!chill/embed$).*)",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: csp("'self'") },
+        ],
+      },
+      // /chill/embed: khung nhạc thu nhỏ để nhúng vào Notion, blog… nên cho phép mọi
+      // site https đặt vào iframe. Trang này không có ô nhập liệu hay chuyển tiền nào
+      {
+        source: "/chill/embed",
+        headers: [{ key: "Content-Security-Policy", value: csp("'self' https:") }],
       },
     ];
   },
