@@ -13,7 +13,7 @@
 //   theo tâm trạng.
 // - Studio tắt "Mở bảng nhật ký" (mặc định) thì component này không hiện gì.
 
-import {Mynerve, Sedgwick_Ave} from 'next/font/google'
+import {Playpen_Sans} from 'next/font/google'
 import Script from 'next/script'
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
@@ -23,10 +23,11 @@ import {useLang, useT} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, cafeQuoteOf, dayOf, isMood, recentDays, type DiaryNote, type Mood, type Quote} from './diary-shared'
 
-// Chữ cho cuốn sổ, đều có dấu tiếng Việt: nét bút bi viết tay cho nội dung, nét bút dạ cho
-// tiêu đề (tháng, thứ). Chỉ tải khi mở sổ, không preload cho cả trang
-const hand = Mynerve({weight: '400', subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
-const marker = Sedgwick_Ave({weight: '400', subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
+// Chữ cho cuốn sổ: Playpen Sans — viết tay nhưng dễ đọc, dấu tiếng Việt to và tách khỏi chữ.
+// Nội dung nét 400, tiêu đề (tháng, thứ, tuần) nét 600 — 1 font cho cả sổ. Chỉ tải khi mở sổ,
+// không preload cho cả trang
+const hand = Playpen_Sans({weight: ['400', '600'], subsets: ['latin', 'vietnamese'], display: 'swap', preload: false})
+const marker = {className: `${hand.className} font-semibold`}
 
 const STORE_KEY = 'chill:diary'
 // Cùng danh tính với phòng chat (ChillChat tạo lần đầu)
