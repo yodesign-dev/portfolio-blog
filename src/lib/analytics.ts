@@ -14,7 +14,8 @@ export type AnalyticsEvent =
   //   Chill Visit → Chill Start (lần bấm phát đầu tiên) → Chill Listen (mốc phút đã nghe)
   // `visitor`: new = lần đầu · same-day / within-week / later = khoảng cách từ lần ghé trước
   // · returning = khách cũ từ trước khi có mốc này
-  | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'}}
+  // `ref` = khách tới từ đâu: ?ref= trên link (vd yt, ext), không có thì utm_source, không có nữa thì "none"
+  | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'; ref: string}}
   | {name: 'Chill Start'; props: {from: 'welcome' | 'player'}}
   | {name: 'Chill Listen'; props: {minutes: number}}
   | {name: 'Chill Look Around'; props?: undefined}

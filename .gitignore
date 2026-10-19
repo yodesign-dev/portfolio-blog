@@ -42,3 +42,6 @@ next-env.d.ts
 .originkit/
 .env*.local
 .env*.local
+
+# video YouTube của /chill (scripts/chill-mix-audio.mjs, chill-make-video.mjs)
+/.chill-video/

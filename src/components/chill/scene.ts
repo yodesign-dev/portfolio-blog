@@ -441,6 +441,7 @@ export class ChillScene {
   private vignette: {kind: VignetteKind; x: number; target: number; speed: number; step: number; stopT: number; leaving: boolean} | null =
     null
   private nextVignette = 10
+  private busy = false
   private lastVignette: VignetteKind | null = null
   private vignetteImgs: Partial<Record<VignetteKind, {img: HTMLImageElement; tinted: HTMLCanvasElement | null; key: string}>> = {}
   private groupChars: HTMLImageElement | null = null
@@ -576,6 +577,12 @@ export class ChillScene {
 
   setMusic(on: boolean) {
     this.musicOn = on
+  }
+
+  // Trang quay video (/chill/record): cảnh nhỏ ngoài phố (shipper, cặp đôi…) đến dày hơn
+  setBusy(on: boolean) {
+    this.busy = on
+    if (on) this.nextVignette = Math.min(this.nextVignette, 4)
   }
 
   // Tạm dừng cảnh (nút pause / giảm chuyển động)
@@ -1790,7 +1797,7 @@ export class ChillScene {
       for (const kind of Object.keys(VIGNETTES) as VignetteKind[]) this.vignetteLayer(kind)
       this.nextVignette -= dt
       if (this.nextVignette > 0) return
-      this.nextVignette = 30 + this.rng() * 20
+      this.nextVignette = this.busy ? 12 + this.rng() * 8 : 30 + this.rng() * 20
       // Không lặp lại cảnh vừa xem
       const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette)
       const kind = pick(this.rng, kinds)

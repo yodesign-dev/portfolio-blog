@@ -49,6 +49,13 @@ const CAT_SAY_MS = 4500
 const CAT_HOLD_MS = 350
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
+
+// Nguồn khách cho event Chill Visit: ?ref= (vd yt, ext), không có thì utm_source
+function visitRef() {
+  const p = new URLSearchParams(window.location.search)
+  const raw = (p.get('ref') || p.get('utm_source') || '').toLowerCase()
+  return raw.replace(/[^a-z0-9._-]/g, '').slice(0, 32) || 'none'
+}
 // Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
 const LISTEN_MINUTES = [1, 5, 15, 30, 60]
 // Màn dọc: đã kéo ngang cảnh lần nào chưa (chưa → gợi ý "kéo để nhìn quanh")
@@ -324,7 +331,7 @@ export function ChillRoom({
       } catch {
         // Chặn storage → chỉ biết khách mới / cũ theo prefs
       }
-      trackEvent({name: 'Chill Visit', props: {visitor}})
+      trackEvent({name: 'Chill Visit', props: {visitor, ref: visitRef()}})
     }
   }, [tracks, destinations])
 
