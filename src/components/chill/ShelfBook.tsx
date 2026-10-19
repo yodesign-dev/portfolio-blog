@@ -4,12 +4,14 @@
 // hoặc dòng kệ dưới thẻ khách quen. Cùng khung gỗ với bảng cảm ơn: popup giữa màn
 // (desktop) / sheet từ dưới lên (điện thoại).
 //
-// Lưới đủ 20 món: món đã có hiện hình, món chưa có là bóng tối + gợi ý cách có
+// Lưới đủ 20 món: món đã có hiện hình, món chưa có là bóng tối + điều kiện ngắn ngay dưới
 // (kiểu Spirit City). Chọn 1 món để đọc chuyện của nó và bày lên / cất khỏi kệ.
+// Đầu bảng: 3 bước "pha phin → mèo mang món → bày lên bậu cửa", món tiếp theo kèm thanh
+// tiến độ (mặc định chọn sẵn món này) và nút "Pha một phin" mở thẳng đồng hồ phin.
 
 import {useEffect, useRef} from 'react'
 import {useT} from './i18n'
-import {ITEMS, drawItem, itemById, spriteSize, type ShelfItem, type ShelfState} from './shelf'
+import {ITEMS, drawItem, itemById, nextRegular, phinsLeft, spriteSize, type ShelfItem, type ShelfState} from './shelf'
 
 // Hình món vẽ lên canvas nhỏ, phóng nguyên ô cho sắc nét
 export function ItemIcon({id, scale = 3, shadow = false, className = ''}: {id: string; scale?: number; shadow?: boolean; className?: string}) {
@@ -36,6 +38,8 @@ export function Shelf({
   onToggle,
   slots,
   placeName,
+  phins,
+  onBrew,
 }: {
   open: boolean
   onClose: () => void
@@ -47,6 +51,10 @@ export function Shelf({
   slots: number
   // id điểm đến → tên hiển thị (Studio), cho gợi ý món theo điểm đến
   placeName: (id: string) => string
+  // Tổng số phin đã xong (thẻ khách quen) — cho thanh tiến độ món tiếp theo
+  phins: number
+  // Nút "Pha một phin": đóng kệ, mở đồng hồ phin
+  onBrew: () => void
 }) {
   const t = useT()
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -55,7 +63,16 @@ export function Shelf({
   }, [open])
 
   const owned = new Map(state.owned.map((o) => [o.id, o.at]))
-  const pick = selected ? itemById(selected) : undefined
+  const next = nextRegular(state)
+  // Chưa chọn gì → chọn sẵn món tiếp theo để khách biết mình đang nhắm tới gì
+  const pick = selected ? itemById(selected) : next
+  const left = pick?.kind === 'regular' ? phinsLeft(state, pick, phins) : 0
+  const tag = (item: ShelfItem) =>
+    item.kind === 'regular'
+      ? t.shelf.tag.regular(item.phins ?? 0)
+      : item.kind === 'place'
+        ? t.shelf.tag.place(placeName(item.places?.[0] ?? ''))
+        : t.shelf.tag[item.kind]
   const hint = (item: ShelfItem) =>
     item.kind === 'regular'
       ? t.shelf.hint.regular(item.phins ?? 0)
@@ -112,7 +129,16 @@ export function Shelf({
       </header>
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-        <p className="text-xs leading-relaxed text-[#e6cfae]">{t.shelf.intro}</p>
+        <ol className="grid grid-cols-3 gap-1.5 text-center" aria-label={t.shelf.intro}>
+          {t.shelf.steps.map((step, i) => (
+            <li key={step} className="flex flex-col items-center gap-1 rounded-lg border border-[#fbf1d2]/10 bg-black/15 px-1.5 py-2 text-[11px] leading-snug text-[#f3e3c3]">
+              <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e8b27d] font-mono text-[11px] font-bold text-[#2a1a10]">
+                {i + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
 
         {/* Món đang chọn */}
         {pick && (
@@ -141,13 +167,30 @@ export function Shelf({
                 </>
               ) : (
                 <>
-                  <p className="font-semibold text-[#8a6a50]">{t.shelf.unknown}</p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-[#5a4030]">{hint(pick)}</p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#8a6a50]">{pick.id === next?.id ? t.shelf.next : t.shelf.unknown}</p>
+                  <p className="mt-0.5 text-[13px] font-medium leading-snug text-[#5a4030]">{hint(pick)}</p>
+                  {pick.kind === 'regular' && (
+                    <>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#8a6a50]/20" role="progressbar" aria-valuemin={0} aria-valuemax={phins + left} aria-valuenow={phins}>
+                        <div className="h-full rounded-full bg-[#8a5a2b]" style={{width: `${(phins / (phins + left || 1)) * 100}%`}} />
+                      </div>
+                      <p className="mt-1 text-xs text-[#8a6a50]">{t.shelf.left(left)}</p>
+                    </>
+                  )}
                 </>
               )}
             </div>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={onBrew}
+          className="mt-3 w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fbf1d2]"
+        >
+          {t.shelf.brew}
+        </button>
+        <p className="mt-2 text-[11px] leading-snug text-[#e6cfae]/80">{t.shelf.rare}</p>
 
         <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
           {ITEMS.map((item) => {
@@ -159,13 +202,14 @@ export function Shelf({
                 <button
                   type="button"
                   onClick={() => onSelect(item.id)}
-                  aria-pressed={selected === item.id}
+                  aria-pressed={pick?.id === item.id}
                   aria-label={have ? t.shelf.items[item.id]?.name : `${t.shelf.unknown} — ${hint(item)}`}
-                  className={`relative flex h-[72px] w-full flex-col items-center justify-end gap-1 rounded-lg border px-1 pb-1.5 transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
-                    selected === item.id ? 'border-[#e8b27d] bg-black/30' : 'border-[#fbf1d2]/10 bg-black/15 hover:bg-black/25'
+                  className={`relative flex h-[84px] w-full flex-col items-center justify-end gap-1 rounded-lg border px-1 pb-1.5 transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                    pick?.id === item.id ? 'border-[#e8b27d] bg-black/30' : 'border-[#fbf1d2]/10 bg-black/15 hover:bg-black/25'
                   }`}
                 >
                   <ItemIcon id={item.id} scale={3} shadow={!have} />
+                  {!have && <span className="max-w-full truncate text-[10px] leading-none text-[#e6cfae]/85">{tag(item)}</span>}
                   {at >= 0 && (
                     <span
                       aria-hidden

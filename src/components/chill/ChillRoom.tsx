@@ -226,6 +226,8 @@ export function ChillRoom({
   const [shelfOpen, setShelfOpen] = useState(false)
   const [shelfPick, setShelfPick] = useState<string | null>(null)
   const [shelfBoxes, setShelfBoxes] = useState<{id: string; box: Box}[]>([])
+  // Ô đầu của kệ — kệ chưa bày món nào thì đây là lối vào kệ (và chỗ lời mời chỉ vào)
+  const [shelfStartBox, setShelfStartBox] = useState<Box | null>(null)
   const [panelTab, setPanelTab] = useState<PanelTab>('music')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
@@ -450,6 +452,8 @@ export function ChillRoom({
         const b = toBox(box)
         return b ? [{id, box: b}] : []
       }))
+      const slot = scene.shelfFirstSlotBox
+      setShelfStartBox(slot ? toBox(slot) : null)
       const glass = scene.drinkHitBox
       setDrinkBox(glass ? toBox(glass) : null)
       setHasGlass(glass !== null)
@@ -858,11 +862,26 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [shelf, shelfOn, theme])
 
-  const openShelf = useCallback((id?: string) => {
-    setShelfPick(id ?? null)
-    setShelfOpen(true)
-    trackEvent({name: 'Chill Shelf', props: {action: 'open'}})
+  // Lời mời làm quen (guide.ts): những món khách đã thử — khai báo sớm vì mở kệ cũng tính
+  const [guideTried, setGuideTried] = useState<GuideStep[]>([])
+  const markTried = useCallback((step: GuideStep) => {
+    setGuideTried((tried) => {
+      if (tried.includes(step)) return tried
+      const next = [...tried, step]
+      saveTried(next)
+      return next
+    })
   }, [])
+
+  const openShelf = useCallback(
+    (id?: string) => {
+      setShelfPick(id ?? null)
+      setShelfOpen(true)
+      markTried('shelf')
+      trackEvent({name: 'Chill Shelf', props: {action: 'open'}})
+    },
+    [markTried],
+  )
 
   const primeAudio = useCallback(() => audioRef.current?.prime(), [])
   const destId = dest?.id
@@ -876,6 +895,7 @@ export function ChillRoom({
     // Mèo mang ra 1 món cho kệ (nếu tới lượt) — hiện trong bảng tổng kết phin
     const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time})
     if (!item) return
+    if (!shelf.owned.length) sayCat(t.shelf.firstGift)
     setShelf(addItem(shelf, item.id))
     setGift(item.id)
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
@@ -1226,7 +1246,6 @@ export function ChillRoom({
   // Lời mời làm quen với quán (xem guide.ts): mỗi lúc 1 món, làm rồi thì thôi mời
   const [guide, setGuide] = useState<{step: GuideStep; forced: boolean} | null>(null)
   const [guideShown, setGuideShown] = useState<GuideStep[]>([])
-  const [guideTried, setGuideTried] = useState<GuideStep[]>([])
   const guideLeft = useRef(0)
   // Lời mời vừa hiện thì giữ giao diện lại 1 lúc (khách ngồi yên thì giao diện tự ẩn sau 3,5s,
   // lời mời sẽ không ai thấy)
@@ -1236,14 +1255,6 @@ export function ChillRoom({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
     setGuideTried(loadTried())
-  }, [])
-  const markTried = useCallback((step: GuideStep) => {
-    setGuideTried((tried) => {
-      if (tried.includes(step)) return tried
-      const next = [...tried, step]
-      saveTried(next)
-      return next
-    })
   }, [])
   const onFocusOpen = useCallback(
     (open: boolean) => {
@@ -1259,6 +1270,7 @@ export function ChillRoom({
     cat: catPetted,
     diary: guideTried.includes('diary'),
     settings: settingsSeen,
+    shelf: shelf.owned.length > 0 || guideTried.includes('shelf'),
   }
   // Phòng không có ly, đang xem bàn nhóm, Studio tắt nhật ký → bỏ qua món đó
   const guideCan: Record<GuideStep, boolean> = {
@@ -1267,6 +1279,7 @@ export function ChillRoom({
     cat: !groupView,
     diary: diaryAvailable,
     settings: true,
+    shelf: shelfOn && !groupView,
   }
   const guideNext = guideShown.length < GUIDE_PER_VISIT ? (GUIDE_ORDER.find((s) => guideCan[s] && !guideDone[s] && !guideShown.includes(s)) ?? null) : null
   const activeGuide = guide && guideCan[guide.step] && (guide.forced || !guideDone[guide.step]) ? guide.step : null
@@ -1300,7 +1313,7 @@ export function ChillRoom({
   useEffect(() => {
     const scene = sceneRef.current
     if (!scene) return
-    const hit = activeGuide === 'drink' ? scene.drinkHitBox : activeGuide === 'cat' ? scene.catHitBox : null
+    const hit = activeGuide === 'drink' ? scene.drinkHitBox : activeGuide === 'cat' ? scene.catHitBox : activeGuide === 'shelf' ? scene.shelfFirstSlotBox : null
     if (hit) panTo(hit)
   }, [activeGuide, panTo])
   const pointAt = (step: GuideStep) => {
@@ -2186,9 +2199,10 @@ export function ChillRoom({
         }}
       />
 
-      {/* Món trên kệ sưu tầm: mở sổ sưu tầm ngay món đó */}
-      {!groupView &&
-        shelfBoxes.map(({id, box}) => (
+      {/* Món trên kệ sưu tầm: mở sổ sưu tầm ngay món đó. Lời mời "kệ" chỉ vào món đầu */}
+      {shelfOn &&
+        !groupView &&
+        shelfBoxes.map(({id, box}, i) => (
           <button
             key={id}
             type="button"
@@ -2199,12 +2213,38 @@ export function ChillRoom({
           >
             <span
               aria-hidden
-              className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
+              className={`absolute bottom-full left-1/2 mb-1 flex items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 sm:text-[11px] ${
+                i === 0 && guideOn('shelf') ? 'opacity-100 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite]' : 'pointer-events-none opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              }`}
+              style={{transform: 'translate(-50%, 0)'}}
             >
-              {t.shelf.items[id]?.name}
+              {i === 0 && guideOn('shelf') ? t.shelf.open : t.shelf.items[id]?.name}
             </span>
           </button>
         ))}
+      {/* Kệ chưa bày món nào (khách mới, hoặc đã cất hết): ô đầu của kệ là lối vào kệ. Ô này
+          không có hình gì, nên lúc đang mời thì bấm vào nhãn cũng mở kệ */}
+      {shelfOn && !groupView && !shelfBoxes.length && shelfStartBox && (
+        <button
+          type="button"
+          aria-label={t.shelf.open}
+          onClick={() => openShelf()}
+          className="group absolute min-h-11 min-w-11 cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          style={shelfStartBox}
+        >
+          <span
+            aria-hidden
+            className={`absolute bottom-full left-1/2 mb-1 flex w-max max-w-[14rem] items-center gap-1.5 rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 text-left font-mono text-[10px] uppercase leading-snug tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 sm:max-w-none sm:whitespace-nowrap sm:text-[11px] ${
+              guideOn('shelf') ? 'opacity-100 motion-safe:animate-[chill-bob_2.4s_ease-in-out_infinite]' : 'pointer-events-none opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+            }`}
+            style={{transform: 'translate(-50%, 0)'}}
+          >
+            <span aria-hidden>✨</span>
+            {shelf.owned.length ? t.shelf.open : t.shelf.empty}
+            <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
+          </span>
+        </button>
+      )}
 
       {/* Lọ tip trên bàn: mở bảng cảm ơn (tên người đã mời Bin cà phê) */}
       {jarBox && !groupView && (
@@ -2613,6 +2653,11 @@ export function ChillRoom({
         <Shelf
           open={shelfOpen}
           onClose={() => setShelfOpen(false)}
+          phins={regular.phins}
+          onBrew={() => {
+            setShelfOpen(false)
+            setFocusSignal((n) => n + 1)
+          }}
           state={shelf}
           selected={shelfPick}
           onSelect={setShelfPick}

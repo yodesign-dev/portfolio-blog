@@ -1439,6 +1439,12 @@ export class ChillScene {
     return this.shelfSlots().map(({item, x, y}) => ({id: item.id, box: itemHitBox(item, x, y)}))
   }
 
+  // Ô đầu của kệ (chỗ dễ thấy nhất) — kệ còn trống thì ChillRoom đặt lối vào kệ ở đây
+  get shelfFirstSlotBox() {
+    const slot = this.theme.shelf[0]
+    return slot ? {x: slot.x - 13, y: slot.y - 20, w: 26, h: 22} : null
+  }
+
   // Lọ tip → mở bảng cảm ơn, theo px gốc 640×360 (như cuốn sổ)
   get tipJarHitBox() {
     const {x, y} = this.theme.tipJar

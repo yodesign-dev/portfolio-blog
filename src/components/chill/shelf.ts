@@ -465,6 +465,19 @@ export function toggleShown(s: ShelfState, id: string): ShelfState {
 // Gợi ý cho món chưa có — trả về khoá i18n kiểu món + số phin (món thường)
 export const nextRegular = (s: ShelfState) => REGULAR.find((i) => !s.owned.some((o) => o.id === i.id))
 
+// Còn mấy phin nữa thì có món thường `item` (0 = đã có). Mỗi phin mèo mang ra tối đa 1 món,
+// món thường theo thứ tự (pickGift) → khách pha nhiều phin từ trước khi có kệ vẫn phải nhận
+// dần các món đứng trước. Món hiếm có thể chen vào nên đây là số ít nhất
+export function phinsLeft(s: ShelfState, item: ShelfItem, phins: number) {
+  let left = 0
+  for (const i of REGULAR) {
+    const have = s.owned.some((o) => o.id === i.id)
+    if (!have) left = Math.max(left + 1, (i.phins ?? 0) - phins)
+    if (i.id === item.id) return have ? 0 : left
+  }
+  return left
+}
+
 // ---------- Vẽ ----------
 
 export const spriteSize = (item: Sprite) => ({w: Math.max(...item.rows.map((r) => r.length)), h: item.rows.length})

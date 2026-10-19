@@ -1,7 +1,7 @@
 // Lời mời làm quen với quán (/chill): mỗi lúc chỉ mời 1 món, theo thứ tự dưới đây. Khách
 // làm rồi thì không mời lại; mỗi lần ghé mời tối đa GUIDE_PER_VISIT món. Tấm thực đơn
 // (nút "Thực đơn" trên thanh trên) liệt kê đủ các món, bấm dòng nào thì quán chỉ chỗ đó.
-export const GUIDE_ORDER = ['phin', 'drink', 'cat', 'diary', 'settings'] as const
+export const GUIDE_ORDER = ['phin', 'drink', 'cat', 'diary', 'shelf', 'settings'] as const
 export type GuideStep = (typeof GUIDE_ORDER)[number]
 
 // Lời mời đầu hiện trước khi giao diện kịp tự ẩn (IDLE_MS trong ChillRoom)
