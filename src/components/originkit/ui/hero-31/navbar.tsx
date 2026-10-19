@@ -70,7 +70,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
           type="button"
           aria-haspopup="dialog"
           onClick={() => openModal(undefined, "nav")}
-          className="h-full px-10 font-sans text-sm font-bold bg-brand text-white transition hover:bg-brand-hover flex items-center justify-center"
+          className="h-full px-10 font-sans text-sm font-bold bg-accent text-ink transition hover:bg-accent-hover flex items-center justify-center"
         >
           Get in touch
         </button>
@@ -116,7 +116,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
               setIsMenuOpen(false);
               openModal(undefined, "nav_mobile");
             }}
-            className="mt-4 w-full bg-brand px-6 py-4 font-sans text-sm font-bold text-white transition hover:bg-brand-hover"
+            className="mt-4 w-full bg-accent px-6 py-4 font-sans text-sm font-bold text-ink transition hover:bg-accent-hover"
           >
             Get in touch
           </button>

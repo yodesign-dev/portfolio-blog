@@ -84,7 +84,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => openModal(undefined, "hero_book_call")}
-                className="flex min-h-12 cursor-pointer items-center justify-center border border-white/60 px-6 text-base font-semibold text-white transition hover:border-white hover:bg-white/10"
+                className="flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-base font-semibold text-ink transition hover:bg-accent-hover"
               >
                 Get in touch
               </button>

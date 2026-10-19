@@ -228,7 +228,7 @@ export function ContactModal() {
                 data-cal-link="yoshark-bin/30min"
                 onClick={() => trackEvent({ name: "Book Call Click" })}
                 data-cal-config='{"layout":"month_view"}'
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-3 text-base font-semibold text-white transition hover:bg-neutral-700"
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-ink transition hover:bg-accent-hover"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -275,7 +275,7 @@ export function ContactModal() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="mt-6 w-full rounded-lg bg-neutral-900 px-4 py-2.5 text-base font-semibold text-white transition hover:bg-neutral-700"
+                className="mt-6 w-full rounded-lg bg-accent px-4 py-2.5 text-base font-semibold text-ink transition hover:bg-accent-hover"
               >
                 Close
               </button>
@@ -373,7 +373,7 @@ export function ContactModal() {
               <button
                 type="submit"
                 disabled={status === "submitting" || !captchaToken}
-                className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-ink transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-ink transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === "submitting" ? (
                   "Sending..."
