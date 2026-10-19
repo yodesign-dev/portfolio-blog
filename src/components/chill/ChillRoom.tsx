@@ -66,6 +66,8 @@ function visitRef() {
 }
 // Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
 const LISTEN_MINUTES = [1, 5, 15, 30, 60]
+// Mốc phút ngồi ở 1 cảnh (event Chill Stay) — dưới 5 phút coi như đang lướt xem
+const STAY_MINUTES = [5, 15, 30, 60]
 // Màn dọc: đã kéo ngang cảnh lần nào chưa (chưa → gợi ý "kéo để nhìn quanh")
 const PAN_SEEN_KEY = 'chill:pan-seen'
 const PAN_HINT_DELAY_MS = 1500
@@ -958,6 +960,36 @@ export function ChillRoom({
     }, 1000)
     return () => clearInterval(id)
   }, [travel, destinations.length])
+
+  // Mốc thời gian ngồi ở từng cảnh (event Chill Stay), cộng dồn theo cảnh trong 1 lần mở
+  // trang. Chỉ tính khi khách tự ở lại: chuyển ga tắt, tab đang hiện, nhìn thấy phố
+  // (bàn nhóm tường gạch che phố). Đồng hồ thật như Chill Listen, máy ngủ tối đa ~1 phút
+  const stayMs = useRef(new Map<string, number>())
+  const stayMark = useRef(new Map<string, number>())
+  const staying = entered && !travel && (!groupView || groupWall === 'glass')
+  useEffect(() => {
+    if (!staying) return
+    const place = dest.id
+    let last = Date.now()
+    const tick = () => {
+      const now = Date.now()
+      if (document.visibilityState === 'visible') {
+        stayMs.current.set(place, (stayMs.current.get(place) ?? 0) + Math.min(now - last, 65_000))
+      }
+      last = now
+      const mark = stayMark.current.get(place) ?? 0
+      const minutes = STAY_MINUTES[mark]
+      if (minutes && (stayMs.current.get(place) ?? 0) >= minutes * 60_000) {
+        stayMark.current.set(place, mark + 1)
+        trackEvent({name: 'Chill Stay', props: {place, minutes}})
+      }
+    }
+    const id = setInterval(tick, 5000)
+    return () => {
+      clearInterval(id)
+      tick()
+    }
+  }, [staying, dest.id])
 
   useEffect(() => {
     sceneRef.current?.setMusic(playing)
@@ -2869,7 +2901,10 @@ export function ChillRoom({
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        onClick={() => goTo(i)}
+                        onClick={() => {
+                          if (!active) trackEvent({name: 'Chill Place', props: {place: d.id, how: 'pick'}})
+                          goTo(i)
+                        }}
                         className={`group relative overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
                           active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
                         }`}
@@ -2903,6 +2938,8 @@ export function ChillRoom({
                         role="radio"
                         aria-checked={travel === o.value}
                         onClick={() => {
+                          // Tắt chuyển ga khi đang ở cảnh này = muốn dừng lại ở đây
+                          if (!o.value && travel) trackEvent({name: 'Chill Place', props: {place: dest.id, how: 'stop'}})
                           setTravel(o.value)
                           travelRef.current = 0
                           setTravelElapsed(0)

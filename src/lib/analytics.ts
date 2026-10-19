@@ -33,6 +33,12 @@ export type AnalyticsEvent =
   | {name: 'Chill Update Try'; props: {action: string}}
   | {name: 'Chill Table'; props: {action: 'create' | 'join' | 'copy' | 'leave' | 'view' | 'wall-glass' | 'wall-brick'}}
   | {name: 'Chill Zen'; props: {on: 'on' | 'off'}}
+  // Cảnh nào được thích: `place` = slug điểm đến trong Studio.
+  // Chill Place: pick = tự bấm chọn cảnh · stop = tắt "tự chuyển ga" khi đang ở cảnh này
+  // (chuyển ga tự động không tính). Chill Stay: mốc phút ngồi ở 1 cảnh trong 1 lần mở
+  // trang — chỉ tính lúc tab đang hiện, chuyển ga đang tắt và nhìn thấy phố
+  | {name: 'Chill Place'; props: {place: string; how: 'pick' | 'stop'}}
+  | {name: 'Chill Stay'; props: {place: string; minutes: number}}
   // Bảng nhật ký: mở bảng / treo mẩu lên tường / cất mẩu vào sổ / báo cáo mẩu
   | {name: 'Chill Diary'; props: {action: 'open' | 'pin' | 'keep' | 'report'}}
   // Khách chọn món cà phê cho ly trên bàn nhật ký
