@@ -258,8 +258,11 @@ export function ChillRoom({
 
   const track = tracks[index]
   // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
+  // `station` chỉ là tab đang xem — bài đang phát giữ nguyên trạm của nó cho tới khi chọn bài khác
   const stationList = tracks.map((tr, i) => ({tr, i})).filter(({tr}) => stationOf(tr) === station)
-  const stationPos = stationList.findIndex(({i}) => i === index)
+  const playingStation = stationOf(track)
+  const playingList = tracks.filter((tr) => stationOf(tr) === playingStation)
+  const playingPos = playingList.indexOf(track)
   const dest = destinations[destIndex]
   const nextDest = destinations[(destIndex + 1) % destinations.length]
 
@@ -922,19 +925,17 @@ export function ChillRoom({
     playAt(list[(pos - 1 + list.length) % list.length].i)
   }, [index, playAt, started, tracks])
 
+  // Đổi tab trạm chỉ đổi danh sách đang xem; bài đang phát / tạm dừng vẫn giữ nguyên. Chưa
+  // phát bài nào thì bài đầu của trạm thành bài chờ, bấm Play là nghe trạm đó
   const changeStation = (id: StationId) => {
     if (id === station) return
     setStation(id)
+    if (started) return
     const first = tracks.findIndex((t) => stationOf(t) === id)
     if (first < 0) return
-    if (playing) playAt(first, true)
-    else {
-      setIndex(first)
-      setPosition(0)
-      setDuration(tracks[first].duration)
-      setStarted(false)
-      audioRef.current?.pause()
-    }
+    setIndex(first)
+    setPosition(0)
+    setDuration(tracks[first].duration)
   }
 
   // Nút "Thử ngay" trong nhật ký: đưa người xem tới đúng tính năng
@@ -1506,7 +1507,7 @@ export function ChillRoom({
   const weatherLabel = t.room.weathers[weather]
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
-  const stationLabel = STATIONS.find((st) => st.id === station)?.label ?? ''
+  const stationLabel = STATIONS.find((st) => st.id === playingStation)?.label ?? ''
   const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
@@ -2274,7 +2275,7 @@ export function ChillRoom({
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
-                {stationLabel} · {stationPos + 1}/{stationList.length}
+                {stationLabel} · {playingPos + 1}/{playingList.length}
               </p>
               <p className="truncate font-semibold">{track.title}</p>
             </div>
