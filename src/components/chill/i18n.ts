@@ -120,7 +120,7 @@ const en = {
     menuMore: 'More',
     menuCopied: 'Link copied',
     menuItems: {
-      phin: {title: 'Brew a phin', desc: 'Jot a few tasks for today, pick 15, 25 or 45 minutes, and cross one off when the phin is done.'},
+      phin: {title: 'Brew a phin', desc: 'Pick 15, 25 or 45 minutes. Today’s tasks live in the notebook on the counter — cross one off when the phin is done.'},
       drink: {title: 'Pick your coffee', desc: 'Iced black, iced milk or bạc xỉu — tap the glass on the counter.'},
       cat: {title: 'Pet the cat', desc: 'It naps on the counter and has a word or two for you.'},
       diary: {title: 'Write in the diary', desc: 'Two notes a day. The café keeps them for a week.'},
@@ -247,6 +247,14 @@ const en = {
     doneToday: (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'} crossed off today`,
     checkAria: (text: string) => `Done: ${text}`,
     removeAria: (text: string) => `Remove: ${text}`,
+    // Cuốn sổ trên quầy (TodayBook.tsx)
+    bookLabel: 'Today’s list',
+    bookOpen: 'Open today’s list',
+    bookTip: 'Jot today’s tasks here',
+    bookHint: 'Brew a phin and pick one of these for it, then cross it off. Saved on this device only.',
+    bookCount: (done: number, total: number) => `${done}/${total} crossed off`,
+    brew: 'Brew a phin',
+    close: 'Close',
   },
   regular: {
     card: (n: number) => `Regular’s card${n > 1 ? ` · #${n}` : ''}`,
@@ -580,7 +588,7 @@ const vi: typeof en = {
     menuMore: 'Khác',
     menuCopied: 'Đã copy link',
     menuItems: {
-      phin: {title: 'Pha một phin', desc: 'Ghi vài việc cho hôm nay, hẹn 15, 25 hay 45 phút, xong phin thì gạch.'},
+      phin: {title: 'Pha một phin', desc: 'Hẹn 15, 25 hay 45 phút. Việc hôm nay ghi ở cuốn sổ trên quầy, xong phin thì gạch.'},
       drink: {title: 'Chọn món', desc: 'Đen đá, sữa đá hay bạc xỉu — bấm vào ly trên quầy.'},
       cat: {title: 'Vuốt mèo', desc: 'Nó nằm ngủ trên quầy, có đôi lời cho bạn.'},
       diary: {title: 'Viết vào sổ nhật ký', desc: 'Mỗi ngày 2 mẩu. Quán giữ lại một tuần.'},
@@ -707,6 +715,13 @@ const vi: typeof en = {
     doneToday: (n) => `Hôm nay đã gạch ${n} việc`,
     checkAria: (text) => `Xong: ${text}`,
     removeAria: (text) => `Xoá: ${text}`,
+    bookLabel: 'Việc hôm nay',
+    bookOpen: 'Mở việc hôm nay',
+    bookTip: 'Ghi việc hôm nay ở đây',
+    bookHint: 'Pha phin thì chọn một việc cho nó, xong phin thì gạch. Chỉ lưu trên máy này.',
+    bookCount: (done, total) => `Đã gạch ${done}/${total}`,
+    brew: 'Pha một phin',
+    close: 'Đóng',
   },
   regular: {
     card: (n) => `Thẻ khách quen${n > 1 ? ` · thẻ ${n}` : ''}`,

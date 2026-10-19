@@ -24,6 +24,7 @@ import {PixelGlass} from './pixel-icons'
 import {Shelf} from './ShelfBook'
 import {addItem, loadShelf, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
+import {BookSparkles, TodayBook} from './TodayBook'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
 const PREFS_KEY = 'chill:prefs'
@@ -51,6 +52,11 @@ const CAT_SAY_MS = 4500
 const CAT_HOLD_MS = 350
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
+// Đã mở cuốn sổ "Việc hôm nay" trên quầy lần nào chưa (chưa → sao lấp lánh + nhãn gợi ý)
+const BOOK_SEEN_KEY = 'chill:book-seen'
+// Nhãn gợi ý cạnh cuốn sổ cho khách chưa mở: hiện sau khi vào quán bấy lâu, rồi tự tắt
+const BOOK_TIP_DELAY_MS = 4000
+const BOOK_TIP_MS = 9000
 
 // Nguồn khách cho event Chill Visit: ?ref= (vd yt, ext), không có thì utm_source
 function visitRef() {
@@ -245,6 +251,12 @@ export function ChillRoom({
   const [seatBoxes, setSeatBoxes] = useState<(Box | null)[]>([])
   const [moreBox, setMoreBox] = useState<Box | null>(null)
   const [wishOpen, setWishOpen] = useState(false)
+  const [todayOpen, setTodayOpen] = useState(false)
+  // Mặc định coi như đã mở để khỏi nháy sao lúc hydrate; đọc storage xong mới biết
+  const [bookSeen, setBookSeen] = useState(true)
+  // Vừa xong 1 phin → sổ lấp lánh lại tới khi khách mở (nhắc gạch việc)
+  const [bookNudge, setBookNudge] = useState(false)
+  const [bookTip, setBookTip] = useState(false)
   const [diaryOpen, setDiaryOpen] = useState(false)
   // Lọ tip + bảng cảm ơn: số ly Bin đã xác nhận, người đồng ý hiện tên
   const [board, setBoard] = useState<Board | null>(null)
@@ -859,6 +871,7 @@ export function ChillRoom({
     sceneRef.current?.noticeCat()
     sayCat(t.room.catPhin)
     setRegular((r) => addPhin(r, minutes))
+    setBookNudge(true)
     if (!shelfOn) return
     // Mèo mang ra 1 món cho kệ (nếu tới lượt) — hiện trong bảng tổng kết phin
     const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time})
@@ -867,6 +880,40 @@ export function ChillRoom({
     setGift(item.id)
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
   }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time])
+
+  // ---------- Cuốn sổ "Việc hôm nay" ----------
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBookSeen(localStorage.getItem(BOOK_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → coi như đã thấy, không lấp lánh mãi
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!entered || bookSeen) return
+    const show = window.setTimeout(() => setBookTip(true), BOOK_TIP_DELAY_MS)
+    const hide = window.setTimeout(() => setBookTip(false), BOOK_TIP_DELAY_MS + BOOK_TIP_MS)
+    return () => {
+      window.clearTimeout(show)
+      window.clearTimeout(hide)
+    }
+  }, [entered, bookSeen])
+
+  const openTodayBook = useCallback(() => {
+    setTodayOpen(true)
+    setBookTip(false)
+    setBookNudge(false)
+    setBookSeen(true)
+    try {
+      localStorage.setItem(BOOK_SEEN_KEY, '1')
+    } catch {
+      // Chặn storage — lần sau lấp lánh lại, không sao
+    }
+    trackEvent({name: 'Chill Todo', props: {action: 'book'}})
+  }, [])
+  const closeTodayBook = useCallback(() => setTodayOpen(false), [])
 
   // ---------- Điểm đến ----------
 
@@ -1157,7 +1204,7 @@ export function ChillRoom({
     }
   }, [panelOpen, settingsSeen])
   // Hiện sau khi bấm Play một lúc, nhường thông báo "Có gì mới" hiện trước
-  const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast || diaryOpen || shelfOpen
+  const otherOverlay = wishOpen || todayOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast || diaryOpen || shelfOpen
 
   // Bảng nhật ký phủ gần hết màn hình → mở bảng / khung khác thì nhật ký tự đóng
   useEffect(() => {
@@ -1564,7 +1611,7 @@ export function ChillRoom({
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === playingStation)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !todayOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
   const guideVisible = entered && !zen && !guideBusy && (activeGuide === 'settings' || !hideUi)
@@ -2103,27 +2150,41 @@ export function ChillRoom({
         </div>
       )}
 
-      {/* Cuốn sổ trên bàn: mở Wishlist (lối vào thứ 2, cạnh nút pill) */}
+      {/* Cuốn sổ trên quầy = "Việc hôm nay" (TodayBook). Chưa mở lần nào, hoặc vừa xong 1 phin:
+          sao lấp lánh; lần đầu thêm nhãn gợi ý hiện sẵn. Góp ý chỉ còn nút pill góc phải dưới */}
       {bookBox && !groupView && (
         <button
           type="button"
-          aria-label={t.room.openWishlist}
+          data-today-book
+          aria-label={t.todo.bookOpen}
           onClick={() => {
             setPanelOpen(false)
             setChatOpen(false)
-            setWishOpen(true)
+            setWishOpen(false)
+            openTodayBook()
           }}
-          className="group absolute cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          className="group absolute min-h-11 min-w-11 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
           style={bookBox}
         >
+          {entered && !hideUi && (!bookSeen || bookNudge) && <BookSparkles />}
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
+            className={`pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px] ${
+              bookTip && entered && !hideUi ? 'opacity-100' : 'opacity-0'
+            }`}
           >
-            💡 {t.room.wishlist}
+            📝 {bookTip ? t.todo.bookTip : t.todo.bookLabel}
           </span>
         </button>
       )}
+      <TodayBook
+        open={todayOpen}
+        onClose={closeTodayBook}
+        onBrew={() => {
+          closeTodayBook()
+          setFocusSignal((n) => n + 1)
+        }}
+      />
 
       {/* Món trên kệ sưu tầm: mở sổ sưu tầm ngay món đó */}
       {!groupView &&
