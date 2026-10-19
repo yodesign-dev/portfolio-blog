@@ -4,12 +4,12 @@ import {Resend} from "resend";
 import {client} from "@/sanity/lib/client";
 import {writeClient} from "@/sanity/lib/writeClient";
 import {checkText, clean, overLimit, redis} from "@/lib/chillChat";
-import {KEEP_DAYS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, dayOf, isMood, type DiaryNote} from "@/components/chill/diary-shared";
+import {KEEP_DAYS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, dayOf, isMood, type DiaryNote, type Quote} from "@/components/chill/diary-shared";
 
 // Bảng nhật ký của trang /chill (xem src/components/chill/diary-shared.ts).
 //
-// GET  → {open, notes, cafe} — mẩu giấy công khai của 7 ngày gần nhất (không bao giờ trả
-//        uidHash / ipHash) + câu riêng của quán nếu Studio có điền. CDN giữ 15s.
+// GET  → {open, notes, cafe, quote} — mẩu giấy công khai của 7 ngày gần nhất (không bao giờ
+//        trả uidHash / ipHash) + câu riêng của quán / câu danh ngôn nếu Studio có điền. CDN giữ 15s.
 // POST {action: "post", uid, name, text, mood, captchaToken} → treo 1 mẩu lên bảng
 //        (hiện ngay, không chờ duyệt). Mỗi người 2 mẩu / ngày theo giờ Hà Nội.
 // POST {action: "report", id} → báo cáo; đủ 2 máy khác nhau thì mẩu tự ẩn.
@@ -34,37 +34,42 @@ const LIST_QUERY = `*[_type == "chillNote" && hidden != true && _createdAt > $si
   "id": _id, text, mood, "name": coalesce(name, ""), day, "ts": dateTime(_createdAt)
 }`;
 
-type Settings = {open: boolean; cafe: {vi: string; en: string} | null};
+type Settings = {open: boolean; cafe: {vi: string; en: string} | null; quote: Quote | null};
 
 async function settings(): Promise<Settings> {
   try {
-    const s = await client.fetch<{open?: boolean; vi?: string; en?: string} | null>(
-      `*[_id == "chillSettings"][0]{"open": diaryOpen, "vi": diaryNoteVi, "en": diaryNoteEn}`,
+    const s = await client.fetch<{open?: boolean; vi?: string; en?: string; qEn?: string; qVi?: string; qBy?: string} | null>(
+      `*[_id == "chillSettings"][0]{"open": diaryOpen, "vi": diaryNoteVi, "en": diaryNoteEn, "qEn": diaryQuoteEn, "qVi": diaryQuoteVi, "qBy": diaryQuoteBy}`,
       {},
       {next: {revalidate: 30}},
     );
     const vi = s?.vi?.trim();
-    return {open: s?.open === true, cafe: vi ? {vi, en: s?.en?.trim() || vi} : null};
+    const qEn = s?.qEn?.trim();
+    return {
+      open: s?.open === true,
+      cafe: vi ? {vi, en: s?.en?.trim() || vi} : null,
+      quote: qEn ? {en: qEn, vi: s?.qVi?.trim() || "", by: s?.qBy?.trim() || ""} : null,
+    };
   } catch {
     // Không đọc được công tắc → coi như đang tắt (tính năng thử nghiệm, an toàn là trên hết)
-    return {open: false, cafe: null};
+    return {open: false, cafe: null, quote: null};
   }
 }
 
 export async function GET() {
   const cache = {"Cache-Control": "public, s-maxage=15, stale-while-revalidate=60"};
-  const {open, cafe} = await settings();
-  if (!open) return NextResponse.json({open: false, notes: [], cafe: null}, {headers: cache});
+  const {open, cafe, quote} = await settings();
+  if (!open) return NextResponse.json({open: false, notes: [], cafe: null, quote: null}, {headers: cache});
   try {
     const since = new Date(Date.now() - KEEP_MS).toISOString();
     const rows = await writeClient.fetch<(Omit<DiaryNote, "ts"> & {ts: string})[]>(LIST_QUERY, {since});
     const notes: DiaryNote[] = rows
       .filter((n) => isMood(n.mood) && typeof n.text === "string")
       .map((n) => ({...n, ts: Date.parse(n.ts), day: n.day || dayOf(Date.parse(n.ts))}));
-    return NextResponse.json({open: true, notes, cafe}, {headers: cache});
+    return NextResponse.json({open: true, notes, cafe, quote}, {headers: cache});
   } catch (error) {
     console.error("chill-diary list error:", error);
-    return NextResponse.json({open: true, notes: [], cafe, error: true}, {status: 500});
+    return NextResponse.json({open: true, notes: [], cafe, quote, error: true}, {status: 500});
   }
 }
 

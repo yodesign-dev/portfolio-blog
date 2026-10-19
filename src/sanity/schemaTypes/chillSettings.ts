@@ -53,6 +53,28 @@ export default defineType({
       validation: (rule) => rule.max(140),
       description: 'Bản tiếng Anh của câu trên. Để trống thì khách xem tiếng Anh thấy câu tiếng Việt.',
     }),
+    defineField({
+      name: 'diaryQuoteEn',
+      title: 'Câu danh ngôn hôm nay (tiếng Anh, chữ lớn)',
+      type: 'string',
+      validation: (rule) => rule.max(200),
+      description:
+        'Để trống = quán tự lấy 1 câu trong kho 20 câu theo ngày. Điền vào để thay bằng câu riêng (vd. ngày Tết) — nhớ xoá đi khi hết dịp.',
+    }),
+    defineField({
+      name: 'diaryQuoteVi',
+      title: 'Câu danh ngôn hôm nay (tiếng Việt, chữ nhỏ)',
+      type: 'string',
+      validation: (rule) => rule.max(200),
+      description: 'Bản tiếng Việt in nhỏ bên dưới. Để trống thì chỉ hiện câu tiếng Anh.',
+    }),
+    defineField({
+      name: 'diaryQuoteBy',
+      title: 'Tác giả câu danh ngôn',
+      type: 'string',
+      validation: (rule) => rule.max(60),
+      description: 'Vd. "Seneca" hoặc "Confucius · Khổng Tử". Để trống thì không ghi tên.',
+    }),
   ],
   preview: {prepare: () => ({title: 'Chill · Cài đặt'})},
 })

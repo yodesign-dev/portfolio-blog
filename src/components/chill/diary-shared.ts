@@ -83,3 +83,66 @@ export function cafeQuestionOf(day: string) {
   const since = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${QUESTIONS_FROM}T00:00:00Z`)) / 86_400_000)
   return CAFE_QUESTIONS[since % CAFE_QUESTIONS.length]
 }
+
+// Câu danh ngôn của hôm nay: tờ giấy in dán trong sổ, tiếng Anh lớn + tiếng Việt nhỏ (cố định
+// thứ tự, không theo ngôn ngữ đang xem). Chủ đề: mục tiêu, bắt đầu, bền bỉ. Chỉ lấy câu có
+// nguồn rõ (sách, thư, tục ngữ) — nhiều "danh ngôn" trên mạng bị gán nhầm tác giả. Bản tiếng
+// Anh của tác giả cổ là bản dịch tự viết, không chép bản dịch có bản quyền.
+// Studio › Chill · Cài đặt có ô ghi đè cho ngày đặc biệt.
+export type Quote = {en: string; vi: string; by: string}
+export const CAFE_QUOTES: Quote[] = [
+  // Mục tiêu
+  {en: 'If you don’t know which port you’re sailing to, no wind is the right wind.', vi: 'Không biết mình đi về bến nào thì chẳng ngọn gió nào là thuận.', by: 'Seneca'},
+  {en: 'First tell yourself who you want to be, then do what you have to do.', vi: 'Trước hết hãy nói với mình bạn muốn trở thành ai, rồi làm những gì cần làm.', by: 'Epictetus'},
+  {en: 'If you have built castles in the air, your work need not be lost; that is where they should be. Now put the foundations under them.', vi: 'Nếu bạn đã xây lâu đài trên mây thì đừng tiếc, đó đúng là chỗ của nó. Giờ hãy xây móng bên dưới.', by: 'Henry David Thoreau'},
+  {en: 'A craftsman who wants to do good work must first sharpen his tools.', vi: 'Người thợ muốn làm việc cho khéo, trước hết phải mài sắc đồ nghề.', by: 'Confucius · Khổng Tử'},
+  {en: 'Do what you can, with what you have, where you are.', vi: 'Làm những gì bạn có thể, bằng những gì bạn có, ngay tại nơi bạn đứng.', by: 'Theodore Roosevelt'},
+  {en: 'Trust yourself: every heart vibrates to that iron string.', vi: 'Hãy tin chính mình: trái tim nào cũng rung theo sợi dây ấy.', by: 'Ralph Waldo Emerson'},
+  // Bắt đầu
+  {en: 'A journey of a thousand miles begins with a single step.', vi: 'Hành trình vạn dặm bắt đầu từ một bước chân.', by: 'Lao Tzu · Lão Tử'},
+  {en: 'Well begun is half done.', vi: 'Bắt đầu được là đã xong một nửa.', by: 'Horace'},
+  {en: 'While we put things off, life speeds by.', vi: 'Trong lúc ta còn hẹn lần lữa, đời đã trôi qua.', by: 'Seneca'},
+  {en: 'Stop arguing about what a good person should be. Be one.', vi: 'Đừng mất thời gian bàn người tốt phải ra sao nữa. Hãy là người đó.', by: 'Marcus Aurelius'},
+  {en: 'Well done is better than well said.', vi: 'Làm tốt hơn nói hay.', by: 'Benjamin Franklin'},
+  {en: 'He who conquers others is strong; he who conquers himself is mighty.', vi: 'Thắng người là có sức, thắng mình mới là mạnh.', by: 'Lao Tzu · Lão Tử'},
+  // Bền bỉ
+  {en: 'Dripping water hollows out stone.', vi: 'Nước nhỏ giọt mãi cũng mòn đá.', by: 'Ovid'},
+  {en: 'No great thing is created suddenly, any more than a bunch of grapes or a fig.', vi: 'Không điều gì lớn lao thành ra trong chốc lát, như chùm nho hay trái vả cũng vậy.', by: 'Epictetus'},
+  {en: 'Great things are not done by impulse, but by a series of small things brought together.', vi: 'Việc lớn không làm bằng một phút bốc đồng, mà bằng nhiều việc nhỏ góp lại.', by: 'Vincent van Gogh'},
+  {en: 'Genius is one percent inspiration and ninety-nine percent perspiration.', vi: 'Thiên tài là 1% cảm hứng và 99% mồ hôi.', by: 'Thomas Edison'},
+  {en: 'Grind an iron bar long enough and it becomes a needle.', vi: 'Có công mài sắt, có ngày nên kim.', by: 'Vietnamese proverb · Tục ngữ'},
+  {en: 'Carry it bit by bit, and the ant fills its nest.', vi: 'Kiến tha lâu cũng đầy tổ.', by: 'Vietnamese proverb · Tục ngữ'},
+  {en: 'Failure is the mother of success.', vi: 'Thất bại là mẹ thành công.', by: 'Proverb · Tục ngữ'},
+  {en: 'Nothing is truly hard, only a heart that won’t hold on.', vi: 'Không có việc gì khó, chỉ sợ lòng không bền.', by: 'Hồ Chí Minh'},
+]
+
+// Xáo kho câu theo 1 hạt giống cố định (mulberry32) — cùng hạt thì cùng thứ tự trên mọi máy
+function shuffled(n: number, seed: number) {
+  let s = seed >>> 0
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const order = Array.from({length: n}, (_, i) => i)
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return order
+}
+
+// Câu của 1 ngày (YYYY-MM-DD): cùng ngày thì ai cũng thấy cùng 1 câu. Mỗi vòng (= số câu
+// trong kho) xáo lại 1 lần nên trông như ngẫu nhiên mà không lặp câu trước khi hết kho, và
+// không lặp câu ở chỗ nối 2 vòng. Sổ chỉ hiện câu của hôm nay nên thêm câu vào kho (đổi
+// thứ tự) cũng không sao.
+export function cafeQuoteOf(day: string): Quote {
+  const n = CAFE_QUOTES.length
+  const days = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86_400_000)
+  const round = Math.floor(days / n)
+  const order = shuffled(n, round)
+  const prevLast = shuffled(n, round - 1)[n - 1]
+  if (order[0] === prevLast) [order[0], order[1]] = [order[1], order[0]]
+  return CAFE_QUOTES[order[((days % n) + n) % n]]
+}

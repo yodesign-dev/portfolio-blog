@@ -21,7 +21,7 @@ import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixe
 import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
-import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, dayOf, isMood, recentDays, type DiaryNote, type Mood} from './diary-shared'
+import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, cafeQuoteOf, dayOf, isMood, recentDays, type DiaryNote, type Mood, type Quote} from './diary-shared'
 
 // Chữ cho cuốn sổ, đều có dấu tiếng Việt: nét bút bi viết tay cho nội dung, nét bút dạ cho
 // tiêu đề (tháng, thứ). Chỉ tải khi mở sổ, không preload cho cả trang
@@ -47,7 +47,7 @@ type MyNote = DiaryNote & {kind: Kind}
 type ShownNote = DiaryNote & {kind?: Kind; mine?: boolean}
 // `read` = id các mẩu quán đã đưa cho khách này đọc (mẩu "người trước để lại")
 type Store = {mine: MyNote[]; hidden: string[]; seen: number; read: string[]}
-type Room = {open: boolean; notes: DiaryNote[]; cafe: {vi: string; en: string} | null}
+type Room = {open: boolean; notes: DiaryNote[]; cafe: {vi: string; en: string} | null; quote: Quote | null}
 
 const EMPTY: Store = {mine: [], hidden: [], seen: 0, read: []}
 
@@ -148,7 +148,7 @@ export function Diary({
     try {
       const res = await fetch('/api/chill-diary')
       const data = (await res.json()) as Room
-      setRoom({open: data.open === true, notes: data.notes ?? [], cafe: data.cafe ?? null})
+      setRoom({open: data.open === true, notes: data.notes ?? [], cafe: data.cafe ?? null, quote: data.quote ?? null})
       setNow(Date.now())
     } catch {
       // Mạng chập chờn — lần sau hỏi lại
@@ -267,6 +267,7 @@ export function Diary({
 
   const cafe = room.cafe ?? cafeNoteOf(today)
   const cafeText = cafe[lang] || cafe.vi
+  const quote = room.quote ?? cafeQuoteOf(today)
   const top = others.find((n) => n.id === pick?.id) ?? null
   const topPaper = top ? PAPER[top.mood] : PIN_PAPER
   // Câu hỏi của quán mà mẩu này trả lời (mẩu của những ngày quán chưa hỏi thì không có)
@@ -438,6 +439,7 @@ export function Diary({
           days={days}
           today={today}
           cafeText={cafeText}
+          quote={quote}
           left={left}
           filtered={mood !== null}
           composing={composing}
@@ -509,6 +511,7 @@ function Book({
   days,
   today,
   cafeText,
+  quote,
   left,
   filtered,
   composing,
@@ -523,6 +526,7 @@ function Book({
   days: string[]
   today: string
   cafeText: string
+  quote: Quote
   left: number
   // Đang lọc theo tâm trạng → ẩn mẩu của mèo quán + báo khi không có mẩu nào khớp
   filtered: boolean
@@ -595,7 +599,7 @@ function Book({
     return () => {
       alive = false
     }
-  }, [notes, composing, filtered, lang, box.w, box.h, gap, step, cafeText, left])
+  }, [notes, composing, filtered, lang, box.w, box.h, gap, step, cafeText, quote, left])
 
   // Trang chứa 1 phần tử trong sổ (đo theo vị trí thật, không phụ thuộc đang lật tới đâu)
   const spreadOf = useCallback(
@@ -896,6 +900,29 @@ function Book({
                     />
                   </div>
                 </div>
+              )}
+
+              {/* Câu danh ngôn của hôm nay: mẩu giấy in (chữ có chân, không phải chữ viết tay) dán
+                  vào sổ — tiếng Anh lớn, tiếng Việt nhỏ bên dưới, thứ tự cố định với mọi khách */}
+              {!filtered && (
+                <figure className="break-inside-avoid pb-[24px]">
+                  <div className="relative mx-auto w-[90%] rotate-[1.5deg] border-2 border-[#2a1a10] bg-[#fffaf0] px-4 pb-3 pt-4 font-serif text-[#3a2a20] shadow-[0_10px_14px_-10px_rgba(60,40,20,0.55)]">
+                    <p className="font-mono text-[10px] uppercase leading-[16px] tracking-[0.16em] text-[#8a6a55]">
+                      {t.diary.quoteLabel} · {today.slice(8, 10)}.{today.slice(5, 7)}
+                    </p>
+                    <blockquote className="mt-2">
+                      <p lang="en" className="text-[17px] leading-[24px]">“{quote.en}”</p>
+                      {quote.vi && (
+                        <p lang="vi" className="mt-2 border-t border-dashed border-[#c9b49a] pt-2 text-[13px] italic leading-[19px] text-[#7a5d4a]">
+                          “{quote.vi}”
+                        </p>
+                      )}
+                    </blockquote>
+                    {quote.by && <figcaption className="mt-2 text-right text-[12px] leading-[16px] text-[#8a6a55]">— {quote.by}</figcaption>}
+                    {/* Mẩu băng keo trong dán xéo góc trên trái */}
+                    <span aria-hidden className="absolute -left-[14px] -top-[9px] h-[18px] w-[58px] -rotate-[28deg] bg-[rgba(235,225,200,0.75)] shadow-[0_1px_2px_rgba(90,60,20,0.2)]" />
+                  </div>
+                </figure>
               )}
 
               {dayList.map((day) => {
