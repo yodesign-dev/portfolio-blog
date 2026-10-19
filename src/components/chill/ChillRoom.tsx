@@ -2817,6 +2817,15 @@ export function ChillRoom({
             </a>{' '}
             (CC BY 4.0)
           </span>
+          <span className="text-white/30 sm:basis-full">
+            <Link href="/chill/terms" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline">
+              {t.room.terms}
+            </Link>
+            {' · '}
+            <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline">
+              {t.room.privacy}
+            </Link>
+          </span>
         </div>
       </aside>
       </div>
@@ -2886,6 +2895,16 @@ export function ChillRoom({
             >
               {t.welcome.look}
             </button>
+            {/* Bấm link không được tính là "vào quán" (cả màn chào bắt click) */}
+            <p className="mt-1 text-[10px] text-white/45" onClick={(e) => e.stopPropagation()}>
+              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline">
+                {t.room.terms}
+              </Link>
+              {' · '}
+              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-white hover:underline">
+                {t.room.privacy}
+              </Link>
+            </p>
           </div>
         </div>
       )}

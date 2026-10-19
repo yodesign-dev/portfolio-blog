@@ -27,6 +27,7 @@ const STRINGS = {
     rainOn: 'Turn rain on',
     rainOff: 'Turn rain off',
     open: 'Open the café',
+    terms: 'Terms & copyright',
     times: {morning: 'Morning', afternoon: 'Afternoon', night: 'Night'},
   },
   vi: {
@@ -36,6 +37,7 @@ const STRINGS = {
     rainOn: 'Bật mưa',
     rainOff: 'Tắt mưa',
     open: 'Vào quán',
+    terms: 'Điều khoản & bản quyền',
     times: {morning: 'Sáng', afternoon: 'Chiều', night: 'Tối'},
   },
 } as const
@@ -292,6 +294,18 @@ export function ChillEmbed({tracks, destinations}: {tracks: Track[]; destination
         className="absolute right-2 top-2 bg-[#e8b27d] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#2a1a10] transition-colors hover:bg-[#f3c89a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         {t.open} ↗
+      </a>
+
+      {/* Điều khoản khi nhúng: phải giữ link về quán, không sửa rồi đóng gói lại */}
+      <a
+        href="/chill/terms"
+        target="_blank"
+        rel="noopener"
+        aria-label={t.terms}
+        title={t.terms}
+        className="absolute right-2 top-9 px-1 text-[10px] text-white/55 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-white"
+      >
+        ©
       </a>
 
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/80 via-black/55 to-transparent px-2 pb-2 pt-6">

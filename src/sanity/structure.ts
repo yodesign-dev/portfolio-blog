@@ -51,6 +51,11 @@ export const structure: StructureResolver = (S) =>
         .title('Chill · Cài đặt')
         .id('chillSettings')
         .child(S.document().schemaType('chillSettings').documentId('chillSettings')),
+      // Điều khoản & Quyền riêng tư: /chill/terms và /chill/privacy
+      S.listItem()
+        .title('Chill · Pháp lý')
+        .id('chillLegal')
+        .child(S.document().schemaType('chillLegal').documentId('chillLegal')),
       // Góp ý người xem gửi từ khung Wishlist (tạo qua API, không tạo tay ở đây)
       S.listItem()
         .title('Chill · Wishlist')
@@ -145,6 +150,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillNote'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillNote', 'chillLegal'].includes(listItem.getId() as string),
       ),
     ])

@@ -64,9 +64,18 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
       </div>
 
       <div className="border-t border-white/10">
-        <p className="mx-auto max-w-6xl px-6 py-6 text-sm text-white/50 sm:px-8">
-          © {new Date().getFullYear()} {SITE_NAME}. Learn by sharing, share by learning.
-        </p>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-6 text-sm text-white/50 sm:px-8">
+          <p>© {new Date().getFullYear()} {SITE_NAME}. Learn by sharing, share by learning.</p>
+          {/* Điều khoản & quyền riêng tư hiện chỉ áp dụng cho quán /chill */}
+          <p className="flex gap-4">
+            <Link href="/chill/terms" className="transition hover:text-white">
+              /chill terms
+            </Link>
+            <Link href="/chill/privacy" className="transition hover:text-white">
+              /chill privacy
+            </Link>
+          </p>
+        </div>
       </div>
     </footer>
   )
