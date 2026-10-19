@@ -20,6 +20,8 @@ import {MAX_TODO_LENGTH, MAX_TODOS, addTodo, doneTodayOf, loadTodos, removeTodo,
 
 const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
+// Đã mở bảng phin từ khi có việc cần làm → thôi chấm "mới" trên nút
+const TODO_SEEN_KEY = 'chill:todo-seen'
 const OPTIONS = [15, 25, 45]
 
 type Session = {endsAt: number; minutes: number; todo?: string}
@@ -45,6 +47,7 @@ export function Focus({
   onTick,
   onOpenChange,
   hint,
+  openSignal = 0,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -57,6 +60,8 @@ export function Focus({
   onOpenChange: (open: boolean) => void
   // Lời mời pha phin cho người chưa thử (xem guide.ts) — bong bóng ngay dưới nút
   hint?: string | null
+  // Tăng 1 = mở bảng (nút "Thử ngay" trong Có gì mới, hành động `phin`)
+  openSignal?: number
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -70,12 +75,15 @@ export function Focus({
   const [picked, setPicked] = useState<string | null>(null)
   // Tổng kết: khách bấm "Chưa" thì thôi hỏi
   const [askSkipped, setAskSkipped] = useState(false)
+  // Chấm "mới" cho khách chưa thấy danh sách việc; mặc định ẩn tới khi đọc được storage
+  const [todoSeen, setTodoSeen] = useState(true)
   const ref = useRef<HTMLDivElement>(null)
 
   // Khôi phục sau khi hydrate: phút đã chọn + phiên đang chạy dở
   useEffect(() => {
     try {
       /* eslint-disable react-hooks/set-state-in-effect */
+      setTodoSeen(Boolean(localStorage.getItem(TODO_SEEN_KEY) || localStorage.getItem('chill:todo')))
       const savedMin = Number(localStorage.getItem(MINUTES_KEY))
       if (OPTIONS.includes(savedMin)) setMinutes(savedMin)
       const saved = JSON.parse(localStorage.getItem(FOCUS_KEY) ?? 'null') as Partial<Session> | null
@@ -91,9 +99,20 @@ export function Focus({
 
   // Mở bảng thì đọc lại danh sách — qua nửa đêm việc đã gạch hôm qua tự đi
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (open) setTodos(loadTodos())
+    if (!open) return
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setTodos(loadTodos())
+    setTodoSeen(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
+    try {
+      localStorage.setItem(TODO_SEEN_KEY, '1')
+    } catch {
+      // Chặn storage — lần sau chấm hiện lại, không sao
+    }
   }, [open])
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => openSignal > 0 ? setOpen(true) : undefined, [openSignal])
 
   // Đếm theo đồng hồ thật (timer bị bóp khi tab chạy nền vẫn không lệch giờ)
   useEffect(() => {
@@ -200,13 +219,19 @@ export function Focus({
         aria-controls="chill-focus"
         aria-label={session ? t.focus.runningAria(clock(left)) : t.focus.open}
         title={t.focus.title}
-        className={`flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+        className={`relative flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
           session || open || done
             ? 'border-[#e8b27d]/60 bg-[#2a1f18]/85 text-[#f6dcbd]'
             : 'border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] hover:border-[#e8b27d]/80 hover:text-white'
         }`}
       >
         <PhinIcon dripping={Boolean(session)} />
+        {!todoSeen && !hint && !session && (
+          <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d]" />
+          </span>
+        )}
         {session ? <span className="font-mono text-[11px] tabular-nums">{clock(left)}</span> : <span className="font-medium">{done ? t.focus.doneChip : t.focus.chip}</span>}
       </button>
       {hint && !open && !session && (

@@ -206,6 +206,8 @@ export function ChillRoom({
   const [zen, setZen] = useState(false)
   // "Thử ngay" bàn nhóm → mở màn tạo bàn / menu bàn nhóm trong GroupTable
   const [tableSignal, setTableSignal] = useState(0)
+  // Tăng 1 = mở bảng đồng hồ phin (nút "Thử ngay" trong Có gì mới)
+  const [focusSignal, setFocusSignal] = useState(0)
   const [panelTab, setPanelTab] = useState<PanelTab>('music')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
@@ -959,6 +961,12 @@ export function ChillRoom({
       setPanelOpen(true)
     } else if (kind === 'chat') setChatOpen(true)
     else if (kind === 'zen' && !zen) toggleZen()
+    else if (kind === 'phin') {
+      // Ngắm cảnh giấu cả thanh trên → tắt trước rồi mới mở bảng phin
+      if (zen) toggleZen()
+      setChatOpen(false)
+      setFocusSignal((n) => n + 1)
+    }
     else if (kind === 'table') {
       // Bàn nhóm chỉ có ở quán cà phê
       setTheme('cafe')
@@ -2211,7 +2219,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} />
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} />
           <span className="sm:hidden">{menuButton}</span>
           <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}
