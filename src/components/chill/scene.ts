@@ -346,7 +346,7 @@ const TRAIN = {
   cars: 3,
   gap: 1, // khớp nối giữa 2 toa (ô lưới)
   ground: 121, // mặt thanh ray gần (ảnh hanoi-tau: y≈648/672) — giữa 2 làn xe của ảnh phố
-  speed: 18, // ô lưới / giây → cả đoàn qua khung ~30 giây
+  speed: 20.5, // ô lưới / giây → cả đoàn qua khung ~30 giây (khớp file tiếng tàu chạy qua)
   first: [60, 90], // chuyến đầu: khách mới kịp thấy tàu trước khi rời trang
   every: [240, 480], // các chuyến sau
   horn: 4, // còi vọng từ xa trước khi đầu tàu vào khung (giây)
@@ -842,16 +842,17 @@ export class ChillScene {
       this.nextTrain = Math.min(this.nextTrain, TRAIN.horn + 0.5)
     }
     this.nextTrain -= dt
-    // Còi vọng từ phía tàu sắp tới
+    // Còi vọng từ phía tàu sắp tới, tiếng tàu bắt đầu từ xa ngay lúc đó và kéo dài tới
+    // khi toa cuối ra khỏi khung (đỉnh tiếng rơi vào lúc đầu máy ngang cửa sổ)
     if (!this.trainHorned && this.nextTrain <= TRAIN.horn) {
       this.trainHorned = true
-      this.onSound?.('train-horn', -0.8 * this.trainDir, this.trainDir)
+      const dir = this.trainDir
+      this.onSound?.('train-horn', -0.8 * dir, dir)
+      this.onSound?.('train', 0, dir, Math.max(0, this.nextTrain) + (SCENE_W + this.trainLength) / TRAIN.speed)
     }
     if (this.nextTrain > 0) return
     const dir = this.trainDir
     this.train = {x: dir > 0 ? -2 : SCENE_W + 2, dir}
-    // Tiếng tàu kéo dài đúng lúc cả đoàn chạy ngang khung
-    this.onSound?.('train', 0, dir, (SCENE_W + this.trainLength) / TRAIN.speed)
   }
 
   private trainLayer() {

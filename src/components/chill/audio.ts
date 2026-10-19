@@ -11,6 +11,16 @@ import type {SynthSpec, Track} from './tracks'
 export type Ambience = 'street' | 'rain' | 'quiet'
 export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder' | 'train-horn' | 'train'
 
+// Tiếng tàu thu sẵn (CassetteAI qua Figma Weave, đã cắt + cân âm lượng, mono):
+// còi vọng xa và cả đoàn chạy qua (~30 giây: nhỏ lúc tới, to nhất khi đầu máy ngang
+// cửa sổ, nhỏ dần khi toa cuối đi khỏi). Chỉ tải khi ở phố đường tàu; chưa tải xong
+// thì phát tạm tiếng tổng hợp trong streetSound. `gain` cân với tiếng xe / còi xe máy
+const TRAIN_SFX = {
+  'train-horn': {src: '/chill/sfx/train-horn.mp3', gain: 0.7},
+  train: {src: '/chill/sfx/train-pass.mp3', gain: 0.9},
+} as const
+type TrainSfx = keyof typeof TRAIN_SFX
+
 // Thời gian chồng mờ giữa 2 bài (giây)
 const CROSSFADE = 5
 // Đuôi vang dài nhất của delay (feedback 0.3) + reverb 2.6 giây
@@ -93,6 +103,9 @@ export class ChillAudio {
   private active = 0
   private nearEndFired = false
   private sfxIn: AudioNode | null = null
+  // File tiếng tàu: đã tải (chưa cần AudioContext) · đã giải mã (null = đang giải mã)
+  private sfxFiles = new Map<TrainSfx, Promise<ArrayBuffer | null>>()
+  private sfxBuffers = new Map<TrainSfx, AudioBuffer | null>()
 
   private track: Track | null = null
   private trackBus: GainNode | null = null
@@ -214,6 +227,60 @@ export class ChillAudio {
     return ctx
   }
 
+  // ---------- Tiếng tàu thu sẵn ----------
+
+  // Tải trước file tiếng tàu (vd khi vào phố đường tàu) — chưa cần AudioContext
+  preloadTrain() {
+    for (const kind of Object.keys(TRAIN_SFX) as TrainSfx[]) void this.fetchTrain(kind)
+  }
+
+  private fetchTrain(kind: TrainSfx) {
+    let file = this.sfxFiles.get(kind)
+    if (!file) {
+      file = fetch(TRAIN_SFX[kind].src)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .catch(() => null)
+      this.sfxFiles.set(kind, file)
+    }
+    return file
+  }
+
+  // Bản đã giải mã; chưa có thì bắt đầu giải mã cho lần sau và trả null (phát tiếng
+  // tổng hợp lần này). Còi kêu trước tàu ~4 giây nên tiếng chạy qua thường kịp có
+  private trainBuffer(kind: TrainSfx) {
+    const ready = this.sfxBuffers.get(kind)
+    if (ready || this.sfxBuffers.has(kind) || !this.ctx) return ready ?? null
+    this.sfxBuffers.set(kind, null)
+    const ctx = this.ctx
+    void this.fetchTrain(kind)
+      // decodeAudioData lấy luôn ArrayBuffer → giải mã bản sao để còn thử lại khi lỗi
+      .then((data) => (data ? ctx.decodeAudioData(data.slice(0)) : null))
+      .then((buf) => (buf ? this.sfxBuffers.set(kind, buf) : this.sfxBuffers.delete(kind)))
+      .catch(() => this.sfxBuffers.delete(kind))
+    if (kind === 'train-horn') this.trainBuffer('train')
+    return null
+  }
+
+  // Còi: đứng yên ở phía tàu sắp tới. Tàu chạy qua: kéo giãn nhẹ cho khớp `len` (từ
+  // lúc còi tới lúc toa cuối ra khỏi khung), quét từ loa phía tàu tới sang loa bên kia
+  private playTrainSample(kind: TrainSfx, buf: AudioBuffer, panner: StereoPannerNode, pan: number, dir: 1 | -1, len: number) {
+    const ctx = this.ctx!
+    const now = ctx.currentTime
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    const gain = ctx.createGain()
+    gain.gain.value = TRAIN_SFX[kind].gain
+    if (kind === 'train') {
+      src.playbackRate.value = Math.min(1.2, Math.max(0.8, buf.duration / len))
+      panner.pan.setValueAtTime(-0.7 * dir, now)
+      panner.pan.linearRampToValueAtTime(0.7 * dir, now + len)
+    } else {
+      panner.pan.value = Math.max(-1, Math.min(1, pan))
+    }
+    src.connect(gain).connect(panner)
+    src.start(now)
+  }
+
   // ---------- Điều khiển ----------
 
   // crossfade = true: bài đang phát nhỏ dần trong CROSSFADE giây, bài mới to dần
@@ -325,6 +392,14 @@ export class ChillAudio {
     const now = ctx.currentTime
     const panner = ctx.createStereoPanner()
     panner.connect(this.sfxIn)
+
+    if (kind === 'train' || kind === 'train-horn') {
+      const buf = this.trainBuffer(kind)
+      if (buf) {
+        this.playTrainSample(kind, buf, panner, pan, dir, len)
+        return
+      }
+    }
 
     if (kind === 'whoosh' || kind === 'whoosh-big') {
       const big = kind === 'whoosh-big'
