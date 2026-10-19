@@ -341,11 +341,11 @@ const WINDOWS: Record<string, [number, number, number, number]> = {
 // Đổi ảnh tàu thì đo lại các tỉ lệ này cho khớp.
 const TRAIN = {
   src: '/chill/scenes/train.webp',
-  loco: {x: 0, w: 224, h: 104, windows: [[0.71, 0.27, 0.16, 0.23]], lamp: [0.97, 0.53]},
-  car: {x: 224, w: 248, h: 104, windows: [[0.07, 0.27, 0.86, 0.21]]},
+  loco: {x: 0, w: 282, h: 104, windows: [[0.83, 0.2, 0.14, 0.18]], lamp: [0.95, 0.55]},
+  car: {x: 282, w: 297, h: 104, windows: [[0.11, 0.34, 0.77, 0.19]]},
   cars: 3,
   gap: 1, // khớp nối giữa 2 toa (ô lưới)
-  ground: 122, // mặt ray — giữa 2 làn xe của ảnh phố
+  ground: 121, // mặt thanh ray gần (ảnh hanoi-tau: y≈648/672) — giữa 2 làn xe của ảnh phố
   speed: 18, // ô lưới / giây → cả đoàn qua khung ~30 giây
   first: [60, 90], // chuyến đầu: khách mới kịp thấy tàu trước khi rời trang
   every: [240, 480], // các chuyến sau

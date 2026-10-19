@@ -125,9 +125,9 @@ export async function getChillContent(revalidate: number) {
       streets: {morning: img('morning'), afternoon: img('afternoon'), night: img('night')},
     })
   }
-  // Chỉ máy dev: phố đường tàu thử cơ chế tàu chạy khi chưa có ảnh ray (tạm mượn ảnh Hà Nội)
+  // Chỉ máy dev: phố đường tàu Hà Nội (ảnh local) để thử trước khi đưa lên Studio
   if (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_RAILWAY === '1') {
-    const img = (t: string) => `/chill/scenes/hanoi-${t}.webp`
+    const img = (t: string) => `/chill/scenes/hanoi-tau-${t}.webp`
     destinations.unshift({
       id: 'railway-dev',
       name: 'Đường tàu (dev)',
