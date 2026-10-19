@@ -156,7 +156,7 @@ export const LEGAL_DEFAULTS: Record<LegalKind, {vi: LegalSection[]; en: LegalSec
       {
         heading: 'Lưu trên máy bạn',
         paragraphs: [
-          'Cài đặt (nhạc, cảnh, âm lượng, ngôn ngữ), chuỗi ngày ghé quán, danh sách việc cần làm, ly cà phê đã chọn, mẩu nhật ký "cất vào sổ" và các gợi ý đã xem nằm trong bộ nhớ trình duyệt của bạn (localStorage). Chúng không được gửi về máy chủ. Xoá dữ liệu trang web trong trình duyệt là mất hết.',
+          'Cài đặt (nhạc, cảnh, âm lượng, ngôn ngữ), chuỗi ngày ghé quán, danh sách việc cần làm, kệ sưu tầm, ly cà phê đã chọn, mẩu nhật ký "cất vào sổ" và các gợi ý đã xem nằm trong bộ nhớ trình duyệt của bạn (localStorage). Chúng không được gửi về máy chủ. Xoá dữ liệu trang web trong trình duyệt là mất hết.',
         ],
       },
       {
@@ -205,7 +205,7 @@ export const LEGAL_DEFAULTS: Record<LegalKind, {vi: LegalSection[]; en: LegalSec
       {
         heading: 'Stored on your device',
         paragraphs: [
-          'Your settings (music, scene, volume, language), visit streak, to-do list, chosen coffee, diary notes you keep to yourself and the hints you have seen live in your browser storage (localStorage). They are never sent to the server. Clearing site data in your browser removes them.',
+          'Your settings (music, scene, volume, language), visit streak, to-do list, shelf collection, chosen coffee, diary notes you keep to yourself and the hints you have seen live in your browser storage (localStorage). They are never sent to the server. Clearing site data in your browser removes them.',
         ],
       },
       {

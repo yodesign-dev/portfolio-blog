@@ -16,6 +16,8 @@ import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {useT} from './i18n'
 import {CARD_SLOTS, cardOf, levelOf, streakOf, todayOf, type Regular} from './regular'
+import {ItemIcon} from './ShelfBook'
+import {ITEMS} from './shelf'
 import {MAX_TODO_LENGTH, MAX_TODOS, addTodo, doneTodayOf, loadTodos, removeTodo, setTodoDone, type Todo} from './todo'
 
 const FOCUS_KEY = 'chill:focus'
@@ -48,6 +50,9 @@ export function Focus({
   onOpenChange,
   hint,
   openSignal = 0,
+  gift = null,
+  shelfCount = null,
+  onOpenShelf,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -62,6 +67,11 @@ export function Focus({
   hint?: string | null
   // Tăng 1 = mở bảng (nút "Thử ngay" trong Có gì mới, hành động `phin`)
   openSignal?: number
+  // Món mèo vừa mang ra cho kệ sau phin này (shelf.ts) — hiện trong tổng kết
+  gift?: string | null
+  // Số món đã có trên kệ; null = kệ đang tắt ở Studio
+  shelfCount?: number | null
+  onOpenShelf?: () => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -320,6 +330,27 @@ export function Focus({
                       </div>
                     ))}
                   </dl>
+                  {gift && (
+                    <div className="mt-3 flex items-center gap-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5 motion-safe:animate-[chill-pop_0.35s_ease-out]">
+                      <div className="flex h-10 w-10 shrink-0 items-end justify-center">
+                        <ItemIcon id={gift} scale={3} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#e8b27d]">{t.shelf.gift}</p>
+                        <p className="text-sm font-medium text-[#f3ece4]">{t.shelf.items[gift]?.name}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          close()
+                          onOpenShelf?.()
+                        }}
+                        className="shrink-0 rounded-full border border-[#e8b27d]/50 px-2.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                      >
+                        {t.shelf.seeShelf}
+                      </button>
+                    </div>
+                  )}
                   {doneToday > 0 && <p className="mt-2 text-xs text-[#a79e94]">{t.todo.doneToday(doneToday)}</p>}
                   <p className="mt-3 text-sm leading-relaxed text-[#ede6dd]">{t.focus.doneBody}</p>
                 </div>
@@ -376,6 +407,21 @@ export function Focus({
             <p className="mt-2 text-xs leading-relaxed text-[#a79e94]">
               {t.regular.summary(regular.total, streak, regular.phins)}
             </p>
+            {shelfCount !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  close()
+                  onOpenShelf?.()
+                }}
+                className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.04] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                <span>
+                  {t.shelf.title} · {t.shelf.count(shelfCount, ITEMS.length)}
+                </span>
+                <span aria-hidden>→</span>
+              </button>
+            )}
           </div>
         </div>
       )}

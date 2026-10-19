@@ -67,6 +67,8 @@ export type Theme = {
   // Lọ tip (đáy, giữa lọ) — bấm vào mở bảng cảm ơn. Ly cà phê của người vừa mời
   // đặt cạnh lọ, lệch `cupDx`. Tránh vùng mèo (cat.x - 6 … cat.x + 90)
   tipJar: Pt & {cupDx: number}
+  // Ô bày món sưu tầm (đáy giữa món, px gốc 640×360), ô đầu là chỗ dễ thấy nhất — xem shelf.ts
+  shelf: Pt[]
   steam: Pt | null
   // Ly thuỷ tinh dưới phin (px gốc 640×360): `hit` = vùng bấm để đổi món (cả phin lẫn ly),
   // `coffee` / `milk` = phần cà phê đen ở trên / lớp sữa đặc ở đáy trong tranh, để scene tô
@@ -107,6 +109,8 @@ export const THEMES: Theme[] = [
     notebook: {x: 324, y: 264, w: 102, h: 44},
     // Cạnh trái cuốn sổ, ly của người mời đứng giữa phin và lọ
     tipJar: {x: 310, y: 294, cupDx: -22},
+    // Gờ dưới khung cửa sổ: ô giữa (sau phin, trên cuốn sổ) rồi ô trái (trên đầu mèo)
+    shelf: [296, 326, 356, 386, 86, 114, 142, 170].map((x) => ({x, y: 249})),
     steam: {x: 127, y: 113},
     drink: {hit: {x: 230, y: 226, w: 44, h: 72}, coffee: {x: 241, y: 274, w: 20, h: 9}, milk: {x: 242, y: 283, w: 21, h: 7}},
     lamp: {x: 63, y: 42},
@@ -138,6 +142,8 @@ export const THEMES: Theme[] = [
     notebook: null,
     // Trên bàn nhỏ, giữa ly cà phê đá và quyển sách; ly của người mời đứng mép trái bàn
     tipJar: {x: 440, y: 293, cupDx: -46},
+    // Thanh trên lan can, chừa mèo nằm đầu lan can và 2 bụi hoa giấy
+    shelf: [292, 322, 352, 170].map((x) => ({x, y: 196})),
     steam: null,
     drink: null,
     lamp: {x: 44, y: 28},
@@ -172,6 +178,8 @@ export const THEMES: Theme[] = [
     notebook: {x: 118, y: 258, w: 92, h: 28},
     // Mép trước bàn, giữa sổ mở và cốc cà phê nóng — ngay dưới ánh đèn bàn
     tipJar: {x: 222, y: 304, cupDx: 24},
+    // Bậu cửa sổ, giữa chỗ mèo nằm (cat.x … cat.x + 90) và laptop
+    shelf: [370, 395, 419].map((x) => ({x, y: 267})),
     steam: {x: 124, y: 126},
     drink: null,
     lamp: {x: 33, y: 106},

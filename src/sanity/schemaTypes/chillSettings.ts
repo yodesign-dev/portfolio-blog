@@ -39,6 +39,14 @@ export default defineType({
         'Bật để khách viết mẩu giấy (2 mẩu / ngày) và xem bảng nhật ký của quán. Tắt là /chill trở lại y như trước: không nút, không mẩu giấy, không ai gửi được. Có hiệu lực sau khoảng 30 giây.',
     }),
     defineField({
+      name: 'shelfOpen',
+      title: 'Mở kệ sưu tầm (thử nghiệm)',
+      type: 'boolean',
+      initialValue: false,
+      description:
+        'Bật để mỗi phin xong mèo mang ra một món cho kệ (bậu cửa sổ quán, lan can ban công, bậu cửa phòng học) và có sổ sưu tầm 20 món. Món chỉ lưu trên máy khách. Tắt là kệ biến mất, món đã có vẫn nằm trên máy khách cho lần bật sau. Có hiệu lực sau khoảng 1 phút.',
+    }),
+    defineField({
       name: 'diaryNoteVi',
       title: 'Mẩu giấy của quán hôm nay (tiếng Việt)',
       type: 'string',

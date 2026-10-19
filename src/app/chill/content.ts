@@ -49,7 +49,8 @@ const CHILL_QUERY = `{
     "image": image.asset->{url, mimeType, "w": metadata.dimensions.width, "h": metadata.dimensions.height},
     "imageAlt": image.alt,
     "imageAltEn": image.altEn
-  }
+  },
+  "shelfOpen": *[_id == "chillSettings"][0].shelfOpen
 }`
 
 type ChillContent = {
@@ -66,6 +67,7 @@ type ChillContent = {
     afternoon: string
     night: string
   }[]
+  shelfOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -130,5 +132,8 @@ export async function getChillContent(revalidate: number) {
       : null,
   }))
 
-  return {tracks, destinations, updates}
+  // Kệ sưu tầm: bật ở Studio. Máy dev bật thử được bằng CHILL_DEV_SHELF=1 (không đụng Studio)
+  const shelfOn = content.shelfOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SHELF === '1')
+
+  return {tracks, destinations, updates, shelfOn}
 }

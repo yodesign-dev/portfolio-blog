@@ -29,6 +29,7 @@ import {drawScreen} from './screen'
 import {themeById, type CharacterVideo, type SheetSpec, type Theme, type ThemeId} from './themes'
 import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
 import {drawCoinDrop, drawIcedCoffee, drawTipJar, jarHitBox} from './tipjar'
+import {drawItem, itemById, itemHitBox} from './shelf'
 import type {Drink} from './drink'
 import {CHARACTERS, type SeatedFriend} from './table-view'
 import type {StreetSound} from './audio'
@@ -393,6 +394,8 @@ export class ChillScene {
   // Lọ tip: số ly Bin đã xác nhận + ly của chính người xem (vừa mời trên máy này).
   // Vẽ vào lớp riêng, chỉ vẽ lại khi đổi → tô màu theo giờ giống nội thất
   private tip = {cups: 0, cup: false}
+  // Món sưu tầm đang bày, trái → phải theo ô của phòng (shelf.ts)
+  private shelf: string[] = []
   private propsLayer: HTMLCanvasElement
   private propsKey = ''
   private coinAt = -1
@@ -1419,6 +1422,23 @@ export class ChillScene {
     this.tip = {...this.tip, cup: true}
   }
 
+  // Món sưu tầm đang bày (id theo thứ tự trên kệ); thừa ô của phòng thì không hiện
+  setShelf(ids: string[]) {
+    this.shelf = ids
+  }
+
+  private shelfSlots() {
+    return this.theme.shelf.flatMap((slot, i) => {
+      const item = this.shelf[i] ? itemById(this.shelf[i]) : undefined
+      return item ? [{item, x: slot.x, y: slot.y}] : []
+    })
+  }
+
+  // Món trên kệ → mở sổ sưu tầm, theo px gốc 640×360
+  get shelfHitBoxes() {
+    return this.shelfSlots().map(({item, x, y}) => ({id: item.id, box: itemHitBox(item, x, y)}))
+  }
+
   // Lọ tip → mở bảng cảm ơn, theo px gốc 640×360 (như cuốn sổ)
   get tipJarHitBox() {
     const {x, y} = this.theme.tipJar
@@ -2155,7 +2175,7 @@ export class ChillScene {
   // Lọ tip + ly cà phê (lớp tô sẵn màu) + đồng xu đang rơi. ctx đang ở px gốc 640×360
   private drawTip(ctx: CanvasRenderingContext2D, t: number) {
     const jar = this.theme.tipJar
-    const key = `${this.theme.id}:${this.tip.cups}:${this.tip.cup}`
+    const key = `${this.theme.id}:${this.tip.cups}:${this.tip.cup}:${this.shelf.join(',')}`
     if (key !== this.propsKey) {
       this.propsKey = key
       const layer = this.propsLayer
@@ -2165,6 +2185,7 @@ export class ChillScene {
       c.setTransform(RES, 0, 0, RES, 0, 0)
       drawTipJar(c, jar.x, jar.y, this.tip.cups)
       if (this.tip.cup) drawIcedCoffee(c, jar.x + jar.cupDx, jar.y)
+      this.shelfSlots().forEach(({item, x, y}) => drawItem(c, item, x, y))
       c.setTransform(1, 0, 0, 1, 0, 0)
       this.wash(c, layer.width, layer.height)
     }

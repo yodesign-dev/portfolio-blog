@@ -14,13 +14,15 @@ import {GroupTable} from './GroupTable'
 import {arrangeFriends, type TableMember} from './table-view'
 import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
-import {THEMES, type ThemeId} from './themes'
+import {THEMES, themeById, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
 import {ChillChat, type ChatMessage} from './ChillChat'
 import {setLang, useLang, useT, type Lang} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {GUIDE_FIRST_MS, GUIDE_GAP_MS, GUIDE_HOLD_MS, GUIDE_ORDER, GUIDE_PER_VISIT, GUIDE_POINT_MS, GUIDE_SHOW_MS, loadTried, saveTried, type GuideStep} from './guide'
 import {PixelGlass} from './pixel-icons'
+import {Shelf} from './ShelfBook'
+import {addItem, loadShelf, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
@@ -147,10 +149,13 @@ export function ChillRoom({
   tracks = TRACKS,
   destinations = DESTINATIONS,
   updates = [],
+  shelfOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
   updates?: ChillUpdate[]
+  // Kệ sưu tầm (Studio "Chill · Cài đặt"), mặc định tắt
+  shelfOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -208,6 +213,13 @@ export function ChillRoom({
   const [tableSignal, setTableSignal] = useState(0)
   // Tăng 1 = mở bảng đồng hồ phin (nút "Thử ngay" trong Có gì mới)
   const [focusSignal, setFocusSignal] = useState(0)
+  // Kệ sưu tầm (shelf.ts): món đã có + đang bày, món mèo vừa mang ra cho phin vừa xong,
+  // sổ sưu tầm đang mở + món đang chọn trong sổ, vùng bấm từng món trên kệ
+  const [shelf, setShelf] = useState<ShelfState>({owned: [], shown: []})
+  const [gift, setGift] = useState<string | null>(null)
+  const [shelfOpen, setShelfOpen] = useState(false)
+  const [shelfPick, setShelfPick] = useState<string | null>(null)
+  const [shelfBoxes, setShelfBoxes] = useState<{id: string; box: Box}[]>([])
   const [panelTab, setPanelTab] = useState<PanelTab>('music')
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
@@ -422,6 +434,10 @@ export function ChillRoom({
       const book = scene.notebookHitBox
       setBookBox(book ? toBox(book) : null)
       setJarBox(hasDonate() ? toBox(scene.tipJarHitBox) : null)
+      setShelfBoxes(scene.shelfHitBoxes.flatMap(({id, box}) => {
+        const b = toBox(box)
+        return b ? [{id, box: b}] : []
+      }))
       const glass = scene.drinkHitBox
       setDrinkBox(glass ? toBox(glass) : null)
       setHasGlass(glass !== null)
@@ -814,13 +830,43 @@ export function ChillRoom({
     return () => window.clearTimeout(id)
   }, [entered, loaded, sayCat, t])
 
+  // ---------- Kệ sưu tầm ----------
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (shelfOn) setShelf(loadShelf())
+  }, [shelfOn])
+
+  // Món đang bày → vẽ lên kệ của phòng, tính lại vùng bấm
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setShelf(shelfOn ? shelf.shown : [])
+    fitRef.current()
+    scene.frame(performance.now())
+  }, [shelf, shelfOn, theme])
+
+  const openShelf = useCallback((id?: string) => {
+    setShelfPick(id ?? null)
+    setShelfOpen(true)
+    trackEvent({name: 'Chill Shelf', props: {action: 'open'}})
+  }, [])
+
   const primeAudio = useCallback(() => audioRef.current?.prime(), [])
+  const destId = dest?.id
   const onFocusDone = useCallback((minutes: number) => {
     audioRef.current?.chime()
     sceneRef.current?.noticeCat()
     sayCat(t.room.catPhin)
     setRegular((r) => addPhin(r, minutes))
-  }, [sayCat, t])
+    if (!shelfOn) return
+    // Mèo mang ra 1 món cho kệ (nếu tới lượt) — hiện trong bảng tổng kết phin
+    const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time})
+    if (!item) return
+    setShelf(addItem(shelf, item.id))
+    setGift(item.id)
+    trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
+  }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time])
 
   // ---------- Điểm đến ----------
 
@@ -1111,7 +1157,7 @@ export function ChillRoom({
     }
   }, [panelOpen, settingsSeen])
   // Hiện sau khi bấm Play một lúc, nhường thông báo "Có gì mới" hiện trước
-  const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast || diaryOpen
+  const otherOverlay = wishOpen || chatOpen || boardOpen || updatesOpen || updatesSeen.toast || diaryOpen || shelfOpen
 
   // Bảng nhật ký phủ gần hết màn hình → mở bảng / khung khác thì nhật ký tự đóng
   useEffect(() => {
@@ -1156,6 +1202,7 @@ export function ChillRoom({
     (open: boolean) => {
       setFocusOpen(open)
       if (open) markTried('phin')
+      else setGift(null)
     },
     [markTried],
   )
@@ -1462,6 +1509,7 @@ export function ChillRoom({
           setPanelOpen(false)
           setBoardOpen(false)
           setUpdatesOpen(false)
+          setShelfOpen(false)
           break
       }
     }
@@ -1516,7 +1564,7 @@ export function ChillRoom({
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === playingStation)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
   const guideVisible = entered && !zen && !guideBusy && (activeGuide === 'settings' || !hideUi)
@@ -2077,6 +2125,26 @@ export function ChillRoom({
         </button>
       )}
 
+      {/* Món trên kệ sưu tầm: mở sổ sưu tầm ngay món đó */}
+      {!groupView &&
+        shelfBoxes.map(({id, box}) => (
+          <button
+            key={id}
+            type="button"
+            aria-label={`${t.shelf.title}: ${t.shelf.items[id]?.name ?? ''}`}
+            onClick={() => openShelf(id)}
+            className="group absolute cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+            style={box}
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
+            >
+              {t.shelf.items[id]?.name}
+            </span>
+          </button>
+        ))}
+
       {/* Lọ tip trên bàn: mở bảng cảm ơn (tên người đã mời Bin cà phê) */}
       {jarBox && !groupView && (
         <button
@@ -2219,7 +2287,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} />
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} />
           <span className="sm:hidden">{menuButton}</span>
           <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}
@@ -2237,14 +2305,15 @@ export function ChillRoom({
       {/* Nền tối sau bảng cảm ơn / nhật ký — bấm ra ngoài để đóng */}
       <button
         type="button"
-        aria-label={updatesOpen ? t.room.closeUpdates : t.room.closeBoard}
+        aria-label={updatesOpen ? t.room.closeUpdates : shelfOpen ? t.shelf.close : t.room.closeBoard}
         tabIndex={-1}
         onClick={() => {
           setBoardOpen(false)
           setUpdatesOpen(false)
+          setShelfOpen(false)
         }}
         className={`absolute inset-0 z-30 cursor-default bg-black/55 backdrop-blur-[2px] transition-opacity duration-300 ${
-          boardOpen || updatesOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          boardOpen || updatesOpen || shelfOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       />
 
@@ -2478,6 +2547,19 @@ export function ChillRoom({
         listening={playing}
         onOnline={setOnline}
       />
+
+      {shelfOn && (
+        <Shelf
+          open={shelfOpen}
+          onClose={() => setShelfOpen(false)}
+          state={shelf}
+          selected={shelfPick}
+          onSelect={setShelfPick}
+          onToggle={(id) => setShelf((s) => toggleShown(s, id))}
+          slots={themeById(theme).shelf.length}
+          placeName={(id) => destinations.find((d) => d.id === id)?.name ?? id}
+        />
+      )}
 
       <SupporterBoard
         open={boardOpen}
