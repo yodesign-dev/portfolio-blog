@@ -8,16 +8,21 @@
 //   mấy phin / bao nhiêu phút, chuỗi ngày ghé. Tổng kết ở yên tới khi người xem đóng bảng
 //   (đa số đang ở tab khác lúc hết giờ). Giờ kết thúc lưu trên máy nên tải lại trang vẫn
 //   chạy tiếp; hết giờ trong lúc đóng trang thì bỏ qua, không tính phin
+// - Việc cần làm: chạm 1 việc để dành phin sắp pha cho nó (bỏ qua cũng được); xong phin thì
+//   tổng kết hỏi "xong việc này chưa?" để gạch luôn (xem todo.ts)
 // - Thẻ khách quen: mỗi ngày ghé 1 dấu chân mèo, 10 dấu đầy 1 thẻ (xem regular.ts)
 
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {useT} from './i18n'
 import {CARD_SLOTS, cardOf, levelOf, streakOf, todayOf, type Regular} from './regular'
+import {MAX_TODO_LENGTH, MAX_TODOS, addTodo, doneTodayOf, loadTodos, removeTodo, setTodoDone, type Todo} from './todo'
 
 const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
 const OPTIONS = [15, 25, 45]
+
+type Session = {endsAt: number; minutes: number; todo?: string}
 
 const clock = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000))
@@ -56,10 +61,15 @@ export function Focus({
   const t = useT()
   const [open, setOpen] = useState(false)
   const [minutes, setMinutes] = useState(25)
-  const [session, setSession] = useState<{endsAt: number; minutes: number} | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [now, setNow] = useState(0)
-  // Phin vừa xong (số phút) — còn giữ thì bảng hiện tổng kết; đóng bảng là xoá
-  const [finished, setFinished] = useState<number | null>(null)
+  // Phin vừa xong (số phút + việc đã dành cho nó) — còn giữ thì bảng hiện tổng kết; đóng bảng là xoá
+  const [finished, setFinished] = useState<{minutes: number; todo?: string} | null>(null)
+  const [todos, setTodos] = useState<Todo[]>([])
+  // Việc dành cho phin sắp pha
+  const [picked, setPicked] = useState<string | null>(null)
+  // Tổng kết: khách bấm "Chưa" thì thôi hỏi
+  const [askSkipped, setAskSkipped] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   // Khôi phục sau khi hydrate: phút đã chọn + phiên đang chạy dở
@@ -68,9 +78,9 @@ export function Focus({
       /* eslint-disable react-hooks/set-state-in-effect */
       const savedMin = Number(localStorage.getItem(MINUTES_KEY))
       if (OPTIONS.includes(savedMin)) setMinutes(savedMin)
-      const saved = JSON.parse(localStorage.getItem(FOCUS_KEY) ?? 'null') as {endsAt?: number; minutes?: number} | null
+      const saved = JSON.parse(localStorage.getItem(FOCUS_KEY) ?? 'null') as Partial<Session> | null
       if (saved?.endsAt && saved.endsAt > Date.now() && saved.minutes) {
-        setSession({endsAt: saved.endsAt, minutes: saved.minutes})
+        setSession({endsAt: saved.endsAt, minutes: saved.minutes, ...(typeof saved.todo === 'string' ? {todo: saved.todo} : {})})
         setNow(Date.now())
       } else if (saved) store(FOCUS_KEY, null)
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -78,6 +88,12 @@ export function Focus({
       // Chặn storage → bắt đầu từ đầu
     }
   }, [])
+
+  // Mở bảng thì đọc lại danh sách — qua nửa đêm việc đã gạch hôm qua tự đi
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setTodos(loadTodos())
+  }, [open])
 
   // Đếm theo đồng hồ thật (timer bị bóp khi tab chạy nền vẫn không lệch giờ)
   useEffect(() => {
@@ -87,7 +103,8 @@ export function Focus({
       if (at < session.endsAt) return setNow(at)
       setSession(null)
       store(FOCUS_KEY, null)
-      setFinished(session.minutes)
+      setFinished({minutes: session.minutes, todo: session.todo})
+      setAskSkipped(false)
       setOpen(true)
       trackEvent({name: 'Chill Focus', props: {action: 'done'}})
       onDone(session.minutes)
@@ -130,11 +147,13 @@ export function Focus({
 
   const start = () => {
     const at = Date.now()
-    const next = {endsAt: at + minutes * 60_000, minutes}
+    const todo = picked && todos.some((t) => t.id === picked && !t.doneDay) ? picked : undefined
+    const next: Session = {endsAt: at + minutes * 60_000, minutes, ...(todo ? {todo} : {})}
     onPrime()
     setNow(at)
     setFinished(null)
     setSession(next)
+    setPicked(null)
     store(FOCUS_KEY, next)
     trackEvent({name: 'Chill Focus', props: {action: 'start'}})
   }
@@ -150,6 +169,25 @@ export function Focus({
   const streak = streakOf(regular)
   const done = finished !== null && !session
   const today = todayOf(regular)
+  const sessionTodo = session?.todo ? todos.find((t) => t.id === session.todo) : undefined
+  const finishedTodo = done && finished.todo ? todos.find((t) => t.id === finished.todo) : undefined
+  const doneToday = doneTodayOf(todos)
+
+  const add = (text: string) => {
+    const next = addTodo(todos, text)
+    if (next === todos) return
+    setTodos(next)
+    trackEvent({name: 'Chill Todo', props: {action: 'add'}})
+  }
+  const check = (id: string, value: boolean) => {
+    setTodos(setTodoDone(todos, id, value))
+    if (value && picked === id) setPicked(null)
+    if (value) trackEvent({name: 'Chill Todo', props: {action: 'done'}})
+  }
+  const drop = (id: string) => {
+    setTodos(removeTodo(todos, id))
+    if (picked === id) setPicked(null)
+  }
 
   return (
     // Điện thoại: bảng neo theo cả thanh trên (sát mép phải màn hình) cho khỏi tràn mép trái
@@ -187,7 +225,7 @@ export function Focus({
           id="chill-focus"
           role="dialog"
           aria-label={t.focus.title}
-          className="absolute right-3 top-full z-40 mt-2 w-[min(300px,calc(100vw-24px))] sm:right-0 rounded-2xl border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl"
+          className="absolute right-3 top-full z-40 mt-2 max-h-[calc(100dvh-5rem)] w-[min(300px,calc(100vw-24px))] overflow-y-auto overscroll-contain sm:right-0 rounded-2xl border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.title}</p>
 
@@ -199,6 +237,12 @@ export function Focus({
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
                 <div className="h-full rounded-full bg-[#e8b27d] transition-[width] duration-1000 ease-linear" style={{width: `${progress * 100}%`}} />
               </div>
+              {sessionTodo && (
+                <p className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2 text-sm leading-snug text-[#f3ece4]">
+                  <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.todo.forPhin}</span>
+                  <span className="break-words">{sessionTodo.text}</span>
+                </p>
+              )}
               <p className="mt-2 text-xs text-[#a79e94]">{t.focus.dripping}</p>
               <button
                 type="button"
@@ -212,7 +256,33 @@ export function Focus({
             <>
               {done ? (
                 <div role="status">
-                  <p className="mt-2 text-lg font-semibold tracking-tight text-[#f3ece4]">{t.focus.doneTitle(finished)}</p>
+                  <p className="mt-2 text-lg font-semibold tracking-tight text-[#f3ece4]">{t.focus.doneTitle(finished.minutes)}</p>
+                  {finishedTodo && (finishedTodo.doneDay || !askSkipped) && (
+                    <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
+                      <p className={`break-words text-sm leading-snug ${finishedTodo.doneDay ? 'text-[#a79e94] line-through' : 'text-[#f3ece4]'}`}>{finishedTodo.text}</p>
+                      {finishedTodo.doneDay ? (
+                        <p className="mt-1 text-xs text-[#f3cfa8]">{t.todo.crossed}</p>
+                      ) : (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="mr-auto text-xs text-[#c9c0b6]">{t.todo.ask}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAskSkipped(true)}
+                            className="rounded-full px-2.5 py-1 text-xs text-[#a79e94] transition hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                          >
+                            {t.todo.notYet}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => check(finishedTodo.id, true)}
+                            className="rounded-full bg-[#e8b27d] px-3 py-1 text-xs font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
+                          >
+                            {t.todo.markDone}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <dl className="mt-3 grid grid-cols-3 gap-1.5">
                     {[
                       {value: today.phins, label: t.focus.todayPhins(today.phins)},
@@ -225,11 +295,13 @@ export function Focus({
                       </div>
                     ))}
                   </dl>
+                  {doneToday > 0 && <p className="mt-2 text-xs text-[#a79e94]">{t.todo.doneToday(doneToday)}</p>}
                   <p className="mt-3 text-sm leading-relaxed text-[#ede6dd]">{t.focus.doneBody}</p>
                 </div>
               ) : (
                 <p className="mt-2 text-sm leading-relaxed text-[#ede6dd]">{t.focus.pitch}</p>
               )}
+              <TodoList todos={todos} picked={picked} onPick={setPicked} onAdd={add} onCheck={check} onRemove={drop} />
               <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl border border-white/10 p-1" role="radiogroup" aria-label={t.focus.length}>
                 {OPTIONS.map((m) => (
                   <button
@@ -282,6 +354,101 @@ export function Focus({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Mảnh giấy việc cần làm: chạm chữ = dành phin sắp pha cho việc đó (chạm lại để bỏ),
+// ô vuông = gạch / bỏ gạch, × = xoá. Hết chỗ thì giấu ô thêm việc
+function TodoList({
+  todos,
+  picked,
+  onPick,
+  onAdd,
+  onCheck,
+  onRemove,
+}: {
+  todos: Todo[]
+  picked: string | null
+  onPick: (id: string | null) => void
+  onAdd: (text: string) => void
+  onCheck: (id: string, done: boolean) => void
+  onRemove: (id: string) => void
+}) {
+  const t = useT()
+  const [draft, setDraft] = useState('')
+  const open = todos.some((x) => !x.doneDay)
+
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-2">
+      <p className="px-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.todo.heading}</p>
+      {todos.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {todos.map((x) => {
+            const isPicked = picked === x.id && !x.doneDay
+            return (
+              <li key={x.id} className={`group flex items-center gap-1 rounded-lg border ${isPicked ? 'border-[#e8b27d]/60 bg-[#e8b27d]/10' : 'border-transparent'}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(x.doneDay)}
+                  onChange={(e) => onCheck(x.id, e.target.checked)}
+                  aria-label={t.todo.checkAria(x.text)}
+                  className="ml-1.5 size-3.5 shrink-0 cursor-pointer accent-[#e8b27d]"
+                />
+                <button
+                  type="button"
+                  disabled={Boolean(x.doneDay)}
+                  onClick={() => onPick(isPicked ? null : x.id)}
+                  aria-pressed={isPicked}
+                  className={`min-w-0 flex-1 break-words rounded-md px-1.5 py-1 text-left text-[13px] leading-snug transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                    x.doneDay ? 'text-[#7d756d] line-through' : isPicked ? 'text-[#f3cfa8]' : 'text-[#ede6dd] hover:text-white'
+                  }`}
+                >
+                  {x.text}
+                  {isPicked && <span className="ml-1.5 whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-[#e8b27d]">· {t.todo.forPhin}</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemove(x.id)}
+                  aria-label={t.todo.removeAria(x.text)}
+                  className="mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-sm leading-none text-[#7d756d] opacity-60 transition hover:text-[#ede6dd] hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-[#e8b27d] sm:opacity-0 sm:group-hover:opacity-100"
+                >
+                  ×
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {todos.length < MAX_TODOS ? (
+        <form
+          className="mt-1.5 flex gap-1"
+          onSubmit={(e) => {
+            e.preventDefault()
+            onAdd(draft)
+            setDraft('')
+          }}
+        >
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={MAX_TODO_LENGTH}
+            placeholder={t.todo.placeholder}
+            aria-label={t.todo.placeholder}
+            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-2 py-1.5 text-[13px] text-[#ede6dd] placeholder:text-[#7d756d] focus:border-[#e8b27d]/60 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim()}
+            className="rounded-lg border border-white/15 px-2.5 text-xs text-[#c9c0b6] transition enabled:hover:bg-white/[0.06] enabled:hover:text-[#ede6dd] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+          >
+            {t.todo.add}
+          </button>
+        </form>
+      ) : (
+        <p className="mt-1.5 px-1 text-xs text-[#a79e94]">{t.todo.full}</p>
+      )}
+      <p className="mt-1.5 px-1 text-[11px] leading-snug text-[#7d756d]">{open ? t.todo.pickHint : t.todo.emptyHint}</p>
     </div>
   )
 }
