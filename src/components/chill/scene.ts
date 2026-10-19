@@ -351,6 +351,50 @@ const TRAIN = {
   every: [180, 360], // các chuyến sau — tự chuyển ga 5 phút vẫn kịp thêm 1 chuyến
   horn: 4, // còi vọng từ xa trước khi đầu tàu vào khung (giây)
 } as const
+// Lá bay theo gió: lâu lâu 1 cơn gió thổi vài chiếc lá / cánh hoa chập chờn ngang cửa
+// sổ (mưa thì thôi, đêm thưa hơn). Màu [chính, bóng] theo điểm đến (id trong Studio),
+// không có thì lá vàng / cam. Khung lá vẽ bằng code, 1 "pixel" = 1 ô lưới phố (to hơn
+// pixel của ảnh nền vì lá bay sát cửa sổ): '#' màu chính, '+' màu bóng, viền nâu tự
+// thêm quanh lá như các sprite khác (không viền thì lá chìm vào cảnh phố nhiều chi tiết).
+// Lật khung liên tục trông như lá đang xoay
+const LEAF_COLORS: Record<string, [string, string][]> = {
+  // Lá rụng vàng / cam (sấu, bàng) + 1 xanh nõn sáng — nổi trên cả tán cây lẫn tường vàng
+  default: [
+    ['#ecc65a', '#b48b2c'],
+    ['#de8436', '#a65a20'],
+    ['#c3dc68', '#86a23a'],
+  ],
+  dalat: [
+    ['#f4b9cb', '#d98ba7'],
+    ['#f8d6df', '#e3a6bb'],
+  ],
+  hue: [
+    ['#e9572f', '#b53b1f'],
+    ['#f27d3b', '#c3532a'],
+  ],
+}
+const LEAF_OUTLINE = '#4a2e18'
+const LEAF_FRAMES = [
+  ['.##..', '####+', '.+++.'],
+  ['...#', '..#+', '.##+', '#+..'],
+  ['###+', '.++.'],
+  ['#...', '+#..', '.##+', '..+#'],
+].map((rows) => {
+  // Thêm 1 ô viền 'o' quanh các ô có màu
+  const h = rows.length + 2
+  const w = Math.max(...rows.map((r) => r.length)) + 2
+  const grid = Array.from({length: h}, (_, y) => Array.from({length: w}, (_, x) => rows[y - 1]?.[x - 1] ?? '.'))
+  const filled = (y: number, x: number) => grid[y]?.[x] === '#' || grid[y]?.[x] === '+'
+  return grid.map((row, y) =>
+    row.map((c, x) => (c === '.' && (filled(y - 1, x) || filled(y + 1, x) || filled(y, x - 1) || filled(y, x + 1)) ? 'o' : c)).join(''),
+  )
+})
+const LEAF = {
+  gust: [20, 45], // giây giữa 2 cơn gió
+  count: [4, 8], // số lá mỗi cơn (đêm còn một nửa)
+  speed: [24, 38], // ô lưới / giây theo chiều gió
+  q: 1,
+} as const
 const DOG_POSES: SpriteName[] = ['dog-stand', 'dog-wag', 'dog-sniff', 'dog-sit']
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
 // Kích thước sprite theo lưới 320×180 (atlas vẽ SPRITE_SCALE px cho mỗi px gốc)
@@ -492,6 +536,11 @@ export class ChillScene {
   private trainImg: HTMLImageElement | null = null
   private trainTinted: HTMLCanvasElement | null = null
   private trainKey = ''
+  // Lá đang bay (x, y lưới phố; `wait` = giây nữa mới bay vào — lá trong 1 cơn gió vào
+  // lệch nhau), giờ tới cơn gió sau, chiều gió (giữ cả buổi, thỉnh thoảng đổi)
+  private leaves: {x: number; y: number; vx: number; ph: number; spin: number; wait: number; color: [string, string]}[] = []
+  private nextGust = 8
+  private windDir: 1 | -1 = 1
   // Âm thanh sự kiện ngoài phố (ChillRoom nối sang ChillAudio). `len` = độ dài tiếng
   // (giây) cho tiếng kéo dài theo cảnh, vd tàu chạy qua
   onSound: ((kind: StreetSound, pan: number, dir: 1 | -1, len?: number) => void) | null = null
@@ -907,6 +956,70 @@ export class ChillScene {
     })
   }
 
+  private updateLeaves(dt: number) {
+    const {view, streetDy} = this.theme
+    this.nextGust -= dt
+    if (this.nextGust <= 0) {
+      const [g0, g1] = LEAF.gust
+      this.nextGust = g0 + this.rng() * (g1 - g0)
+      if (this.rng() < 0.15) this.windDir = this.windDir > 0 ? -1 : 1
+      if (this.weather !== 'rain') {
+        const palette = LEAF_COLORS[this.destination.id] ?? LEAF_COLORS.default
+        const [c0, c1] = LEAF.count
+        let n = c0 + Math.floor(this.rng() * (c1 - c0 + 1))
+        if (this.time === 'night') n = Math.ceil(n / 2)
+        const [s0, s1] = LEAF.speed
+        for (let i = 0; i < n; i++) {
+          this.leaves.push({
+            x: this.windDir > 0 ? view.x - 3 : view.x + view.w + 3,
+            y: view.y + 6 + this.rng() * (SIDEWALK_Y + streetDy - view.y - 24),
+            vx: this.windDir * (s0 + this.rng() * (s1 - s0)),
+            ph: this.rng() * Math.PI * 2,
+            spin: 5 + this.rng() * 5,
+            wait: i * 0.25 + this.rng() * 0.9,
+            color: pick(this.rng, palette),
+          })
+        }
+      }
+    }
+    const t = this.clock
+    const ground = SIDEWALK_Y + streetDy
+    for (const l of this.leaves) {
+      if (l.wait > 0) {
+        l.wait -= dt
+        continue
+      }
+      // Gió thổi từng đợt (nhanh / chậm), lá chao lên xuống và rơi dần
+      l.x += l.vx * (0.75 + 0.35 * Math.sin(t * 1.4 + l.ph)) * dt
+      l.y += (3.5 + 9 * Math.sin(t * 2.6 + l.ph)) * dt
+    }
+    this.leaves = this.leaves.filter((l) => l.wait > 0 || (l.y < ground && l.x > view.x - 8 && l.x < view.x + view.w + 8))
+  }
+
+  // Vẽ trong hệ lưới phố (quầy hoặc lớp kính), trước lớp mưa / sương
+  private drawLeaves() {
+    if (!this.leaves.length) return
+    const ctx = this.ctx
+    const q = LEAF.q
+    const t = this.clock
+    for (const l of this.leaves) {
+      if (l.wait > 0) continue
+      const rows = LEAF_FRAMES[Math.floor(t * l.spin + l.ph * 2) % LEAF_FRAMES.length]
+      const x0 = Math.round(l.x / q) * q
+      const y0 = Math.round(l.y / q) * q
+      const ink = {'#': this.o(l.color[0]), '+': this.o(l.color[1]), o: this.o(LEAF_OUTLINE)}
+      rows.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          if (row[c] === '.') continue
+          ctx.fillStyle = ink[row[c] as keyof typeof ink]
+          // Lá bay sang trái thì lật khung
+          const cx = l.vx > 0 ? c : row.length - 1 - c
+          ctx.fillRect(x0 + cx * q, y0 + r * q, q, q)
+        }
+      })
+    }
+  }
+
   private drawTrainLamp(dir: 1 | -1, x: number, y: number, w: number, h: number, base: number) {
     const ctx = this.ctx
     const [lx, ly] = TRAIN.loco.lamp
@@ -1241,6 +1354,7 @@ export class ChillScene {
     this.updateKids(dt)
     this.updateFisher(dt)
     this.updateTrain(dt)
+    this.updateLeaves(dt)
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
@@ -1899,6 +2013,7 @@ export class ChillScene {
       this.drawVignette(t)
       for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane)) this.drawMover(m, t)
       this.drawTrain()
+      this.drawLeaves()
       this.ctx = counter
       if (rain) {
         // Màu nước: lớp phố đã làm mịn phủ lên, nét gốc chỉ còn thấp thoáng
@@ -2246,6 +2361,7 @@ export class ChillScene {
     for (const m of [...this.movers].sort((a, b) => order(a) - order(b))) this.drawMover(m, t)
     // Tàu chạy trên ray, che người đi bộ trên vỉa hè bên kia
     this.drawTrain()
+    this.drawLeaves()
 
     if (this.weather === 'rain') {
       ctx.globalCompositeOperation = 'multiply'
