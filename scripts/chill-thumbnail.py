@@ -125,10 +125,14 @@ def main():
     if bad:
         print(f'Lưu ý: font pixel không có các chữ {" ".join(bad)} — nên viết không dấu hoặc tiếng Anh.', file=sys.stderr)
 
-    # Góc trên: mèo nhỏ + tên kênh
+    # Góc trên: mèo nhỏ + tên kênh trên nền tối (che luôn nhãn điểm đến của /chill/record)
     cat = Image.open(CAT).convert('RGBA')
     x0, y0, w, h = CAT_LOOK
-    cat = cat.crop((x0, y0, x0 + w, y0 + h)).resize((w // 2 * 1, h // 2 * 1), Image.NEAREST)
+    cat = cat.crop((x0, y0, x0 + w, y0 + h)).resize((w // 2, h // 2), Image.NEAREST)
+    brand_w = d.textlength(BRAND, font=brand_f)
+    panel = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(panel).rectangle((0, 0, 48 + cat.width + 16 + brand_w + 28, 40 + cat.height + 20), fill=(14, 10, 18, 250))
+    base.alpha_composite(panel)
     base.alpha_composite(cat, (48, 40))
     shadow_text(d, (48 + cat.width + 16, 40 + cat.height - 38), BRAND, brand_f, CREAM, depth=3)
 
