@@ -156,7 +156,7 @@ export function ChillEmbed({tracks, destinations}: {tracks: Track[]; destination
     void import('./scene').then(({ChillScene}) => {
       if (cancelled) return
       scene = new ChillScene(canvas)
-      scene.onSound = (kind, pan, dir) => audioRef.current?.streetSound(kind, pan, dir)
+      scene.onSound = (kind, pan, dir, len) => audioRef.current?.streetSound(kind, pan, dir, len)
       sceneRef.current = scene
       fit()
       // Hiệu ứng bên dưới đặt giờ / thời tiết thật; lần đầu đặt ngay để khỏi vẽ cảnh mặc định

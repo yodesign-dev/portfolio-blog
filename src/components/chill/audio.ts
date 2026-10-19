@@ -9,7 +9,7 @@
 import type {SynthSpec, Track} from './tracks'
 
 export type Ambience = 'street' | 'rain' | 'quiet'
-export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder'
+export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder' | 'train-horn' | 'train'
 
 // Thời gian chồng mờ giữa 2 bài (giây)
 const CROSSFADE = 5
@@ -316,9 +316,10 @@ export class ChillAudio {
   }
 
   // Âm thanh 1 sự kiện ngoài phố. pan -1…1 là vị trí trái/phải, dir là chiều
-  // xe chạy (tiếng "vù" quét theo chiều đó). Chưa có AudioContext (người xem
-  // chưa bấm gì) thì bỏ qua — không tự bật âm thanh.
-  streetSound(kind: StreetSound, pan = 0, dir: 1 | -1 = 1) {
+  // xe chạy (tiếng "vù" quét theo chiều đó). `len` = độ dài tiếng kéo dài theo cảnh
+  // (tàu chạy qua). Chưa có AudioContext (người xem chưa bấm gì) thì bỏ qua — không
+  // tự bật âm thanh.
+  streetSound(kind: StreetSound, pan = 0, dir: 1 | -1 = 1, len = 30) {
     const ctx = this.ctx
     if (!ctx || !this.sfxIn || this.ambienceLevel <= 0) return
     const now = ctx.currentTime
@@ -347,6 +348,47 @@ export class ChillAudio {
       return
     }
 
+    if (kind === 'train') {
+      // Tàu chạy qua: tiếng rền trầm to dần khi đầu tàu tới giữa khung rồi nhỏ dần,
+      // quét từ loa phía tàu tới sang loa bên kia; "xình xịch" mỗi lần bánh lăn qua mối ray
+      const src = ctx.createBufferSource()
+      src.buffer = this.white
+      src.loop = true
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 220
+      const env = ctx.createGain()
+      env.gain.setValueAtTime(0, now)
+      env.gain.linearRampToValueAtTime(0.5, now + len * 0.25)
+      env.gain.setValueAtTime(0.5, now + len * 0.7)
+      env.gain.linearRampToValueAtTime(0, now + len)
+      panner.pan.setValueAtTime(-0.8 * dir, now)
+      panner.pan.linearRampToValueAtTime(0.8 * dir, now + len)
+      src.connect(lp).connect(env).connect(panner)
+      src.start(now, Math.random())
+      src.stop(now + len + 0.05)
+      // Cặp "xình xịch" đều nhịp, to theo cùng đường bao với tiếng rền
+      for (let at = 0.6; at < len - 0.4; at += 0.85) {
+        const loud = Math.min(1, at / (len * 0.25), (len - at) / (len * 0.3))
+        for (const dt of [0, 0.13]) {
+          const hit = ctx.createBufferSource()
+          hit.buffer = this.white
+          const bp = ctx.createBiquadFilter()
+          bp.type = 'bandpass'
+          bp.frequency.value = 900
+          bp.Q.value = 1.4
+          const g = ctx.createGain()
+          g.gain.setValueAtTime(0, now + at + dt)
+          g.gain.linearRampToValueAtTime(0.16 * loud, now + at + dt + 0.005)
+          g.gain.exponentialRampToValueAtTime(0.001, now + at + dt + 0.09)
+          hit.connect(bp).connect(g).connect(panner)
+          hit.start(now + at + dt, Math.random())
+          hit.stop(now + at + dt + 0.1)
+        }
+      }
+      return
+    }
+
     if (kind === 'thunder') {
       // Sấm xa: tiếng ì ầm trầm, nổ nhẹ rồi rền dài
       const len = 4.5
@@ -370,6 +412,33 @@ export class ChillAudio {
     }
 
     panner.pan.value = Math.max(-1, Math.min(1, pan))
+    if (kind === 'train-horn') {
+      // Còi tàu vọng từ xa "tuuu… tu": 2 hồi, hợp âm trầm, lọc bớt cho nghe như ở xa
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.value = 700
+      lp.connect(panner)
+      for (const [start, dur] of [
+        [0, 1.1],
+        [1.35, 0.45],
+      ]) {
+        const env = ctx.createGain()
+        env.gain.setValueAtTime(0, now + start)
+        env.gain.linearRampToValueAtTime(0.09, now + start + 0.06)
+        env.gain.setValueAtTime(0.09, now + start + dur - 0.12)
+        env.gain.linearRampToValueAtTime(0, now + start + dur)
+        env.connect(lp)
+        for (const f of [233, 277, 349]) {
+          const o = ctx.createOscillator()
+          o.type = 'sawtooth'
+          o.frequency.value = f
+          o.connect(env)
+          o.start(now + start)
+          o.stop(now + start + dur + 0.02)
+        }
+      }
+      return
+    }
     if (kind === 'horn') {
       // Còi xe máy "bíp bíp": 2 tiếng ngắn, 2 nốt chồng
       for (const [start, dur] of [

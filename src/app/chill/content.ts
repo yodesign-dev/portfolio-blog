@@ -7,7 +7,8 @@ import type {ChillUpdate} from '@/components/chill/Changelog'
 //
 // Nhạc + điểm đến quản lý trong Sanity Studio. Code (tracks.ts / destinations.ts)
 // chỉ còn vài bài + Hà Nội dự phòng, dùng khi Sanity không trả về gì.
-// Chỉ lấy bản đã đủ file/ảnh và không bị "Ẩn khỏi trang".
+// Chỉ lấy bản đã đủ file/ảnh và không bị "Ẩn khỏi trang" — riêng điểm đến, máy dev
+// bật CHILL_DEV_HIDDEN=1 thì lấy cả điểm đến đang ẩn để thử (vd cảnh mới chưa mở cho khách).
 const CHILL_QUERY = `{
   "tracks": *[_type == "chillTrack" && hidden != true && (defined(audio.asset) || defined(localFile))]
     | order(select(station == "acoustic" => 0, station == "focus" => 1, station == "sax" => 2, station == "lofi" => 3, station == "study" => 4, 5) asc,
@@ -19,7 +20,7 @@ const CHILL_QUERY = `{
     duration,
     "src": coalesce(audio.asset->url, localFile)
   },
-  "destinations": *[_type == "chillDestination" && hidden != true && defined(slug.current)
+  "destinations": *[_type == "chillDestination" && ($showHidden || hidden != true) && defined(slug.current)
     && defined(morning.asset) && defined(afternoon.asset) && defined(night.asset)]
     | order(coalesce(order, 9999) asc, _createdAt asc) {
     "id": slug.current,
@@ -85,7 +86,8 @@ function isTimeZone(tz?: string): tz is string {
 }
 
 export async function getChillContent(revalidate: number) {
-  const content = await sanityFetch<ChillContent>({query: CHILL_QUERY, revalidate}).catch(
+  const showHidden = process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_HIDDEN === '1'
+  const content = await sanityFetch<ChillContent>({query: CHILL_QUERY, params: {showHidden}, revalidate}).catch(
     (): ChillContent => ({tracks: [], destinations: [], updates: []})
   )
 
@@ -107,7 +109,7 @@ export async function getChillContent(revalidate: number) {
     timeZone: isTimeZone(d.timeZone) ? d.timeZone : 'Asia/Ho_Chi_Minh',
     tilt: d.tilt,
     laneShift: d.laneShift,
-    scenery: d.scenery === 'countryside' ? 'countryside' : 'street',
+    scenery: d.scenery === 'countryside' || d.scenery === 'railway' ? d.scenery : 'street',
     streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
   }))
   const destinations: Destination[] = [...(fromStudioDest.length ? fromStudioDest : DESTINATIONS)]
@@ -120,6 +122,18 @@ export async function getChillContent(revalidate: number) {
       region: 'Việt Nam',
       timeZone: 'Asia/Ho_Chi_Minh',
       scenery: 'countryside',
+      streets: {morning: img('morning'), afternoon: img('afternoon'), night: img('night')},
+    })
+  }
+  // Chỉ máy dev: phố đường tàu thử cơ chế tàu chạy khi chưa có ảnh ray (tạm mượn ảnh Hà Nội)
+  if (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_RAILWAY === '1') {
+    const img = (t: string) => `/chill/scenes/hanoi-${t}.webp`
+    destinations.unshift({
+      id: 'railway-dev',
+      name: 'Đường tàu (dev)',
+      region: 'Việt Nam',
+      timeZone: 'Asia/Ho_Chi_Minh',
+      scenery: 'railway',
       streets: {morning: img('morning'), afternoon: img('afternoon'), night: img('night')},
     })
   }

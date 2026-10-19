@@ -397,7 +397,9 @@ export function ChillRoom({
     const scene = new ChillScene(canvasRef.current!)
     sceneRef.current = scene
     // Tiếng xe chạy qua, còi, chó sủa ngoài phố → phát qua bộ âm thanh (theo thanh Ambience)
-    scene.onSound = (kind, pan, dir) => audioRef.current?.streetSound(kind, pan, dir)
+    scene.onSound = (kind, pan, dir, len) => audioRef.current?.streetSound(kind, pan, dir, len)
+    // ?train=now: gọi tàu tới ngay khi đang ở phố đường tàu (quay clip khỏi phải chờ)
+    if (new URLSearchParams(window.location.search).get('train') === 'now') scene.callTrain()
     let raf = 0
     let lastDraw = 0
     scene.frame(performance.now())

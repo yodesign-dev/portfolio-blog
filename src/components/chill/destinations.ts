@@ -22,7 +22,9 @@ export type Destination = {
   laneShift?: number
   // "countryside" = cảnh đồng quê: đường đất chỉ có xe máy / xe đạp, lúa lắc lư theo
   // gió, không có các cảnh nhỏ của phố (shipper, cặp đôi, bảng menu…)
-  scenery?: 'street' | 'countryside'
+  // "railway" = phố đường tàu: ray thay cho 2 làn xe, không xe cộ, chỉ người đi bộ +
+  // đoàn tàu chạy qua vài phút một lần (TRAIN trong scene.ts)
+  scenery?: 'street' | 'countryside' | 'railway'
 }
 
 const local = (id: string): Record<TimeOfDay, string> => ({

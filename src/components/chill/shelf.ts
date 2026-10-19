@@ -235,7 +235,7 @@ export const ITEMS: ShelfItem[] = [
   {
     id: 'egg-coffee',
     kind: 'place',
-    places: ['hanoi'],
+    places: ['hanoi', 'hanoi-tau'],
     palette: {o: O, F: '#f3dc94', f: '#e2b85a', C: '#5a3418', B: '#f1ece0'},
     rows: [
       '.ooooo.',

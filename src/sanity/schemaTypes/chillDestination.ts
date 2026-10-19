@@ -78,11 +78,13 @@ export default defineType({
         list: [
           {title: 'Phố (ô tô, xe buýt, shipper, cặp đôi…)', value: 'street'},
           {title: 'Đồng quê (chỉ xe máy, xe đạp; lúa lắc lư theo gió)', value: 'countryside'},
+          {title: 'Đường tàu (không xe cộ; đoàn tàu chạy qua vài phút một lần)', value: 'railway'},
         ],
         layout: 'radio',
       },
       initialValue: 'street',
-      description: 'Đồng quê: phần ruộng trong ảnh tự lắc theo gió, đường chỉ có xe máy / xe đạp / chó.',
+      description:
+        'Đồng quê: phần ruộng trong ảnh tự lắc theo gió, đường chỉ có xe máy / xe đạp / chó. Đường tàu: ray nằm ở dải làn xe sát mép dưới ảnh, chỉ có người đi bộ và đoàn tàu. Cần bản code đã có kiểu này trước khi bật hiện — code cũ coi là phố thường, cho ô tô chạy trên ray.',
     }),
     defineField({
       name: 'tilt',

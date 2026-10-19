@@ -334,6 +334,23 @@ const WINDOWS: Record<string, [number, number, number, number]> = {
   'car-hatch': [0.25, 0.1, 0.47, 0.3],
   bus: [0.06, 0.14, 0.76, 0.32],
 }
+// Phố đường tàu (điểm đến kiểu "railway"): không xe cộ, đoàn tàu chạy chậm ngang qua.
+// Sprite train.webp: 2 ô đặt cạnh nhau, nhìn ngang, hướng PHẢI, đáy ô = mặt ray, 4 px
+// ảnh = 1 ô lưới phố — đầu máy (loco) rồi 1 toa (car); toa lặp lại `cars` lần.
+// Vùng cửa sổ (tỉ lệ theo ô, sprite hướng phải) sáng đèn ban đêm; `lamp` = đèn pha.
+// Đổi ảnh tàu thì đo lại các tỉ lệ này cho khớp.
+const TRAIN = {
+  src: '/chill/scenes/train.webp',
+  loco: {x: 0, w: 224, h: 104, windows: [[0.71, 0.27, 0.16, 0.23]], lamp: [0.97, 0.53]},
+  car: {x: 224, w: 248, h: 104, windows: [[0.07, 0.27, 0.86, 0.21]]},
+  cars: 3,
+  gap: 1, // khớp nối giữa 2 toa (ô lưới)
+  ground: 122, // mặt ray — giữa 2 làn xe của ảnh phố
+  speed: 18, // ô lưới / giây → cả đoàn qua khung ~30 giây
+  first: [60, 90], // chuyến đầu: khách mới kịp thấy tàu trước khi rời trang
+  every: [240, 480], // các chuyến sau
+  horn: 4, // còi vọng từ xa trước khi đầu tàu vào khung (giây)
+} as const
 const DOG_POSES: SpriteName[] = ['dog-stand', 'dog-wag', 'dog-sniff', 'dog-sit']
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
 // Kích thước sprite theo lưới 320×180 (atlas vẽ SPRITE_SCALE px cho mỗi px gốc)
@@ -465,8 +482,19 @@ export class ChillScene {
   private nextNote = 0
   private nextHorn = 12
   private lastWhoosh = 0
-  // Âm thanh sự kiện ngoài phố (ChillRoom nối sang ChillAudio)
-  onSound: ((kind: StreetSound, pan: number, dir: 1 | -1) => void) | null = null
+  // Phố đường tàu: đoàn tàu đang chạy (x = mũi đầu máy, lưới 320), giờ tới chuyến sau,
+  // chiều chuyến sau (chọn sẵn để còi vọng đúng phía), còi chuyến sau đã kêu chưa
+  private train: {x: number; dir: 1 | -1} | null = null
+  private nextTrain = 0
+  private trainDir: 1 | -1 = 1
+  private trainHorned = false
+  private trainCalled = false
+  private trainImg: HTMLImageElement | null = null
+  private trainTinted: HTMLCanvasElement | null = null
+  private trainKey = ''
+  // Âm thanh sự kiện ngoài phố (ChillRoom nối sang ChillAudio). `len` = độ dài tiếng
+  // (giây) cho tiếng kéo dài theo cảnh, vd tàu chạy qua
+  onSound: ((kind: StreetSound, pan: number, dir: 1 | -1, len?: number) => void) | null = null
   private last = 0
   private clock = 0
 
@@ -549,11 +577,18 @@ export class ChillScene {
       this.street = next
       this.fade = 0
     }
+    const wasRailway = this.railway
     this.time = time
     this.weather = weather
     this.destination = destination
     // Sang đồng quê: ô tô, xe buýt, xích lô đang chạy trên phố cũ biến mất luôn
     if (destination.scenery === 'countryside') this.movers = this.movers.filter((m) => !m.road || COUNTRY_BIKES.includes(m.sprite as SpriteName) || m.sprite === 'bike-poncho')
+    // Sang phố đường tàu: hết xe trên ray; vừa tới nơi thì chuyến đầu đến sớm
+    if (this.railway && !wasRailway) {
+      this.movers = this.movers.filter((m) => !m.road)
+      this.scheduleTrain(TRAIN.first)
+    }
+    if (!this.railway) this.train = null
     this.tilt = destination.tilt ?? 0
     this.laneShift = destination.laneShift ?? 0
     this.dirty = true
@@ -765,6 +800,139 @@ export class ChillScene {
 
   private get countryside() {
     return this.destination.scenery === 'countryside'
+  }
+
+  private get railway() {
+    return this.destination.scenery === 'railway'
+  }
+
+  // Hẹn chuyến tàu sau trong khoảng [min, max] giây, chiều chạy chọn sẵn
+  private scheduleTrain([min, max]: readonly [number, number]) {
+    this.nextTrain = min + this.rng() * (max - min)
+    this.trainDir = this.rng() < 0.5 ? 1 : -1
+    this.trainHorned = false
+  }
+
+  // Gọi tàu tới ngay (vd ?train=now khi quay clip) — áp dụng khi đang ở phố đường tàu
+  callTrain() {
+    this.trainCalled = true
+  }
+
+  private get trainLength() {
+    const snap = SCALE * SPRITE_SCALE
+    return TRAIN.loco.w / snap + TRAIN.cars * (TRAIN.car.w / snap + TRAIN.gap)
+  }
+
+  private updateTrain(dt: number) {
+    if (!this.railway) return
+    this.trainLayer()
+    const tr = this.train
+    if (tr) {
+      tr.x += tr.dir * TRAIN.speed * dt
+      // Đuôi tàu ra khỏi khung bên kia → hẹn chuyến sau
+      const tail = tr.x - tr.dir * this.trainLength
+      if (tr.dir > 0 ? tail > SCENE_W + 4 : tail < -4) {
+        this.train = null
+        this.scheduleTrain(TRAIN.every)
+      }
+      return
+    }
+    if (this.trainCalled) {
+      this.trainCalled = false
+      this.nextTrain = Math.min(this.nextTrain, TRAIN.horn + 0.5)
+    }
+    this.nextTrain -= dt
+    // Còi vọng từ phía tàu sắp tới
+    if (!this.trainHorned && this.nextTrain <= TRAIN.horn) {
+      this.trainHorned = true
+      this.onSound?.('train-horn', -0.8 * this.trainDir, this.trainDir)
+    }
+    if (this.nextTrain > 0) return
+    const dir = this.trainDir
+    this.train = {x: dir > 0 ? -2 : SCENE_W + 2, dir}
+    // Tiếng tàu kéo dài đúng lúc cả đoàn chạy ngang khung
+    this.onSound?.('train', 0, dir, (SCENE_W + this.trainLength) / TRAIN.speed)
+  }
+
+  private trainLayer() {
+    this.trainImg ??= loadImage(TRAIN.src, () => (this.trainKey = ''))
+    if (!ready(this.trainImg)) return null
+    const key = this.tint ?? 'none'
+    if (this.trainTinted && this.trainKey === key) return this.trainTinted
+    this.trainTinted = this.tinted(this.trainImg, this.trainTinted)
+    this.trainKey = key
+    return this.trainTinted
+  }
+
+  // Vẽ trong hệ lưới phố (quầy hoặc lớp kính). Mỗi toa nảy nhẹ khi lăn qua mối ray,
+  // lệch nhịp nhau; đêm sáng cửa sổ + đèn pha; mưa có vệt đèn trên ray ướt
+  private drawTrain() {
+    const tr = this.train
+    const img = this.trainLayer()
+    if (!tr || !img) return
+    const ctx = this.ctx
+    const snap = SCALE * SPRITE_SCALE
+    const night = this.time === 'night'
+    const rainy = this.weather === 'rain'
+    const units = [TRAIN.loco, ...Array.from({length: TRAIN.cars}, () => TRAIN.car)]
+    // Từ mũi đầu máy lùi về đuôi
+    let front = tr.x
+    units.forEach((u, i) => {
+      const w = u.w / snap
+      const h = u.h / snap
+      const left = tr.dir > 0 ? front - w : front
+      const base = this.groundY(TRAIN.ground, left + w / 2, this.laneShift)
+      const joint = ((left + i * 3.7) % 9 + 9) % 9 < 0.7 ? 0.25 : 0
+      const x = Math.round(left * snap) / snap
+      const y = Math.round((base - h - joint) * snap) / snap
+      // Bóng dưới gầm
+      ctx.fillStyle = night || rainy ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.25)'
+      ctx.fillRect(x + 1, base - 1, w - 2, 1)
+      ctx.save()
+      if (tr.dir < 0) {
+        ctx.translate(x * 2 + w, 0)
+        ctx.scale(-1, 1)
+      }
+      ctx.drawImage(img, u.x, 0, u.w, u.h, x, y, w, h)
+      if (night) {
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.fillStyle = 'rgba(255,205,120,0.34)'
+        for (const [wx, wy, ww, wh] of u.windows) ctx.fillRect(x + wx * w, y + wy * h, ww * w, wh * h)
+        ctx.globalCompositeOperation = 'source-over'
+      }
+      ctx.restore()
+      if (i === 0 && (night || rainy || this.weather === 'mist')) this.drawTrainLamp(tr.dir, x, y, w, h, base)
+      front = tr.dir > 0 ? left - TRAIN.gap : left + w + TRAIN.gap
+    })
+  }
+
+  private drawTrainLamp(dir: 1 | -1, x: number, y: number, w: number, h: number, base: number) {
+    const ctx = this.ctx
+    const [lx, ly] = TRAIN.loco.lamp
+    const fx = dir > 0 ? x + lx * w : x + (1 - lx) * w
+    const fy = y + ly * h
+    const reach = 46
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    const beam = ctx.createLinearGradient(fx, fy, fx + dir * reach, fy)
+    beam.addColorStop(0, 'rgba(255,240,190,0.4)')
+    beam.addColorStop(1, 'rgba(255,240,190,0)')
+    ctx.fillStyle = beam
+    ctx.beginPath()
+    ctx.moveTo(fx, fy - 1.5)
+    ctx.lineTo(fx + dir * reach, fy - 7)
+    ctx.lineTo(fx + dir * reach, base + 1)
+    ctx.lineTo(fx, fy + 1.5)
+    ctx.fill()
+    if (this.weather === 'rain') {
+      const g = ctx.createLinearGradient(0, base, 0, base + 8)
+      g.addColorStop(0, 'rgba(255,238,175,0.3)')
+      g.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(fx - 1, base, 2, 8)
+    }
+    ctx.restore()
+    this.rect(fx - 0.5, fy - 0.5, 1, 1, '#fff6c8')
   }
 
   // Ảnh để vẽ phố: cảnh đồng quê đã có lớp gió → dùng bản đã lắc
@@ -1071,6 +1239,7 @@ export class ChillScene {
     this.updateVignette(dt)
     this.updateKids(dt)
     this.updateFisher(dt)
+    this.updateTrain(dt)
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
@@ -1469,6 +1638,8 @@ export class ChillScene {
   }
 
   private spawnVehicle(x?: number) {
+    // Phố đường tàu: lòng đường là ray, không xe nào chạy
+    if (this.railway) return
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
     const lane = dir > 0 ? NEAR_LANE : FAR_LANE
@@ -1726,6 +1897,7 @@ export class ChillScene {
       for (const m of this.movers) if (!m.road) this.drawMover(m, t)
       this.drawVignette(t)
       for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane)) this.drawMover(m, t)
+      this.drawTrain()
       this.ctx = counter
       if (rain) {
         // Màu nước: lớp phố đã làm mịn phủ lên, nét gốc chỉ còn thấp thoáng
@@ -1817,6 +1989,8 @@ export class ChillScene {
   private updateVignette(dt: number) {
     // Đổi sang cảnh đồng quê giữa chừng → cảnh nhỏ của phố biến mất
     if (this.countryside) this.vignette = null
+    // Phố đường tàu không có xe → bỏ cảnh anh shipper chạy xe máy
+    if (this.railway && this.vignette?.kind === 'shipper') this.vignette = null
     const v = this.vignette
     if (!v) {
       if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain' || this.countryside) return
@@ -1825,7 +1999,7 @@ export class ChillScene {
       if (this.nextVignette > 0) return
       this.nextVignette = this.busy ? 12 + this.rng() * 8 : 30 + this.rng() * 20
       // Không lặp lại cảnh vừa xem
-      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette)
+      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette && !(this.railway && k === 'shipper'))
       const kind = pick(this.rng, kinds)
       this.lastVignette = kind
       const spec: VignetteSpec = VIGNETTES[kind]
@@ -2069,6 +2243,8 @@ export class ChillScene {
     // Vỉa hè → làn xa → làn gần (gần hơn vẽ sau, đè lên trên)
     const order = (m: Mover) => (m.road ? m.lane : 0)
     for (const m of [...this.movers].sort((a, b) => order(a) - order(b))) this.drawMover(m, t)
+    // Tàu chạy trên ray, che người đi bộ trên vỉa hè bên kia
+    this.drawTrain()
 
     if (this.weather === 'rain') {
       ctx.globalCompositeOperation = 'multiply'
