@@ -86,8 +86,9 @@ export const THEMES: Theme[] = [
   {
     id: 'cafe',
     name: 'Café window',
+    // 1280×720: bản 640×360 cũ phóng ×2 bằng Recraft Crisp Upscale (Weave), giữ nền trong suốt cũ
     interior: '/chill/scenes/interior.webp',
-    interiorScale: 1,
+    interiorScale: 2,
     thumb: '/chill/scenes/room-cafe-thumb.webp',
     view: {x: 24, y: 15, w: 272, h: 109},
     panes: [
@@ -112,7 +113,7 @@ export const THEMES: Theme[] = [
     // Gờ dưới khung cửa sổ: ô giữa (sau phin, trên cuốn sổ) rồi ô trái (trên đầu mèo)
     shelf: [296, 326, 356, 386, 86, 114, 142, 170].map((x) => ({x, y: 249})),
     steam: {x: 127, y: 113},
-    drink: {hit: {x: 230, y: 226, w: 44, h: 72}, coffee: {x: 241, y: 274, w: 20, h: 9}, milk: {x: 242, y: 283, w: 21, h: 7}},
+    drink: {hit: {x: 230, y: 226, w: 44, h: 72}, coffee: {x: 242, y: 274, w: 19, h: 10}, milk: {x: 242, y: 284, w: 21, h: 7}},
     lamp: {x: 63, y: 42},
     lampAlways: false,
     laptop: {x: 235, y: 119},

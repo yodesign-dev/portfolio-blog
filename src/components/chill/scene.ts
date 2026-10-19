@@ -702,7 +702,7 @@ export class ChillScene {
       ctx.fillRect(x * RES, y * RES, w * RES, h * RES)
     }
     if (this.drink === 'den') {
-      fill('#120c0a', milk.x, milk.y, milk.w, milk.h)
+      fill('#100705', milk.x, milk.y, milk.w, milk.h)
       // Vệt sáng dọc thành ly chạy tiếp xuống đáy
       fill('#2f1d13', milk.x + milk.w - 5, milk.y, 2, milk.h)
     } else {
