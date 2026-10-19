@@ -347,8 +347,8 @@ const TRAIN = {
   gap: 1, // khớp nối giữa 2 toa (ô lưới)
   ground: 121, // mặt thanh ray gần (ảnh hanoi-tau: y≈648/672) — giữa 2 làn xe của ảnh phố
   speed: 20.5, // ô lưới / giây → cả đoàn qua khung ~30 giây (khớp file tiếng tàu chạy qua)
-  first: [60, 90], // chuyến đầu: khách mới kịp thấy tàu trước khi rời trang
-  every: [240, 480], // các chuyến sau
+  first: [15, 25], // chuyến đầu (giây): khách vừa vào đã kịp thấy tàu, trước khi bỏ đi
+  every: [180, 360], // các chuyến sau — tự chuyển ga 5 phút vẫn kịp thêm 1 chuyến
   horn: 4, // còi vọng từ xa trước khi đầu tàu vào khung (giây)
 } as const
 const DOG_POSES: SpriteName[] = ['dog-stand', 'dog-wag', 'dog-sniff', 'dog-sit']
