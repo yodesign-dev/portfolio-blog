@@ -142,7 +142,7 @@ export function Shelf({
       }}
     >
       <header className="flex items-start gap-3 border-b-2 border-[#3a2414] bg-[#6b4527] px-5 py-4 shadow-[inset_0_-2px_0_rgba(255,220,170,0.08)]">
-        <ItemIcon id="porcelain-cup" scale={2} className="mt-1 shrink-0" />
+        <ItemIcon id="porcelain-cup" scale={1} className="mt-1 shrink-0" />
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold tracking-tight text-[#fbf1d2]">{t.shelf.title}</h2>
           <p className="mt-0.5 text-xs text-[#e6cfae]">{t.shelf.count(owned.size, ITEMS.length)}</p>
@@ -275,7 +275,7 @@ export function Shelf({
                       {t.shelf.newStamp}
                     </span>
                   )}
-                  <ItemIcon id={item.id} scale={3} shadow={!have} className={have ? 'chill-motion relative [animation:chill-float_3.2s_ease-in-out_infinite]' : 'relative'} />
+                  <ItemIcon id={item.id} scale={2} shadow={!have} className={have ? 'chill-motion relative [animation:chill-float_3.2s_ease-in-out_infinite]' : 'relative'} />
                   {!have && (
                     <span className="relative flex max-w-full items-center gap-1 truncate text-[10px] leading-none text-[#e6cfae]/85">
                       <CondIcon item={item} />
@@ -334,7 +334,7 @@ function CollectorCard({item, have, number, label, children}: {item: ShelfItem; 
         <span className={`absolute bottom-7 left-1/2 -translate-x-1/2 ${have ? '' : 'opacity-60'}`}>
           <ItemIcon
             id={item.id}
-            scale={7}
+            scale={4}
             shadow={!have}
             className={have ? 'chill-motion [animation:chill-float_3.6s_ease-in-out_infinite] drop-shadow-[0_6px_0_rgba(0,0,0,0.18)]' : ''}
           />
@@ -382,7 +382,7 @@ export function GiftReveal({id, onSeeShelf}: {id: string; onSeeShelf: () => void
             )}
             <Burst rarity={r} />
             <span className="chill-motion relative mb-1 [animation:chill-rise_0.7s_cubic-bezier(0.2,1.6,0.4,1)_both]">
-              <ItemIcon id={item.id} scale={5} />
+              <ItemIcon id={item.id} scale={3} />
             </span>
           </>
         )}
