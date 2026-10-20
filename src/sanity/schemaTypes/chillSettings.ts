@@ -23,6 +23,17 @@ export default defineType({
     defineField({name: 'diaryOpen', title: 'Mở bảng nhật ký', type: 'boolean', initialValue: false}),
     defineField({name: 'shelfOpen', title: 'Mở kệ sưu tầm', type: 'boolean', initialValue: false}),
     defineField({name: 'playCountsOpen', title: 'Đếm và hiện lượt nghe', type: 'boolean', initialValue: false}),
+    // Thử thách chung "Cả quán cùng pha phin" (xem src/app/api/chill-quest/route.ts)
+    defineField({name: 'questOpen', title: 'Mở thử thách chung', type: 'boolean', initialValue: false}),
+    defineField({name: 'questSeason', title: 'Mã mùa', type: 'string', initialValue: 'mua-1', description: 'Đổi mã (vd. mua-2) là bắt đầu mùa mới, bộ đếm và phiếu về 0.', validation: (rule) => rule.regex(/^[a-z0-9-]{1,24}$/)}),
+    defineField({name: 'questTitle', title: 'Tên mùa', type: 'string', initialValue: 'Mùa 1', validation: (rule) => rule.max(40)}),
+    defineField({name: 'questTitleEn', title: 'Tên mùa (tiếng Anh)', type: 'string', initialValue: 'Season 1', validation: (rule) => rule.max(40)}),
+    defineField({name: 'questGoal', title: 'Mục tiêu (số phin)', type: 'number', initialValue: 100, validation: (rule) => rule.integer().min(10).max(100000)}),
+    defineField({name: 'questVoteDays', title: 'Số ngày bỏ phiếu', type: 'number', initialValue: 3, validation: (rule) => rule.integer().min(1).max(14)}),
+    ...[1, 2, 3, 4].flatMap((i) => [
+      defineField({name: `questOpt${i}`, title: `Lựa chọn ${i}`, type: 'string', validation: (rule) => rule.max(60)}),
+      defineField({name: `questOpt${i}En`, title: `Lựa chọn ${i} (tiếng Anh)`, type: 'string', validation: (rule) => rule.max(60)}),
+    ]),
     defineField({name: 'diaryNoteVi', title: 'Mẩu giấy của quán (tiếng Việt)', type: 'string', validation: (rule) => rule.max(140)}),
     defineField({name: 'diaryNoteEn', title: 'Mẩu giấy của quán (tiếng Anh)', type: 'string', validation: (rule) => rule.max(140)}),
     defineField({name: 'diaryQuoteEn', title: 'Câu danh ngôn (tiếng Anh)', type: 'string', validation: (rule) => rule.max(200)}),

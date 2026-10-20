@@ -18,6 +18,20 @@ type Value = {
   diaryOpen?: boolean
   shelfOpen?: boolean
   playCountsOpen?: boolean
+  questOpen?: boolean
+  questSeason?: string
+  questTitle?: string
+  questTitleEn?: string
+  questGoal?: number
+  questVoteDays?: number
+  questOpt1?: string
+  questOpt1En?: string
+  questOpt2?: string
+  questOpt2En?: string
+  questOpt3?: string
+  questOpt3En?: string
+  questOpt4?: string
+  questOpt4En?: string
   diaryNoteVi?: string
   diaryNoteEn?: string
   diaryQuoteEn?: string
@@ -25,7 +39,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen'
 
 const FEATURES: {key: FeatureKey; icon: string; title: string; desc: string; beta?: boolean; delay: string}[] = [
   {key: 'chatOpen', icon: '💬', title: 'Phòng chat', desc: 'Khách nhắn tin với nhau trong quán. Tắt khi bị spam: nút chat ẩn đi, tin cũ tự xoá sau 24 giờ.', delay: '30 giây'},
@@ -33,7 +47,10 @@ const FEATURES: {key: FeatureKey; icon: string; title: string; desc: string; bet
   {key: 'diaryOpen', icon: '📓', title: 'Bảng nhật ký', desc: 'Mỗi khách viết 2 mẩu giấy một ngày, cả quán đọc trong một tuần.', beta: true, delay: '30 giây'},
   {key: 'shelfOpen', icon: '🏺', title: 'Kệ sưu tầm', desc: 'Xong phin, mèo mang ra một món cho kệ. 20 món, chỉ lưu trên máy khách.', beta: true, delay: '1 phút'},
   {key: 'playCountsOpen', icon: '🎧', title: 'Lượt nghe', desc: 'Đếm lượt nghe từng bài (nghe đủ 30 giây, 1 máy 1 lượt mỗi ngày). Bài từ 50 lượt mới hiện số trong danh sách.', beta: true, delay: '5 phút'},
+  {key: 'questOpen', icon: '☕', title: 'Cả quán cùng pha phin', desc: 'Phin của mọi khách cộng vào một con số chung. Đủ mục tiêu thì cả quán bỏ phiếu chọn thứ được mở khoá tiếp theo.', beta: true, delay: '30 giây'},
 ]
+
+const QUEST_OPTS = [1, 2, 3, 4] as const
 
 const DEFAULT_MAX = 8
 
@@ -90,6 +107,70 @@ export function ChillSettingsInput(props: ObjectInputProps) {
                   <Text size={1} muted style={{lineHeight: 1.5}}>
                     {f.desc}
                   </Text>
+                  {f.key === 'questOpen' && on && (
+                    <Card radius={2} padding={3} border tone="transparent">
+                      <Stack gap={4}>
+                        <Text size={0} muted style={{lineHeight: 1.5}}>
+                          Đổi mã mùa (vd. mua-2) là mở mùa mới: bộ đếm và phiếu bắt đầu lại từ 0. Cần ít nhất 2 lựa chọn.
+                        </Text>
+                        <Grid gridTemplateColumns={[1, 3]} gap={3}>
+                          <Stack gap={2}>
+                            <Text size={1} weight="medium">Mã mùa</Text>
+                            <TextInput value={value.questSeason ?? 'mua-1'} readOnly={readOnly} onChange={(e) => put('questSeason', e.currentTarget.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24))} />
+                          </Stack>
+                          <Stack gap={2}>
+                            <Text size={1} weight="medium">Mục tiêu (phin)</Text>
+                            <TextInput
+                              type="number"
+                              min={10}
+                              readOnly={readOnly}
+                              value={String(value.questGoal ?? 100)}
+                              onChange={(e) => {
+                                const n = Math.round(Number(e.currentTarget.value))
+                                if (Number.isFinite(n)) put('questGoal', Math.min(100000, Math.max(10, n)))
+                              }}
+                            />
+                          </Stack>
+                          <Stack gap={2}>
+                            <Text size={1} weight="medium">Ngày bỏ phiếu</Text>
+                            <TextInput
+                              type="number"
+                              min={1}
+                              max={14}
+                              readOnly={readOnly}
+                              value={String(value.questVoteDays ?? 3)}
+                              onChange={(e) => {
+                                const n = Math.round(Number(e.currentTarget.value))
+                                if (Number.isFinite(n)) put('questVoteDays', Math.min(14, Math.max(1, n)))
+                              }}
+                            />
+                          </Stack>
+                        </Grid>
+                        <Grid gridTemplateColumns={[1, 2]} gap={3}>
+                          <Stack gap={2}>
+                            <Text size={1} weight="medium">Tên mùa</Text>
+                            <TextInput value={value.questTitle ?? ''} placeholder="Mùa 1" readOnly={readOnly} onChange={(e) => put('questTitle', e.currentTarget.value)} />
+                          </Stack>
+                          <Stack gap={2}>
+                            <Text size={1} weight="medium">Tên mùa (tiếng Anh)</Text>
+                            <TextInput value={value.questTitleEn ?? ''} placeholder="Season 1" readOnly={readOnly} onChange={(e) => put('questTitleEn', e.currentTarget.value)} />
+                          </Stack>
+                        </Grid>
+                        {QUEST_OPTS.map((i) => (
+                          <Grid key={i} gridTemplateColumns={[1, 2]} gap={3}>
+                            <Stack gap={2}>
+                              <Text size={1} weight="medium">{`Lựa chọn ${i}`}</Text>
+                              <TextInput value={value[`questOpt${i}`] ?? ''} placeholder={i <= 2 ? 'Vd. Mèo học trò' : 'Để trống nếu không cần'} readOnly={readOnly} onChange={(e) => put(`questOpt${i}`, e.currentTarget.value)} />
+                            </Stack>
+                            <Stack gap={2}>
+                              <Text size={1} weight="medium">Tiếng Anh</Text>
+                              <TextInput value={value[`questOpt${i}En`] ?? ''} placeholder="Trống thì dùng bản tiếng Việt" readOnly={readOnly} onChange={(e) => put(`questOpt${i}En`, e.currentTarget.value)} />
+                            </Stack>
+                          </Grid>
+                        ))}
+                      </Stack>
+                    </Card>
+                  )}
                   {f.key === 'groupTableOpen' && on && (
                     <Card radius={2} padding={3} border tone="transparent">
                       <Flex align="center" gap={3}>

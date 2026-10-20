@@ -12,7 +12,7 @@
 //   tổng kết hỏi "xong việc này chưa?" để gạch luôn (xem todo.ts)
 // - Thẻ khách quen: mỗi ngày ghé 1 dấu chân mèo, 10 dấu đầy 1 thẻ (xem regular.ts)
 
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useRef, useState, type ReactNode} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {useT} from './i18n'
 import {CARD_SLOTS, cardOf, levelOf, streakOf, todayOf, type Regular} from './regular'
@@ -54,6 +54,8 @@ export function Focus({
   gift = null,
   shelfCount = null,
   onOpenShelf,
+  onStart,
+  quest = null,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -73,6 +75,10 @@ export function Focus({
   // Số món đã có trên kệ; null = kệ đang tắt ở Studio
   shelfCount?: number | null
   onOpenShelf?: () => void
+  // Bấm "Bắt đầu" 1 phin (thử thách chung ghi lúc bắt đầu, xem ChillRoom)
+  onStart?: () => void
+  // Thẻ "Cả quán cùng pha phin" (QuestCard); null = thử thách đang tắt
+  quest?: ReactNode
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -185,6 +191,7 @@ export function Focus({
     setSession(next)
     setPicked(null)
     store(FOCUS_KEY, next)
+    onStart?.()
     trackEvent({name: 'Chill Focus', props: {action: 'start'}})
   }
 
@@ -373,6 +380,8 @@ export function Focus({
               </button>
             </>
           )}
+
+          {quest}
 
           <div className="mt-4 border-t border-white/[0.08] pt-3">
             <div className="flex items-center justify-between gap-2">

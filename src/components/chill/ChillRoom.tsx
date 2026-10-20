@@ -24,6 +24,8 @@ import {PixelGlass} from './pixel-icons'
 import {Shelf} from './ShelfBook'
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
+import {QuestCard} from './QuestCard'
+import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
@@ -69,6 +71,27 @@ const LISTEN_MINUTES = [1, 5, 15, 30, 60]
 // Lượt nghe: phát đủ 30 giây mới tính (như Spotify); dưới 50 lượt thì chưa hiện số
 const PLAY_COUNT_MS = 30_000
 const PLAY_COUNT_SHOW = 50
+// Thử thách chung: mã máy, phin đã góp / phiếu đã bỏ trong mùa (theo mã mùa)
+const QUEST_UID_KEY = 'chill:quest-uid'
+const QUEST_MINE_KEY = 'chill:quest-mine'
+const QUEST_VOTE_KEY = 'chill:quest-vote'
+
+function readJson<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Chặn storage — thử thách vẫn chạy, chỉ không nhớ được số phin của mình
+  }
+}
 // Mốc phút ngồi ở 1 cảnh (event Chill Stay) — dưới 5 phút coi như đang lướt xem
 const STAY_MINUTES = [5, 15, 30, 60]
 // Màn dọc: đã kéo ngang cảnh lần nào chưa (chưa → gợi ý "kéo để nhìn quanh")
@@ -169,6 +192,7 @@ export function ChillRoom({
   updates = [],
   shelfOn = false,
   playCountsOn = false,
+  questOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -177,6 +201,8 @@ export function ChillRoom({
   shelfOn?: boolean
   // Lượt nghe từng bài (Studio "Chill · Cài đặt"), mặc định tắt
   playCountsOn?: boolean
+  // Thử thách chung "Cả quán cùng pha phin" (Studio "Chill · Cài đặt"), mặc định tắt
+  questOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -900,6 +926,81 @@ export function ChillRoom({
     [markTried],
   )
 
+  // ---------- Thử thách chung "Cả quán cùng pha phin" (/api/chill-quest) ----------
+  // Mã máy riêng cho thử thách, phin đã góp và phiếu đã bỏ của mùa hiện tại — chỉ lưu trên máy
+  const [quest, setQuest] = useState<QuestState | null>(null)
+  const [questMine, setQuestMine] = useState(0)
+  const [questVote, setQuestVote] = useState<string | null>(null)
+  const [questJust, setQuestJust] = useState(false)
+  const [questVoteErr, setQuestVoteErr] = useState<'voted' | 'retry' | null>(null)
+  const questUid = useCallback(() => {
+    try {
+      let uid = localStorage.getItem(QUEST_UID_KEY)
+      if (!uid || !/^[a-z0-9]{12,32}$/i.test(uid)) {
+        uid = crypto.randomUUID().replace(/-/g, '').slice(0, 20)
+        localStorage.setItem(QUEST_UID_KEY, uid)
+      }
+      return uid
+    } catch {
+      return null
+    }
+  }, [])
+  const questPost = useCallback(
+    async (payload: Record<string, string>) => {
+      const uid = questUid()
+      if (!uid) return null
+      try {
+        const res = await fetch('/api/chill-quest', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...payload, uid}), keepalive: true})
+        return res.ok ? ((await res.json()) as {ok?: boolean; counted?: boolean; state?: QuestState; voted?: string; code?: string}) : null
+      } catch {
+        return null
+      }
+    },
+    [questUid],
+  )
+  useEffect(() => {
+    if (!questOn) return
+    fetch('/api/chill-quest')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: QuestState | {open: false} | null) => {
+        if (!data || !data.open) return
+        setQuest(data)
+        const mine = readJson<{season?: string; n?: number}>(QUEST_MINE_KEY)
+        setQuestMine(mine?.season === data.season ? Number(mine.n) || 0 : 0)
+        const vote = readJson<{season?: string; option?: string}>(QUEST_VOTE_KEY)
+        setQuestVote(vote?.season === data.season && vote.option ? vote.option : null)
+      })
+      .catch(() => {})
+  }, [questOn])
+  const onQuestStart = useCallback(() => {
+    setQuestJust(false)
+    if (quest) void questPost({action: 'start'})
+  }, [quest, questPost])
+  const onQuestDone = useCallback(async () => {
+    if (!quest) return
+    const res = await questPost({action: 'done'})
+    if (!res?.counted || !res.state) return
+    setQuest(res.state)
+    setQuestJust(true)
+    setQuestMine((n) => {
+      writeJson(QUEST_MINE_KEY, {season: res.state!.season, n: n + 1})
+      return n + 1
+    })
+  }, [quest, questPost])
+  const onQuestVote = useCallback(
+    async (option: string) => {
+      if (!quest) return
+      setQuestVoteErr(null)
+      const res = await questPost({action: 'vote', option})
+      if (res?.ok && res.voted) {
+        setQuestVote(res.voted)
+        writeJson(QUEST_VOTE_KEY, {season: quest.season, option: res.voted})
+        trackEvent({name: 'Chill Quest', props: {action: 'vote', option}})
+      } else setQuestVoteErr(res?.code === 'voted' || res?.code === 'ip' ? 'voted' : 'retry')
+    },
+    [quest, questPost],
+  )
+
   const primeAudio = useCallback(() => audioRef.current?.prime(), [])
   const destId = dest?.id
   const onFocusDone = useCallback((minutes: number) => {
@@ -908,6 +1009,7 @@ export function ChillRoom({
     sayCat(t.room.catPhin)
     setRegular((r) => addPhin(r, minutes))
     setBookNudge(true)
+    void onQuestDone()
     if (!shelfOn) return
     // Mèo mang ra 1 món cho kệ (nếu tới lượt) — hiện trong bảng tổng kết phin
     const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time})
@@ -916,7 +1018,7 @@ export function ChillRoom({
     setShelf(addItem(shelf, item.id, new Date(), {place: destId, weather, time, phin: regular.phins + 1}))
     setGift(item.id)
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
-  }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time])
+  }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time, onQuestDone])
 
   // ---------- Cuốn sổ "Việc hôm nay" ----------
   useEffect(() => {
@@ -2491,7 +2593,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} />
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} quest={quest ? <QuestCard state={quest} mine={questMine} justAdded={questJust} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} />
           <span className="sm:hidden">{menuButton}</span>
           <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}

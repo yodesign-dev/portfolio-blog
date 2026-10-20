@@ -24,6 +24,7 @@ export type AnalyticsEvent =
   | {name: 'Chill Focus'; props: {action: 'start' | 'done' | 'stop'}}
   | {name: 'Chill Todo'; props: {action: 'add' | 'done' | 'book'}}
   | {name: 'Chill Shelf'; props: {action: 'gift' | 'open'}}
+  | {name: 'Chill Quest'; props: {action: 'vote'; option: string}}
   | {name: 'Chill Play'; props: {track: string}}
   | {name: 'Chill Pet Cat'; props?: undefined}
   | {name: 'Chill Donate Open'; props?: {from: string}}
