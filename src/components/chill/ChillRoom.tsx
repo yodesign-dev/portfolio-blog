@@ -22,7 +22,7 @@ import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {GUIDE_FIRST_MS, GUIDE_GAP_MS, GUIDE_HOLD_MS, GUIDE_ORDER, GUIDE_PER_VISIT, GUIDE_POINT_MS, GUIDE_SHOW_MS, loadTried, saveTried, type GuideStep} from './guide'
 import {PixelGlass} from './pixel-icons'
 import {Shelf} from './ShelfBook'
-import {addItem, loadShelf, pickGift, toggleShown, type ShelfState} from './shelf'
+import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
 import {BookSparkles, TodayBook} from './TodayBook'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
@@ -900,7 +900,7 @@ export function ChillRoom({
     const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time})
     if (!item) return
     if (!shelf.owned.length) sayCat(t.shelf.firstGift)
-    setShelf(addItem(shelf, item.id))
+    setShelf(addItem(shelf, item.id, new Date(), {place: destId, weather, time, phin: regular.phins + 1}))
     setGift(item.id)
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
   }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time])
@@ -2699,10 +2699,13 @@ export function ChillRoom({
           }}
           state={shelf}
           selected={shelfPick}
-          onSelect={setShelfPick}
+          onSelect={(id) => {
+            setShelfPick(id)
+            setShelf((s) => markSeen(s, id))
+          }}
           onToggle={(id) => setShelf((s) => toggleShown(s, id))}
           slots={themeById(theme).shelf.length}
-          placeName={(id) => destinations.find((d) => d.id === id)?.name ?? id}
+          placeName={(id) => destinations.find((d) => d.id === id)?.name ?? ''}
         />
       )}
 

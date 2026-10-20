@@ -68,6 +68,18 @@ body {
 }
 
 /* Bong bóng lời nói của mèo ở trang /chill bật lên */
+/* Kệ sưu tầm (ShelfBook.tsx): món lơ lửng, khung hiếm lấp lánh, mở túi quà */
+@keyframes chill-float { 50% { transform: translateY(-6px); } }
+@keyframes chill-holo { 50% { background-position: 100% 50%; } }
+@keyframes chill-spin { to { transform: rotate(1turn); } }
+@keyframes chill-wiggle { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-6deg); } 82% { transform: rotate(5deg); } 89% { transform: rotate(-3deg); } }
+@keyframes chill-rise { 0% { opacity: 0; transform: translateY(24px) scale(0.4); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes chill-fly { 0% { transform: translate(0, 0) scale(0.3); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; } }
+@keyframes chill-glow { 50% { transform: scale(1.15); opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) {
+  .chill-motion { animation: none !important; }
+}
+
 @keyframes chill-pop {
   0% { opacity: 0; transform: translateY(6px) scale(0.85); }
   100% { opacity: 1; transform: translateY(0) scale(1); }

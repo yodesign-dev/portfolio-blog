@@ -235,7 +235,7 @@ export const ITEMS: ShelfItem[] = [
   {
     id: 'egg-coffee',
     kind: 'place',
-    places: ['hanoi', 'hanoi-tau'],
+    places: ['hanoi-tau', 'hanoi'],
     palette: {o: O, F: '#f3dc94', f: '#e2b85a', C: '#5a3418', B: '#f1ece0'},
     rows: [
       '.ooooo.',
@@ -394,12 +394,22 @@ const REGULAR = ITEMS.filter((i) => i.kind === 'regular')
 
 // ---------- Lưu trên máy ----------
 
+// Lúc nhận món: điểm đến, trời, giờ, phin thứ mấy — hiện trên thẻ sưu tầm. Món nhận trước
+// khi có thẻ thì không có (chỉ còn ngày)
+export type GiftContext = {place?: string; weather?: Weather; time?: TimeOfDay; phin?: number}
+
 export type ShelfState = {
   // Món đã có, theo thứ tự nhận
-  owned: {id: string; at: string}[]
+  owned: {id: string; at: string; ctx?: GiftContext}[]
   // Món đang bày trên kệ, trái → phải (tối đa SHELF_MAX)
   shown: string[]
+  // Món mới nhận mà khách chưa mở xem (dấu "MỚI" trong kệ)
+  unseen?: string[]
 }
+
+// Độ hiếm: món thường theo số phin · theo dịp (điểm đến) · rất hiếm (trời mưa / sương / đêm)
+export type Rarity = 'common' | 'place' | 'rare'
+export const rarityOf = (item: ShelfItem): Rarity => (item.kind === 'regular' ? 'common' : item.kind === 'place' ? 'place' : 'rare')
 
 const EMPTY: ShelfState = {owned: [], shown: []}
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -408,12 +418,26 @@ export function loadShelf(): ShelfState {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<ShelfState> | null
     if (!saved || !Array.isArray(saved.owned)) return EMPTY
-    const owned = saved.owned.filter((o) => o && typeof o.id === 'string' && itemById(o.id)).map((o) => ({id: o.id, at: String(o.at ?? '')}))
+    const owned = saved.owned
+      .filter((o) => o && typeof o.id === 'string' && itemById(o.id))
+      .map((o) => ({id: o.id, at: String(o.at ?? ''), ...(o.ctx && typeof o.ctx === 'object' ? {ctx: cleanCtx(o.ctx)} : {})}))
     const have = new Set(owned.map((o) => o.id))
     const shown = (Array.isArray(saved.shown) ? saved.shown : []).filter((id) => have.has(id)).slice(0, SHELF_MAX)
-    return {owned, shown}
+    const unseen = (Array.isArray(saved.unseen) ? saved.unseen : []).filter((id) => have.has(id))
+    return {owned, shown, unseen}
   } catch {
     return EMPTY
+  }
+}
+
+const WEATHERS: Weather[] = ['clear', 'rain', 'mist']
+const TIMES: TimeOfDay[] = ['morning', 'afternoon', 'night']
+function cleanCtx(c: GiftContext): GiftContext {
+  return {
+    ...(typeof c.place === 'string' ? {place: c.place} : {}),
+    ...(WEATHERS.includes(c.weather as Weather) ? {weather: c.weather} : {}),
+    ...(TIMES.includes(c.time as TimeOfDay) ? {time: c.time} : {}),
+    ...(typeof c.phin === 'number' && c.phin > 0 ? {phin: Math.round(c.phin)} : {}),
   }
 }
 
@@ -446,9 +470,21 @@ export function pickGift(s: ShelfState, m: Moment): ShelfItem | null {
 }
 
 // Nhận món: kệ còn chỗ thì bày luôn
-export function addItem(s: ShelfState, id: string, now = new Date()): ShelfState {
+export function addItem(s: ShelfState, id: string, now = new Date(), ctx?: GiftContext): ShelfState {
   if (s.owned.some((o) => o.id === id)) return s
-  const next = {owned: [...s.owned, {id, at: dayKey(now)}], shown: s.shown.length < SHELF_MAX ? [...s.shown, id] : s.shown}
+  const next = {
+    owned: [...s.owned, {id, at: dayKey(now), ...(ctx ? {ctx: cleanCtx(ctx)} : {})}],
+    shown: s.shown.length < SHELF_MAX ? [...s.shown, id] : s.shown,
+    unseen: [...(s.unseen ?? []), id],
+  }
+  save(next)
+  return next
+}
+
+// Khách đã mở xem món → bỏ dấu "MỚI"
+export function markSeen(s: ShelfState, id: string): ShelfState {
+  if (!s.unseen?.includes(id)) return s
+  const next = {...s, unseen: s.unseen.filter((x) => x !== id)}
   save(next)
   return next
 }
