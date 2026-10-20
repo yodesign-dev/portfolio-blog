@@ -17,6 +17,7 @@ type Value = {
   groupMaxMembers?: number
   diaryOpen?: boolean
   shelfOpen?: boolean
+  playCountsOpen?: boolean
   diaryNoteVi?: string
   diaryNoteEn?: string
   diaryQuoteEn?: string
@@ -24,13 +25,14 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen'
 
 const FEATURES: {key: FeatureKey; icon: string; title: string; desc: string; beta?: boolean; delay: string}[] = [
   {key: 'chatOpen', icon: '💬', title: 'Phòng chat', desc: 'Khách nhắn tin với nhau trong quán. Tắt khi bị spam: nút chat ẩn đi, tin cũ tự xoá sau 24 giờ.', delay: '30 giây'},
   {key: 'groupTableOpen', icon: '🪑', title: 'Bàn nhóm', desc: 'Khách tạo bàn, mời bạn qua link và ngồi chung một bàn.', beta: true, delay: '30 giây'},
   {key: 'diaryOpen', icon: '📓', title: 'Bảng nhật ký', desc: 'Mỗi khách viết 2 mẩu giấy một ngày, cả quán đọc trong một tuần.', beta: true, delay: '30 giây'},
   {key: 'shelfOpen', icon: '🏺', title: 'Kệ sưu tầm', desc: 'Xong phin, mèo mang ra một món cho kệ. 20 món, chỉ lưu trên máy khách.', beta: true, delay: '1 phút'},
+  {key: 'playCountsOpen', icon: '🎧', title: 'Lượt nghe', desc: 'Đếm lượt nghe từng bài (nghe đủ 30 giây, 1 máy 1 lượt mỗi ngày). Bài từ 50 lượt mới hiện số trong danh sách.', beta: true, delay: '5 phút'},
 ]
 
 const DEFAULT_MAX = 8

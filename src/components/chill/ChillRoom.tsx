@@ -66,6 +66,9 @@ function visitRef() {
 }
 // Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
 const LISTEN_MINUTES = [1, 5, 15, 30, 60]
+// Lượt nghe: phát đủ 30 giây mới tính (như Spotify); dưới 50 lượt thì chưa hiện số
+const PLAY_COUNT_MS = 30_000
+const PLAY_COUNT_SHOW = 50
 // Mốc phút ngồi ở 1 cảnh (event Chill Stay) — dưới 5 phút coi như đang lướt xem
 const STAY_MINUTES = [5, 15, 30, 60]
 // Màn dọc: đã kéo ngang cảnh lần nào chưa (chưa → gợi ý "kéo để nhìn quanh")
@@ -139,6 +142,13 @@ const AMBIENCE_FOR: Record<Weather, {kind: Ambience; label: string}> = {
   mist: {kind: 'quiet', label: 'Quiet room'},
 }
 
+// 846 · 1.2k (en) / 1,2k (vi)
+function formatPlays(n: number, lang: Lang) {
+  if (n < 1000) return String(n)
+  const k = (Math.floor(n / 100) / 10).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, '')
+  return `${lang === 'vi' ? k.replace('.', ',') : k}k`
+}
+
 function formatTime(sec: number) {
   const s = Math.max(0, Math.floor(sec))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -158,12 +168,15 @@ export function ChillRoom({
   destinations = DESTINATIONS,
   updates = [],
   shelfOn = false,
+  playCountsOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
   updates?: ChillUpdate[]
   // Kệ sưu tầm (Studio "Chill · Cài đặt"), mặc định tắt
   shelfOn?: boolean
+  // Lượt nghe từng bài (Studio "Chill · Cài đặt"), mặc định tắt
+  playCountsOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -1166,6 +1179,50 @@ export function ChillRoom({
     return () => clearInterval(id)
   }, [playing])
 
+  // Lượt nghe từng bài (/api/chill-plays): số chung của cả quán, CDN giữ 5 phút
+  const [playCounts, setPlayCounts] = useState<Record<string, number>>({})
+  useEffect(() => {
+    if (!playCountsOn) return
+    fetch('/api/chill-plays')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: {counts?: Record<string, number>} | null) => data?.counts && setPlayCounts(data.counts))
+      .catch(() => {})
+  }, [playCountsOn])
+
+  // Bài đang phát đủ PLAY_COUNT_MS (đồng hồ thật, như Chill Listen) → báo +1 lượt. Mỗi lần
+  // chuyển sang bài khác thì đếm lại; máy chủ bỏ qua nếu máy này đã nghe bài đó trong 24h
+  const playCount = useRef({id: '', ms: 0, sent: false})
+  const currentId = tracks[index]?.id
+  useEffect(() => {
+    if (!playing || !playCountsOn || !currentId) return
+    if (playCount.current.id !== currentId) playCount.current = {id: currentId, ms: 0, sent: false}
+    let last = Date.now()
+    const tick = () => {
+      const now = Date.now()
+      const c = playCount.current
+      c.ms += Math.min(now - last, 65_000)
+      last = now
+      if (c.sent || c.ms < PLAY_COUNT_MS) return
+      c.sent = true
+      fetch('/api/chill-plays', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: c.id}),
+        keepalive: true,
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: {counted?: boolean} | null) => {
+          if (data?.counted) setPlayCounts((prev) => ({...prev, [c.id]: (prev[c.id] ?? 0) + 1}))
+        })
+        .catch(() => {})
+    }
+    const id = setInterval(tick, 2000)
+    return () => {
+      clearInterval(id)
+      tick()
+    }
+  }, [playing, playCountsOn, currentId])
+
   // Mốc thời gian nghe (cộng dồn lúc đang phát, tính theo đồng hồ thật vì timer bị
   // bóp khi tab chạy nền; máy ngủ thì mỗi nhịp tính tối đa ~1 phút)
   const listenedMs = useRef(0)
@@ -1866,7 +1923,14 @@ export function ChillRoom({
                           {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
                         </span>
                         <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
-                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
+                        <span className="flex flex-col items-end">
+                          <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
+                          {playCountsOn && (playCounts[tr.id] ?? 0) >= PLAY_COUNT_SHOW && (
+                            <span className="whitespace-nowrap text-[11px] tabular-nums text-[#a79e94]/80">
+                              {t.room.plays(formatPlays(playCounts[tr.id], lang))}
+                            </span>
+                          )}
+                        </span>
                       </button>
                     </li>
                   )
@@ -2857,7 +2921,14 @@ export function ChillRoom({
                           <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
                           <span className="block truncate text-xs text-[#a79e94]">{tr.mood}</span>
                         </span>
-                        <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
+                        <span className="flex flex-col items-end">
+                          <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
+                          {playCountsOn && (playCounts[tr.id] ?? 0) >= PLAY_COUNT_SHOW && (
+                            <span className="whitespace-nowrap text-[11px] tabular-nums text-[#a79e94]/80">
+                              {t.room.plays(formatPlays(playCounts[tr.id], lang))}
+                            </span>
+                          )}
+                        </span>
                       </button>
                     </li>
                   )

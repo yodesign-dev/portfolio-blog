@@ -51,7 +51,8 @@ const CHILL_QUERY = `{
     "imageAlt": image.alt,
     "imageAltEn": image.altEn
   },
-  "shelfOpen": *[_id == "chillSettings"][0].shelfOpen
+  "shelfOpen": *[_id == "chillSettings"][0].shelfOpen,
+  "playCountsOpen": *[_id == "chillSettings"][0].playCountsOpen
 }`
 
 type ChillContent = {
@@ -69,6 +70,7 @@ type ChillContent = {
     night: string
   }[]
   shelfOpen?: boolean | null
+  playCountsOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -149,5 +151,6 @@ export async function getChillContent(revalidate: number) {
   // Kệ sưu tầm: bật ở Studio. Máy dev bật thử được bằng CHILL_DEV_SHELF=1 (không đụng Studio)
   const shelfOn = content.shelfOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SHELF === '1')
 
-  return {tracks, destinations, updates, shelfOn}
+  const playCountsOn = content.playCountsOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_PLAYS === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn}
 }

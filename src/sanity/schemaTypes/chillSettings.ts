@@ -22,6 +22,7 @@ export default defineType({
     }),
     defineField({name: 'diaryOpen', title: 'Mở bảng nhật ký', type: 'boolean', initialValue: false}),
     defineField({name: 'shelfOpen', title: 'Mở kệ sưu tầm', type: 'boolean', initialValue: false}),
+    defineField({name: 'playCountsOpen', title: 'Đếm và hiện lượt nghe', type: 'boolean', initialValue: false}),
     defineField({name: 'diaryNoteVi', title: 'Mẩu giấy của quán (tiếng Việt)', type: 'string', validation: (rule) => rule.max(140)}),
     defineField({name: 'diaryNoteEn', title: 'Mẩu giấy của quán (tiếng Anh)', type: 'string', validation: (rule) => rule.max(140)}),
     defineField({name: 'diaryQuoteEn', title: 'Câu danh ngôn (tiếng Anh)', type: 'string', validation: (rule) => rule.max(200)}),
