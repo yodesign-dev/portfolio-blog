@@ -16,13 +16,13 @@ import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel} from './pixel-icons'
 import {NOTO, NotoEmoji, withNoto} from './noto-emoji'
 import {isVisitLine, tServer, useLang, useT} from './i18n'
+import {loadMe, onMeChange, renameMe} from './identity'
 
 export type ChatMessage = {id: string; kind: 'msg' | 'event' | 'cat'; name?: string; color?: number; text: string; ts: number; who?: string}
 type Message = ChatMessage
 type Room = {open: boolean; online: number; messages: Message[]; reactions: Record<string, Record<string, number>>; typing?: string[]}
 type Me = {uid: string; name: string; color: number}
 
-const ME_KEY = 'chill:chat-me'
 const PASS_KEY = 'chill:chat-pass'
 const MINE_KEY = 'chill:chat-mine'
 const RX_KEY = 'chill:chat-rx'
@@ -32,15 +32,10 @@ const REACTIONS = ['☕', '❤️', '😂', '🐱']
 // Hàng chèn nhanh = đúng 16 emoji động Noto (noto-emoji.tsx)
 const QUICK = NOTO.map((e) => e.char)
 const COLORS = ['#f08a5d', '#e8b27d', '#7bb98a', '#7fa6d6', '#c98bd6', '#e39bb0', '#6fc2c0', '#d6c26f']
-const NAMES = [
-  'Mây Chiều', 'Phin Đen', 'Mèo Mướp', 'Gió Heo May', 'Bạc Xỉu', 'Hoa Sữa', 'Mưa Phùn', 'Đèn Lồng', 'Lá Me', 'Trà Đá',
-  'Hạt Mưa', 'Ly Nâu', 'Phố Cổ', 'Sương Sớm', 'Cà Phê Muối', 'Hoàng Hôn', 'Bánh Mì', 'Nắng Nhạt', 'Hẻm Nhỏ', 'Trăng Khuyết',
-]
 const MAX = 200
 // Dưới ngần này người thì không nêu số online (quán vắng nhìn buồn, chẳng ai muốn vào)
 const BUSY_ONLINE = 3
 
-const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)]
 const timeOf = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})
 
 function load<T>(key: string, fallback: T): T {
@@ -114,14 +109,8 @@ export function ChillChat({
 
   // Danh tính trên máy này (tạo lần đầu)
   useEffect(() => {
-    let saved = load<Me | null>(ME_KEY, null)
-    if (!saved || !/^[a-z0-9]{8,32}$/i.test(saved.uid)) {
-      // Đã có danh tính ở bàn nhóm → dùng chung uid (bong bóng lời thoại nhận ra đúng người)
-      const table = load<{uid?: string} | null>('chill:table-me', null)
-      const uid = table?.uid && /^[a-z0-9]{8,32}$/i.test(table.uid) ? table.uid : crypto.randomUUID().replace(/-/g, '').slice(0, 20)
-      saved = {uid, name: pick(NAMES), color: Math.floor(Math.random() * COLORS.length)}
-      save(ME_KEY, saved)
-    }
+    // Danh tính dùng chung cả quán (identity.ts): cùng uid với bàn nhóm, cùng tên với bảng góp phin
+    const saved = loadMe()
     /* eslint-disable react-hooks/set-state-in-effect */
     setMe(saved)
     setMine(load<string[]>(MINE_KEY, []))
@@ -273,11 +262,10 @@ export function ChillChat({
     setRoom((r) => (r ? {...r, messages: r.messages.filter((m) => m.id !== id)} : r))
   }
 
+  // Đổi tên ở đâu trong quán (bảng phin, màn chào) thì chat cũng đổi theo
+  useEffect(() => onMeChange(setMe), [])
   const rename = (name: string) => {
-    if (!me) return
-    const next = {...me, name}
-    setMe(next)
-    save(ME_KEY, next)
+    renameMe(name)
   }
 
   if (!room?.open || !me) return null

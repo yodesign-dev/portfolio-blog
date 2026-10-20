@@ -20,6 +20,7 @@ import {GiftReveal} from './ShelfBook'
 import {ITEMS} from './shelf'
 import {addTodo, doneTodayOf, loadTodos, removeTodo, setTodoDone, type Todo} from './todo'
 import {TodoList} from './TodoList'
+import {NameField} from './NameField'
 
 const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
@@ -56,6 +57,7 @@ export function Focus({
   onOpenShelf,
   onStart,
   quest = null,
+  contrib = null,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -79,6 +81,8 @@ export function Focus({
   onStart?: () => void
   // Thẻ "Cả quán cùng pha phin" (QuestCard); null = thử thách đang tắt
   quest?: ReactNode
+  // Dòng "phin của bạn đã góp cho quán" + tên trên bảng, hiện trong tổng kết phin
+  contrib?: ReactNode
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -94,6 +98,9 @@ export function Focus({
   const [askSkipped, setAskSkipped] = useState(false)
   // Chấm "mới" cho khách chưa thấy danh sách việc; mặc định ẩn tới khi đọc được storage
   const [todoSeen, setTodoSeen] = useState(true)
+  // 2 tab: Pha phin (hẹn giờ, việc, tổng kết) · Khách quen (Của bạn / Cả quán)
+  const [tab, setTab] = useState<'brew' | 'regulars'>('brew')
+  const [sub, setSub] = useState<'mine' | 'cafe'>('mine')
   const ref = useRef<HTMLDivElement>(null)
 
   // Khôi phục sau khi hydrate: phút đã chọn + phiên đang chạy dở
@@ -141,6 +148,7 @@ export function Focus({
       store(FOCUS_KEY, null)
       setFinished({minutes: session.minutes, todo: session.todo})
       setAskSkipped(false)
+      setTab('brew')
       setOpen(true)
       trackEvent({name: 'Chill Focus', props: {action: 'done'}})
       onDone(session.minutes)
@@ -271,6 +279,18 @@ export function Focus({
           className="absolute right-3 top-full z-40 mt-2 max-h-[calc(100dvh-5rem)] w-[min(300px,calc(100vw-24px))] overflow-y-auto overscroll-contain sm:right-0 rounded-2xl border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.title}</p>
+          {/* Đang chạy phin thì chỉ có đồng hồ, không tab */}
+          {!session && (
+            <Tabs
+              className="mt-2.5"
+              value={tab}
+              onChange={setTab}
+              items={[
+                {id: 'brew', label: t.focus.tabs.brew},
+                {id: 'regulars', label: t.focus.tabs.regulars},
+              ]}
+            />
+          )}
 
           {session ? (
             <>
@@ -295,7 +315,7 @@ export function Focus({
                 {t.focus.stop}
               </button>
             </>
-          ) : (
+          ) : tab === 'brew' ? (
             <>
               {done ? (
                 <div role="status">
@@ -338,6 +358,7 @@ export function Focus({
                       </div>
                     ))}
                   </dl>
+                  {contrib}
                   {gift && (
                     <GiftReveal
                       key={gift}
@@ -379,49 +400,69 @@ export function Focus({
                 {done ? t.focus.again : t.focus.start}
               </button>
             </>
+          ) : (
+            <>
+              {quest && (
+                <Tabs
+                  small
+                  className="mt-3"
+                  value={sub}
+                  onChange={setSub}
+                  items={[
+                    {id: 'mine', label: t.focus.tabs.mine},
+                    {id: 'cafe', label: t.focus.tabs.cafe},
+                  ]}
+                />
+              )}
+              {quest && sub === 'cafe' ? (
+                quest
+              ) : (
+                <div className="mt-3">
+                  <NameField label={t.name.label} />
+                  <p className="mt-0.5 text-[11px] leading-snug text-[#7d756d]">{t.name.shared}</p>
+                  <div className="mt-3 border-t border-white/[0.08] pt-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.regular.card(card)}</p>
+                      <span className="rounded-full border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2 py-0.5 text-[11px] font-medium text-[#f3cfa8]">
+                        {t.regular.levels[levelOf(regular.total)]}
+                      </span>
+                    </div>
+                    <ol className="mt-2 grid grid-cols-10 gap-1" aria-label={t.regular.stampsAria(stamps, CARD_SLOTS)}>
+                      {Array.from({length: CARD_SLOTS}).map((_, i) => (
+                        <li
+                          key={i}
+                          aria-hidden
+                          className={`flex aspect-square items-center justify-center rounded-full border ${
+                            i < stamps ? 'border-[#e8b27d] bg-[#e8b27d] text-[#2a1a10]' : 'border-dashed border-white/20 text-transparent'
+                          }`}
+                        >
+                          <PawIcon />
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="mt-2 text-xs leading-relaxed text-[#a79e94]">
+                      {t.regular.summary(regular.total, streak, regular.phins)}
+                    </p>
+                    {shelfCount !== null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          close()
+                          onOpenShelf?.()
+                        }}
+                        className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.04] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                      >
+                        <span>
+                          {t.shelf.title} · {t.shelf.count(shelfCount, ITEMS.length)}
+                        </span>
+                        <span aria-hidden>→</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
-
-          {quest}
-
-          <div className="mt-4 border-t border-white/[0.08] pt-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.regular.card(card)}</p>
-              <span className="rounded-full border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2 py-0.5 text-[11px] font-medium text-[#f3cfa8]">
-                {t.regular.levels[levelOf(regular.total)]}
-              </span>
-            </div>
-            <ol className="mt-2 grid grid-cols-10 gap-1" aria-label={t.regular.stampsAria(stamps, CARD_SLOTS)}>
-              {Array.from({length: CARD_SLOTS}).map((_, i) => (
-                <li
-                  key={i}
-                  aria-hidden
-                  className={`flex aspect-square items-center justify-center rounded-full border ${
-                    i < stamps ? 'border-[#e8b27d] bg-[#e8b27d] text-[#2a1a10]' : 'border-dashed border-white/20 text-transparent'
-                  }`}
-                >
-                  <PawIcon />
-                </li>
-              ))}
-            </ol>
-            <p className="mt-2 text-xs leading-relaxed text-[#a79e94]">
-              {t.regular.summary(regular.total, streak, regular.phins)}
-            </p>
-            {shelfCount !== null && (
-              <button
-                type="button"
-                onClick={() => {
-                  close()
-                  onOpenShelf?.()
-                }}
-                className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.04] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
-              >
-                <span>
-                  {t.shelf.title} · {t.shelf.count(shelfCount, ITEMS.length)}
-                </span>
-                <span aria-hidden>→</span>
-              </button>
-            )}
-          </div>
         </div>
       )}
     </div>
@@ -449,5 +490,27 @@ function PawIcon() {
       <circle cx="9.8" cy="3.8" r="1.6" />
       <circle cx="12.6" cy="6.6" r="1.6" />
     </svg>
+  )
+}
+
+// Hàng tab dạng nút gạt (radiogroup đơn giản, bấm là đổi)
+function Tabs<T extends string>({items, value, onChange, small = false, className = ''}: {items: {id: T; label: string}[]; value: T; onChange: (id: T) => void; small?: boolean; className?: string}) {
+  return (
+    <div role="tablist" className={`grid gap-1 rounded-xl border border-white/10 p-1 ${className}`} style={{gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`}}>
+      {items.map((it) => (
+        <button
+          key={it.id}
+          type="button"
+          role="tab"
+          aria-selected={value === it.id}
+          onClick={() => onChange(it.id)}
+          className={`rounded-lg transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${small ? 'py-1 text-xs' : 'py-1.5 text-[13px] font-medium'} ${
+            value === it.id ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
+          }`}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
   )
 }

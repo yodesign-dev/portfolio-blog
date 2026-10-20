@@ -164,6 +164,7 @@ export const LEGAL_DEFAULTS: Record<LegalKind, {vi: LegalSection[]; en: LegalSec
         bullets: [
           'Phòng chat: tên hiển thị, màu, tin nhắn và cảm xúc. Tự xoá sau 24 giờ.',
           'Bàn nhóm: tên, nhân vật và trạng thái của bạn ở bàn. Tự xoá sau 7 ngày không ai dùng.',
+          'Cả quán cùng pha phin: số phin bạn đã góp trong mùa và tên hiển thị của bạn (tên ngẫu nhiên quán tạo sẵn hoặc tên bạn tự đặt), hiện công khai trên bảng góp phin. Gắn với một mã ngẫu nhiên của máy, không phải tài khoản. Xoá khi mùa đó được dọn.',
           'Bảng nhật ký: tên, nội dung và tâm trạng của mẩu giấy. Tự xoá sau 7 ngày.',
           'Wishlist: góp ý, tên và email nếu bạn điền (chỉ để báo bạn khi góp ý được làm). Giữ đến khi góp ý được xoá. Lượt tim giữ 1 năm.',
           'Ủng hộ quán: tên, lời nhắn, số tiền, cách chuyển và mã đối chiếu, để khớp với sao kê và cảm ơn bạn. Số tiền và mã không bao giờ hiện công khai. Giữ đến khi bạn yêu cầu xoá.',
@@ -213,6 +214,7 @@ export const LEGAL_DEFAULTS: Record<LegalKind, {vi: LegalSection[]; en: LegalSec
         bullets: [
           'Chat: display name, colour, messages and reactions. Deleted after 24 hours.',
           'Group table: your name, character and status at the table. Deleted after 7 days of no use.',
+          'Whole café brewing: how many phins you added this season and your display name (the random name the café gave you, or one you chose), shown publicly on the phin board. Tied to a random device code, not an account. Removed when that season is cleared.',
           'Diary wall: the name, text and mood of each note. Deleted after 7 days.',
           'Wishlist: your idea, name and email if you add one (only to tell you when it ships). Kept until the idea is removed. Hearts are kept for 1 year.',
           'Support: name, message, amount, method and a matching code, to match bank statements and thank you. The amount and code are never shown publicly. Kept until you ask for deletion.',

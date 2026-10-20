@@ -2,14 +2,16 @@
 
 // Thẻ "Cả quán cùng pha phin" trong bảng phin (Focus.tsx) — xem quest-shared.ts.
 // Đang pha: thanh tiến độ cả quán + mở khoá gì · Đủ mục tiêu: nút bỏ phiếu · Xong: lựa chọn thắng.
+// Dưới cùng: khách đã góp phin mùa này (tên + số phin, nhiều trước, không đánh số hạng),
+// dòng của chính khách ghim trên cùng.
 
 import {useLang, useT} from './i18n'
+import {useMyName} from './identity'
 import type {QuestState} from './quest-shared'
 
 export function QuestCard({
   state,
   mine,
-  justAdded,
   myVote,
   voteError,
   onVote,
@@ -17,8 +19,6 @@ export function QuestCard({
   state: QuestState
   // Số phin máy này đã góp trong mùa (lưu trên máy)
   mine: number
-  // Phin vừa xong đã được cộng → hiện 1 dòng xác nhận trong tổng kết
-  justAdded: boolean
   myVote: string | null
   // 'voted' = máy này (hoặc mạng này) đã bỏ phiếu · 'retry' = lỗi mạng, bấm lại được
   voteError: 'voted' | 'retry' | null
@@ -26,6 +26,9 @@ export function QuestCard({
 }) {
   const t = useT()
   const lang = useLang()
+  const myName = useMyName()
+  const people = state.people ?? []
+  const more = Math.max(0, (state.peopleCount ?? people.length) - people.length)
   const label = (key: string) => {
     const o = state.options.find((x) => x.key === key)
     return o ? (lang === 'vi' ? o.vi : o.en) : ''
@@ -108,8 +111,31 @@ export function QuestCard({
         </>
       )}
 
-      {justAdded && <p className="mt-2 text-xs text-[#f3cfa8]">{t.quest.justAdded}</p>}
-      {mine > 0 && !justAdded && <p className="mt-2 text-[11px] text-[#a79e94]">{t.quest.mine(mine)}</p>}
+      <div className="mt-3 border-t border-white/[0.08] pt-2.5">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.quest.people}</p>
+        {mine > 0 && (
+          <p className="mt-1.5 flex items-baseline justify-between gap-3 rounded-lg bg-[#e8b27d]/10 px-2 py-1.5 text-sm">
+            <span className="min-w-0 truncate text-[#f3cfa8]">
+              {t.quest.you}
+              {myName ? ` · ${myName}` : ''}
+            </span>
+            <span className="shrink-0 font-mono text-xs tabular-nums text-[#f3cfa8]">{t.quest.phins(mine)}</span>
+          </p>
+        )}
+        {people.length ? (
+          <ul className="mt-1 max-h-48 overflow-y-auto overscroll-contain pr-1">
+            {people.map((p, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3 px-2 py-1 text-[13px] text-[#ede6dd]">
+                <span className={`min-w-0 truncate ${p.name ? '' : 'text-[#a79e94]'}`}>{p.name || t.quest.anon}</span>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-[#a79e94]">{t.quest.phins(p.n)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1.5 text-xs leading-relaxed text-[#a79e94]">{t.quest.noPeople}</p>
+        )}
+        {more > 0 && <p className="mt-1 px-2 text-[11px] text-[#a79e94]">{t.quest.peopleMore(more)}</p>}
+      </div>
     </section>
   )
 }

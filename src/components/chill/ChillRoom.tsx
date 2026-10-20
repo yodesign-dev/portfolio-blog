@@ -25,6 +25,8 @@ import {Shelf} from './ShelfBook'
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
 import {QuestCard} from './QuestCard'
+import {NameField} from './NameField'
+import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
@@ -951,7 +953,7 @@ export function ChillRoom({
       if (!uid) return null
       try {
         const res = await fetch('/api/chill-quest', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...payload, uid}), keepalive: true})
-        return res.ok ? ((await res.json()) as {ok?: boolean; counted?: boolean; state?: QuestState; voted?: string; code?: string}) : null
+        return res.ok ? ((await res.json()) as {ok?: boolean; counted?: boolean; mine?: number; state?: QuestState; voted?: string; code?: string}) : null
       } catch {
         return null
       }
@@ -978,15 +980,21 @@ export function ChillRoom({
   }, [quest, questPost])
   const onQuestDone = useCallback(async () => {
     if (!quest) return
-    const res = await questPost({action: 'done'})
+    const res = await questPost({action: 'done', name: loadMe().name})
     if (!res?.counted || !res.state) return
     setQuest(res.state)
     setQuestJust(true)
     setQuestMine((n) => {
-      writeJson(QUEST_MINE_KEY, {season: res.state!.season, n: n + 1})
-      return n + 1
+      const mine = res.mine ?? n + 1
+      writeJson(QUEST_MINE_KEY, {season: res.state!.season, n: mine})
+      return mine
     })
   }, [quest, questPost])
+  // Đổi tên ở đâu trong quán thì bảng góp phin cũng đổi (chỉ khi máy này đã góp phin)
+  useEffect(() => {
+    if (!quest || questMine <= 0) return
+    return onMeChange((me) => void questPost({action: 'name', name: me.name}))
+  }, [quest, questMine, questPost])
   const onQuestVote = useCallback(
     async (option: string) => {
       if (!quest) return
@@ -2593,7 +2601,12 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} quest={quest ? <QuestCard state={quest} mine={questMine} justAdded={questJust} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} />
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
+            <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
+              <p className="text-sm text-[#f3ece4]">{t.quest.added}</p>
+              <NameField label={t.name.onBoard} className="mt-1" />
+            </div>
+          ) : null} />
           <span className="sm:hidden">{menuButton}</span>
           <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}
@@ -3319,6 +3332,10 @@ export function ChillRoom({
             >
               {t.welcome.look}
             </button>
+            {/* Tên ngồi quán (tạo sẵn ngẫu nhiên), bấm "đổi tên" để sửa — không tính là "vào quán" */}
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="[text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">
+              <NameField label={t.name.welcome} className="justify-center text-white/75" />
+            </div>
             {/* Bấm link không được tính là "vào quán" (cả màn chào bắt click) */}
             <p className="mt-1 text-[10px] text-white/45" onClick={(e) => e.stopPropagation()}>
               <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline">
