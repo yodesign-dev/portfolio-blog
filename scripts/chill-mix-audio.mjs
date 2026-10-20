@@ -171,7 +171,10 @@ async function main() {
       prev = label
     }
   }
-  graph += '[mix]loudnorm=I=-14:TP=-1.5:LRA=11,aformat=sample_rates=48000:channel_layouts=stereo[out]'
+  // loudnorm 1 lượt vẫn để lọt đỉnh (đo được +1.6 dBFS sau khi mã hoá AAC) → chặn thêm ở −3 dBFS
+  graph +=
+    '[mix]loudnorm=I=-14:TP=-1.5:LRA=11,aformat=sample_rates=48000:channel_layouts=stereo,' +
+    'alimiter=limit=0.7:attack=5:release=50:level=false[out]'
 
   console.log(`Ghép ${list.length} bài, dài ${clock(length)}…`)
   await run(
