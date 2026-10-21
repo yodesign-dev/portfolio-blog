@@ -10,6 +10,8 @@ export const structure: StructureResolver = (S) =>
       // ⬇️ CẬP NHẬT: mục "Timeline" — danh sách bình thường (nhiều năm),
       // không phải singleton
       S.documentTypeListItem('timelineYear').title('Timeline'),
+      // Mục "What people say" trang chủ
+      S.documentTypeListItem('testimonial').title('Lời giới thiệu'),
       S.divider(),
       // Trang /chill: nhạc + điểm đến thêm từ Studio (ngoài bộ có sẵn trong code)
       // Nhạc chia theo trạm cho dễ tìm khi playlist dài ra
@@ -150,6 +152,6 @@ export const structure: StructureResolver = (S) =>
         ),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillNote', 'chillLegal'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillNote', 'chillLegal', 'testimonial'].includes(listItem.getId() as string),
       ),
     ])

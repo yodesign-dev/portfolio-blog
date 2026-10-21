@@ -54,6 +54,12 @@ body {
   }
 }
 
+/* Dải lời giới thiệu trang chủ (Testimonials.tsx): danh sách nhân đôi trượt đúng
+   một nửa (+ nửa khoảng cách gap-6) rồi lặp lại liền mạch */
+@keyframes testimonial-marquee {
+  to { transform: translateX(calc(-50% - 0.75rem)); }
+}
+
 /* Bong bóng "Pet me" nhún nhẹ phía trên con mèo ở trang /chill */
 @keyframes chill-bob {
   0%, 100% { transform: translate(-50%, 0); }

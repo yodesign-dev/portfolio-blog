@@ -3,6 +3,7 @@ import { client } from '@/sanity/lib/client'
 import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
 import { SideProjects } from '@/components/SideProjects'
 import { HowIWork } from '@/components/HowIWork'
+import { Testimonials } from '@/components/Testimonials'
 import { BehanceCard } from '@/components/BehanceArchive'
 import { getBehanceProjects } from '@/lib/behance'
 import { getMediumPosts } from '@/lib/medium'
@@ -96,7 +97,7 @@ export default async function HomePage() {
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
       <Hero31 study={heroStudy} />
 
-      {/* Thứ tự: hero → việc đã làm → cách làm → side projects → bài viết */}
+      {/* Thứ tự: hero → việc đã làm → cách làm → lời giới thiệu → side projects → bài viết */}
       {(featuredStudies.length > 0 || featuredBehance.length > 0) && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
@@ -111,6 +112,9 @@ export default async function HomePage() {
       )}
 
       <HowIWork />
+
+      {/* Tự ẩn khi Studio chưa có lời giới thiệu nào */}
+      <Testimonials />
 
       <div className="mt-24">
         <SideProjects />
