@@ -1,6 +1,7 @@
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
+import { Fragment, type CSSProperties } from "react";
 import Link from "next/link";
 import { AvatarLoop } from "@/components/originkit/ui/hero-31/avatar-loop";
 import { InfoBand } from "@/components/originkit/ui/hero-31/info-band";
@@ -13,6 +14,10 @@ import { STAGE } from "@/components/originkit/ui/hero-31/stage";
 import { useContactModal } from "@/components/originkit/ui/hero-31/contact-modal-context";
 import { SITE_NAME, SITE_ROLE } from "@/lib/site";
 import { trackEvent } from "@/lib/analytics";
+
+// Headline hiện lần lượt từng chữ (hero-word trong hero-31.css), phần
+// "with AI." tách riêng ở dưới để gắn gạch chân vẽ tay.
+const HEADLINE_WORDS = ["From", "user", "research", "to", "hi-fi", "—", "faster,"];
 
 // MỚI: Navbar + ContactModalProvider + ContactModal đã dời lên
 // layout.tsx (dùng chung cho mọi trang, không chỉ trang chủ). Bỏ hết
@@ -61,7 +66,34 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
               Sharing" — người mới vào cần hiểu trong 5 giây. Slogan vẫn còn ở
               footer. text-balance để các dòng dài ngắn đều khi xuống dòng. */}
           <h1 className="mb-6 text-balance text-center font-display text-[clamp(32px,8vw,56px)] font-light leading-[1.08] tracking-[-0.035em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]">
-            From user research to hi-fi — faster, with AI.
+            {HEADLINE_WORDS.map((word, i) => (
+              <Fragment key={word}>
+                <span className="hero-word" style={{ "--i": i } as CSSProperties}>
+                  {word}
+                </span>{" "}
+              </Fragment>
+            ))}
+            {/* "with AI." — điểm khác biệt, gạch chân vẽ tay sau khi chữ hiện xong.
+                nowrap để nét gạch không bị cắt đôi khi xuống dòng. */}
+            <span className="relative inline-block whitespace-nowrap">
+              <span className="hero-word" style={{ "--i": HEADLINE_WORDS.length } as CSSProperties}>with</span>{" "}
+              <span className="hero-word" style={{ "--i": HEADLINE_WORDS.length + 1 } as CSSProperties}>AI.</span>
+              <svg
+                aria-hidden
+                viewBox="0 0 200 16"
+                preserveAspectRatio="none"
+                className="hero-underline pointer-events-none absolute -bottom-[0.14em] left-[-2%] h-[0.28em] w-[104%] text-accent"
+              >
+                <path
+                  d="M3 11 C 40 4, 92 3, 130 6 S 182 10, 197 5"
+                  pathLength={1}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
           </h1>
 
           <div className="flex flex-col items-center gap-8 md:items-start">
