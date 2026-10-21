@@ -285,6 +285,15 @@ type Mover = {
   pose: SpriteName | null // tư thế chó khi dừng
   chase: number // chó đang đuổi xe (giây còn lại)
   crossed: boolean // đã qua giữa khung (phát tiếng "vù" 1 lần)
+  // Chỉ dùng khi chuyển động mượt bật
+  dy: number // lệch khỏi vạch làn / vạch vỉa hè (ô lưới, dương = gần hơn)
+  pace: number // hệ số tốc độ đi bộ riêng từng người
+  drift: number // xe: tốc độ trôi lên xuống quanh cruise (tỉ lệ)
+  spring: number // xe máy: nhịp nảy riêng (lần/giây)
+  accel: number // gia tốc vừa rồi (ô/s²) — ô tô chúi mũi / ghìm đuôi
+  bumps: number[] // lúc bánh xe lăn qua mối nối (giây, theo clock)
+  pauseFor: number // tổng thời gian lần dừng này
+  look: boolean // đang ngoái lại lúc dừng
 }
 
 type Note = {x: number; y: number; age: number; drift: number}
@@ -399,6 +408,21 @@ const LEAF = {
 } as const
 const DOG_POSES: SpriteName[] = ['dog-stand', 'dog-wag', 'dog-sniff', 'dog-sit']
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
+// Chuyển động mượt (công tắc Studio streetMotionOpen, setStreetMotion):
+//   SEAMS: mối nối mặt đường (lưới 320) — bánh trước rồi bánh sau lăn qua thì xe nảy 1 px
+//   WHEELS: bánh có nan (px atlas trong ô sprite hướng phải: tâm x, tâm y, bán kính) —
+//   vẽ thêm 3 nan quay theo quãng đường, 1 nan sáng để mắt bắt được chiều quay
+const SEAMS = [82, 168, 241]
+const WHEELS: Partial<Record<SpriteName, [number, number, number][]>> = {
+  cyclist: [
+    [13, 55, 13],
+    [58, 55, 13],
+  ],
+  cyclo: [
+    [15, 62, 14],
+    [75, 62, 14],
+  ],
+}
 // Kích thước sprite theo lưới 320×180 (atlas vẽ SPRITE_SCALE px cho mỗi px gốc)
 const spriteSize = (name: SpriteName) => {
   const [, , w, h] = SPRITES[name]
@@ -412,6 +436,7 @@ export class ChillScene {
   private destination: Destination = DESTINATIONS[0]
   private tilt = 0
   private laneShift = 0
+  private smooth = false
   private musicOn = false
   private tint: string | null = null
 
@@ -677,7 +702,9 @@ export class ChillScene {
 
   // Cao độ mặt đường tại x (cảnh phố dốc thì làn xe nghiêng theo)
   private groundY(base: number, x: number, shift = 0) {
-    return Math.round(base + shift + this.theme.streetDy + this.tilt * (x - SCENE_W / 2))
+    const y = base + shift + this.theme.streetDy + this.tilt * (x - SCENE_W / 2)
+    // Mượt: làm tròn theo px đệm (¼ ô) → phố nghiêng không nhảy bậc 4 px
+    return this.smooth ? Math.round(y * 4) / 4 : Math.round(y)
   }
 
   // Tải trước ảnh của 1 điểm đến (vd điểm kế tiếp) để lúc chuyển không bị trống
@@ -702,6 +729,13 @@ export class ChillScene {
   setBusy(on: boolean) {
     this.busy = on
     if (on) this.nextVignette = Math.min(this.nextVignette, 4)
+  }
+
+  // Người, xe, chó ngoài phố chuyển động mượt (công tắc Studio streetMotionOpen): nảy 1 px
+  // theo nhịp riêng + mối nối mặt đường, ô tô chúi mũi khi phanh, nan bánh quay, người nhún
+  // theo bước, dừng / đi có hãm, đứng so le trên vỉa hè. Tắt = như cũ
+  setStreetMotion(on: boolean) {
+    this.smooth = on
   }
 
   // Tạm dừng cảnh (nút pause / giảm chuyển động)
@@ -1396,8 +1430,10 @@ export class ChillScene {
     for (const m of this.movers) {
       if (m.road) this.updateVehicle(m, dt)
       else this.updateWalker(m, dt)
+      const from = m.x
       m.x += m.dir * m.speed * dt
       m.step += m.speed * dt
+      if (this.smooth && m.road) this.rollOverSeams(m, from)
       // Xe qua giữa khung → tiếng "vù" chạy từ loa này sang loa kia
       if (m.road && !m.crossed && (m.x - SCENE_W / 2) * m.dir > 0) {
         m.crossed = true
@@ -1461,7 +1497,7 @@ export class ChillScene {
   // Xe: bám xe phía trước bằng gia tốc (tăng tốc chậm, phanh nhanh hơn) thay vì đổi tốc độ tức thì
   private updateVehicle(m: Mover, dt: number) {
     const size = this.sizeOf(m)
-    let target = m.cruise
+    let target = this.smooth ? m.cruise * (1 + m.drift * Math.sin(this.clock * 0.35 + m.phase * 6)) : m.cruise
     for (const o of this.movers) {
       if (o === m || !o.road || o.lane !== m.lane) continue
       const gap = (o.x - m.x) * m.dir - (size.w + this.sizeOf(o).w) / 2
@@ -1470,13 +1506,44 @@ export class ChillScene {
     const accel = 16
     const decel = 45
     const diff = target - m.speed
-    m.speed += Math.max(-decel * dt, Math.min(accel * dt, diff))
+    const dv = Math.max(-decel * dt, Math.min(accel * dt, diff))
+    m.speed += dv
+    m.accel = dt > 0 ? dv / dt : 0
     m.braking = diff < -0.5
   }
 
-  // Người đi bộ / gánh hàng: thỉnh thoảng dừng lại. Chó: chạy, chạy chậm, dừng
-  // với 1 tư thế (đứng, vẫy đuôi, hít ngửi, ngồi), thỉnh thoảng đuổi theo xe máy
+  // Bánh trước rồi bánh sau lăn qua mối nối mặt đường → ghi lại lúc nảy
+  private rollOverSeams(m: Mover, from: number) {
+    const reach = this.sizeOf(m).w * 0.32
+    for (const s of SEAMS) {
+      for (const off of [reach, -reach]) {
+        const a = from + m.dir * off - s
+        const b = m.x + m.dir * off - s
+        if (a * b <= 0 && a !== b) m.bumps.push(this.clock)
+      }
+    }
+    if (m.bumps.length) m.bumps = m.bumps.filter((t) => this.clock - t < 0.2)
+  }
+
+  // Mượt: tốc độ đổi dần về tốc độ mong muốn (hãm khi dừng, lấy đà khi đi tiếp — khung
+  // bước vẫn theo quãng đường nên chân không trượt); gánh hàng dồn bước theo nhịp quang
+  // gánh; lúc dừng có người ngoái lại nhìn
   private updateWalker(m: Mover, dt: number) {
+    const was = m.speed
+    this.walkerTarget(m, dt)
+    if (!this.smooth) return
+    let target = m.speed * (m.chase > 0 ? 1 : m.pace)
+    if (m.sprite === 'vendor' && target > 0) target *= 1 + 0.14 * Math.cos((m.step / 2.6) * Math.PI)
+    const rate = target < was ? 34 : 22
+    m.speed = was + Math.max(-rate * dt, Math.min(rate * dt, target - was))
+    if (target === 0 && m.speed < 0.05) m.speed = 0
+    m.look = m.pause > 0 && m.sprite !== 'dog' && m.phase < 0.5 && m.pause > m.pauseFor * 0.3 && m.pause < m.pauseFor * 0.7
+  }
+
+  // Người đi bộ / gánh hàng: thỉnh thoảng dừng lại. Chó: chạy, chạy chậm, dừng
+  // với 1 tư thế (đứng, vẫy đuôi, hít ngửi, ngồi), thỉnh thoảng đuổi theo xe máy.
+  // Đặt m.speed = tốc độ mong muốn (mượt thì updateWalker đổi dần tới đó)
+  private walkerTarget(m: Mover, dt: number) {
     if (m.chase > 0) {
       m.chase -= dt
       const bike = this.movers.find((o) => o.road && o.dir === m.dir && Math.abs(o.x - m.x) < 30 && o.sprite.startsWith('bike'))
@@ -1499,6 +1566,7 @@ export class ChillScene {
     if (m.nextPause <= 0 && m.x > 20 && m.x < SCENE_W - 20) {
       m.nextPause = m.sprite === 'dog' ? 4 + this.rng() * 5 : 7 + this.rng() * 10
       m.pause = m.sprite === 'dog' ? 1.5 + this.rng() * 2.5 : 1.5 + this.rng() * 2
+      m.pauseFor = m.pause
       m.pose = m.sprite === 'dog' ? pick(this.rng, DOG_POSES) : null
       m.speed = 0
       return
@@ -1843,7 +1911,8 @@ export class ChillScene {
     const startX = x ?? (dir > 0 ? -w / 2 - 2 : SCENE_W + w / 2 + 2)
     // Không sinh xe chồng lên xe khác vừa vào cùng làn
     if (x === undefined && this.movers.some((m) => m.road && m.lane === lane && Math.abs(m.x - startX) < w + 8)) return
-    this.movers.push({...this.baseMover(), sprite, road: true, x: startX, dir, cruise, speed: cruise, lane})
+    // Lệch làn ±2 px đệm (chỉ dùng khi mượt)
+    this.movers.push({...this.baseMover(), sprite, road: true, x: startX, dir, cruise, speed: cruise, lane, dy: Math.round(r() * 4 - 2) / 4})
   }
 
   private spawnWalker(x?: number) {
@@ -1861,6 +1930,9 @@ export class ChillScene {
       cruise,
       speed: cruise,
       lane: SIDEWALK_Y,
+      // Mượt: đứng so le 3 hàng trên vỉa hè, người lớn đi nhanh hơn (~1,1 m/s)
+      dy: -Math.floor(r() * 3),
+      pace: sprite === 'walker' ? 1.2 + r() * 0.15 : sprite === 'vendor' ? 1.15 + r() * 0.1 : 1,
     })
   }
 
@@ -1874,6 +1946,14 @@ export class ChillScene {
       pose: null,
       chase: 0,
       crossed: false,
+      dy: 0,
+      pace: 1,
+      drift: 0.04 + this.rng() * 0.04,
+      spring: 1.6 + this.rng() * 1.6,
+      accel: 0,
+      bumps: [],
+      pauseFor: 0,
+      look: false,
     }
   }
 
@@ -2069,7 +2149,7 @@ export class ChillScene {
       this.drawFisher()
       for (const m of this.movers) if (!m.road) this.drawMover(m, t)
       this.drawVignette(t)
-      for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane)) this.drawMover(m, t)
+      for (const m of [...this.movers].filter((m) => m.road).sort((a, b) => a.lane - b.lane + (this.smooth ? (a.dy - b.dy) / 8 : 0))) this.drawMover(m, t)
       this.drawTrain()
       this.drawLeaves()
       this.ctx = counter
@@ -2228,7 +2308,7 @@ export class ChillScene {
     let bob = 0
     if (v.stopT < 0 || v.leaving) {
       frame = spec.stride ? spec.walk[Math.floor(v.step / spec.stride) % spec.walk.length] : spec.walk[0]
-      if (spec.ride && v.speed > 1 && (t * 2.5) % 1 < 0.14) bob = 0.5
+      if (spec.ride && v.speed > 1 && (t * 2.5) % 1 < 0.14) bob = this.smooth ? 0.25 : 0.5
     } else {
       const beat = spec.beats.find((b) => v.stopT < b.until) ?? spec.beats[spec.beats.length - 1]
       const on = beat.fps ? Math.floor(v.stopT * beat.fps) % 2 === 1 : false
@@ -2415,7 +2495,8 @@ export class ChillScene {
     this.drawKids()
     this.drawFisher()
     // Vỉa hè → làn xa → làn gần (gần hơn vẽ sau, đè lên trên)
-    const order = (m: Mover) => (m.road ? m.lane : 0)
+    // Mượt: trong cùng vỉa hè / làn, ai đứng gần hơn (dy lớn) vẽ sau
+    const order = (m: Mover) => (m.road ? m.lane : 0) + (this.smooth ? m.dy / 8 : 0)
     for (const m of [...this.movers].sort((a, b) => order(a) - order(b))) this.drawMover(m, t)
     // Tàu chạy trên ray, che người đi bộ trên vỉa hè bên kia
     this.drawTrain()
@@ -2692,8 +2773,12 @@ export class ChillScene {
       return `${m.sprite}-${i}` as SpriteName
     }
     if (m.sprite === 'dog') {
+      // Mượt: lon ton (chậm) chỉ dùng 2 khung chân thu / chân duỗi, nhịp nhanh hơn
+      if (m.speed > 0 && this.smooth && m.speed < 14) return (Math.floor(m.step / 1.6) % 2 ? 'dog-3' : 'dog-0') as SpriteName
       if (m.speed > 0) return `dog-${Math.floor(m.step / 2.2) % 4}` as SpriteName
       const pose = m.pose ?? 'dog-stand'
+      // Mượt: đuôi vẫy từng đợt không đều thay vì lật đều 6 lần/giây
+      if (pose === 'dog-wag' && this.smooth) return [0, 1, 1, 0, 1, 0][Math.floor(t * 7 + m.phase * 6) % 6] ? 'dog-wag' : 'dog-stand'
       if (pose === 'dog-wag') return Math.floor(t * 6) % 2 ? 'dog-wag' : 'dog-stand'
       return pose
     }
@@ -2701,7 +2786,8 @@ export class ChillScene {
   }
 
   // Nhún theo loại xe: xe máy nảy nhanh, ô tô nảy nhẹ, xe buýt lắc chậm, xích lô chòng chành
-  private bobOf(m: Mover, t: number) {
+  private bobOf(m: Mover, t: number, name: SpriteName) {
+    if (this.smooth) return this.smoothBob(m, t, name)
     if (m.speed < 1) return 0
     const s = m.sprite
     if (!m.road) return 0
@@ -2711,37 +2797,77 @@ export class ChillScene {
     return (t * 2.5 + m.phase) % 1 < 0.14 ? 0.5 : 0
   }
 
+  // Mượt: mọi cú nảy 1 px đệm (¼ ô). Người: nhổm lên ở khung giữa bước, gánh hàng trĩu
+  // xuống lúc chân chạm đất; chó phi nhổm theo nhịp. Xe: treo dao động theo nhịp riêng
+  // (xe máy mỗi xe một nhịp, ô tô chậm, buýt chậm hơn) + nảy khi bánh qua mối nối
+  private smoothBob(m: Mover, t: number, name: SpriteName) {
+    if (!m.road) {
+      if (m.speed < 0.5) return 0
+      const odd = Number(name.slice(-1)) % 2 === 1
+      if (m.sprite === 'walker') return odd ? 0.25 : 0
+      if (m.sprite === 'vendor') return odd ? 0 : -0.25
+      if (m.sprite === 'dog') return m.speed > 14 && odd ? 0.25 : 0
+      return 0
+    }
+    const big = CARS.has(m.sprite)
+    if (m.bumps.some((b) => t - b < (big ? 0.12 : 0.08))) return 0.25
+    if (m.speed < 1) return 0
+    const f = m.sprite === 'bus' ? 0.9 : big ? 1.3 : m.sprite === 'cyclo' ? 2.2 : m.spring
+    return Math.sin(t * f * Math.PI * 2 + m.phase * 6) * Math.min(1, m.speed / 20) > 0.55 ? 0.25 : 0
+  }
+
   private drawMover(m: Mover, t: number) {
     if (!this.atlasTinted.width) return
     const ctx = this.ctx
     const name = this.frameOf(m, t)
     const [sx, sy, sw, sh] = SPRITES[name]
     const {w, h} = spriteSize(name)
-    const base = m.road ? this.groundY(m.lane, m.x, this.laneShift) : this.groundY(m.lane, m.x)
+    const base = (m.road ? this.groundY(m.lane, m.x, this.laneShift) : this.groundY(m.lane, m.x)) + (this.smooth ? m.dy : 0)
     // Bám lưới pixel của atlas → sprite không bị lệch nửa pixel, nét đều
     const snap = SCALE * SPRITE_SCALE
     const x = Math.round((m.x - w / 2) * snap) / snap
-    const y = Math.round((base - h - this.bobOf(m, t)) * snap) / snap
+    const y = Math.round((base - h - this.bobOf(m, t, name)) * snap) / snap
     const night = this.time === 'night'
     const rainy = this.weather === 'rain'
 
     // Bóng đổ theo hướng nắng: sáng ngả phải, chiều ngả dài sang trái, đêm/mưa chỉ bóng mờ dưới chân
     const shadowDx = night || rainy ? 0 : this.time === 'afternoon' ? -9 : 3
-    ctx.fillStyle = night || rainy ? 'rgba(0,0,0,0.14)' : 'rgba(0,0,0,0.2)'
-    ctx.beginPath()
-    ctx.moveTo(x + w * 0.1, base)
-    ctx.lineTo(x + w * 0.9, base)
-    ctx.lineTo(x + w * 0.9 + shadowDx, base - 1)
-    ctx.lineTo(x + w * 0.1 + shadowDx, base - 1)
-    ctx.fill()
+    if (this.smooth) {
+      // Mượt: bóng đổ nhạt hơn, đầu xa thu hẹp + 1 dải đậm sát chân / bánh (bóng tiếp đất)
+      ctx.fillStyle = night || rainy ? 'rgba(0,0,0,0.1)' : 'rgba(20,10,30,0.13)'
+      ctx.beginPath()
+      ctx.moveTo(x + w * 0.12, base)
+      ctx.lineTo(x + w * 0.88, base)
+      ctx.lineTo(x + w * 0.8 + shadowDx, base - 1.25)
+      ctx.lineTo(x + w * 0.04 + shadowDx, base - 1.25)
+      ctx.fill()
+      ctx.fillStyle = night || rainy ? 'rgba(0,0,0,0.2)' : 'rgba(20,10,30,0.26)'
+      ctx.fillRect(Math.round((x + w * 0.14) * snap) / snap, base - 0.5, Math.round(w * 0.72 * snap) / snap, 0.5)
+    } else {
+      ctx.fillStyle = night || rainy ? 'rgba(0,0,0,0.14)' : 'rgba(0,0,0,0.2)'
+      ctx.beginPath()
+      ctx.moveTo(x + w * 0.1, base)
+      ctx.lineTo(x + w * 0.9, base)
+      ctx.lineTo(x + w * 0.9 + shadowDx, base - 1)
+      ctx.lineTo(x + w * 0.1 + shadowDx, base - 1)
+      ctx.fill()
+    }
 
     ctx.save()
-    // Mọi sprite đều vẽ hướng sang phải → đi sang trái thì lật
-    if (m.dir < 0) {
+    // Mọi sprite đều vẽ hướng sang phải → đi sang trái thì lật (ngoái lại thì lật ngược)
+    if (m.dir < 0 !== (this.smooth && m.look)) {
       ctx.translate(x * 2 + w, 0)
       ctx.scale(-1, 1)
     }
-    ctx.drawImage(this.atlasTinted, sx, sy, sw, sh, x, y, w, h)
+    // Mượt: ô tô / buýt phanh gấp thì nửa đầu chúi xuống 1 px, tăng tốc thì nửa đuôi ghìm xuống
+    const pitch = this.smooth && CARS.has(m.sprite) && m.speed > 2 ? (m.accel < -20 ? 1 : m.accel > 12 ? -1 : 0) : 0
+    if (pitch) {
+      const half = Math.round(sw / 2)
+      ctx.drawImage(this.atlasTinted, sx, sy, half, sh, x, y + (pitch < 0 ? 1 / snap : 0), half / snap, h)
+      ctx.drawImage(this.atlasTinted, sx + half, sy, sw - half, sh, x + half / snap, y + (pitch > 0 ? 1 / snap : 0), (sw - half) / snap, h)
+    } else ctx.drawImage(this.atlasTinted, sx, sy, sw, sh, x, y, w, h)
+    const wheels = this.smooth ? WHEELS[name] : undefined
+    if (wheels) this.drawSpokes(wheels, m.step, x, y, snap)
     // Đêm: cửa kính ô tô / xe buýt sáng đèn bên trong (vẽ trong hệ toạ độ đã lật)
     const win = WINDOWS[name]
     if (night && win) {
@@ -2767,6 +2893,28 @@ export class ChillScene {
 
     const lightsOn = m.road && !LIGHTS_OFF.has(m.sprite) && (night || rainy)
     if (lightsOn) this.drawLights2(m, x, w, h, base)
+  }
+
+  // Nan bánh quay theo quãng đường đã lăn (góc = quãng đường / bán kính), vẽ trong hệ
+  // toạ độ đã lật nên xe đi sang trái tự quay ngược chiều
+  private drawSpokes(wheels: [number, number, number][], step: number, x: number, y: number, snap: number) {
+    const ctx = this.ctx
+    const light = this.o('#ece8de')
+    const dark = this.o('#28282e')
+    for (const [cx, cy, r] of wheels) {
+      const a = (step * snap) / r
+      for (let k = 0; k < 3; k++) {
+        const ang = a + (k * Math.PI * 2) / 3
+        ctx.fillStyle = k === 0 ? light : dark
+        ctx.globalAlpha = k === 0 ? 0.95 : 0.7
+        for (let d = 4; d < r - 1; d += 1.5) {
+          const px = Math.round(cx + Math.cos(ang) * d)
+          const py = Math.round(cy + Math.sin(ang) * d)
+          ctx.fillRect(x + px / snap, y + py / snap, 1 / snap, 1 / snap)
+        }
+      }
+    }
+    ctx.globalAlpha = 1
   }
 
   // Đèn pha rọi thành chùm + vệt sáng trên mặt đường, đèn hậu phát sáng (sáng

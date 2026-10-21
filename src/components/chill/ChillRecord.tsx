@@ -64,7 +64,8 @@ function readSetup(destinations: Destination[]): Setup {
   }
 }
 
-export function ChillRecord({destinations}: {destinations: Destination[]}) {
+// streetMotionOn: công tắc Studio "Phố chuyển động mượt"; ?motion=1 / ?motion=0 ghi đè
+export function ChillRecord({destinations, streetMotionOn = false}: {destinations: Destination[]; streetMotionOn?: boolean}) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<ChillScene | null>(null)
@@ -128,6 +129,8 @@ export function ChillRecord({destinations}: {destinations: Destination[]}) {
       scene.setSeat(setup.seat)
       scene.setMusic(true)
       scene.setBusy(setup.busy)
+      const motion = new URLSearchParams(window.location.search).get('motion')
+      scene.setStreetMotion(motion ? motion === '1' : streetMotionOn)
       scene.setAtmosphere(setup.time ?? timeOfDay(setup.dest.timeZone), setup.weather, setup.dest)
       fit()
       raf = requestAnimationFrame(loop)
@@ -141,7 +144,7 @@ export function ChillRecord({destinations}: {destinations: Destination[]}) {
       ro.disconnect()
       sceneRef.current = null
     }
-  }, [setup])
+  }, [setup, streetMotionOn])
 
   useEffect(() => {
     if (setup) sceneRef.current?.setAtmosphere(time, setup.weather, setup.dest)

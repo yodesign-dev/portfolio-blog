@@ -55,7 +55,8 @@ const CHILL_QUERY = `{
   "playCountsOpen": *[_id == "chillSettings"][0].playCountsOpen,
   "questOpen": *[_id == "chillSettings"][0].questOpen,
   "catToyOpen": *[_id == "chillSettings"][0].catToyOpen,
-  "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen
+  "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen,
+  "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen
 }`
 
 type ChillContent = {
@@ -77,6 +78,7 @@ type ChillContent = {
   questOpen?: boolean | null
   catToyOpen?: boolean | null
   seatPickOpen?: boolean | null
+  streetMotionOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -164,5 +166,7 @@ export async function getChillContent(revalidate: number) {
   const catToyOn = content.catToyOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_CATTOY === '1')
   // Khách chọn người ngồi nam / nữ. Máy dev: CHILL_DEV_SEAT=1
   const seatPickOn = content.seatPickOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SEAT === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn}
+  // Người, xe, chó ngoài phố chuyển động mượt (nảy, nan quay, nhún bước). Máy dev: CHILL_DEV_MOTION=1
+  const streetMotionOn = content.streetMotionOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MOTION === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn}
 }
