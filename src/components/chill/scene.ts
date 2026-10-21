@@ -2447,6 +2447,13 @@ export class ChillScene {
     }
     ctx.restore()
 
+    const {screen, screenBehind} = this.theme
+    if (screen && screenBehind && ready(this.interior)) {
+      ctx.save()
+      ctx.setTransform(RES, 0, 0, RES, 0, 0)
+      drawScreen(ctx, screen, t, this.time === 'night')
+      ctx.restore()
+    }
     ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W, SCENE_H)
     ctx.save()
     // Lớp vẽ theo px gốc 640×360
@@ -2455,7 +2462,7 @@ export class ChillScene {
     if (character.kind === 'video') {
       // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
       if (ready(this.charSheet) && ready(this.interior)) {
-        if (this.theme.screen) drawScreen(ctx, t, this.time === 'night')
+        if (screen && !screenBehind) drawScreen(ctx, screen, t, this.time === 'night')
         const {at} = character
         ctx.drawImage(this.charFrameCanvas(), at.x, at.y, at.w, at.h)
       }

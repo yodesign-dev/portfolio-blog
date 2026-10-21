@@ -63,7 +63,11 @@ export type Theme = {
   streetDy: number
   // Café: người ngồi là sprite sheet từ video + màn hình laptop vẽ bằng code
   character: CharacterVideo | CharacterFrames
-  screen: boolean
+  // Màn laptop vẽ app thiết kế bằng code (screen.ts), px gốc — nằm dưới lớp người ngồi,
+  // đầu / vai che phía trước. null = không có màn hình
+  screen: Rect | null
+  // Vẽ màn dưới ảnh nội thất (ảnh tĩnh đã khoét lòng màn): người vẽ sẵn trong ảnh che lên
+  screenBehind: boolean
   cat: Pt
   // Khoảng bậu mèo được đi lại khi chơi cần câu (mép trái → mép phải thân, px gốc)
   catRoom: [number, number]
@@ -111,7 +115,8 @@ export const THEMES: Theme[] = [
       duration: 121 / 12,
       sip: [0.75, 6.8],
     },
-    screen: true,
+    screen: {x: 436, y: 219, w: 88, h: 49},
+    screenBehind: false,
     cat: {x: 112, y: 296},
     // Giữa chậu cây và phin
     catRoom: [66, 228],
@@ -147,7 +152,8 @@ export const THEMES: Theme[] = [
       duration: 121 / 12,
       sip: [1.1, 9.1],
     },
-    screen: false,
+    screen: null,
+    screenBehind: false,
     cat: {x: 60, y: 197},
     // Đầu lan can, tới trước bụi hoa giấy
     catRoom: [44, 186],
@@ -186,7 +192,10 @@ export const THEMES: Theme[] = [
       duration: 121 / 12,
       sip: [1.62, 8.3],
     },
-    screen: false,
+    // Lòng màn hình (đã khoét khỏi ảnh tĩnh, dải màn xám cũ trong video đã xoá). Vai người
+    // vẽ sẵn trong ảnh tĩnh nên màn vẽ dưới ảnh, viền laptop che phần thừa
+    screen: {x: 436, y: 219, w: 99, h: 51},
+    screenBehind: true,
     cat: {x: 270, y: 283},
     // Giữa cốc cà phê và ô kệ đầu tiên
     catRoom: [268, 364],

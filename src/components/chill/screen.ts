@@ -2,11 +2,10 @@
 // con trỏ kéo khung, gõ chữ, đổi màu nút, kéo nút sang chỗ khác… xong 1 màn
 // thì "xuất" rồi bắt đầu màn mới.
 //
-// Vẽ theo px thật trên canvas đệm 640×360 (ctx không scale), nằm dưới lớp người
-// ngồi — vùng màn hình trong sheet đã khoét trong suốt, đầu/vai vẫn che phía trước.
-// Phần bên phải bị đầu che nên bố cục dồn sang trái.
-
-export const SCREEN = {x: 436, y: 219, w: 88, h: 49}
+// Bố cục theo px gốc 640×360 nhưng nét vẽ theo lưới 0,5px (= 1px canvas đệm 1280×720),
+// cho khớp độ chi tiết ×2 của tranh xung quanh. Nằm dưới lớp người ngồi — vùng màn hình
+// trong sheet đã khoét trong suốt, đầu/vai vẫn che phía trước. Phần bên phải hay bị
+// đầu che nên bố cục dồn sang trái. Khung màn hình theo từng phòng (themes.ts).
 
 type Rect = {x: number; y: number; w: number; h: number}
 type El = Rect & {color: string; kind: 'rect' | 'text' | 'round'}
@@ -65,16 +64,19 @@ const DESIGNS: {board: Rect; steps: Step[]}[] = [
 
 const SWATCHES = ['#5b6cff', '#e0567a', '#ff7a45', '#f2a65a', '#1f9d6b']
 // Khung canvas của app (trong màn hình): chừa panel trái 16px, thanh trên 4px
-const CANVAS = {x: 16, y: 4, w: 56, h: 45}
+const PANEL = 16
+const BAR = 4
 const STEP_TIME = 2.2
 const HOLD = 2.5
 
 const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2)
 const clamp01 = (k: number) => Math.max(0, Math.min(1, k))
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k
+// Bám lưới 0,5px gốc (1px canvas đệm)
+const snap = (v: number) => Math.round(v * 2) / 2
 
-export function drawScreen(ctx: CanvasRenderingContext2D, t: number, night: boolean) {
-  const S = SCREEN
+export function drawScreen(ctx: CanvasRenderingContext2D, S: Rect, t: number, night: boolean) {
+  const CANVAS = {x: PANEL, y: BAR, w: Math.min(56, S.w - PANEL), h: S.h - BAR}
   const cycle = DESIGNS.map((d) => d.steps.length * STEP_TIME + HOLD)
   const total = cycle.reduce((a, b) => a + b, 0)
   let local = t % total
@@ -101,7 +103,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, t: number, night: bool
       const p = abs(el)
       if (act > 0) {
         const grow = ease(act)
-        els.push({...el, w: Math.max(1, Math.round(el.w * grow)), h: step.op === 'draw' ? Math.max(1, Math.round(el.h * grow)) : el.h})
+        els.push({...el, w: Math.max(0.5, snap(el.w * grow)), h: step.op === 'draw' ? Math.max(0.5, snap(el.h * grow)) : el.h})
         active = els.length - 1
         if (step.op === 'type' && act < 1) typing = els[active]
       }
@@ -148,69 +150,74 @@ export function drawScreen(ctx: CanvasRenderingContext2D, t: number, night: bool
   ctx.fillStyle = '#3a3a42'
   ctx.fillRect(S.x + CANVAS.x, S.y + CANVAS.y, CANVAS.w, CANVAS.h)
   ctx.fillStyle = '#2a2a30'
-  ctx.fillRect(S.x, S.y, S.w, 4)
+  ctx.fillRect(S.x, S.y, S.w, BAR)
   for (const [i, c] of ['#ff5f57', '#febc2e', '#28c840'].entries()) {
     ctx.fillStyle = c
-    ctx.fillRect(S.x + 2 + i * 3, S.y + 1, 2, 2)
+    ctx.fillRect(S.x + 2 + i * 2.5, S.y + 1.5, 1.5, 1.5)
   }
   ctx.fillStyle = '#5a5a66'
-  ctx.fillRect(S.x + 30, S.y + 1, 22, 2)
+  ctx.fillRect(S.x + 30, S.y + 1.5, 22, 1)
 
   // Panel layers: mỗi phần tử 1 dòng, dòng đang chọn tô xanh
   ctx.fillStyle = '#6d6d78'
-  ctx.fillRect(S.x + 2, S.y + 6, 9, 1)
+  ctx.fillRect(S.x + 2, S.y + 6, 9, 0.5)
   els.forEach((el, i) => {
     const y = S.y + 9 + i * 4
     if (i === active) {
       ctx.fillStyle = '#2f4c8a'
-      ctx.fillRect(S.x, y - 1, CANVAS.x, 3)
+      ctx.fillRect(S.x, y - 1, CANVAS.x, 2.5)
     }
     ctx.fillStyle = el.color
-    ctx.fillRect(S.x + 2, y, 2, 1)
+    ctx.fillRect(S.x + 2, y, 1.5, 1)
     ctx.fillStyle = i === active ? '#dfe6ff' : '#8a8a96'
-    ctx.fillRect(S.x + 5, y, el.kind === 'text' ? 8 : 6, 1)
+    ctx.fillRect(S.x + 4.5, y + 0.25, el.kind === 'text' ? 8 : 6, 0.5)
   })
   // Ô màu dưới panel
   SWATCHES.forEach((c, i) => {
     ctx.fillStyle = c
-    ctx.fillRect(S.x + 2 + i * 2.5, S.y + S.h - 6, 2, 2)
+    ctx.fillRect(S.x + 2 + i * 2.5, S.y + S.h - 6, 1.5, 1.5)
   })
 
   // Artboard + phần tử
   ctx.fillStyle = '#fbfaf7'
   ctx.fillRect(board.x, board.y, board.w, board.h)
+  // Dòng chữ vẽ mảnh bằng nửa chiều cao khai báo (nét 0,5px như chữ thật trên màn)
+  const tall = (el: El) => (el.kind === 'text' ? Math.max(0.5, el.h / 2) : el.h)
   for (const el of els) {
-    const x = Math.round(board.x + el.x)
-    const y = Math.round(board.y + el.y)
+    const x = snap(board.x + el.x)
+    const y = snap(board.y + el.y)
+    const h = tall(el)
     ctx.fillStyle = el.color
-    if (el.kind === 'round' && el.w > 2 && el.h > 2) {
-      ctx.fillRect(x + 1, y, el.w - 2, el.h)
-      ctx.fillRect(x, y + 1, el.w, el.h - 2)
-    } else ctx.fillRect(x, y, el.w, el.h)
+    if (el.kind === 'round' && el.w > 2 && h > 2) {
+      ctx.fillRect(x + 0.5, y, el.w - 1, h)
+      ctx.fillRect(x, y + 0.5, el.w, h - 1)
+    } else ctx.fillRect(x, y, el.w, h)
   }
   // Con trỏ nhấp nháy khi đang gõ
   if (typing && Math.floor(t * 3) % 2) {
     ctx.fillStyle = '#3d6df2'
-    ctx.fillRect(Math.round(board.x + typing.x + typing.w + 1), Math.round(board.y + typing.y - 1), 1, typing.h + 2)
+    ctx.fillRect(snap(board.x + typing.x + typing.w + 0.5), snap(board.y + typing.y - 0.5), 0.5, tall(typing) + 1)
   }
-  // Khung chọn + 4 tay nắm
+  // Khung chọn nét 0,5px + 4 tay nắm
   const sel = els[active]
   if (sel) {
-    const x = Math.round(board.x + sel.x) - 1
-    const y = Math.round(board.y + sel.y) - 1
-    const w = sel.w + 2
-    const h = sel.h + 2
-    ctx.strokeStyle = '#4f8cff'
-    ctx.lineWidth = 1
-    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+    const x = snap(board.x + sel.x) - 0.5
+    const y = snap(board.y + sel.y) - 0.5
+    const w = sel.w + 1
+    const h = tall(sel) + 1
+    ctx.fillStyle = '#4f8cff'
+    ctx.fillRect(x, y, w, 0.5)
+    ctx.fillRect(x, y + h - 0.5, w, 0.5)
+    ctx.fillRect(x, y, 0.5, h)
+    ctx.fillRect(x + w - 0.5, y, 0.5, h)
     ctx.fillStyle = '#ffffff'
     for (const [hx, hy] of [
-      [x, y],
-      [x + w - 1, y],
-      [x, y + h - 1],
-      [x + w - 1, y + h - 1],
+      [x - 0.25, y - 0.25],
+      [x + w - 0.75, y - 0.25],
+      [x - 0.25, y + h - 0.75],
+      [x + w - 0.75, y + h - 0.75],
     ])
-      ctx.fillRect(hx, hy, 1, 1)
+      ctx.fillRect(snap(hx), snap(hy), 1, 1)
   }
   // Chớp trắng lúc "xuất" màn xong
   if (holding) {
@@ -220,7 +227,7 @@ export function drawScreen(ctx: CanvasRenderingContext2D, t: number, night: bool
       ctx.fillRect(board.x, board.y, board.w, board.h)
     }
   }
-  drawPointer(ctx, Math.round(cursor.x), Math.round(cursor.y), press)
+  drawPointer(ctx, snap(cursor.x), snap(cursor.y), press)
   // Ban ngày màn hình bị nắng làm bạc đi một chút
   if (!night) {
     ctx.fillStyle = 'rgba(210,220,235,0.1)'
@@ -229,15 +236,15 @@ export function drawScreen(ctx: CanvasRenderingContext2D, t: number, night: bool
   ctx.restore()
 }
 
-// Mũi tên chuột 4×6, viền tối; đang nhấn thì co lại 1px
+// Mũi tên chuột ô 0,5px (cao 5px gốc), viền tối; đang nhấn thì co đuôi lại
+const POINTER = ['1', '11', '121', '1221', '12221', '122221', '1222221', '1221111', '1211', '11 21', '1  21', '    11']
 function drawPointer(ctx: CanvasRenderingContext2D, x: number, y: number, press: boolean) {
-  const shape = ['1', '11', '121', '1221', '1222', '11', '01']
-  shape.forEach((row, j) => {
-    if (press && j === shape.length - 1) return
+  POINTER.forEach((row, j) => {
+    if (press && j >= POINTER.length - 2) return
     for (let i = 0; i < row.length; i++) {
-      if (row[i] === '0') continue
+      if (row[i] !== '1' && row[i] !== '2') continue
       ctx.fillStyle = row[i] === '1' ? '#101014' : '#ffffff'
-      ctx.fillRect(x + i, y + j, 1, 1)
+      ctx.fillRect(x + i * 0.5, y + j * 0.5, 0.5, 0.5)
     }
   })
 }
