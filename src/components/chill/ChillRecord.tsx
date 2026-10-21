@@ -7,6 +7,7 @@
 // Tham số trên link (đều tuỳ chọn):
 //   place=<id điểm đến>          mặc định điểm đến đầu tiên trong Studio
 //   theme=cafe|balcony|desk      căn phòng
+//   seat=girl                    người ngồi nữ (phòng chưa có bản nữ thì vẫn là nam)
 //   time=morning|afternoon|night bỏ trống = giờ thật của điểm đến
 //   weather=clear|rain|mist
 //   x=0–100                      khung dọc 9:16: lấy phần nào của cảnh theo chiều ngang (mặc định 50)
@@ -18,7 +19,7 @@
 import {useEffect, useRef, useState} from 'react'
 import type {Destination} from './destinations'
 import type {ChillScene, TimeOfDay, Weather} from './scene'
-import type {ThemeId} from './themes'
+import {SEATS, type Seat, type ThemeId} from './themes'
 
 const TIMES: TimeOfDay[] = ['morning', 'afternoon', 'night']
 const WEATHERS: Weather[] = ['clear', 'rain', 'mist']
@@ -38,6 +39,7 @@ const oneOf = <T extends string>(list: readonly T[], value: string | null) => (l
 type Setup = {
   dest: Destination
   theme: ThemeId
+  seat: Seat
   time: TimeOfDay | null // null = theo giờ thật
   weather: Weather
   x: number
@@ -52,6 +54,7 @@ function readSetup(destinations: Destination[]): Setup {
   return {
     dest: destinations.find((d) => d.id === p.get('place')) ?? destinations[0],
     theme: oneOf(THEMES, p.get('theme')) ?? 'cafe',
+    seat: oneOf(SEATS, p.get('seat')) ?? 'boy',
     time: oneOf(TIMES, p.get('time')),
     weather: oneOf(WEATHERS, p.get('weather')) ?? 'clear',
     x: p.has('x') && Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
@@ -122,6 +125,7 @@ export function ChillRecord({destinations}: {destinations: Destination[]}) {
       scene = new ChillScene(canvas)
       sceneRef.current = scene
       scene.setTheme(setup.theme)
+      scene.setSeat(setup.seat)
       scene.setMusic(true)
       scene.setBusy(setup.busy)
       scene.setAtmosphere(setup.time ?? timeOfDay(setup.dest.timeZone), setup.weather, setup.dest)

@@ -54,7 +54,8 @@ const CHILL_QUERY = `{
   "shelfOpen": *[_id == "chillSettings"][0].shelfOpen,
   "playCountsOpen": *[_id == "chillSettings"][0].playCountsOpen,
   "questOpen": *[_id == "chillSettings"][0].questOpen,
-  "catToyOpen": *[_id == "chillSettings"][0].catToyOpen
+  "catToyOpen": *[_id == "chillSettings"][0].catToyOpen,
+  "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen
 }`
 
 type ChillContent = {
@@ -75,6 +76,7 @@ type ChillContent = {
   playCountsOpen?: boolean | null
   questOpen?: boolean | null
   catToyOpen?: boolean | null
+  seatPickOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -160,5 +162,7 @@ export async function getChillContent(revalidate: number) {
   const questOn = content.questOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_QUEST === '1')
   // Cần câu lông vũ trêu mèo. Máy dev: CHILL_DEV_CATTOY=1
   const catToyOn = content.catToyOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_CATTOY === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn}
+  // Khách chọn người ngồi nam / nữ. Máy dev: CHILL_DEV_SEAT=1
+  const seatPickOn = content.seatPickOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SEAT === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn}
 }

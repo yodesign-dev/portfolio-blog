@@ -14,7 +14,7 @@ import {GroupTable} from './GroupTable'
 import {arrangeFriends, type TableMember} from './table-view'
 import {SupporterBoard, type Board} from './SupporterBoard'
 import {hasDonate, loadCup} from './donate-config'
-import {THEMES, themeById, type ThemeId} from './themes'
+import {SEATS, THEMES, hasGirl, themeById, type Seat, type ThemeId} from './themes'
 import {Changelog, WhatsNewButton, useUpdatesSeen, type ChillUpdate} from './Changelog'
 import {ChillChat, type ChatMessage} from './ChillChat'
 import {setLang, useLang, useT, type Lang} from './i18n'
@@ -133,6 +133,8 @@ type Prefs = {
   destination: string
   travel: number
   theme: ThemeId
+  // Người ngồi nam / nữ (chỉ dùng khi Studio bật seatPickOpen)
+  seat?: Seat
   panelTab: PanelTab
   zen: boolean
   groupWall: GroupWall
@@ -210,6 +212,7 @@ export function ChillRoom({
   playCountsOn = false,
   questOn = false,
   catToyOn = false,
+  seatPickOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -222,6 +225,8 @@ export function ChillRoom({
   questOn?: boolean
   // Cần câu lông vũ trêu mèo (Studio "Chill · Cài đặt"), mặc định tắt
   catToyOn?: boolean
+  // Khách chọn người ngồi nam / nữ (Studio "Chill · Cài đặt"), mặc định tắt = luôn nam
+  seatPickOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -279,6 +284,9 @@ export function ChillRoom({
   const [destIndex, setDestIndex] = useState(0)
   const [travel, setTravel] = useState(5)
   const [theme, setTheme] = useState<ThemeId>('cafe')
+  // Người ngồi khách chọn; Studio tắt thì cảnh luôn là nam (lựa chọn cũ vẫn giữ trong prefs)
+  const [seat, setSeat] = useState<Seat>('boy')
+  const shownSeat: Seat = seatPickOn ? seat : 'boy'
   // Chế độ Zen: giấu hết nút, chỉ còn cảnh động + nhạc. Bật / tắt bằng công tắc trên
   // thanh trên (hoặc phím H); trong Zen công tắc chỉ hiện lại khi nhích chuột / chạm
   const [zen, setZen] = useState(false)
@@ -407,6 +415,7 @@ export function ChillRoom({
     if (savedDest >= 0) setDestIndex(savedDest)
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
+    if (SEATS.includes(prefs.seat!)) setSeat(prefs.seat!)
     if (PANEL_TABS.some((t) => t.id === prefs.panelTab)) setPanelTab(prefs.panelTab!)
     if (prefs.zen === true) setZen(true)
     if (prefs.groupWall === 'glass') setGroupWall('glass')
@@ -458,6 +467,7 @@ export function ChillRoom({
       destination: dest.id,
       travel,
       theme,
+      seat,
       panelTab,
       zen,
       groupWall,
@@ -467,7 +477,7 @@ export function ChillRoom({
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, mix, time, weather, shuffle, station, dest.id, travel, theme, panelTab, zen, groupWall])
+  }, [loaded, track.id, volume, ambience, mix, time, weather, shuffle, station, dest.id, travel, theme, seat, panelTab, zen, groupWall])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -564,6 +574,14 @@ export function ChillRoom({
     fitRef.current()
     scene.frame(performance.now())
   }, [theme])
+
+  // Người ngồi nam / nữ (phòng chưa có bản nữ thì cảnh tự giữ bản nam)
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setSeat(shownSeat)
+    scene.frame(performance.now())
+  }, [shownSeat])
 
   // Màn dọc: vào quán rồi thì phóng to cảnh; bàn nhóm cần thấy đủ 4 ghế nên thu về như cũ
   useEffect(() => {
@@ -2130,7 +2148,7 @@ export function ChillRoom({
         aria-label={
           groupView && table
             ? t.room.canvasTable(table.seated.map((f) => `${f.name} ${t.room.status[f.status] ?? ''}`).join(', '), table.rest.length)
-            : t.room.canvasCounter(dest.name, timeLabel.toLowerCase(), weatherLabel.toLowerCase())
+            : t.room.canvasCounter(dest.name, timeLabel.toLowerCase(), weatherLabel.toLowerCase(), shownSeat === 'girl' && hasGirl(theme))
         }
       />
       </div>
@@ -3026,6 +3044,7 @@ export function ChillRoom({
         onView={() => setGroupView(true)}
         openSignal={tableSignal}
         onAvailable={setTableAvailable}
+        seat={shownSeat}
       />
 
       <Wishlist
@@ -3307,6 +3326,13 @@ export function ChillRoom({
                     )
                   })}
                 </div>
+                {seatPickOn && (
+                  <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="text-sm text-[#a79e94]">{t.room.seatTitle}</span>
+                    <SeatPicker seat={seat} onPick={setSeat} label={t.room.seatTitle} names={t.room.seats} />
+                    {seat === 'girl' && !hasGirl(theme) && <p className="w-full text-xs text-[#a79e94]">{t.room.seatNoGirl}</p>}
+                  </div>
+                )}
               </section>
 
               <section>
@@ -3568,6 +3594,13 @@ export function ChillRoom({
                 {t.welcome.visit(visitDayOf(regular), t.regular.levels[levelOf(visitDayOf(regular))])}
               </p>
             )}
+            {seatPickOn && hasGirl(theme) && (
+              // Chọn người ngồi — không tính là "vào quán" (cả màn chào bắt click)
+              <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mb-1 flex flex-col items-center gap-1.5">
+                <p className="text-xs text-white/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.welcome.seat}</p>
+                <SeatPicker seat={seat} onPick={setSeat} label={t.welcome.seat} names={t.room.seats} />
+              </div>
+            )}
             <button
               type="button"
               onClick={(e) => {
@@ -3678,6 +3711,39 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
       {Array.from({length: 12}).map((_, i) => (
         <span key={i} className="h-full w-[3px] origin-center rounded-full bg-[#e8b27d] transition-transform duration-75" />
       ))}
+    </div>
+  )
+}
+
+// Chọn người ngồi nam / nữ: 2 nút có mặt nhân vật, cắt từ ảnh nội thất phòng Cửa sổ quán
+// (vùng đầu người ngồi, px 1280: x 980–1140, y 270–430)
+const SEAT_FACES: Record<Seat, string> = {boy: '/chill/scenes/interior.webp', girl: '/chill/scenes/interior-girl.webp'}
+
+function SeatPicker({seat, onPick, label, names}: {seat: Seat; onPick: (s: Seat) => void; label: string; names: Record<Seat, string>}) {
+  return (
+    <div className="flex gap-1 rounded-full bg-black/45 p-1 backdrop-blur" role="radiogroup" aria-label={label}>
+      {SEATS.map((s) => {
+        const active = s === seat
+        return (
+          <button
+            key={s}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onPick(s)}
+            className={`flex min-h-9 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+              active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/80 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <span
+              aria-hidden
+              className="block size-7 shrink-0 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated]"
+              style={{backgroundImage: `url(${SEAT_FACES[s]})`, backgroundSize: '224px 126px', backgroundPosition: '-171px -47px'}}
+            />
+            {names[s]}
+          </button>
+        )
+      })}
     </div>
   )
 }

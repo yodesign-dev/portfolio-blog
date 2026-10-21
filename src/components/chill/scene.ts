@@ -28,7 +28,7 @@ import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
-import {themeById, type CharacterVideo, type SheetSpec, type Theme, type ThemeId} from './themes'
+import {seatArt, themeById, type CharacterVideo, type Seat, type SheetSpec, type Theme, type ThemeId} from './themes'
 import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
 import {drawCoinDrop, drawIcedCoffee, drawTipJar, jarHitBox} from './tipjar'
 import {drawItem, itemById, itemHitBox} from './shelf'
@@ -442,6 +442,7 @@ export class ChillScene {
   private catSheet: HTMLImageElement
   private catTinted: HTMLCanvasElement
   private theme: Theme = themeById('cafe')
+  private seat: Seat = 'boy'
   // Theme ảnh tĩnh: atlas các vùng biến thể của người ngồi (gõ phím, uống)
   private poseSheet: HTMLImageElement | null = null
   // Nhịp gõ phím: gõ liên tục vài giây rồi dừng đọc màn hình; tay nhún khi gõ
@@ -562,7 +563,7 @@ export class ChillScene {
     this.resize(this.buffer.width, this.buffer.height)
 
     this.street = this.image(this.destination.streets[this.time])
-    this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
+    this.interior = loadImage(this.art.interior, () => (this.dirty = true))
     this.interiorLayer = this.makeLayer()
     this.propsLayer = this.makeLayer()
     this.atlas = loadImage(SPRITE_SRC, () => (this.dirty = true))
@@ -587,7 +588,7 @@ export class ChillScene {
 
   // Người ngồi của theme hiện tại: sheet video (bản ×2 cho màn rộng) hoặc atlas tư thế
   private loadCharacter() {
-    const c = this.theme.character
+    const c = this.art.character
     this.charFrameKey = ''
     if (c.kind === 'video') {
       this.charCfg = c
@@ -621,13 +622,31 @@ export class ChillScene {
   setTheme(id: ThemeId) {
     if (id === this.theme.id) return
     this.theme = themeById(id)
-    this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
+    this.interior = loadImage(this.art.interior, () => (this.dirty = true))
     this.loadCharacter()
     this.sipT = -1
     this.wand = null
     this.cat.setRear(this.theme.cat, this.theme.catRoom)
     this.pawTarget = null
     this.rain = this.makeRain()
+    this.dirty = true
+  }
+
+  // Ảnh nội thất + người ngồi theo phòng và lựa chọn nam / nữ
+  private get art() {
+    return seatArt(this.theme, this.seat)
+  }
+
+  // Người ngồi nam / nữ (lựa chọn của khách khi công tắc Studio seatPickOpen bật). Phòng chưa
+  // có bản nữ thì giữ nguyên bản nam, không tải lại gì
+  setSeat(seat: Seat) {
+    if (seat === this.seat) return
+    const before = this.art.interior
+    this.seat = seat
+    if (this.art.interior === before) return
+    this.interior = loadImage(this.art.interior, () => (this.dirty = true))
+    this.loadCharacter()
+    this.sipT = -1
     this.dirty = true
   }
 
@@ -768,7 +787,7 @@ export class ChillScene {
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
     this.paintDrink(ctx)
     // Theme ảnh tĩnh: khoét vùng người ngồi theo ô mặt nạ, tư thế vẽ vào lúc draw
-    const frames = this.theme.character
+    const frames = this.art.character
     if (frames.kind === 'frames' && ready(this.poseSheet)) {
       const [mx, my] = frames.cells.mask
       const {at} = frames
@@ -1432,7 +1451,7 @@ export class ChillScene {
     }
     this.notes = this.notes.filter((n) => n.age < 3)
 
-    if (this.theme.character.kind === 'video') this.updateCharacter(dt)
+    if (this.art.character.kind === 'video') this.updateCharacter(dt)
     else this.updatePose(dt)
     this.updateCat(dt)
 
@@ -1595,7 +1614,7 @@ export class ChillScene {
   // Vùng bấm vào mèo, theo lưới canvas đệm (px thật 640×360)
   // Đỉnh đầu người ngồi ở quầy (px gốc) — để đặt bong bóng lời thoại của chính mình
   get headBox() {
-    const at = this.theme.character.at
+    const at = this.art.character.at
     return {x: Math.round(at.x + at.w * 0.45) - 1, y: at.y + 6, w: 2, h: 2}
   }
 
@@ -2458,7 +2477,7 @@ export class ChillScene {
     ctx.save()
     // Lớp vẽ theo px gốc 640×360
     ctx.setTransform(RES, 0, 0, RES, 0, 0)
-    const character = this.theme.character
+    const character = this.art.character
     if (character.kind === 'video') {
       // Màn hình laptop chỉ hiện khi nội thất đã tải và đã khoét vùng người ngồi
       if (ready(this.charSheet) && ready(this.interior)) {

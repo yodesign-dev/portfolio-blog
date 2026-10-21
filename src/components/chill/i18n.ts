@@ -79,10 +79,12 @@ const en = {
     look: 'Just look around, no music',
     home: 'Back to Bin Nguyen’s site',
     visit: (day: number, level: string) => `Visit day ${day} · ${level}`,
+    // Chọn người ngồi nam / nữ (công tắc Studio seatPickOpen)
+    seat: 'Who’s at the counter today?',
   },
   room: {
-    canvasCounter: (place: string, time: string, weather: string) =>
-      `Pixel art: a person with headphones sipping phin coffee by a café window, ${place} street outside, ${time}, ${weather}`,
+    canvasCounter: (place: string, time: string, weather: string, girl = false) =>
+      `Pixel art: ${girl ? 'a girl with a ponytail and headphones' : 'a person with headphones'} sipping phin coffee by a café window, ${place} street outside, ${time}, ${weather}`,
     canvasTable: (who: string, more: number) =>
       `Pixel art: friends at a long table inside the café — ${who || 'empty chairs'}${more ? `, and ${more} more` : ''}`,
     tabs: {music: 'Music', scene: 'Scene', atmosphere: 'Atmosphere'},
@@ -151,6 +153,9 @@ const en = {
     shuffle: 'Shuffle',
     plays: (n: string) => `${n} plays`,
     roomTitle: 'Room',
+    seatTitle: 'Who sits here',
+    seats: {boy: 'He', girl: 'She'},
+    seatNoGirl: 'This room only has him for now. She sits in the Café window.',
     destination: 'Destination',
     now: 'Now',
     autoTravel: 'Auto travel',
@@ -644,10 +649,11 @@ const vi: typeof en = {
     look: 'Chỉ ngắm cảnh, chưa cần nhạc',
     home: 'Về trang của Bin Nguyen',
     visit: (day, level) => `Ngày ghé thứ ${day} · ${level}`,
+    seat: 'Hôm nay ai ngồi ở quầy?',
   },
   room: {
-    canvasCounter: (place, time, weather) =>
-      `Tranh pixel: một người đeo tai nghe nhâm nhi cà phê phin bên cửa sổ quán, ngoài kia là phố ${place}, ${time}, ${weather}`,
+    canvasCounter: (place, time, weather, girl = false) =>
+      `Tranh pixel: ${girl ? 'một cô gái buộc tóc đuôi ngựa, đeo tai nghe' : 'một người đeo tai nghe'} nhâm nhi cà phê phin bên cửa sổ quán, ngoài kia là phố ${place}, ${time}, ${weather}`,
     canvasTable: (who, more) =>
       `Tranh pixel: bạn bè ngồi quanh bàn dài trong quán — ${who || 'ghế còn trống'}${more ? `, và ${more} người nữa` : ''}`,
     tabs: {music: 'Nhạc', scene: 'Cảnh', atmosphere: 'Không khí'},
@@ -716,6 +722,9 @@ const vi: typeof en = {
     shuffle: 'Trộn bài',
     plays: (n) => `${n} lượt nghe`,
     roomTitle: 'Phòng',
+    seatTitle: 'Người ngồi',
+    seats: {boy: 'Anh', girl: 'Chị'},
+    seatNoGirl: 'Phòng này hiện mới có anh. Chị ngồi ở phòng Cửa sổ quán.',
     destination: 'Điểm đến',
     now: 'Đang ở',
     autoTravel: 'Tự đổi điểm đến',

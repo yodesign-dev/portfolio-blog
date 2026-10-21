@@ -6,6 +6,7 @@ import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixe
 import {trackEvent} from '@/lib/analytics'
 import {CHARACTERS, SEATS, arrangeFriends, type TableMember} from './table-view'
 import {tServer, useLang, useT} from './i18n'
+import type {Seat} from './themes'
 
 // Bàn nhóm (thử nghiệm) — phía quầy cửa sổ: nút "Mời bạn" trên thanh trên,
 // chọn nhân vật, danh sách bạn đang ở bàn. Backend: /api/chill-table.
@@ -21,6 +22,8 @@ const INVITE_SEEN_KEY = 'chill:invite-seen'
 const TABLE_KEY = 'chill:table-id'
 const CHAT_ME_KEY = 'chill:chat-me'
 const POLL_MS = 20_000
+// Bạn áo tím tóc dài (CHARACTERS[2]) — gần với người ngồi nữ G2 nhất
+const GIRL_CHARACTER = 2
 // Thông báo nhỏ: mã (dịch theo t.table) hoặc nguyên văn câu lỗi server trả về
 const NOTICES = ['gone', 'full', 'joinFailed', 'createFailed', 'disbanded'] as const
 type NoticeKey = (typeof NOTICES)[number]
@@ -65,6 +68,7 @@ export function GroupTable({
   onView,
   openSignal = 0,
   onAvailable,
+  seat = 'boy',
 }: {
   visible: boolean
   // Ô giữa trong hàng nút góc phải dưới (Wishlist · Mời bạn · Chat) — nút được đặt vào đây
@@ -79,6 +83,8 @@ export function GroupTable({
   openSignal?: number
   // Studio có đang mở bàn nhóm không (để Thực đơn trên điện thoại biết có nên hiện dòng "Mời bạn")
   onAvailable?: (available: boolean) => void
+  // Người ngồi khách chọn: chọn nữ mà chưa từng chọn nhân vật bàn nhóm → chọn sẵn bạn áo tím
+  seat?: Seat
 }) {
   const t = useT()
   const lang = useLang()
@@ -381,7 +387,7 @@ export function GroupTable({
           title={picker.mode === 'join' ? (picker.host ? t.table.invitedBy(picker.host) : t.table.invited) : t.table.createTitle}
           action={picker.mode === 'join' ? t.table.join : t.table.create}
           name={me.name}
-          character={me.character}
+          character={me.character ?? (seat === 'girl' ? GIRL_CHARACTER : null)}
           busy={busy}
           onConfirm={confirmPicker}
           onClose={() => setPicker(null)}

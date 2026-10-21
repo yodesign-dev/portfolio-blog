@@ -7,10 +7,16 @@
 // - café: ảnh nội thất 640×360 + người ngồi là sprite sheet cắt từ video (scene.ts).
 // - desk: ảnh AI 1280×720 (Nano Banana 2) + người ngồi là video loop Kling như quán.
 // - balcony: ảnh AI 1280×720 (người đọc sách, không laptop) + video loop Kling như quán.
+//
+// Người ngồi nam (art gốc) hoặc nữ (`girl`, công tắc Studio seatPickOpen): bản nữ là ảnh
+// nội thất + video riêng, cùng toạ độ với bản nam (scripts/chill-girl-cafe-art.py).
+// Phòng chưa có bản nữ thì luôn là nam.
 
 import type {ToySpot} from './wand'
 
 export type ThemeId = 'cafe' | 'balcony' | 'desk'
+export type Seat = 'boy' | 'girl'
+export const SEATS: Seat[] = ['boy', 'girl']
 
 type Rect = {x: number; y: number; w: number; h: number}
 type Pt = {x: number; y: number}
@@ -63,6 +69,8 @@ export type Theme = {
   streetDy: number
   // Café: người ngồi là sprite sheet từ video + màn hình laptop vẽ bằng code
   character: CharacterVideo | CharacterFrames
+  // Bản người ngồi nữ: ảnh nội thất + video riêng, cùng vị trí với bản nam
+  girl?: {interior: string; character: CharacterVideo}
   // Màn laptop vẽ app thiết kế bằng code (screen.ts), px gốc — nằm dưới lớp người ngồi,
   // đầu / vai che phía trước. null = không có màn hình
   screen: Rect | null
@@ -114,6 +122,18 @@ export const THEMES: Theme[] = [
       lo: {src: '/chill/scenes/interior-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
       duration: 121 / 12,
       sip: [0.75, 6.8],
+    },
+    // Nữ G2 (tóc dài buộc thấp, kính, cardigan tím): Nano Banana 2 + Kling O1 Pro, cùng động tác
+    girl: {
+      interior: '/chill/scenes/interior-girl.webp',
+      character: {
+        kind: 'video',
+        at: {x: 429, y: 116, w: 211, h: 220},
+        hi: {src: '/chill/scenes/interior-girl-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+        lo: {src: '/chill/scenes/interior-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+        duration: 121 / 12,
+        sip: [2.4, 7.7],
+      },
     },
     screen: {x: 436, y: 219, w: 88, h: 49},
     screenBehind: false,
@@ -215,3 +235,9 @@ export const THEMES: Theme[] = [
 ]
 
 export const themeById = (id: string | undefined) => THEMES.find((t) => t.id === id) ?? THEMES[0]
+
+// Ảnh nội thất + người ngồi của phòng theo lựa chọn nam / nữ
+export const seatArt = (theme: Theme, seat: Seat) =>
+  (seat === 'girl' && theme.girl) || {interior: theme.interior, character: theme.character}
+
+export const hasGirl = (id: ThemeId) => !!themeById(id).girl

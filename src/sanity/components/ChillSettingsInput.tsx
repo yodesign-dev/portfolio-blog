@@ -19,6 +19,7 @@ type Value = {
   shelfOpen?: boolean
   playCountsOpen?: boolean
   catToyOpen?: boolean
+  seatPickOpen?: boolean
   questOpen?: boolean
   questSeason?: string
   questTitle?: string
@@ -40,7 +41,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen'
 
 const FEATURES: {key: FeatureKey; icon: string; title: string; desc: string; beta?: boolean; delay: string}[] = [
   {key: 'chatOpen', icon: '💬', title: 'Phòng chat', desc: 'Khách nhắn tin với nhau trong quán. Tắt khi bị spam: nút chat ẩn đi, tin cũ tự xoá sau 24 giờ.', delay: '30 giây'},
@@ -49,6 +50,7 @@ const FEATURES: {key: FeatureKey; icon: string; title: string; desc: string; bet
   {key: 'shelfOpen', icon: '🏺', title: 'Kệ sưu tầm', desc: 'Xong phin, mèo mang ra một món cho kệ. 20 món, chỉ lưu trên máy khách.', beta: true, delay: '1 phút'},
   {key: 'playCountsOpen', icon: '🎧', title: 'Lượt nghe', desc: 'Đếm lượt nghe từng bài (nghe đủ 30 giây, 1 máy 1 lượt mỗi ngày). Bài từ 50 lượt mới hiện số trong danh sách.', beta: true, delay: '5 phút'},
   {key: 'catToyOpen', icon: '🪶', title: 'Trêu mèo', desc: 'Cần câu lông vũ dựng cạnh mèo. Khách cầm lên đung đưa, mèo rình, lắc mông, vồ, khều. Chơi chừng 7 lần vồ là mèo đi ngủ.', beta: true, delay: '1 phút'},
+  {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', beta: true, delay: '1 phút'},
   {key: 'questOpen', icon: '☕', title: 'Cả quán cùng pha phin', desc: 'Phin của mọi khách cộng vào một con số chung. Đủ mục tiêu thì cả quán bỏ phiếu chọn thứ được mở khoá tiếp theo.', beta: true, delay: '30 giây'},
 ]
 
