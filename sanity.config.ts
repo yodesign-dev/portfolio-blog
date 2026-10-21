@@ -12,7 +12,7 @@ import {table} from '@sanity/table'
 
 import {apiVersion, dataset, projectId} from './src/sanity/env'
 import {schema} from './src/sanity/schemaTypes'
-import {structure} from './src/sanity/structure'
+import {SINGLETON_TYPES, structure} from './src/sanity/structure'
 import {resolve} from './src/sanity/presentation/resolve'
 
 export default defineConfig({
@@ -20,6 +20,11 @@ export default defineConfig({
   projectId,
   dataset,
   schema,
+  // Tài liệu đơn mở thẳng từ danh sách bên trái, không cho tạo bản thứ hai từ nút "+"
+  document: {
+    newDocumentOptions: (prev, {creationContext}) =>
+      creationContext.type === 'global' ? prev.filter((t) => !SINGLETON_TYPES.includes(t.templateId)) : prev,
+  },
   plugins: [
     structureTool({structure}),
     visionTool({defaultApiVersion: apiVersion}),
