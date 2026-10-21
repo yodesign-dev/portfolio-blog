@@ -22,6 +22,7 @@ import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {GUIDE_FIRST_MS, GUIDE_GAP_MS, GUIDE_HOLD_MS, GUIDE_ORDER, GUIDE_PER_VISIT, GUIDE_POINT_MS, GUIDE_SHOW_MS, loadTried, saveTried, type GuideStep} from './guide'
 import {PixelGlass} from './pixel-icons'
 import {Shelf} from './ShelfBook'
+import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mix, type MixChannel, type MixPreset} from './mix'
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
 import {QuestCard} from './QuestCard'
@@ -122,6 +123,8 @@ type Prefs = {
   trackId: string
   volume: number
   ambience: number
+  // Bản trộn âm nền riêng (mix.ts); null / chưa có = theo cảnh
+  mix?: Mix | null
   time: TimeOfDay
   weather: Weather
   shuffle: boolean
@@ -168,6 +171,8 @@ const WALLS: {value: GroupWall; label: string; icon: React.ReactNode}[] = [
   {value: 'brick', label: 'Brick', icon: <BrickIcon />},
   {value: 'glass', label: 'Glass', icon: <GlassIcon />},
 ]
+
+const MIX_ICONS: Record<MixChannel, string> = {rain: '🌧', street: '🛵', cafe: '☕', purr: '🐱'}
 
 const AMBIENCE_FOR: Record<Weather, {kind: Ambience; label: string}> = {
   clear: {kind: 'street', label: 'Street sounds'},
@@ -259,6 +264,7 @@ export function ChillRoom({
   const [playing, setPlaying] = useState(false)
   const [volume, setVolume] = useState(0.7)
   const [ambience, setAmbience] = useState(0.35)
+  const [mix, setMix] = useState<Mix | null>(null)
   const [shuffle, setShuffle] = useState(false)
   const [station, setStation] = useState<StationId>('acoustic')
   const [position, setPosition] = useState(0)
@@ -377,6 +383,7 @@ export function ChillRoom({
     }
     if (typeof prefs.volume === 'number') setVolume(prefs.volume)
     if (typeof prefs.ambience === 'number') setAmbience(prefs.ambience)
+    setMix(parseMix(prefs.mix))
     if (prefs.time && ['morning', 'afternoon', 'night'].includes(prefs.time)) setTime(prefs.time)
     if (prefs.weather && ['clear', 'rain', 'mist'].includes(prefs.weather)) setWeather(prefs.weather)
     if (typeof prefs.shuffle === 'boolean') setShuffle(prefs.shuffle)
@@ -438,6 +445,7 @@ export function ChillRoom({
       trackId: track.id,
       volume,
       ambience,
+      mix,
       time,
       weather,
       shuffle,
@@ -454,7 +462,7 @@ export function ChillRoom({
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, time, weather, shuffle, station, dest.id, travel, theme, panelTab, zen, groupWall])
+  }, [loaded, track.id, volume, ambience, mix, time, weather, shuffle, station, dest.id, travel, theme, panelTab, zen, groupWall])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -1272,6 +1280,10 @@ export function ChillRoom({
     audioRef.current?.setAmbience(ambience, AMBIENCE_FOR[weather].kind)
   }, [ambience, weather])
 
+  useEffect(() => {
+    audioRef.current?.setMix(mix)
+  }, [mix])
+
   // Giờ địa phương của điểm đến
   useEffect(() => {
     const format = () =>
@@ -1514,10 +1526,19 @@ export function ChillRoom({
     setPosition(sec)
   }
 
-  const changeAmbience = (value: number) => {
-    setAmbience(value)
-    // Kéo thanh ambience cũng là 1 thao tác người dùng → được phép bật âm thanh
-    audioRef.current?.setAmbience(value, AMBIENCE_FOR[weather].kind, true)
+  // Kéo 1 thanh trong bộ trộn: bắt đầu từ mức đang nghe (theo cảnh hoặc bản trộn cũ), từ
+  // đó là bản trộn riêng. Kéo thanh / bấm nút là thao tác người dùng → được phép bật âm thanh
+  const changeChannel = (channel: MixChannel, value: number) => {
+    const next = {...(mix ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)), [channel]: value}
+    if (!mix) trackEvent({name: 'Chill Mix', props: {preset: 'custom'}})
+    setMix(next)
+    audioRef.current?.setMix(next, true)
+  }
+  const choosePreset = (id: MixPreset | 'scene' | 'mute') => {
+    const next = id === 'scene' ? null : id === 'mute' ? SILENT : MIX_PRESETS[id]
+    trackEvent({name: 'Chill Mix', props: {preset: id}})
+    setMix(next)
+    audioRef.current?.setMix(next, true)
   }
 
   const toggleFullscreen = useCallback(() => {
@@ -1961,6 +1982,8 @@ export function ChillRoom({
   const timeLabel = t.room.times[time]
   const weatherLabel = t.room.weathers[weather]
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
+  const mixShown = mix ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)
+  const mixPreset = presetOf(mix)
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === playingStation)?.label ?? ''
   const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !todayOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
@@ -3367,21 +3390,61 @@ export function ChillRoom({
                 </Field>
               )}
               <SwitchRow title={t.room.pauseScene} desc={t.room.pauseSceneDesc} on={scenePaused} onToggle={() => setScenePaused((p) => !p)} />
-              <Field label={t.room.ambienceLabel}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={ambience}
-                    onChange={(e) => changeAmbience(Number(e.target.value))}
-                    aria-label={t.room.ambienceAria(ambienceLabel)}
-                    className="w-full accent-[#e8b27d]"
-                  />
-                  <span className="w-28 shrink-0 text-right text-xs text-[#a79e94]">{ambienceLabel}</span>
+              {/* Bộ trộn âm nền (mix.ts): bản trộn có sẵn + mỗi tiếng 1 thanh */}
+              {/* Cả khối rộng hết bảng (không chia cột nhãn như Field) cho thanh trượt đủ dài */}
+              <div>
+                <p className="mb-2 text-sm text-[#a79e94]">{t.room.ambienceLabel}</p>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label={t.mix.presetsAria}>
+                  {(['scene', 'busy', 'rainyNight', 'quiet'] as const).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={mixPreset === id}
+                      onClick={() => choosePreset(id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                        mixPreset === id ? 'border-[#e8b27d]/70 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#c9c0b6] hover:bg-white/[0.06] hover:text-[#ede6dd]'
+                      }`}
+                    >
+                      {t.mix.presets[id]}
+                    </button>
+                  ))}
+                  {mixPreset === 'custom' && (
+                    <span className="rounded-full border border-[#e8b27d]/70 bg-[#e8b27d]/15 px-3 py-1.5 text-xs text-[#f3cfa8]">{t.mix.custom}</span>
+                  )}
                 </div>
-              </Field>
+                <div className="mt-3 space-y-2.5">
+                  {MIX_CHANNELS.map((c) => (
+                    <label key={c} className="flex items-center gap-3">
+                      <span aria-hidden className="w-5 shrink-0 text-center text-sm">
+                        {MIX_ICONS[c]}
+                      </span>
+                      <span className="w-20 shrink-0 text-xs text-[#c9c0b6]">{t.mix.channels[c]}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={mixShown[c]}
+                        onChange={(e) => changeChannel(c, Number(e.target.value))}
+                        aria-label={t.mix.channelAria(t.mix.channels[c])}
+                        aria-valuetext={`${Math.round(mixShown[c] * 100)}%`}
+                        className="w-full accent-[#e8b27d]"
+                      />
+                      <span className="w-9 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#a79e94]">{Math.round(mixShown[c] * 100)}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-2.5 flex items-center justify-between gap-3">
+                  <p className="text-xs leading-snug text-[#a79e94]">{mix ? t.mix.customHint : t.mix.sceneHint(ambienceLabel)}</p>
+                  <button
+                    type="button"
+                    onClick={() => choosePreset('mute')}
+                    className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-xs text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                  >
+                    {t.mix.muteAll}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

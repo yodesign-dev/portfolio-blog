@@ -4,9 +4,11 @@
 //   bài mp3  → <audio> ─────────────────────────────┐
 //   bài synth → trackBus → lọc lo-fi → saturate ────┼→ master (âm lượng) → analyser → loa
 //                        ↘ reverb ──────────────────┘
-//   ambience (mưa / tiếng phố) → ambienceGain → loa   (âm lượng riêng)
+//   ambience (mưa / tiếng phố / tiếng quán / mèo gừ gừ) → gain riêng từng kênh → loa
+//   (âm lượng riêng, không theo nhạc — xem mix.ts)
 
 import type {SynthSpec, Track} from './tracks'
+import type {Mix} from './mix'
 
 export type Ambience = 'street' | 'rain' | 'quiet'
 export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder' | 'train-horn' | 'train'
@@ -20,6 +22,11 @@ const TRAIN_SFX = {
   train: {src: '/chill/sfx/train-pass.mp3', gain: 0.9},
 } as const
 type TrainSfx = keyof typeof TRAIN_SFX
+
+// Tiếng quán lặp (CassetteAI qua Figma Weave: 2 bản 30 giây cân âm lượng rồi nối, chỗ nối
+// mờ dần nên lặp liền mạch, ~56 giây, mono). Chỉ tải khi thanh "Tiếng quán" > 0.
+// Hệ số cân với tiếng mưa tổng hợp ở cùng vị trí thanh trượt
+const CAFE_SFX = {src: '/chill/sfx/cafe-room.mp3', gain: 1.6}
 
 // Thời gian chồng mờ giữa 2 bài (giây)
 const CROSSFADE = 5
@@ -98,6 +105,13 @@ export class ChillAudio {
   private rainGain!: GainNode
   private streetGain!: GainNode
   private sfxGain!: GainNode
+  private cafeGain!: GainNode
+  private purrGain!: GainNode
+  // Tiếng quán: đã bắt đầu tải / giải mã (1 lần), đang phát
+  private cafeLoading = false
+  private cafeOn = false
+  // Bản trộn riêng của người xem; null = theo cảnh (ambienceLevel + ambience)
+  private mix: Mix | null = null
   // 2 "đầu đĩa" luân phiên để bài mới to dần trong khi bài cũ nhỏ dần (crossfade)
   private decks: {el: HTMLAudioElement; gain: GainNode}[] = []
   private active = 0
@@ -222,6 +236,41 @@ export class ChillAudio {
     this.sfxGain.gain.value = 0
     sfxLp.connect(this.sfxGain).connect(ctx.destination)
     this.sfxIn = sfxLp
+
+    // Tiếng quán: nút gain có sẵn, file chỉ tải khi thanh trượt > 0 (startCafe)
+    this.cafeGain = ctx.createGain()
+    this.cafeGain.gain.value = 0
+    this.cafeGain.connect(ctx.destination)
+
+    // Mèo gừ gừ liên tục (như catSound 'purr' nhưng lặp mãi): tiếng ồn trầm, nhịp ~25 lần/
+    // giây, phập phồng theo hơi thở ~3 giây một nhịp
+    const purr = ctx.createBufferSource()
+    purr.buffer = noiseBuffer(ctx, 2, 'brown')
+    purr.loop = true
+    const purrLp = ctx.createBiquadFilter()
+    purrLp.type = 'lowpass'
+    purrLp.frequency.value = 280
+    const rumble = ctx.createGain()
+    rumble.gain.value = 0.5
+    const rumbleLfo = ctx.createOscillator()
+    rumbleLfo.frequency.value = 25
+    const rumbleDepth = ctx.createGain()
+    rumbleDepth.gain.value = 0.5
+    rumbleLfo.connect(rumbleDepth).connect(rumble.gain)
+    const breath = ctx.createGain()
+    breath.gain.value = 0.6
+    const breathLfo = ctx.createOscillator()
+    breathLfo.frequency.value = 0.33
+    const breathDepth = ctx.createGain()
+    breathDepth.gain.value = 0.35
+    breathLfo.connect(breathDepth).connect(breath.gain)
+    this.purrGain = ctx.createGain()
+    this.purrGain.gain.value = 0
+    purr.connect(purrLp).connect(rumble).connect(breath).connect(this.purrGain).connect(ctx.destination)
+    purr.start()
+    rumbleLfo.start()
+    breathLfo.start()
+
     this.applyAmbience()
 
     return ctx
@@ -382,13 +431,41 @@ export class ChillAudio {
     this.applyAmbience()
   }
 
+  // Bản trộn riêng (null = theo cảnh). `start` = kéo thanh / bấm nút là thao tác người dùng
+  setMix(mix: Mix | null, start = false) {
+    this.mix = mix
+    if (start) this.ensure()
+    this.applyAmbience()
+  }
+
+  // Tải + phát vòng lặp tiếng quán lần đầu thanh "Tiếng quán" > 0
+  private startCafe(ctx: AudioContext) {
+    if (this.cafeLoading) return
+    this.cafeLoading = true
+    void fetch(CAFE_SFX.src)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => ctx.decodeAudioData(data))
+      .then((buf) => {
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        src.loop = true
+        src.connect(this.cafeGain)
+        src.start()
+        this.cafeOn = true
+      })
+      .catch(() => {
+        // Lỗi mạng — cho thử lại lần kéo thanh sau
+        this.cafeLoading = false
+      })
+  }
+
   // Âm thanh 1 sự kiện ngoài phố. pan -1…1 là vị trí trái/phải, dir là chiều
   // xe chạy (tiếng "vù" quét theo chiều đó). `len` = độ dài tiếng kéo dài theo cảnh
   // (tàu chạy qua). Chưa có AudioContext (người xem chưa bấm gì) thì bỏ qua — không
   // tự bật âm thanh.
   streetSound(kind: StreetSound, pan = 0, dir: 1 | -1 = 1, len = 30) {
     const ctx = this.ctx
-    if (!ctx || !this.sfxIn || this.ambienceLevel <= 0) return
+    if (!ctx || !this.sfxIn || (this.mix ? this.mix.street : this.ambienceLevel) <= 0) return
     const now = ctx.currentTime
     const panner = ctx.createStereoPanner()
     panner.connect(this.sfxIn)
@@ -684,12 +761,25 @@ export class ChillAudio {
   private applyAmbience() {
     if (!this.ctx) return
     const now = this.ctx.currentTime
+    const m = this.mix
+    if (m) {
+      // Bản trộn riêng: mỗi thanh 1 kênh; sự kiện ngoài phố (xe, còi, tàu) theo thanh Phố
+      this.rainGain.gain.setTargetAtTime(m.rain * 0.5, now, 0.4)
+      this.streetGain.gain.setTargetAtTime(m.street * 0.6, now, 0.4)
+      this.sfxGain.gain.setTargetAtTime(m.street, now, 0.2)
+      this.cafeGain.gain.setTargetAtTime(m.cafe * CAFE_SFX.gain, now, 0.4)
+      this.purrGain.gain.setTargetAtTime(m.purr * 0.5, now, 0.4)
+      if (m.cafe > 0 && !this.cafeOn) this.startCafe(this.ctx)
+      return
+    }
     const v = this.ambienceLevel
     const rain = this.ambience === 'rain' ? v * 0.5 : 0
     const street = this.ambience === 'street' ? v * 0.6 : this.ambience === 'rain' ? v * 0.15 : v * 0.25
     this.rainGain.gain.setTargetAtTime(rain, now, 0.4)
     this.streetGain.gain.setTargetAtTime(street, now, 0.4)
     this.sfxGain.gain.setTargetAtTime(this.ambience === 'quiet' ? v * 0.4 : v, now, 0.2)
+    this.cafeGain.gain.setTargetAtTime(0, now, 0.4)
+    this.purrGain.gain.setTargetAtTime(0, now, 0.4)
   }
 
   private get element(): HTMLAudioElement | null {

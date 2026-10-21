@@ -297,6 +297,16 @@ const en = {
       'oil-lamp': {name: 'Oil lamp', story: 'For the phins brewed after the streetlights come on.'},
     } as Record<string, {name: string; story: string}>,
   },
+  mix: {
+    presetsAria: 'Ambience mixes',
+    presets: {scene: 'Follow the scene', busy: 'Busy café', rainyNight: 'Rainy night', quiet: 'Quiet'},
+    custom: 'Your mix',
+    channels: {rain: 'Rain', street: 'Street', cafe: 'Café chatter', purr: 'Cat purring'},
+    channelAria: (name: string) => `${name} volume`,
+    sceneHint: (label: string) => `Following the scene: ${label}. Drag any slider to make your own mix.`,
+    customHint: 'Your mix is saved on this device and stays the same in any weather.',
+    muteAll: 'Mute all',
+  },
   todo: {
     heading: 'To-do today',
     placeholder: 'Add a task…',
@@ -824,6 +834,16 @@ const vi: typeof en = {
       teapot: {name: 'Ấm trà', story: 'Hôm sương mù, quán pha thêm ấm trà nóng.'},
       'oil-lamp': {name: 'Đèn dầu', story: 'Cho những phin pha khi phố đã lên đèn.'},
     },
+  },
+  mix: {
+    presetsAria: 'Bản trộn âm nền',
+    presets: {scene: 'Theo cảnh', busy: 'Quán đông', rainyNight: 'Đêm mưa', quiet: 'Yên tĩnh'},
+    custom: 'Của bạn',
+    channels: {rain: 'Mưa', street: 'Phố', cafe: 'Tiếng quán', purr: 'Mèo gừ gừ'},
+    channelAria: (name) => `Âm lượng ${name.toLowerCase()}`,
+    sceneHint: (label) => `Đang theo cảnh: ${label}. Kéo thanh bất kỳ để tự trộn.`,
+    customHint: 'Bản trộn của bạn lưu trên máy này, trời nào cũng giữ nguyên.',
+    muteAll: 'Tắt hết',
   },
   todo: {
     heading: 'Việc hôm nay',
