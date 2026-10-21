@@ -4,6 +4,7 @@ import { client } from '@/sanity/lib/client'
 import { urlFor } from '@/sanity/lib/image'
 import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
 import { ChillTeaser } from '@/components/ChillTeaser'
+import { HowIWork } from '@/components/HowIWork'
 import { BehanceCard } from '@/components/BehanceArchive'
 import { getBehanceProjects } from '@/lib/behance'
 import { getMediumPosts } from '@/lib/medium'
@@ -85,8 +86,6 @@ export default async function HomePage() {
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
       <Hero31 study={heroStudy} />
 
-      <ChillTeaser />
-
       {(featuredStudies.length > 0 || featuredBehance.length > 0) && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
@@ -99,6 +98,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Thứ tự: hero → việc đã làm → cách làm → bài viết → /chill (dự án phụ, để cuối) */}
+      <HowIWork />
 
       {posts.length === 0 && featuredMedium.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 py-20 sm:px-8">
@@ -170,6 +172,8 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      <ChillTeaser />
     </div>
   )
 }
