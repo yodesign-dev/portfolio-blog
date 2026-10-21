@@ -56,9 +56,18 @@ export const NAV_LINKS = [
   {href: '/work', label: 'Work'},
   {href: '/blog', label: 'Writing'},
   {href: '/tools', label: 'Toolkit'},
-  // "Chill" không nói trang làm gì — nhãn mới nói rõ: nhạc + cảnh để tập trung làm việc
-  {href: '/chill', label: 'Focus music'},
+  // Mục Side projects trang chủ: quán lofi /chill, Notion template, kênh YouTube
+  {href: '/#side-projects', label: 'Side projects'},
   {href: '/resume', label: 'Resume'},
+]
+
+// Side projects — dùng ở mục Side projects trang chủ và cột riêng ở Footer
+export const NOTION_TEMPLATE_URL = 'https://grand-dust-291.notion.site/Hanoi-Caf-Workspace-3f9a4ffd358081cb9b9cdc607f19c49d'
+export const YOUTUBE_URL = 'https://www.youtube.com/@lofipixel.cafevn'
+export const SIDE_PROJECT_LINKS: {label: string; href: string; external?: boolean}[] = [
+  {label: 'Lofi Pixel Café', href: '/chill'},
+  {label: 'Notion template', href: NOTION_TEMPLATE_URL, external: true},
+  {label: 'YouTube', href: YOUTUBE_URL, external: true},
 ]
 
 // Link mạng xã hội hiện ở Footer — để trống href thì mục đó tự ẩn.

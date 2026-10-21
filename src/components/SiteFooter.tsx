@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import {useContactModal} from '@/components/originkit/ui/hero-31/contact-modal-context'
-import {NAV_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
+import {NAV_LINKS, SIDE_PROJECT_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
 import {trackEvent} from '@/lib/analytics'
 
 export function SiteFooter({showResume}: {showResume: boolean}) {
@@ -12,8 +12,8 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
 
   return (
     <footer className="mt-auto bg-ink text-white antialiased">
-      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr]">
-        <div>
+      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 sm:grid-cols-3 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+        <div className="sm:col-span-3 md:col-span-1">
           <p className="text-xl font-bold tracking-tight">{SITE_NAME}</p>
           <p className="mt-1 text-sm text-white/60">{SITE_ROLE}</p>
           <p className="mt-6 max-w-sm text-base leading-relaxed text-white/80">
@@ -40,6 +40,25 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
             ))}
           </ul>
         </nav>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Side projects</p>
+          <ul className="mt-4 flex flex-col gap-3">
+            {SIDE_PROJECT_LINKS.map((link) => (
+              <li key={link.label}>
+                {link.external ? (
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-white/80 transition hover:text-white">
+                    {link.label} ↗
+                  </a>
+                ) : (
+                  <Link href={link.href} className="text-white/80 transition hover:text-white">
+                    {link.label}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {socialLinks.length > 0 && (
           <div>
