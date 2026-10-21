@@ -133,10 +133,11 @@ export class Wand {
     ctx.beginPath()
     ctx.rect(0, 0, 640, this.hideY)
     ctx.clip()
-    if (!this.pin) line(ctx, this.hand.x, this.hand.y, this.hand.x + 26, this.hand.y - 48, night ? '#5e4026' : '#8a5a34', 1)
+    if (!this.pin) drawRod(ctx, this.hand.x, this.hand.y, this.hand.x + 26, this.hand.y - 48, night)
     for (let i = 1; i < N; i++) line(ctx, this.rope[i - 1].x, this.rope[i - 1].y, this.rope[i].x, this.rope[i].y, night ? 'rgba(200,190,175,.75)' : 'rgba(240,228,210,.9)')
     const end = this.rope[N - 1]
     const near = this.rope[N - 2]
+    drawBell(ctx, this.rope[N - 3].x, this.rope[N - 3].y, night)
     drawFeather(ctx, end.x, end.y, Math.atan2(end.y - near.y, end.x - near.x), 0.12 + Math.min(0.4, this.speed / 400), t, night)
     ctx.restore()
   }
@@ -145,11 +146,12 @@ export class Wand {
 // Cần câu dựng chờ (chưa ai cầm)
 export function drawWandProp(ctx: CanvasRenderingContext2D, spot: ToySpot, t: number, night: boolean) {
   const {base, tip} = spot
-  line(ctx, base.x, base.y, tip.x, tip.y, night ? '#5e4026' : '#8a5a34', 1)
+  drawRod(ctx, base.x, base.y, tip.x, tip.y, night)
   // Dây võng xuống, lông vũ đung đưa nhẹ ngang tầm giữa cán
   const fx = tip.x - 5 + Math.sin(t * 1.3) * 1.5
   const fy = tip.y + 16
   line(ctx, tip.x, tip.y, fx, fy, night ? 'rgba(200,190,175,.6)' : 'rgba(240,228,210,.8)')
+  drawBell(ctx, tip.x + (fx - tip.x) * 0.7, tip.y + (fy - tip.y) * 0.7, night)
   drawFeather(ctx, fx, fy, Math.PI / 2 + 0.2, 0.05, t, night)
 }
 
@@ -160,13 +162,64 @@ export function wandPropBox({base, tip}: ToySpot) {
   return {x, y, w: Math.abs(tip.x - base.x) + 24, h: Math.abs(base.y - tip.y) + 26}
 }
 
+// Viền nâu đậm chung cho cán, chuông, lông vũ (giống nét viền của mèo)
+const OUTLINE = '#3a2116'
+const OUTLINE_NIGHT = '#1c110c'
+
+// Cán sọc kẹo hồng-kem, tay cầm gỗ ở gốc, ngôi sao trên đầu cán
+function drawRod(ctx: CanvasRenderingContext2D, bx: number, by: number, tx: number, ty: number, night: boolean) {
+  const len = Math.hypot(tx - bx, ty - by)
+  const n = Math.ceil(len * 2)
+  line(ctx, bx - 0.5, by - 0.5, tx - 0.5, ty - 0.5, night ? OUTLINE_NIGHT : OUTLINE, 2.5)
+  for (let i = 0; i <= n; i++) {
+    const d = (i / n) * len
+    // 9px gốc là tay cầm gỗ, còn lại sọc 3px
+    const color = d < 9 ? (night ? '#6b4a2e' : '#a8713f') : Math.floor((d - 9) / 3) % 2 ? (night ? '#a5707c' : '#f29bb0') : night ? '#b9ab9a' : '#fff1dc'
+    ctx.fillStyle = color
+    ctx.fillRect(Math.round((bx + ((tx - bx) * i) / n) * 2) / 2, Math.round((by + ((ty - by) * i) / n) * 2) / 2, 1.5, 1.5)
+  }
+  sprite(ctx, STAR, tx, ty, night ? '#b8985a' : '#ffd27a', night)
+}
+
+// Chuông vàng nhỏ trên dây
+function drawBell(ctx: CanvasRenderingContext2D, x: number, y: number, night: boolean) {
+  sprite(ctx, BELL, x, y, night ? '#9c8442' : '#f2c14e', night)
+  ctx.fillStyle = night ? OUTLINE_NIGHT : OUTLINE
+  ctx.fillRect(Math.round(x * 2) / 2 - 0.5, Math.round(y * 2) / 2 + 1, 1, 1)
+}
+
 function drawFeather(ctx: CanvasRenderingContext2D, x: number, y: number, ang: number, wobble: number, t: number, night: boolean) {
-  PLUMES.forEach(([da, len, day, dark], i) => {
+  const plumes = PLUMES.map(([da, len, day, dark], i) => {
     const a = ang + da + Math.sin(t * 9 + i * 1.7) * wobble
-    line(ctx, x, y, x + Math.cos(a) * len, y + Math.sin(a) * len, night ? dark : day, 1)
+    const l = len * 1.6
+    return {x1: x + Math.cos(a) * l, y1: y + Math.sin(a) * l, color: night ? dark : day}
   })
-  ctx.fillStyle = night ? '#9c8442' : '#e6c25a'
-  ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2)
+  // Viền trước, màu sau → các sợi lông có nét viền liền nhau như sprite
+  for (const p of plumes) line(ctx, x - 0.5, y - 0.5, p.x1 - 0.5, p.y1 - 0.5, night ? OUTLINE_NIGHT : OUTLINE, 2)
+  for (const p of plumes) line(ctx, x, y, p.x1, p.y1, p.color, 1)
+  // Cục bông hồng ở gốc chùm lông
+  sprite(ctx, POM, x, y, night ? '#b27a84' : '#f7b3c2', night)
+  ctx.fillStyle = night ? 'rgba(255,240,240,.35)' : '#fff4f6'
+  ctx.fillRect(Math.round(x * 2) / 2 - 1, Math.round(y * 2) / 2 - 1.5, 1, 0.5)
+}
+
+// Hình pixel nhỏ, mỗi ô 1px gốc, căn giữa tại (x, y), viền nửa px quanh mọi ô
+const STAR = ['0001000', '0011100', '1111111', '0111110', '0011100', '0110110', '0100010']
+const BELL = ['010', '111', '111']
+const POM = ['01110', '11111', '11111', '11111', '01110']
+function sprite(ctx: CanvasRenderingContext2D, rows: string[], x: number, y: number, fill: string, night: boolean) {
+  const ox = Math.round((x - rows[0].length / 2) * 2) / 2
+  const oy = Math.round((y - rows.length / 2) * 2) / 2
+  for (const pass of [0, 1]) {
+    ctx.fillStyle = pass ? fill : night ? OUTLINE_NIGHT : OUTLINE
+    rows.forEach((row, j) => {
+      for (let i = 0; i < row.length; i++) {
+        if (row[i] === '0') continue
+        if (pass) ctx.fillRect(ox + i, oy + j, 1, 1)
+        else ctx.fillRect(ox + i - 0.5, oy + j - 0.5, 2, 2)
+      }
+    })
+  }
 }
 
 // Nét pixel theo lưới 0,5px gốc (= 1px canvas đệm)
