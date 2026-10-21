@@ -874,8 +874,9 @@ export function ChillRoom({
 
   // ---------- Cần câu lông vũ (wand.ts) ----------
 
-  // Chỉ bày cần câu khi đang ở quầy, không chạy Focus, cảnh không tạm dừng
-  const toyAvailable = catToyOn && !groupView && !focusLabel && !scenePaused
+  // Bày cần câu khi đang ở quầy, cảnh không tạm dừng — kể cả lúc chạy phin (khách vào quán
+  // chủ yếu để làm việc, ẩn lúc Focus thì gần như không ai thấy)
+  const toyAvailable = catToyOn && !groupView && !scenePaused
   const toyOut = toyAvailable && toyIn === theme
   useEffect(() => {
     sceneRef.current?.setToyProp(toyAvailable)
@@ -890,8 +891,9 @@ export function ChillRoom({
     }
   }, [])
 
-  // Chưa cầm lần nào: nhãn tự hiện (cả điện thoại, nơi không rê chuột được), mèo liếc sang
-  const toyHintOn = entered && !toySeen && toyAvailable && !toyOut && !toyRest
+  // Chưa cầm lần nào: nhãn tự hiện (cả điện thoại, nơi không rê chuột được), mèo liếc sang.
+  // Đang chạy phin thì chỉ còn sao lấp lánh, khỏi làm khách xao nhãng
+  const toyHintOn = entered && !toySeen && toyAvailable && !toyOut && !toyRest && !focusLabel
   useEffect(() => {
     if (!toyHintOn) return
     const show = window.setTimeout(() => {
