@@ -27,8 +27,10 @@ export default async function WorkPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
+        {/* Chưa có case study mà Behance có project → để Behance đứng đầu,
+            không hiện dòng "on their way" trơ trọi phía trên */}
         {studies.length === 0 ? (
-          <p className="text-center text-neutral-400">Case studies are on their way.</p>
+          behance.length === 0 && <p className="text-center text-neutral-400">Case studies are on their way.</p>
         ) : (
           <div className="grid grid-cols-1 gap-x-10 gap-y-16 md:grid-cols-2">
             {studies.map((study, index) => (
@@ -37,7 +39,7 @@ export default async function WorkPage() {
           </div>
         )}
 
-        <BehanceArchive projects={behance} />
+        <BehanceArchive projects={behance} lead={studies.length === 0} />
       </main>
     </div>
   )
