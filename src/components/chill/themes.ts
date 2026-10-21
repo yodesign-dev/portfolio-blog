@@ -8,6 +8,8 @@
 // - desk: ảnh AI 1280×720 (Nano Banana 2) + người ngồi là video loop Kling như quán.
 // - balcony: ảnh AI 1280×720 (người đọc sách, không laptop) + video loop Kling như quán.
 
+import type {ToySpot} from './wand'
+
 export type ThemeId = 'cafe' | 'balcony' | 'desk'
 
 type Rect = {x: number; y: number; w: number; h: number}
@@ -63,6 +65,10 @@ export type Theme = {
   character: CharacterVideo | CharacterFrames
   screen: boolean
   cat: Pt
+  // Khoảng bậu mèo được đi lại khi chơi cần câu (mép trái → mép phải thân, px gốc)
+  catRoom: [number, number]
+  // Cần câu lông vũ dựng cạnh mèo (giữa khung, màn 4:3 vẫn thấy) — xem wand.ts
+  toy: ToySpot
   notebook: Rect | null
   // Lọ tip (đáy, giữa lọ) — bấm vào mở bảng cảm ơn. Ly cà phê của người vừa mời
   // đặt cạnh lọ, lệch `cupDx`. Tránh vùng mèo (cat.x - 6 … cat.x + 90)
@@ -107,6 +113,9 @@ export const THEMES: Theme[] = [
     },
     screen: true,
     cat: {x: 112, y: 296},
+    // Giữa chậu cây và phin
+    catRoom: [66, 228],
+    toy: {base: {x: 206, y: 294}, tip: {x: 222, y: 246}, hideY: 312},
     notebook: {x: 324, y: 264, w: 102, h: 44},
     // Cạnh trái cuốn sổ, ly của người mời đứng giữa phin và lọ
     tipJar: {x: 310, y: 294, cupDx: -22},
@@ -140,6 +149,9 @@ export const THEMES: Theme[] = [
     },
     screen: false,
     cat: {x: 60, y: 197},
+    // Đầu lan can, tới trước bụi hoa giấy
+    catRoom: [44, 186],
+    toy: {base: {x: 152, y: 196}, tip: {x: 166, y: 156}, hideY: 199},
     notebook: null,
     // Trên bàn nhỏ, giữa ly cà phê đá và quyển sách; ly của người mời đứng mép trái bàn
     tipJar: {x: 440, y: 293, cupDx: -46},
@@ -176,6 +188,9 @@ export const THEMES: Theme[] = [
     },
     screen: false,
     cat: {x: 270, y: 283},
+    // Giữa cốc cà phê và ô kệ đầu tiên
+    catRoom: [268, 364],
+    toy: {base: {x: 262, y: 250}, tip: {x: 276, y: 214}, hideY: 300},
     notebook: {x: 118, y: 258, w: 92, h: 28},
     // Mép trước bàn, giữa sổ mở và cốc cà phê nóng — ngay dưới ánh đèn bàn
     tipJar: {x: 222, y: 304, cupDx: 24},

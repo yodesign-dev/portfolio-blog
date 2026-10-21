@@ -53,7 +53,8 @@ const CHILL_QUERY = `{
   },
   "shelfOpen": *[_id == "chillSettings"][0].shelfOpen,
   "playCountsOpen": *[_id == "chillSettings"][0].playCountsOpen,
-  "questOpen": *[_id == "chillSettings"][0].questOpen
+  "questOpen": *[_id == "chillSettings"][0].questOpen,
+  "catToyOpen": *[_id == "chillSettings"][0].catToyOpen
 }`
 
 type ChillContent = {
@@ -73,6 +74,7 @@ type ChillContent = {
   shelfOpen?: boolean | null
   playCountsOpen?: boolean | null
   questOpen?: boolean | null
+  catToyOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -156,5 +158,7 @@ export async function getChillContent(revalidate: number) {
   const playCountsOn = content.playCountsOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_PLAYS === '1')
   // Thử thách chung: API tự kiểm tra đủ lựa chọn chưa, trang chỉ cần biết có nên hỏi API
   const questOn = content.questOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_QUEST === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn}
+  // Cần câu lông vũ trêu mèo. Máy dev: CHILL_DEV_CATTOY=1
+  const catToyOn = content.catToyOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_CATTOY === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn}
 }

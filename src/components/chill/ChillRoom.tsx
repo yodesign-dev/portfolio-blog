@@ -54,6 +54,9 @@ const WALL_HINT_MS = 9000
 const CAT_SAY_MS = 4500
 // Giữ tay trên mèo bao lâu thì tính là vuốt ve (gừ gừ) thay vì 1 cú chạm
 const CAT_HOLD_MS = 350
+// Mèo chơi cần câu tới hết sức thì ngủ bù chừng này mới chơi tiếp
+const TOY_REST_MS = 20_000
+const TOY_TIP_MS = 3500
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
 // Đã mở cuốn sổ "Việc hôm nay" trên quầy lần nào chưa (chưa → sao lấp lánh + nhãn gợi ý)
@@ -195,6 +198,7 @@ export function ChillRoom({
   shelfOn = false,
   playCountsOn = false,
   questOn = false,
+  catToyOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -205,6 +209,8 @@ export function ChillRoom({
   playCountsOn?: boolean
   // Thử thách chung "Cả quán cùng pha phin" (Studio "Chill · Cài đặt"), mặc định tắt
   questOn?: boolean
+  // Cần câu lông vũ trêu mèo (Studio "Chill · Cài đặt"), mặc định tắt
+  catToyOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -221,6 +227,8 @@ export function ChillRoom({
   const scenePausedRef = useRef(false)
   // Tính lại vùng bấm (mèo, cuốn sổ) — gán trong effect dựng cảnh
   const fitRef = useRef<() => void>(() => {})
+  // Toạ độ màn hình (clientX/Y) → px gốc 640×360 của cảnh — tính lại mỗi lần `fit`
+  const toSceneRef = useRef<(x: number, y: number) => {x: number; y: number}>((x, y) => ({x, y}))
   const t = useT()
   const lang = useLang()
 
@@ -275,6 +283,14 @@ export function ChillRoom({
   const [travelElapsed, setTravelElapsed] = useState(0)
   // Vị trí con mèo trên màn hình (px CSS) để đặt nút bấm + bong bóng gợi ý
   const [catBox, setCatBox] = useState<Box | null>(null)
+  // Cần câu lông vũ dựng cạnh mèo: đang cầm (toyOut) · mèo vừa hết sức, ngủ bù (toyRest)
+  const [toyBox, setToyBox] = useState<Box | null>(null)
+  // Phòng đang cầm cần câu (đổi phòng là cần câu về chỗ dựng của phòng mới)
+  const [toyIn, setToyIn] = useState<ThemeId | null>(null)
+  const [toyRest, setToyRest] = useState(false)
+  // Nhãn "Đung đưa lông vũ · Esc để cất": chỉ hiện chốc lát lúc vừa cầm lên, khỏi che lông vũ
+  const [toyTip, setToyTip] = useState(false)
+  const toyOutRef = useRef(false)
   const [headBox, setHeadBox] = useState<Box | null>(null)
   const [bookBox, setBookBox] = useState<Box | null>(null)
   const [jarBox, setJarBox] = useState<Box | null>(null)
@@ -489,6 +505,11 @@ export function ChillRoom({
         return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
       }
       setCatBox(toBox(scene.catHitBox))
+      setToyBox(toBox(scene.toyPropBox))
+      toSceneRef.current = (x, y) => {
+        const r = wrap.getBoundingClientRect()
+        return {x: (x - r.left - cw / 2 - tx + (bw * k) / 2) / k, y: (y - r.top - (ch - bh * k) / 2) / k}
+      }
       setHeadBox(toBox(scene.headBox))
       const book = scene.notebookHitBox
       setBookBox(book ? toBox(book) : null)
@@ -541,7 +562,8 @@ export function ChillRoom({
     }
   }
   const onPanDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!panMaxRef.current || !zoomRef.current) return
+    // Đang cầm cần câu: kéo ngón tay là đung đưa lông vũ, không lia cảnh
+    if (!panMaxRef.current || !zoomRef.current || toyOutRef.current) return
     dragRef.current = {id: e.pointerId, x: e.clientX, pan: panRef.current}
     e.currentTarget.setPointerCapture(e.pointerId)
     // Đang kéo thì cảnh bám theo ngón tay, không chạy hiệu ứng phóng
@@ -841,6 +863,77 @@ export function ChillRoom({
   const onCatClick = () => {
     if (purrHeld.current) return
     petCat()
+  }
+
+  // ---------- Cần câu lông vũ (wand.ts) ----------
+
+  // Chỉ bày cần câu khi đang ở quầy, không chạy Focus, cảnh không tạm dừng
+  const toyAvailable = catToyOn && !groupView && !focusLabel && !scenePaused
+  const toyOut = toyAvailable && toyIn === theme
+  useEffect(() => {
+    sceneRef.current?.setToyProp(toyAvailable)
+  }, [toyAvailable])
+
+  const toyRestTimer = useRef(0)
+  const toyTipTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(toyTipTimer.current), [])
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.onCatToy = (e) => {
+      if (e === 'catch') audioRef.current?.catSound('meow')
+      if (e !== 'tired') return
+      // Mèo hết sức nhả cần câu: cần câu về chỗ dựng, mèo ngủ bù 20 giây mới chơi tiếp
+      setToyIn(null)
+      setToyRest(true)
+      window.clearTimeout(toyRestTimer.current)
+      toyRestTimer.current = window.setTimeout(() => setToyRest(false), TOY_REST_MS)
+    }
+    return () => {
+      scene.onCatToy = undefined
+      window.clearTimeout(toyRestTimer.current)
+    }
+  }, [])
+
+  // Cầm cần câu: tay người xem (chuột / ngón tay) là đầu dây câu, Esc để cất
+  useEffect(() => {
+    toyOutRef.current = toyOut
+    const scene = sceneRef.current
+    if (!scene) return
+    if (!toyOut) {
+      scene.stopToy()
+      return
+    }
+    scene.startToy()
+    const move = (e: PointerEvent) => {
+      const p = toSceneRef.current(e.clientX, e.clientY)
+      scene.moveToy(p.x, p.y)
+    }
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setToyIn(null)
+    }
+    window.addEventListener('pointermove', move, {passive: true})
+    window.addEventListener('pointerdown', move, {passive: true})
+    window.addEventListener('keydown', key)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerdown', move)
+      window.removeEventListener('keydown', key)
+    }
+  }, [toyOut])
+
+  const toggleToy = () => {
+    if (toyRest) return
+    if (!toyOut) {
+      trackEvent({name: 'Chill Cat Toy'})
+      setToyTip(true)
+      window.clearTimeout(toyTipTimer.current)
+      toyTipTimer.current = window.setTimeout(() => setToyTip(false), TOY_TIP_MS)
+      // Màn dọc: mèo hay nằm ngoài khung → lia cảnh tới chỗ mèo
+      const hit = sceneRef.current?.catHitBox
+      if (hit) panTo(hit)
+    }
+    setToyIn(toyOut ? null : theme)
   }
 
   const sayCat = useCallback((text: string) => {
@@ -1953,7 +2046,7 @@ export function ChillRoom({
         onPointerMove={onPanMove}
         onPointerUp={onPanUp}
         onPointerCancel={onPanUp}
-        className={`absolute inset-0 overflow-hidden portrait:bottom-[11rem] portrait:top-[6.5rem] max-sm:portrait:top-[5.25rem] portrait:[touch-action:none] ${canPan && entered ? 'portrait:cursor-grab portrait:active:cursor-grabbing' : ''}`}
+        className={`absolute inset-0 overflow-hidden portrait:bottom-[11rem] portrait:top-[6.5rem] max-sm:portrait:top-[5.25rem] portrait:[touch-action:none] ${toyOut ? 'cursor-none' : canPan && entered ? 'portrait:cursor-grab portrait:active:cursor-grabbing' : ''}`}
       >
       <canvas
         ref={canvasRef}
@@ -2276,7 +2369,7 @@ export function ChillRoom({
       )}
 
       {/* Mèo trên bậu cửa: bấm (hoặc Tab + Enter) để vuốt ve — mèo ngẩng lên, kêu, tim bay lên */}
-      {catBox && !groupView && (
+      {catBox && !groupView && !toyOut && (
         <button
           type="button"
           aria-label={t.room.petCat}
@@ -2313,6 +2406,29 @@ export function ChillRoom({
             <PawIcon />
             {t.room.petMe}
             <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
+          </span>
+        </button>
+      )}
+
+      {/* Cần câu lông vũ dựng cạnh mèo: bấm để cầm lên trêu mèo, bấm lại (hoặc Esc) để cất */}
+      {toyBox && toyAvailable && (
+        <button
+          type="button"
+          aria-label={toyOut ? t.room.toyPut : toyRest ? t.room.toyRest : t.room.toyPick}
+          aria-pressed={toyOut}
+          disabled={toyRest}
+          onClick={toggleToy}
+          className="group absolute cursor-pointer rounded-xl outline-none disabled:cursor-default focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          style={toyBox}
+        >
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute bottom-full left-1/2 mb-1 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 sm:text-[11px] ${
+              toyOut ? (toyTip ? 'opacity-100' : 'opacity-0') : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+            }`}
+            style={{transform: 'translate(-50%, 0)'}}
+          >
+            {toyOut ? t.room.toyHint : toyRest ? t.room.toyRest : t.room.toyPick}
           </span>
         </button>
       )}

@@ -13,6 +13,6 @@ export const metadata = pageMetadata({
 })
 
 export default async function ChillPage() {
-  const {tracks, destinations, updates, shelfOn, playCountsOn, questOn} = await getChillContent(revalidate)
-  return <ChillRoom tracks={tracks} destinations={destinations} updates={updates} shelfOn={shelfOn} playCountsOn={playCountsOn} questOn={questOn} />
+  const {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn} = await getChillContent(revalidate)
+  return <ChillRoom tracks={tracks} destinations={destinations} updates={updates} shelfOn={shelfOn} playCountsOn={playCountsOn} questOn={questOn} catToyOn={catToyOn} />
 }

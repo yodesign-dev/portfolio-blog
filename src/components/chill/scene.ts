@@ -19,10 +19,12 @@
 // Thứ tự lớp (xa → gần):
 //   ảnh phố → chim → người/chó trên vỉa hè → xe làn xa → xe làn gần → mưa/sương
 //   → kính cửa (giọt nước, hơi nước) → nội thất (ảnh tĩnh, tô màu theo giờ) →
-//   màn hình laptop → người ngồi → lọ tip (+ ly của người vừa mời) → mèo → hơi
+//   màn hình laptop → người ngồi → lọ tip (+ ly của người vừa mời) → cần câu dựng
+//   chờ → mèo → cần câu trên tay người xem → hơi
 //   cà phê, nốt nhạc → ánh đèn
 
-import {Cat, CAT_SRC} from './cat'
+import {Cat, CAT_SRC, type ToyEvent} from './cat'
+import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
@@ -452,6 +454,10 @@ export class ChillScene {
   private sipFor = 3
   private nextPoseSip = 15
   private cat = new Cat()
+  // Cần câu lông vũ: dựng chờ cạnh mèo (toyProp) hoặc đang trong tay người xem (wand)
+  private wand: Wand | null = null
+  private toyProp = false
+  onCatToy?: (e: ToyEvent) => void
   // Lọ tip: số ly Bin đã xác nhận + ly của chính người xem (vừa mời trên máy này).
   // Vẽ vào lớp riêng, chỉ vẽ lại khi đổi → tô màu theo giờ giống nội thất
   private tip = {cups: 0, cup: false}
@@ -566,6 +572,12 @@ export class ChillScene {
     this.loadCharacter()
     this.catSheet = loadImage(CAT_SRC, () => (this.dirty = true))
     this.catTinted = document.createElement('canvas')
+    this.cat.setRear(this.theme.cat, this.theme.catRoom)
+    this.cat.onToy = (e) => {
+      // Mèo hết sức thì nhả cần câu — cần câu về lại chỗ dựng
+      if (e === 'tired') this.wand = null
+      this.onCatToy?.(e)
+    }
 
     this.rain = this.makeRain()
     // Mở trang ra đã có sẵn vài chiếc xe trên đường, không phải chờ
@@ -612,7 +624,8 @@ export class ChillScene {
     this.interior = loadImage(this.theme.interior, () => (this.dirty = true))
     this.loadCharacter()
     this.sipT = -1
-    this.cat.setRear(this.theme.cat)
+    this.wand = null
+    this.cat.setRear(this.theme.cat, this.theme.catRoom)
     this.pawTarget = null
     this.rain = this.makeRain()
     this.dirty = true
@@ -1553,6 +1566,7 @@ export class ChillScene {
   // sẵn 1 giọt nước trên kính ngay chỗ chân với tới; khều trúng thì giọt trượt xuống
   private updateCat(dt: number) {
     const rain = this.weather === 'rain'
+    this.wand?.update(dt)
     this.cat.update(dt, {night: this.time === 'night', rain, music: this.musicOn})
     if (this.cat.action !== 'paw' || !rain) {
       this.pawTarget = null
@@ -1587,6 +1601,31 @@ export class ChillScene {
 
   get catHitBox() {
     return this.cat.hitBox
+  }
+
+  // Cần câu lông vũ (wand.ts, công tắc Studio catToyOpen): dựng chờ cạnh mèo
+  setToyProp(on: boolean) {
+    this.toyProp = on
+    if (!on) this.stopToy()
+  }
+  get toyPropBox() {
+    return wandPropBox(this.theme.toy)
+  }
+  // Người xem cầm cần câu lên → mèo bắt đầu để ý
+  startToy() {
+    if (this.wand) return
+    this.wand = new Wand(this.theme.toy, this.theme.cat.y)
+    this.cat.setToy(this.wand)
+  }
+  stopToy() {
+    this.wand = null
+    this.cat.setToy(null)
+  }
+  // Tay người xem (px gốc 640×360)
+  moveToy(x: number, y: number) {
+    if (!this.wand) return
+    this.wand.hand.x = Math.max(0, Math.min(SCENE_W * SCALE, x))
+    this.wand.hand.y = Math.max(0, Math.min(SCENE_H * SCALE, y))
   }
 
   // Số ly trong lọ tip (GET /api/chill-support) + ly của người vừa mời trên máy này
@@ -2424,7 +2463,9 @@ export class ChillScene {
       this.drawPose(character)
     }
     if (ready(this.interior)) this.drawTip(ctx, t)
+    if (this.toyProp && !this.wand && ready(this.interior)) drawWandProp(ctx, this.theme.toy, t, this.time === 'night')
     this.cat.draw(ctx, this.catTinted)
+    this.wand?.draw(ctx, t, this.time === 'night')
     if (this.friendLights !== null && this.theme.id === 'cafe') this.drawFriendLights(ctx, t)
     if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
     ctx.restore()

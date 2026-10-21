@@ -23,6 +23,7 @@ export default defineType({
     defineField({name: 'diaryOpen', title: 'Mở bảng nhật ký', type: 'boolean', initialValue: false}),
     defineField({name: 'shelfOpen', title: 'Mở kệ sưu tầm', type: 'boolean', initialValue: false}),
     defineField({name: 'playCountsOpen', title: 'Đếm và hiện lượt nghe', type: 'boolean', initialValue: false}),
+    defineField({name: 'catToyOpen', title: 'Cần câu lông vũ trêu mèo', type: 'boolean', initialValue: false}),
     // Thử thách chung "Cả quán cùng pha phin" (xem src/app/api/chill-quest/route.ts)
     defineField({name: 'questOpen', title: 'Mở thử thách chung', type: 'boolean', initialValue: false}),
     defineField({name: 'questSeason', title: 'Mã mùa', type: 'string', initialValue: 'mua-1', description: 'Đổi mã (vd. mua-2) là bắt đầu mùa mới, bộ đếm và phiếu về 0.', validation: (rule) => rule.regex(/^[a-z0-9-]{1,24}$/)}),
