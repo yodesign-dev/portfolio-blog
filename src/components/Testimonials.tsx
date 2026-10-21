@@ -71,12 +71,9 @@ export async function Testimonials() {
 
 function Card({item, copy = false}: {item: Testimonial; copy?: boolean}) {
   const avatarUrl = item.avatar?.asset ? urlFor(item.avatar)?.width(96).height(96).fit('crop').url() : null
-  const initials = item.name
-    .split(/\s+/)
-    .map((part) => part[0])
-    .slice(-2)
-    .join('')
-    .toUpperCase()
+  // Chữ đầu của từ đầu + từ cuối ("Tu Le Nguyen Anh" → "TA")
+  const words = item.name.trim().split(/\s+/)
+  const initials = (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase()
   const meta = [item.role, item.company].filter(Boolean).join(' · ')
 
   return (
