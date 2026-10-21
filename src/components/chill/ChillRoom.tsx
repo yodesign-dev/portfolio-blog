@@ -57,6 +57,11 @@ const CAT_HOLD_MS = 350
 // Mèo chơi cần câu tới hết sức thì ngủ bù chừng này mới chơi tiếp
 const TOY_REST_MS = 20_000
 const TOY_TIP_MS = 3500
+// Đã cầm cần câu lần nào chưa (chưa → sao lấp lánh quanh cần câu tới khi cầm, nhãn "Trêu
+// mèo" tự hiện một lúc, mèo liếc sang — cần câu mảnh, chìm vào khung cửa, khách không tự thấy)
+const TOY_SEEN_KEY = 'chill:toy-seen'
+const TOY_HINT_DELAY_MS = 3000
+const TOY_HINT_MS = 6000
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
 // Đã mở cuốn sổ "Việc hôm nay" trên quầy lần nào chưa (chưa → sao lấp lánh + nhãn gợi ý)
@@ -290,6 +295,8 @@ export function ChillRoom({
   const [toyRest, setToyRest] = useState(false)
   // Nhãn "Đung đưa lông vũ · Esc để cất": chỉ hiện chốc lát lúc vừa cầm lên, khỏi che lông vũ
   const [toyTip, setToyTip] = useState(false)
+  const [toySeen, setToySeen] = useState(true)
+  const [toyHint, setToyHint] = useState(false)
   const toyOutRef = useRef(false)
   const [headBox, setHeadBox] = useState<Box | null>(null)
   const [bookBox, setBookBox] = useState<Box | null>(null)
@@ -874,6 +881,31 @@ export function ChillRoom({
     sceneRef.current?.setToyProp(toyAvailable)
   }, [toyAvailable])
 
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setToySeen(localStorage.getItem(TOY_SEEN_KEY) === '1')
+    } catch {
+      // Chặn storage → coi như đã thấy, khỏi nhắc mãi
+    }
+  }, [])
+
+  // Chưa cầm lần nào: nhãn tự hiện (cả điện thoại, nơi không rê chuột được), mèo liếc sang
+  const toyHintOn = entered && !toySeen && toyAvailable && !toyOut && !toyRest
+  useEffect(() => {
+    if (!toyHintOn) return
+    const show = window.setTimeout(() => {
+      setToyHint(true)
+      sceneRef.current?.noticeCat()
+    }, TOY_HINT_DELAY_MS)
+    const hide = window.setTimeout(() => setToyHint(false), TOY_HINT_DELAY_MS + TOY_HINT_MS)
+    return () => {
+      window.clearTimeout(show)
+      window.clearTimeout(hide)
+      setToyHint(false)
+    }
+  }, [toyHintOn])
+
   const toyRestTimer = useRef(0)
   const toyTipTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(toyTipTimer.current), [])
@@ -926,6 +958,12 @@ export function ChillRoom({
     if (toyRest) return
     if (!toyOut) {
       trackEvent({name: 'Chill Cat Toy'})
+      setToySeen(true)
+      try {
+        localStorage.setItem(TOY_SEEN_KEY, '1')
+      } catch {
+        // Chặn storage — lần sau lại nhắc, không sao
+      }
       setToyTip(true)
       window.clearTimeout(toyTipTimer.current)
       toyTipTimer.current = window.setTimeout(() => setToyTip(false), TOY_TIP_MS)
@@ -2421,10 +2459,11 @@ export function ChillRoom({
           className="group absolute cursor-pointer rounded-xl outline-none disabled:cursor-default focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
           style={toyBox}
         >
+          {entered && !hideUi && !toySeen && !toyOut && !toyRest && <BookSparkles />}
           <span
             aria-hidden
             className={`pointer-events-none absolute bottom-full left-1/2 mb-1 whitespace-nowrap rounded-md border border-[#e8b27d]/40 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f3cfa8] backdrop-blur transition-opacity duration-500 sm:text-[11px] ${
-              toyOut ? (toyTip ? 'opacity-100' : 'opacity-0') : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              toyOut ? (toyTip ? 'opacity-100' : 'opacity-0') : toyHint ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
             }`}
             style={{transform: 'translate(-50%, 0)'}}
           >
