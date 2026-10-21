@@ -12,10 +12,12 @@ export function BehanceArchive({projects, lead = false}: {projects: BehanceProje
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 id="behance-archive" className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            More on Behance
+            {lead ? 'Projects' : 'More on Behance'}
           </h2>
           <p className="mt-2 max-w-2xl text-neutral-500">
-            Earlier projects and UI explorations — pulled straight from my Behance.
+            {lead
+              ? 'Product and UI work — each one opens the full write-up on Behance.'
+              : 'Earlier projects and UI explorations — pulled straight from my Behance.'}
           </p>
         </div>
         <a
@@ -47,7 +49,8 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
 }) {
   return (
     <a href={project.url} target="_blank" rel="noopener noreferrer" className="group block">
-      <div className="overflow-hidden rounded-xl bg-neutral-100">
+      {/* Hover: khung ảnh nhấc nhẹ + nhãn "View on Behance" trồi lên */}
+      <div className="relative overflow-hidden rounded-xl bg-neutral-100 transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_22px_40px_-20px_rgb(11_20_50/0.45)] motion-reduce:transform-none">
         {project.cover ? (
           <Image
             src={project.cover}
@@ -60,6 +63,12 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
         ) : (
           <div className="aspect-[4/3] w-full" />
         )}
+        <span
+          aria-hidden="true"
+          className="absolute bottom-3 left-3 translate-y-2 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-ink opacity-0 shadow-sm transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
+        >
+          View on Behance ↗
+        </span>
       </div>
       {project.year && (
         <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-neutral-400">Behance · {project.year}</p>

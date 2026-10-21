@@ -44,7 +44,7 @@ export function CaseStudyCard({study, priority = false}: {study: CaseStudy; prio
 
   return (
     <Link href={`/work/${study.slug.current}`} className="group block">
-      <div className="overflow-hidden rounded-xl bg-neutral-100">
+      <div className="relative overflow-hidden rounded-xl bg-neutral-100 transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_22px_40px_-20px_rgb(11_20_50/0.45)] motion-reduce:transform-none">
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -58,6 +58,12 @@ export function CaseStudyCard({study, priority = false}: {study: CaseStudy; prio
         ) : (
           <div className="aspect-[16/10] w-full" />
         )}
+        <span
+          aria-hidden="true"
+          className="absolute bottom-3 left-3 translate-y-2 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-ink opacity-0 shadow-sm transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
+        >
+          Read case study →
+        </span>
       </div>
 
       {meta && (
