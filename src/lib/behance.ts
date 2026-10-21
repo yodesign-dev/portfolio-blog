@@ -11,14 +11,37 @@ export type BehanceProject = {
   year: string
 }
 
-// Feed Behance chỉ có tên + ảnh bìa + năm. Mô tả 1 dòng (vai trò / kết quả) và
-// tag cho từng project điền tay ở đây, theo link Behance — chưa điền thì thẻ chỉ
-// hiện tên + năm. Ví dụ:
-//   'https://www.behance.net/gallery/81174743/AhaMove-Driver': {
-//     summary: 'Driver app for on-demand delivery — redesigned the order flow',
-//     tags: ['Mobile app', 'Logistics'],
-//   },
-export const WORK_NOTES: Record<string, {summary?: string; tags?: string[]}> = {}
+// Chỉ hiện trên site các project Behance có nội dung đủ dày (đã đọc từng project
+// ngày 2026-10-21). Bị ẩn: Allow contact list (1 flow ngắn), Authentication UX (1
+// ảnh), TIKI.VN layout (1 ảnh), 6 bài #DailyUI (bài tập) — vẫn xem được trên
+// Behance qua nút "View all on Behance". Thứ tự ở đây là thứ tự hiện trên site.
+// id = mã số project trong link Behance (/gallery/<mã>/…). Feed chỉ có tên + ảnh
+// bìa + năm, nên mô tả 1 dòng và tag viết tay theo nội dung từng project.
+// (Dùng mảng, không dùng object: key dạng số của object bị JS tự xếp tăng dần.)
+export const BEHANCE_SHOWCASE: {id: string; summary: string; tags: string[]}[] = [
+  // Có My role, Results, User research, layout + flow đặt món tới checkout
+  {
+    id: '81566679',
+    summary: 'Research, flows and UI for ordering on web and mobile — more completed orders, fewer cancellations.',
+    tags: ['Web & mobile', 'Food delivery', 'User research'],
+  },
+  // Có Problem / Solution, user-flow và đủ các màn đăng ký tài xế
+  {
+    id: '81174743',
+    summary: 'Drivers sign up and sign their contract in the app instead of at the office — a new user flow and UI.',
+    tags: ['Mobile app', 'Logistics', 'User flow'],
+  },
+  // Trình diễn UI 6 tính năng, chưa có phần quá trình
+  {
+    id: '59297229',
+    summary: 'iOS app for a social-consumer platform — share your lifestyle, join brand communities and claim rewards.',
+    tags: ['iOS', 'Social', 'UI design'],
+  },
+]
+
+const showcaseId = (url: string) => url.match(/\/gallery\/(\d+)/)?.[1] ?? ''
+const showcaseIndex = (url: string) => BEHANCE_SHOWCASE.findIndex((p) => p.id === showcaseId(url))
+export const showcaseNote = (url: string) => BEHANCE_SHOWCASE[showcaseIndex(url)]
 
 export const BEHANCE_PROFILE = SOCIAL_LINKS.find((l) => l.label === 'Behance')?.href || 'https://www.behance.net/applebin'
 const USERNAME = BEHANCE_PROFILE.replace(/\/+$/, '').split('/').pop()
@@ -50,7 +73,8 @@ export async function getBehanceProjects(revalidate = 86400): Promise<BehancePro
           year: Number.isNaN(date.getTime()) ? '' : String(date.getFullYear()),
         }
       })
-      .filter((p) => p.title && p.url.startsWith('https://www.behance.net/'))
+      .filter((p) => p.title && p.url.startsWith('https://www.behance.net/') && showcaseIndex(p.url) >= 0)
+      .sort((a, b) => showcaseIndex(a.url) - showcaseIndex(b.url))
     // Ảnh cover trong feed chỉ rộng 404px. CDN có bản 808px cho phần lớn project,
     // nhưng vài project cũ bị chuyển hướng sang dịch vụ render đang lỗi → kiểm
     // tra trước, không có thì giữ ảnh gốc (chỉ chạy khi cache hết hạn, ~1 lần/ngày)

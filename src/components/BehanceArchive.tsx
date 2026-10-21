@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import {BEHANCE_PROFILE, WORK_NOTES, type BehanceProject} from '@/lib/behance'
+import {BEHANCE_PROFILE, showcaseNote, type BehanceProject} from '@/lib/behance'
 
 // Section "More on Behance" dưới danh sách case study ở /work — project cũ hơn,
 // lấy tự động từ RSS Behance (cập nhật mỗi ngày), bấm vào mở sang Behance.
@@ -48,7 +48,7 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
   project: BehanceProject
   sizes?: string
 }) {
-  const note = WORK_NOTES[project.url]
+  const note = showcaseNote(project.url)
   return (
     <a href={project.url} target="_blank" rel="noopener noreferrer" className="group flex items-start gap-4 sm:block">
       {/* Hover: khung ảnh nhấc nhẹ + nhãn "View on Behance" trồi lên */}
@@ -81,7 +81,7 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
           <span className="sr-only"> (opens Behance in a new tab)</span>
         </h3>
         {note?.summary && <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-neutral-600">{note.summary}</p>}
-        {note?.tags && note.tags.length > 0 && (
+        {note && note.tags.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {note.tags.map((tag) => (
               <li key={tag} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
