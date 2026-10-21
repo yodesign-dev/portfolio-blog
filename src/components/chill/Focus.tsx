@@ -176,6 +176,12 @@ export function Focus({
     if (kind === 'break') {
       const long = round > 0 && round % LONG_EVERY === 0
       next = {endsAt: at + (long ? LONG_BREAK_MIN : BREAK_MIN) * 60_000, minutes: long ? LONG_BREAK_MIN : BREAK_MIN, kind: 'break', ...(long ? {long} : {})}
+      // Nghỉ dài là hết 1 vòng — phin sau đếm lại từ 1
+      if (long) {
+        const reset = {count: 0, lastAt: at}
+        setChain(reset)
+        store(CHAIN_KEY, reset)
+      }
       trackEvent({name: 'Chill Focus', props: {action: 'break-start', break: long ? 'long' : 'short'}})
     } else {
       const todo = picked && todos.some((t) => t.id === picked && !t.doneDay) ? picked : undefined
