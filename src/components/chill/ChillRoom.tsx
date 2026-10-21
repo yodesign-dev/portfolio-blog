@@ -22,6 +22,7 @@ import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {GUIDE_FIRST_MS, GUIDE_GAP_MS, GUIDE_HOLD_MS, GUIDE_ORDER, GUIDE_PER_VISIT, GUIDE_POINT_MS, GUIDE_SHOW_MS, loadTried, saveTried, type GuideStep} from './guide'
 import {PixelGlass} from './pixel-icons'
 import {Shelf} from './ShelfBook'
+import {useChillApp, useInstall} from './install'
 import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mix, type MixChannel, type MixPreset} from './mix'
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
@@ -265,6 +266,10 @@ export function ChillRoom({
   const [volume, setVolume] = useState(0.7)
   const [ambience, setAmbience] = useState(0.35)
   const [mix, setMix] = useState<Mix | null>(null)
+  // Cài quán thành ứng dụng (install.ts): cách cài của trình duyệt này + hướng dẫn tay đang mở
+  const {mode: installMode, install} = useInstall()
+  const [installHelp, setInstallHelp] = useState(false)
+  useChillApp()
   const [shuffle, setShuffle] = useState(false)
   const [station, setStation] = useState<StationId>('acoustic')
   const [position, setPosition] = useState(0)
@@ -2737,6 +2742,38 @@ export function ChillRoom({
                 ))}
               </ul>
               <p className="mt-2 text-[11px] leading-snug text-[#2a1a10]/60">{t.room.menuNote}</p>
+              {/* Cài quán thành ứng dụng — ẩn khi đang trong ứng dụng hoặc trình duyệt không cài được */}
+              {installMode && (
+                <div className="mt-2.5 rounded-xl border-2 border-[#2a1a10] bg-[#e8b27d]/35 p-2.5">
+                  <button
+                    type="button"
+                    aria-expanded={installMode === 'prompt' ? undefined : installHelp}
+                    onClick={() => {
+                      if (installMode === 'prompt') return void install()
+                      if (!installHelp) trackEvent({name: 'Chill Install', props: {action: 'help'}})
+                      setInstallHelp((v) => !v)
+                    }}
+                    className="flex w-full items-center gap-2.5 text-left focus-visible:outline-2 focus-visible:outline-[#9a6a45]"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/chill/app/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg border-2 border-[#2a1a10] [image-rendering:pixelated]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold leading-snug">{t.install.title}</span>
+                      <span className="block text-xs leading-snug text-[#2a1a10]/70">{t.install.desc}</span>
+                    </span>
+                    <span aria-hidden className="text-sm text-[#9a6a45]">
+                      {installMode === 'prompt' ? '↓' : installHelp ? '▴' : '▾'}
+                    </span>
+                  </button>
+                  {installHelp && installMode !== 'prompt' && (
+                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-snug text-[#2a1a10]/85">
+                      {t.install.steps[installMode].map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
               {/* Điện thoại: những thứ ít dùng không còn nút riêng trên màn hình → nằm ở đây */}
               <div className="mt-2.5 border-t-2 border-[#2a1a10]/70 pt-2 sm:hidden">
                 <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menuMore}</p>

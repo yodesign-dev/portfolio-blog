@@ -297,6 +297,14 @@ const en = {
       'oil-lamp': {name: 'Oil lamp', story: 'For the phins brewed after the streetlights come on.'},
     } as Record<string, {name: string; story: string}>,
   },
+  install: {
+    title: 'Install the café',
+    desc: 'Open Lofi Pixel Cafe like an app, with its own icon and no browser bar.',
+    steps: {
+      ios: ['Tap the Share button (the square with an arrow) in Safari', 'Choose “Add to Home Screen”, then “Add”'],
+      'mac-safari': ['In the menu bar, open File', 'Choose “Add to Dock…”, then “Add”'],
+    },
+  },
   mix: {
     presetsAria: 'Ambience mixes',
     presets: {scene: 'Follow the scene', busy: 'Busy café', rainyNight: 'Rainy night', quiet: 'Quiet'},
@@ -833,6 +841,14 @@ const vi: typeof en = {
       umbrella: {name: 'Cây dù', story: 'Ai đó bỏ quên hôm mưa. Giờ là của kệ.'},
       teapot: {name: 'Ấm trà', story: 'Hôm sương mù, quán pha thêm ấm trà nóng.'},
       'oil-lamp': {name: 'Đèn dầu', story: 'Cho những phin pha khi phố đã lên đèn.'},
+    },
+  },
+  install: {
+    title: 'Cài quán lên máy',
+    desc: 'Mở Lofi Pixel Cafe như một ứng dụng, có biểu tượng riêng, không còn thanh trình duyệt.',
+    steps: {
+      ios: ['Trong Safari, bấm nút Chia sẻ (ô vuông có mũi tên lên)', 'Chọn “Thêm vào MH chính”, rồi bấm “Thêm”'],
+      'mac-safari': ['Trên thanh menu, mở Tệp (File)', 'Chọn “Thêm vào Dock…”, rồi bấm “Thêm”'],
     },
   },
   mix: {
