@@ -115,7 +115,7 @@ export const THEMES: Theme[] = [
     cat: {x: 112, y: 296},
     // Giữa chậu cây và phin
     catRoom: [66, 228],
-    toy: {base: {x: 206, y: 294}, tip: {x: 222, y: 246}, hideY: 312},
+    toy: {base: {x: 206, y: 294}, tip: {x: 216, y: 265}, hideY: 312},
     notebook: {x: 324, y: 264, w: 102, h: 44},
     // Cạnh trái cuốn sổ, ly của người mời đứng giữa phin và lọ
     tipJar: {x: 310, y: 294, cupDx: -22},
@@ -151,7 +151,7 @@ export const THEMES: Theme[] = [
     cat: {x: 60, y: 197},
     // Đầu lan can, tới trước bụi hoa giấy
     catRoom: [44, 186],
-    toy: {base: {x: 152, y: 196}, tip: {x: 166, y: 156}, hideY: 199},
+    toy: {base: {x: 152, y: 196}, tip: {x: 160, y: 172}, hideY: 199},
     notebook: null,
     // Trên bàn nhỏ, giữa ly cà phê đá và quyển sách; ly của người mời đứng mép trái bàn
     tipJar: {x: 440, y: 293, cupDx: -46},
@@ -190,7 +190,7 @@ export const THEMES: Theme[] = [
     cat: {x: 270, y: 283},
     // Giữa cốc cà phê và ô kệ đầu tiên
     catRoom: [268, 364],
-    toy: {base: {x: 262, y: 250}, tip: {x: 276, y: 214}, hideY: 300},
+    toy: {base: {x: 262, y: 250}, tip: {x: 270, y: 228}, hideY: 300},
     notebook: {x: 118, y: 258, w: 92, h: 28},
     // Mép trước bàn, giữa sổ mở và cốc cà phê nóng — ngay dưới ánh đèn bàn
     tipJar: {x: 222, y: 304, cupDx: 24},

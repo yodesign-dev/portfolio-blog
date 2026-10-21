@@ -133,7 +133,8 @@ export class Wand {
     ctx.beginPath()
     ctx.rect(0, 0, 640, this.hideY)
     ctx.clip()
-    if (!this.pin) drawRod(ctx, this.hand.x, this.hand.y, this.hand.x + 26, this.hand.y - 48, night)
+    // Cán chĩa lên phía tay người xem: tay cầm gỗ ở đầu xa, ngôi sao ở đầu treo dây
+    if (!this.pin) drawRod(ctx, this.hand.x + 16, this.hand.y - 30, this.hand.x, this.hand.y, night)
     for (let i = 1; i < N; i++) line(ctx, this.rope[i - 1].x, this.rope[i - 1].y, this.rope[i].x, this.rope[i].y, night ? 'rgba(200,190,175,.75)' : 'rgba(240,228,210,.9)')
     const end = this.rope[N - 1]
     const near = this.rope[N - 2]
