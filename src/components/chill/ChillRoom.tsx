@@ -1174,6 +1174,13 @@ export function ChillRoom({
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
   }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time, onQuestDone])
 
+  // Hết giờ nghỉ giữa 2 phin: chuông khác + mèo gọi pha tiếp (không tính gì thêm)
+  const onBreakDone = useCallback(() => {
+    audioRef.current?.breakChime()
+    sceneRef.current?.noticeCat()
+    sayCat(t.room.catBreak)
+  }, [sayCat, t])
+
   // ---------- Cuốn sổ "Việc hôm nay" ----------
   useEffect(() => {
     try {
@@ -2818,7 +2825,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
             <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
               <p className="text-sm text-[#f3ece4]">{t.quest.added}</p>
               <NameField label={t.name.onBoard} className="mt-1" />

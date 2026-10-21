@@ -21,7 +21,7 @@ export type AnalyticsEvent =
   | {name: 'Chill Look Around'; props?: undefined}
   | {name: 'Chill Lang'; props: {lang: 'en' | 'vi'}}
   // Đồng hồ phin: bắt đầu / làm xong / dừng giữa chừng
-  | {name: 'Chill Focus'; props: {action: 'start' | 'done' | 'stop'}}
+  | {name: 'Chill Focus'; props: {action: 'start' | 'done' | 'stop' | 'break-start' | 'break-done' | 'break-skip' | 'auto-on' | 'auto-off'; break?: 'short' | 'long'}}
   | {name: 'Chill Todo'; props: {action: 'add' | 'done' | 'book'}}
   | {name: 'Chill Shelf'; props: {action: 'gift' | 'open'}}
   | {name: 'Chill Install'; props: {action: 'open' | 'accepted' | 'dismissed' | 'installed' | 'help'}}

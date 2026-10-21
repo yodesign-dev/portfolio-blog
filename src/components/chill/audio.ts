@@ -720,14 +720,23 @@ export class ChillAudio {
 
   // Hết 1 phin: 3 nốt chuông nhỏ đi lên (thìa gõ nhẹ vào ly), không cắt ngang nhạc
   chime() {
+    this.bell([784, 988, 1319], 0.22, 1)
+  }
+
+  // Hết giờ nghỉ: 2 nốt đi xuống, nhẹ hơn chuông xong phin — nghe là biết "vào lại việc"
+  breakChime() {
+    this.bell([1175, 880], 0.3, 0.7)
+  }
+
+  private bell(freqs: number[], gap: number, level: number) {
     const ctx = this.ctx ?? (this.catCtx ??= new AudioContext())
     if (ctx.state === 'suspended') void ctx.resume()
     const now = ctx.currentTime
     const out = ctx.createGain()
-    out.gain.value = 0.25 + this.volume * 0.35
+    out.gain.value = (0.25 + this.volume * 0.35) * level
     out.connect(ctx.destination)
-    ;[784, 988, 1319].forEach((freq, i) => {
-      const start = now + i * 0.22
+    freqs.forEach((freq, i) => {
+      const start = now + i * gap
       const o = ctx.createOscillator()
       o.type = 'sine'
       o.frequency.value = freq
