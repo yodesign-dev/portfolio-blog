@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import {BEHANCE_PROFILE, type BehanceProject} from '@/lib/behance'
+import {BEHANCE_PROFILE, WORK_NOTES, type BehanceProject} from '@/lib/behance'
 
 // Section "More on Behance" dưới danh sách case study ở /work — project cũ hơn,
 // lấy tự động từ RSS Behance (cập nhật mỗi ngày), bấm vào mở sang Behance.
@@ -30,7 +30,7 @@ export function BehanceArchive({projects, lead = false}: {projects: BehanceProje
         </a>
       </div>
 
-      <ul className="mt-10 grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="mt-10 grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 sm:gap-y-12 lg:grid-cols-3">
         {projects.map((project) => (
           <li key={project.url}>
             <BehanceCard project={project} />
@@ -42,15 +42,17 @@ export function BehanceArchive({projects, lead = false}: {projects: BehanceProje
 }
 
 // Thẻ 1 project Behance — dùng ở /work và mục "Selected work" trang chủ
-// (khi Sanity chưa có case study).
-export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-width: 640px) 50vw, 100vw'}: {
+// (khi Sanity chưa có case study). Điện thoại: dạng hàng gọn (ảnh nhỏ bên trái,
+// chữ bên phải); từ sm trở lên: ảnh 16:10 trên, chữ dưới.
+export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-width: 640px) 50vw, 128px'}: {
   project: BehanceProject
   sizes?: string
 }) {
+  const note = WORK_NOTES[project.url]
   return (
-    <a href={project.url} target="_blank" rel="noopener noreferrer" className="group block">
+    <a href={project.url} target="_blank" rel="noopener noreferrer" className="group flex items-start gap-4 sm:block">
       {/* Hover: khung ảnh nhấc nhẹ + nhãn "View on Behance" trồi lên */}
-      <div className="relative overflow-hidden rounded-xl bg-neutral-100 transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_22px_40px_-20px_rgb(11_20_50/0.45)] motion-reduce:transform-none">
+      <div className="relative w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-black/5 transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_22px_40px_-20px_rgb(11_20_50/0.45)] motion-reduce:transform-none sm:w-auto sm:rounded-xl">
         {project.cover ? (
           <Image
             src={project.cover}
@@ -58,25 +60,37 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
             width={808}
             height={632}
             sizes={sizes}
-            className="aspect-[4/3] w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+            className="aspect-[4/3] w-full object-cover sm:aspect-[16/10]"
           />
         ) : (
-          <div className="aspect-[4/3] w-full" />
+          <div className="aspect-[4/3] w-full sm:aspect-[16/10]" />
         )}
         <span
           aria-hidden="true"
-          className="absolute bottom-3 left-3 translate-y-2 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-ink opacity-0 shadow-sm transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
+          className="absolute bottom-3 left-3 hidden translate-y-2 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-ink opacity-0 shadow-sm transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none sm:block"
         >
           View on Behance ↗
         </span>
       </div>
-      {project.year && (
-        <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-neutral-400">Behance · {project.year}</p>
-      )}
-      <h3 className="mt-1.5 text-lg font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
-        {project.title} <span aria-hidden="true" className="text-neutral-300 group-hover:text-brand">↗</span>
-        <span className="sr-only"> (opens Behance in a new tab)</span>
-      </h3>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 sm:mt-4">
+          Behance{project.year && ` · ${project.year}`}
+        </p>
+        <h3 className="mt-1 text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand sm:text-lg">
+          {project.title} <span aria-hidden="true" className="text-neutral-300 group-hover:text-brand">↗</span>
+          <span className="sr-only"> (opens Behance in a new tab)</span>
+        </h3>
+        {note?.summary && <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-neutral-600">{note.summary}</p>}
+        {note?.tags && note.tags.length > 0 && (
+          <ul className="mt-3 flex flex-wrap gap-1.5">
+            {note.tags.map((tag) => (
+              <li key={tag} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
+                {tag}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </a>
   )
 }

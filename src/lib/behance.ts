@@ -11,6 +11,15 @@ export type BehanceProject = {
   year: string
 }
 
+// Feed Behance chỉ có tên + ảnh bìa + năm. Mô tả 1 dòng (vai trò / kết quả) và
+// tag cho từng project điền tay ở đây, theo link Behance — chưa điền thì thẻ chỉ
+// hiện tên + năm. Ví dụ:
+//   'https://www.behance.net/gallery/81174743/AhaMove-Driver': {
+//     summary: 'Driver app for on-demand delivery — redesigned the order flow',
+//     tags: ['Mobile app', 'Logistics'],
+//   },
+export const WORK_NOTES: Record<string, {summary?: string; tags?: string[]}> = {}
+
 export const BEHANCE_PROFILE = SOCIAL_LINKS.find((l) => l.label === 'Behance')?.href || 'https://www.behance.net/applebin'
 const USERNAME = BEHANCE_PROFILE.replace(/\/+$/, '').split('/').pop()
 const FEED_URL = `https://www.behance.net/feeds/user?username=${USERNAME}`

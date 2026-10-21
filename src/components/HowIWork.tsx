@@ -89,7 +89,7 @@ export function HowIWork() {
           </div>
         </div>
 
-        <ol className="lg:py-[12vh]">
+        <ol className="lg:py-[8vh]">
           {STEPS.map((step, i) => (
             <li
               key={step.key}
@@ -97,7 +97,7 @@ export function HowIWork() {
                 stepRefs.current[i] = el
               }}
               data-index={i}
-              className="flex flex-col justify-center pb-16 last:pb-0 lg:min-h-[52vh] lg:pb-0"
+              className="flex flex-col justify-center pb-16 last:pb-0 lg:min-h-[40vh] lg:pb-0"
             >
               <div className="relative mb-8 aspect-[4/3] overflow-hidden rounded-2xl bg-brand lg:hidden" aria-hidden>
                 <DotGrid />

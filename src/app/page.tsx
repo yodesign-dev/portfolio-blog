@@ -1,9 +1,7 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { client } from '@/sanity/lib/client'
-import { urlFor } from '@/sanity/lib/image'
 import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
-import { ChillTeaser } from '@/components/ChillTeaser'
+import { SideProjects } from '@/components/SideProjects'
 import { HowIWork } from '@/components/HowIWork'
 import { BehanceCard } from '@/components/BehanceArchive'
 import { getBehanceProjects } from '@/lib/behance'
@@ -13,11 +11,10 @@ import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn
 export const revalidate = 60
 
 // Trang chủ chỉ lấy bài Writing (case study đã có section Work riêng).
-const POSTS_QUERY = `*[_type == "post" && isCaseStudy != true] | order(publishedAt desc)[0...4] {
+const POSTS_QUERY = `*[_type == "post" && isCaseStudy != true] | order(publishedAt desc)[0...3] {
   _id,
   title,
   slug,
-  mainImage,
   publishedAt
 }`
 
@@ -25,10 +22,6 @@ type Post = {
   _id: string
   title: string
   slug: { current: string }
-  mainImage?: {
-    asset?: { _ref: string }
-    alt?: string
-  }
   publishedAt: string
 }
 
@@ -60,7 +53,7 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href: strin
 
 export default async function HomePage() {
   const [studies, posts] = await Promise.all([getCaseStudies(revalidate), getPosts()])
-  const featuredStudies = studies.slice(0, 4)
+  const featuredStudies = studies.slice(0, 3)
   // Sanity chưa có case study / bài viết → lấy tạm project Behance và bài
   // Medium (giống /work và /blog), để trang chủ không nhảy thẳng từ hero
   // xuống footer.
@@ -68,8 +61,25 @@ export default async function HomePage() {
     featuredStudies.length === 0 ? getBehanceProjects() : [],
     posts.length === 0 ? getMediumPosts() : [],
   ])
-  const featuredBehance = behance.slice(0, 4)
-  const featuredMedium = mediumPosts.slice(0, 4)
+  const featuredBehance = behance.slice(0, 3)
+  // Writing: danh sách gọn 3 bài (ảnh bìa Medium phần lớn là ảnh chụp chữ, xếp
+  // thành thẻ trông rối)
+  const writing =
+    posts.length > 0
+      ? posts.slice(0, 3).map((post) => ({
+          key: post._id,
+          href: `/blog/${post.slug.current}`,
+          title: post.title,
+          date: post.publishedAt,
+          source: null,
+        }))
+      : mediumPosts.slice(0, 3).map((post) => ({
+          key: post.link,
+          href: post.link,
+          title: post.title,
+          date: post.publishedAt,
+          source: 'Medium',
+        }))
 
   // Case study mới nhất → tên + link của frame "Hi-fi" trên hero (frame vẽ
   // skeleton UI web/mobile bằng code, không dùng ảnh)
@@ -86,94 +96,68 @@ export default async function HomePage() {
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
       <Hero31 study={heroStudy} />
 
+      {/* Thứ tự: hero → việc đã làm → cách làm → side projects → bài viết */}
       {(featuredStudies.length > 0 || featuredBehance.length > 0) && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
-          <div className="grid grid-cols-1 gap-x-10 gap-y-16 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-3 sm:gap-y-12">
             {featuredStudies.length > 0
               ? featuredStudies.map((study) => <CaseStudyCard key={study._id} study={study} />)
               : featuredBehance.map((project) => (
-                  <BehanceCard key={project.url} project={project} sizes="(min-width: 1024px) 560px, (min-width: 768px) 50vw, 100vw" />
+                  <BehanceCard key={project.url} project={project} sizes="(min-width: 1152px) 352px, (min-width: 640px) 33vw, 128px" />
                 ))}
           </div>
         </section>
       )}
 
-      {/* Thứ tự: hero → việc đã làm → cách làm → bài viết → /chill (dự án phụ, để cuối) */}
       <HowIWork />
 
-      {posts.length === 0 && featuredMedium.length > 0 && (
+      <div className="mt-24">
+        <SideProjects />
+      </div>
+
+      {writing.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 py-20 sm:px-8">
           <SectionHeading title="Latest writing" href="/blog" linkLabel="All writing" />
-          <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-            {featuredMedium.map((post) => (
-              <a key={post.link} href={post.link} target="_blank" rel="noopener noreferrer" className="group block">
-                <div className="overflow-hidden rounded-lg bg-neutral-100">
-                  {post.image ? (
-                    <Image
-                      src={post.image}
-                      alt=""
-                      width={800}
-                      height={600}
-                      sizes="(min-width: 1024px) 270px, (min-width: 640px) 50vw, 100vw"
-                      className="aspect-[4/3] w-full object-cover transition-all duration-300 ease-out group-hover:scale-105 group-hover:opacity-90"
-                    />
-                  ) : (
-                    <div className="aspect-[4/3] w-full bg-neutral-100" />
-                  )}
-                </div>
-
-                <h3 className="mt-4 text-lg font-bold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
-                  {post.title} <span aria-hidden="true" className="text-neutral-300">↗</span>
-                  <span className="sr-only"> (opens Medium in a new tab)</span>
-                </h3>
-
-                <p className="mt-2 text-sm text-neutral-400">Medium · {formatDate(post.publishedAt)}</p>
-              </a>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {posts.length > 0 && (
-        <section className="mx-auto max-w-6xl px-6 py-20 sm:px-8">
-          <SectionHeading title="Latest writing" href="/blog" linkLabel="All writing" />
-          <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-            {posts.map((post) => {
-              const imageUrl = post.mainImage
-                ? urlFor(post.mainImage)?.width(800).height(600).fit('crop').url()
-                : null
-
-              return (
-                <Link key={post._id} href={`/blog/${post.slug.current}`} className="group block">
-                  <div className="overflow-hidden rounded-lg bg-neutral-100">
-                    {imageUrl ? (
-                      <Image
-                        src={imageUrl}
-                        alt={post.mainImage?.alt || post.title}
-                        width={800}
-                        height={600}
-                        sizes="(min-width: 1024px) 270px, (min-width: 640px) 50vw, 100vw"
-                        className="aspect-[4/3] w-full object-cover transition-all duration-300 ease-out group-hover:scale-105 group-hover:opacity-90"
-                      />
-                    ) : (
-                      <div className="aspect-[4/3] w-full bg-neutral-100" />
+          <ul className="border-t border-neutral-200">
+            {writing.map((item) => {
+              const content = (
+                <>
+                  <span className="text-lg font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
+                    {item.title}
+                    {item.source && (
+                      <>
+                        {' '}
+                        <span aria-hidden="true" className="text-neutral-300 group-hover:text-brand">↗</span>
+                        <span className="sr-only"> (opens {item.source} in a new tab)</span>
+                      </>
                     )}
-                  </div>
-
-                  <h3 className="mt-4 text-lg font-bold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
-                    {post.title}
-                  </h3>
-
-                  <p className="mt-2 text-sm text-neutral-400">{formatDate(post.publishedAt)}</p>
-                </Link>
+                  </span>
+                  <span className="shrink-0 text-sm text-neutral-400 sm:text-right">
+                    {item.source && `${item.source} · `}
+                    {formatDate(item.date)}
+                  </span>
+                </>
+              )
+              const rowClass =
+                'group flex flex-col gap-1 py-5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-8'
+              return (
+                <li key={item.key} className="border-b border-neutral-200">
+                  {item.source ? (
+                    <a href={item.href} target="_blank" rel="noopener noreferrer" className={rowClass}>
+                      {content}
+                    </a>
+                  ) : (
+                    <Link href={item.href} className={rowClass}>
+                      {content}
+                    </Link>
+                  )}
+                </li>
               )
             })}
-          </div>
+          </ul>
         </section>
       )}
-
-      <ChillTeaser />
     </div>
   )
 }
