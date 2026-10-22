@@ -27,6 +27,7 @@ import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mi
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
+import {MiniVideo, canVideoPiP} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
 import {loadMe, onMeChange} from './identity'
@@ -1433,7 +1434,7 @@ export function ChillRoom({
       setPanelOpen(true)
     } else if (kind === 'chat') setChatOpen(true)
     else if (kind === 'zen' && !zen) toggleZen()
-    else if (kind === 'mini' && canMini && !miniWin) openMini('update')
+    else if (kind === 'mini' && canMini && !miniOpen) openMini('update')
     else if (kind === 'phin') {
       // Ngắm cảnh giấu cả thanh trên → tắt trước rồi mới mở bảng phin
       if (zen) toggleZen()
@@ -1557,17 +1558,22 @@ export function ChillRoom({
 
   // ---------- Cửa sổ nổi (MiniPlayer.tsx) ----------
 
-  // Công tắc Studio (?mini=1 / ?mini=0 ghi đè) · trình duyệt có Document PiP không
+  // Công tắc Studio (?mini=1 / ?mini=0 ghi đè) · trình duyệt có Document PiP không.
+  // Không có (Safari) → cửa sổ nổi dạng video (MiniVideo.ts): miniVideoOn thay cho miniWin.
+  // ?mini=video: ép bản video trên Chrome để thử
   const [miniFlag, setMiniFlag] = useState(false)
   const [canMini, setCanMini] = useState(false)
   const [miniWin, setMiniWin] = useState<Window | null>(null)
+  const [miniVideoOn, setMiniVideoOn] = useState(false)
+  const miniVideoRef = useRef<MiniVideo | null>(null)
+  const miniOpen = miniWin !== null || miniVideoOn
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('mini')
-    const on = param ? param === '1' : miniPlayerOn
+    const on = param ? param === '1' || param === 'video' : miniPlayerOn
     /* eslint-disable react-hooks/set-state-in-effect -- đọc URL + khả năng trình duyệt sau khi hydrate */
     setMiniFlag(on)
     // Nút Thu nhỏ chỉ có trên màn rộng (thanh trên điện thoại đã chật)
-    setCanMini(on && canMiniPlayer() && window.matchMedia('(min-width: 640px)').matches)
+    setCanMini(on && (docPiP() || canVideoPiP()) && window.matchMedia('(min-width: 640px)').matches)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [miniPlayerOn])
 
@@ -1596,28 +1602,56 @@ export function ChillRoom({
     navigator.mediaSession.setActionHandler('previoustrack', prev)
   }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex])
 
-  const openMini = useCallback(
-    (from: 'button' | 'auto' | 'guide' | 'update') => {
-      openMiniWindow()
-        .then((win) => {
-          if (!win) return
-          miniRef.current = true
-          setMiniWin(win)
-          markTried('mini')
-          trackEvent({name: 'Chill Mini', props: {from}})
-        })
-        .catch(() => {})
-    },
-    [markTried]
-  )
   const closeMini = useCallback(() => {
     miniRef.current = false
     setMiniWin(null)
+    setMiniVideoOn(false)
   }, [])
+  // Bản video: dựng sẵn khi rê chuột / chạm nút (Safari chỉ mở được ngay trong lúc bấm)
+  const prepareMini = useCallback(() => {
+    if (docPiP() || !canVideoPiP()) return
+    if (!miniVideoRef.current) {
+      const mv = new MiniVideo(canvasRef, drawRef)
+      mv.onClose = closeMini
+      miniVideoRef.current = mv
+    }
+    miniVideoRef.current.prepare()
+  }, [closeMini])
+  const openMini = useCallback(
+    (from: 'button' | 'auto' | 'guide' | 'update') => {
+      const opened = () => {
+        miniRef.current = true
+        markTried('mini')
+        trackEvent({name: 'Chill Mini', props: {from}})
+      }
+      if (!docPiP()) {
+        prepareMini()
+        void miniVideoRef.current?.show().then((ok) => {
+          if (!ok) return
+          setMiniVideoOn(true)
+          opened()
+        })
+        return
+      }
+      openMiniWindow()
+        .then((win) => {
+          if (!win) return
+          setMiniWin(win)
+          opened()
+        })
+        .catch(() => {})
+    },
+    [markTried, prepareMini]
+  )
+  const closeAnyMini = useCallback(() => {
+    if (miniWin) miniWin.close()
+    else miniVideoRef.current?.close()
+  }, [miniWin])
   // Bấm 1 bài trong danh sách của cửa sổ nổi: bài đang phát thì phát/dừng
   const pickMini = useCallback((i: number) => (i === index && started ? togglePlay() : playAt(i)), [index, started, togglePlay, playAt])
   // Rời trang khi cửa sổ nổi còn mở → đóng luôn
   useEffect(() => () => miniWin?.close(), [miniWin])
+  useEffect(() => () => miniVideoRef.current?.destroy(), [])
 
   // Màn hình khoá / thông báo / Control Center: thanh tua. Chrome còn tự mở cửa sổ nổi khi
   // khách chuyển tab lúc nhạc đang phát (nếu khách cho phép)
@@ -1637,7 +1671,7 @@ export function ChillRoom({
       audio.seek(d.seekTime)
       setPosition(d.seekTime)
     })
-    if (canMini) set('enterpictureinpicture', () => openMini('auto'))
+    if (canMini && docPiP()) set('enterpictureinpicture', () => openMini('auto'))
     return () => {
       set('seekto', null)
       set('enterpictureinpicture', null)
@@ -1786,10 +1820,10 @@ export function ChillRoom({
   const guideNext = guideShown.length < GUIDE_PER_VISIT ? (GUIDE_ORDER.find((s) => guideCan[s] && !guideDone[s] && !guideShown.includes(s)) ?? null) : null
   const activeGuide = guide && guideCan[guide.step] && (guide.forced || !guideDone[guide.step]) ? guide.step : null
   // Cửa sổ nổi đang mở → khách không nhìn tab quán, gợi ý chờ tới khi đưa quán về
-  const guideBusy = panelOpen || volumeOpen || otherOverlay || focusOpen || drinkOpen || menuOpen || miniWin !== null
+  const guideBusy = panelOpen || volumeOpen || otherOverlay || focusOpen || drinkOpen || menuOpen || miniOpen
   useEffect(() => {
     // Đang chạy 1 phin → khách đang tập trung, không mời thêm gì
-    if (!entered || zen || activeGuide || !guideNext || focusLabel || miniWin) return
+    if (!entered || zen || activeGuide || !guideNext || focusLabel || miniOpen) return
     const id = window.setTimeout(
       () => {
         guideLeft.current = GUIDE_SHOW_MS
@@ -1801,7 +1835,7 @@ export function ChillRoom({
       guideShown.length ? GUIDE_GAP_MS : GUIDE_FIRST_MS,
     )
     return () => window.clearTimeout(id)
-  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel, miniWin])
+  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel, miniOpen])
   useEffect(() => {
     if (!guideHold) return
     const id = window.setTimeout(() => setGuideHold(false), GUIDE_HOLD_MS)
@@ -2267,25 +2301,28 @@ export function ChillRoom({
       </div>
 
       {/* Cửa sổ nổi đang mở: tab gốc nhắc chỗ quán đang phát + nút đưa về */}
-      {miniWin && (
+      {miniOpen && (
         <>
-          <MiniPlayer
-            win={miniWin}
-            source={canvasRef}
-            draw={drawRef}
-            tracks={tracks}
-            index={index}
-            station={`${stationLabel} · ${dest.name}`}
-            playing={playing}
-            onTogglePlay={togglePlay}
-            onPrev={prev}
-            onNext={next}
-            onPick={pickMini}
-            onClose={closeMini}
-          />
+          {miniWin && (
+            <MiniPlayer
+              win={miniWin}
+              source={canvasRef}
+              draw={drawRef}
+              tracks={tracks}
+              index={index}
+              station={`${stationLabel} · ${dest.name}`}
+              playing={playing}
+              onTogglePlay={togglePlay}
+              onPrev={prev}
+              onNext={next}
+              onPick={pickMini}
+              onClose={closeMini}
+            />
+          )}
+          <MiniVideoSync video={miniVideoRef} open={miniVideoOn} title={track.title} station={`${stationLabel} · ${dest.name}`} playing={playing} onToggle={togglePlay} />
           <div role="status" className="absolute left-1/2 top-16 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/60 py-1.5 pl-4 pr-1.5 text-sm text-[#f3ece4] backdrop-blur">
             {t.room.miniHere}
-            <button type="button" onClick={() => miniWin.close()} className="rounded-full bg-[#e8b27d] px-3 py-1 text-xs font-medium text-[#1a1410] transition hover:bg-[#f0c494]">
+            <button type="button" onClick={closeAnyMini} className="rounded-full bg-[#e8b27d] px-3 py-1 text-xs font-medium text-[#1a1410] transition hover:bg-[#f0c494]">
               {t.room.miniBack}
             </button>
           </div>
@@ -2993,10 +3030,10 @@ export function ChillRoom({
             {clock}
           </span>
           {canMini && (
-            <div className="relative hidden sm:block">
+            <div className="relative hidden sm:block" onPointerEnter={prepareMini} onPointerDown={prepareMini} onFocus={prepareMini}>
               {/* Chưa thử lần nào → nút có chữ + nhãn "Mới" cho khỏi chìm giữa các nút icon */}
-              {guideTried.includes('mini') || miniWin ? (
-                <StageButton label={t.room.miniOpen} onClick={() => (miniWin ? miniWin.close() : openMini('button'))}>
+              {guideTried.includes('mini') || miniOpen ? (
+                <StageButton label={t.room.miniOpen} onClick={() => (miniOpen ? closeAnyMini() : openMini('button'))}>
                   <MiniPlayerIcon />
                 </StageButton>
               ) : (
@@ -4108,6 +4145,19 @@ function SwitchRow({title, desc, on, onToggle}: {title: string; desc: string; on
       <SwitchTrack on={on} size="lg" />
     </button>
   )
+}
+
+// Cửa sổ nổi bản Document PiP (Chrome / Edge) — ?mini=video ép dùng bản video để thử
+const docPiP = () => canMiniPlayer() && new URLSearchParams(window.location.search).get('mini') !== 'video'
+
+// Báo bài / trạm / phát-dừng cho cửa sổ nổi dạng video (MiniVideo.ts tự vẽ chữ lên khung)
+function MiniVideoSync({video, open, title, station, playing, onToggle}: {video: React.RefObject<MiniVideo | null>; open: boolean; title: string; station: string; playing: boolean; onToggle: () => void}) {
+  useEffect(() => {
+    const mv = video.current
+    if (!mv) return
+    mv.update({title, station, playing}, onToggle)
+  }, [video, open, title, station, playing, onToggle])
+  return null
 }
 
 function StageButton({label, onClick, children}: {label: string; onClick: () => void; children: React.ReactNode}) {

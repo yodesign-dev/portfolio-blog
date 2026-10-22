@@ -255,10 +255,21 @@ function combine(a: string | null, b: string | null) {
 
 const pick = <T>(rng: () => number, list: T[]) => list[Math.floor(rng() * list.length)]
 
+// Ảnh khác origin (Sanity CDN) tải kèm CORS cho canvas cảnh khỏi bị "bẩn" — cửa sổ nổi dạng
+// video (MiniVideo.ts) cần quay canvas thành video. CDN không cho origin này (dev ở cổng lạ)
+// thì tải lại không CORS: cảnh vẫn đủ ảnh, chỉ mất cửa sổ nổi dạng video
 function loadImage(src: string, onLoad: () => void) {
   const img = new Image()
   img.decoding = 'async'
   img.onload = onLoad
+  if (/^https?:\/\//.test(src) && !src.startsWith(window.location.origin)) {
+    img.crossOrigin = 'anonymous'
+    img.onerror = () => {
+      img.onerror = null
+      img.removeAttribute('crossorigin')
+      img.src = src
+    }
+  }
   img.src = src
   return img
 }
