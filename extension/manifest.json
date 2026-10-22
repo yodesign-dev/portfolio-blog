@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Lofi Pixel Cafe",
+  "short_name": "Pixel Cafe",
+  "description": "Nhạc lofi của quán cà phê pixel applebin.me/chill ngay trên thanh công cụ — đóng ô vẫn phát.",
+  "version": "0.1.0",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Lofi Pixel Cafe",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["offscreen", "storage"],
+  "commands": {
+    "toggle-play": {
+      "suggested_key": {"default": "Alt+Shift+P"},
+      "description": "Phát / dừng nhạc"
+    }
+  }
+}

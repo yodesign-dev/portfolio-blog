@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Lofi Pixel Cafe</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main class="popup">
+  <header class="top">
+    <img class="logo" src="icons/icon-32.png" width="28" height="28" alt="">
+    <h1 class="brand">Lofi Pixel Cafe</h1>
+    <a class="open" id="open" href="#" target="_blank" rel="noopener">Vào quán
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 2h6v6M10 2 3 9"/></svg>
+    </a>
+  </header>
+
+  <div class="scene" id="scene">
+    <img src="scene.webp" width="320" height="180" alt="Quán cà phê pixel nhìn ra phố">
+    <div class="rain-veil" aria-hidden="true"></div>
+    <span class="chip" id="chip"></span>
+    <button class="rain-btn" id="rain-btn" type="button" aria-pressed="false" aria-label="Bật mưa">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4.5 9.5a3 3 0 0 1 .4-6 4 4 0 0 1 7.4 1.5 2.3 2.3 0 0 1-.3 4.5Z"/><path d="M5.5 12l-.8 2M8.5 12l-.8 2M11.5 12l-.8 2"/></svg>
+    </button>
+  </div>
+
+  <section class="now" aria-live="polite">
+    <div class="now-row">
+      <p class="title" id="title">Bấm phát để nghe</p>
+      <p class="station" id="station-label"></p>
+    </div>
+    <div class="bar" aria-hidden="true"><div class="bar-fill" id="bar"></div></div>
+    <div class="times"><span id="pos">0:00</span><span id="dur">0:00</span></div>
+  </section>
+
+  <div class="controls">
+    <button class="ctl" id="prev" type="button" aria-label="Bài trước">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="2" height="12"/><path d="M16 4v12L7 10Z"/></svg>
+    </button>
+    <button class="play" id="play" type="button" aria-label="Phát">
+      <svg class="i-play" width="22" height="22" viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><path d="M7 4v14l12-7Z"/></svg>
+      <svg class="i-pause" width="22" height="22" viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="4" height="14"/><rect x="13" y="4" width="4" height="14"/></svg>
+    </button>
+    <button class="ctl" id="next" type="button" aria-label="Bài tiếp">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="14" y="4" width="2" height="12"/><path d="M4 4v12l9-6Z"/></svg>
+    </button>
+  </div>
+
+  <div class="stations" id="stations" role="group" aria-label="Trạm nhạc"></div>
+
+  <div class="mix">
+    <label for="v-music">Nhạc</label><input id="v-music" type="range" min="0" max="100">
+    <label for="v-rain">Tiếng mưa</label><input id="v-rain" type="range" min="0" max="100">
+    <label for="v-cafe">Tiếng quán</label><input id="v-cafe" type="range" min="0" max="100">
+  </div>
+
+  <footer class="foot">
+    <span id="note">Đóng ô này nhạc vẫn phát</span>
+    <kbd id="shortcut" hidden></kbd>
+  </footer>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

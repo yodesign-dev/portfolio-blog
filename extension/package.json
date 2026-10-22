@@ -1,0 +1,16 @@
+{
+  "name": "lofi-pixel-cafe-extension",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "CHILL_BASE=http://localhost:3000 node build.mjs --watch",
+    "zip": "node build.mjs --zip",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.6",
+    "esbuild": "^0.28.2",
+    "typescript": "^5"
+  }
+}

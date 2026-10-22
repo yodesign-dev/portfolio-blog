@@ -45,3 +45,8 @@ next-env.d.ts
 
 # video YouTube của /chill (scripts/chill-mix-audio.mjs, chill-make-video.mjs)
 /.chill-video/
+
+# Chrome extension /chill (extension/): bản build + gói nộp Web Store
+/extension/dist
+/extension/node_modules
+/extension/*.zip
