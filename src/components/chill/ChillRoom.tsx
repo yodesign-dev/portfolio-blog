@@ -1780,10 +1780,11 @@ export function ChillRoom({
   }
   const guideNext = guideShown.length < GUIDE_PER_VISIT ? (GUIDE_ORDER.find((s) => guideCan[s] && !guideDone[s] && !guideShown.includes(s)) ?? null) : null
   const activeGuide = guide && guideCan[guide.step] && (guide.forced || !guideDone[guide.step]) ? guide.step : null
-  const guideBusy = panelOpen || volumeOpen || otherOverlay || focusOpen || drinkOpen || menuOpen
+  // Cửa sổ nổi đang mở → khách không nhìn tab quán, gợi ý chờ tới khi đưa quán về
+  const guideBusy = panelOpen || volumeOpen || otherOverlay || focusOpen || drinkOpen || menuOpen || miniWin !== null
   useEffect(() => {
     // Đang chạy 1 phin → khách đang tập trung, không mời thêm gì
-    if (!entered || zen || activeGuide || !guideNext || focusLabel) return
+    if (!entered || zen || activeGuide || !guideNext || focusLabel || miniWin) return
     const id = window.setTimeout(
       () => {
         guideLeft.current = GUIDE_SHOW_MS
@@ -1795,7 +1796,7 @@ export function ChillRoom({
       guideShown.length ? GUIDE_GAP_MS : GUIDE_FIRST_MS,
     )
     return () => window.clearTimeout(id)
-  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel])
+  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel, miniWin])
   useEffect(() => {
     if (!guideHold) return
     const id = window.setTimeout(() => setGuideHold(false), GUIDE_HOLD_MS)
