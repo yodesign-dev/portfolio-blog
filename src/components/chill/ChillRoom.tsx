@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, type Destination} from './destinations'
@@ -33,6 +33,7 @@ import {NameField} from './NameField'
 import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
+import {HotBadge, PlayMeter, playStats} from './PlayMeter'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
 const PREFS_KEY = 'chill:prefs'
@@ -82,9 +83,8 @@ function visitRef() {
 }
 // Mốc phút đã nghe nhạc trong 1 lần mở trang (event Chill Listen)
 const LISTEN_MINUTES = [1, 5, 15, 30, 60]
-// Lượt nghe: phát đủ 30 giây mới tính (như Spotify); dưới 50 lượt thì chưa hiện số
+// Lượt nghe: phát đủ 30 giây mới tính (như Spotify); cách hiện trên danh sách xem PlayMeter.tsx
 const PLAY_COUNT_MS = 30_000
-const PLAY_COUNT_SHOW = 50
 // Thử thách chung: mã máy, phin đã góp / phiếu đã bỏ trong mùa (theo mã mùa)
 const QUEST_UID_KEY = 'chill:quest-uid'
 const QUEST_MINE_KEY = 'chill:quest-mine'
@@ -183,13 +183,6 @@ const AMBIENCE_FOR: Record<Weather, {kind: Ambience; label: string}> = {
   clear: {kind: 'street', label: 'Street sounds'},
   rain: {kind: 'rain', label: 'Rain on the awning'},
   mist: {kind: 'quiet', label: 'Quiet room'},
-}
-
-// 846 · 1.2k (en) / 1,2k (vi)
-function formatPlays(n: number, lang: Lang) {
-  if (n < 1000) return String(n)
-  const k = (Math.floor(n / 100) / 10).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, '')
-  return `${lang === 'vi' ? k.replace('.', ',') : k}k`
 }
 
 function formatTime(sec: number) {
@@ -1499,6 +1492,8 @@ export function ChillRoom({
 
   // Lượt nghe từng bài (/api/chill-plays): số chung của cả quán, CDN giữ 5 phút
   const [playCounts, setPlayCounts] = useState<Record<string, number>>({})
+  // Mức nghe + nhãn "Nghe nhiều" từng bài (so trong trạm); tắt công tắc thì không có gì
+  const plays = useMemo(() => (playCountsOn ? playStats(tracks, playCounts) : undefined), [playCountsOn, tracks, playCounts])
   useEffect(() => {
     if (!playCountsOn) return
     fetch('/api/chill-plays')
@@ -2318,6 +2313,7 @@ export function ChillRoom({
               source={canvasRef}
               draw={drawRef}
               tracks={tracks}
+              plays={plays}
               index={index}
               station={`${stationLabel} · ${dest.name}`}
               playing={playing}
@@ -2403,14 +2399,13 @@ export function ChillRoom({
                         <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
                           {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
                         </span>
-                        <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                          <HotBadge stat={plays?.get(tr.id)} />
+                        </span>
                         <span className="flex flex-col items-end">
                           <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
-                          {playCountsOn && (playCounts[tr.id] ?? 0) >= PLAY_COUNT_SHOW && (
-                            <span className="whitespace-nowrap text-[11px] tabular-nums text-[#a79e94]/80">
-                              {t.room.plays(formatPlays(playCounts[tr.id], lang))}
-                            </span>
-                          )}
+                          <PlayMeter stat={plays?.get(tr.id)} />
                         </span>
                       </button>
                     </li>
@@ -3504,15 +3499,14 @@ export function ChillRoom({
                         </span>
                         <span className="min-w-0">
                           <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
-                          <span className="block truncate text-xs text-[#a79e94]">{tr.mood}</span>
+                          <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#a79e94]">
+                            <HotBadge stat={plays?.get(tr.id)} />
+                            <span className="truncate">{tr.mood}</span>
+                          </span>
                         </span>
                         <span className="flex flex-col items-end">
                           <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
-                          {playCountsOn && (playCounts[tr.id] ?? 0) >= PLAY_COUNT_SHOW && (
-                            <span className="whitespace-nowrap text-[11px] tabular-nums text-[#a79e94]/80">
-                              {t.room.plays(formatPlays(playCounts[tr.id], lang))}
-                            </span>
-                          )}
+                          <PlayMeter stat={plays?.get(tr.id)} />
                         </span>
                       </button>
                     </li>

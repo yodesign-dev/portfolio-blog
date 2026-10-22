@@ -15,6 +15,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {useT} from './i18n'
+import {HotBadge, PlayMeter, type PlayStat} from './PlayMeter'
 import {STATIONS, stationOf, type StationId, type Track} from './tracks'
 
 type DocumentPiP = {
@@ -58,6 +59,7 @@ export function MiniPlayer({
   source,
   draw,
   tracks,
+  plays,
   index,
   station,
   playing,
@@ -73,6 +75,8 @@ export function MiniPlayer({
   // Vẽ 1 khung cảnh (tự giới hạn ~30fps) — true nếu vừa vẽ khung mới
   draw: React.RefObject<(now: number) => boolean>
   tracks: Track[]
+  // Lượt nghe từng bài (công tắc Studio playCountsOpen tắt thì không có)
+  plays?: Map<string, PlayStat>
   // Bài đang phát / chờ phát (vị trí trong `tracks`)
   index: number
   // Dòng phụ dưới tên bài: trạm · điểm đến
@@ -274,8 +278,12 @@ export function MiniPlayer({
                     }`}
                   >
                     <span className="font-mono text-[11px] tabular-nums text-[#a79e94]">{active && playing ? '♪' : String(pos + 1).padStart(2, '0')}</span>
-                    <span className={`truncate text-[13px] ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
-                    <span className="font-mono text-[11px] tabular-nums text-[#a79e94]">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className={`truncate text-[13px] ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                      <HotBadge stat={plays?.get(tr.id)} />
+                    </span>
+                    <span className="flex items-center gap-2 font-mono text-[11px] tabular-nums text-[#a79e94]">
+                      <PlayMeter stat={plays?.get(tr.id)} />
                       {tr.duration ? `${Math.floor(tr.duration / 60)}:${String(Math.round(tr.duration % 60)).padStart(2, '0')}` : '–:––'}
                     </span>
                   </button>
