@@ -5,6 +5,7 @@
 // Danh sách thật quản lý trong Sanity Studio ("Chill · Điểm đến"), ảnh từ Sanity CDN
 // (xem src/app/chill/page.tsx). Ở đây chỉ còn Hà Nội dự phòng khi Sanity không trả về gì.
 
+import type {NeonSign} from './facade'
 import type {TimeOfDay} from './scene'
 
 export type Destination = {
@@ -15,6 +16,10 @@ export type Destination = {
   timeZone: string
   // URL ảnh phố theo từng thời điểm
   streets: Record<TimeOfDay, string>
+  // Bản 1120 px (chỉ khi ảnh gốc đủ lớn) — dùng khi bật "Mặt phố sống động"
+  streetsHd?: Record<TimeOfDay, string>
+  // Bảng hiệu neon ban đêm (Studio › Điểm đến › Mặt phố); trống thì dùng SIGN_DEFAULTS
+  signs?: NeonSign[]
   // Độ nghiêng của lòng đường (px dọc / px ngang, lưới 320×180) cho cảnh phố
   // dốc — làn xe và vỉa hè nghiêng theo, tâm xoay ở giữa khung. Âm = dốc lên phải.
   tilt?: number

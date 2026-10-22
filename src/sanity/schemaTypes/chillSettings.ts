@@ -25,6 +25,7 @@ export default defineType({
     defineField({name: 'playCountsOpen', title: 'Đếm và hiện lượt nghe', type: 'boolean', initialValue: false}),
     defineField({name: 'catToyOpen', title: 'Cần câu lông vũ trêu mèo', type: 'boolean', initialValue: false}),
     defineField({name: 'seatPickOpen', title: 'Khách chọn người ngồi nam / nữ', type: 'boolean', initialValue: false}),
+    defineField({name: 'facadeOpen', title: 'Mặt phố sống động (ảnh nét, đèn đêm, neon, bóng mây)', type: 'boolean', initialValue: false}),
     defineField({name: 'streetMotionOpen', title: 'Chuyển động phố mượt (người, xe, chó)', type: 'boolean', initialValue: false}),
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
     // Thử thách chung "Cả quán cùng pha phin" (xem src/app/api/chill-quest/route.ts)

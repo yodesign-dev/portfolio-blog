@@ -18,6 +18,7 @@ export default defineType({
   groups: [
     {name: 'content', title: 'Nội dung', default: true},
     {name: 'advanced', title: 'Căn chỉnh'},
+    {name: 'facade', title: 'Mặt phố'},
   ],
   fields: [
     defineField({
@@ -99,6 +100,40 @@ export default defineType({
       type: 'number',
       group: 'advanced',
       description: 'Âm = dời làn xe lên, dương = xuống. Thường để trống.',
+    }),
+    defineField({
+      name: 'signs',
+      title: 'Bảng hiệu neon (ban đêm)',
+      type: 'array',
+      group: 'facade',
+      description:
+        'Chỉ hiện khi bật "Mặt phố sống động" trong Chill · Cài đặt. Để trống thì dùng bảng hiệu mặc định trong code (nếu cảnh có). Chữ pixel 3×5, có dấu tiếng Việt; mỗi chữ rộng 4 px của ảnh 560 px, nên đặt lên một mảng tường / bảng tối.',
+      of: [
+        {
+          type: 'object',
+          name: 'neonSign',
+          fields: [
+            defineField({name: 'text', title: 'Chữ', type: 'string', validation: (Rule) => Rule.required().max(14), description: 'Viết hoa không bắt buộc, vd. CÀ PHÊ, PHỞ BÒ, KARAOKE.'}),
+            defineField({name: 'x', title: 'Vị trí ngang (%)', type: 'number', validation: (Rule) => Rule.required().min(0).max(100), description: 'Mép trái hàng chữ, tính theo % chiều ngang ảnh phố.'}),
+            defineField({name: 'y', title: 'Vị trí dọc (%)', type: 'number', validation: (Rule) => Rule.required().min(0).max(100), description: 'Đỉnh thân chữ (dấu nằm phía trên), tính theo % chiều cao ảnh phố.'}),
+            defineField({
+              name: 'color',
+              title: 'Màu',
+              type: 'string',
+              initialValue: 'pink',
+              options: {list: [{title: 'Hồng', value: 'pink'}, {title: 'Xanh ngọc', value: 'cyan'}, {title: 'Đỏ', value: 'red'}, {title: 'Xanh lá', value: 'green'}, {title: 'Vàng', value: 'yellow'}], layout: 'radio', direction: 'horizontal'},
+            }),
+            defineField({
+              name: 'mode',
+              title: 'Cách sáng',
+              type: 'string',
+              initialValue: 'sweep',
+              options: {list: [{title: 'Bật từng chữ, chớp rồi nghỉ', value: 'sweep'}, {title: 'Sáng đều, thỉnh thoảng chập chờn', value: 'steady'}, {title: 'Nhấp nháy', value: 'blink'}], layout: 'radio'},
+            }),
+          ],
+          preview: {select: {title: 'text', subtitle: 'color'}},
+        },
+      ],
     }),
   ],
   orderings: [{title: 'Thứ tự', name: 'order', by: [{field: 'order', direction: 'asc'}]}],

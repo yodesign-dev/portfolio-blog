@@ -26,6 +26,7 @@
 import {Cat, CAT_SRC, type ToyEvent} from './cat'
 import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
+import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
 import {seatArt, themeById, type CharacterVideo, type Seat, type SheetSpec, type Theme, type ThemeId} from './themes'
@@ -557,6 +558,9 @@ export class ChillScene {
   private pawTarget: ReturnType<Rain['plant']> | null = null
 
   private rng = Math.random
+  // Mặt phố sống động (công tắc Studio facadeOpen): ảnh phố 1120 px, đèn đêm, neon, bóng mây
+  private facadeOn = false
+  private facade = new Facade(Math.random)
   private movers: Mover[] = []
   private rain: Rain
   private notes: Note[] = []
@@ -598,7 +602,7 @@ export class ChillScene {
     this.ctx.imageSmoothingEnabled = false
     this.resize(this.buffer.width, this.buffer.height)
 
-    this.street = this.image(this.destination.streets[this.time])
+    this.street = this.image(this.streetsOf(this.destination)[this.time])
     this.interior = loadImage(this.art.interior, () => (this.dirty = true))
     this.interiorLayer = this.makeLayer()
     this.propsLayer = this.makeLayer()
@@ -688,7 +692,7 @@ export class ChillScene {
 
   setAtmosphere(time: TimeOfDay, weather: Weather, destination = this.destination) {
     if (time === this.time && weather === this.weather && destination.id === this.destination.id && !this.dirty) return
-    const next = this.image(destination.streets[time])
+    const next = this.image(this.streetsOf(destination)[time])
     if (next !== this.street) {
       this.prevStreet = ready(this.street) ? this.street : this.prevStreet
       this.street = next
@@ -720,7 +724,24 @@ export class ChillScene {
 
   // Tải trước ảnh của 1 điểm đến (vd điểm kế tiếp) để lúc chuyển không bị trống
   preload(destination: Destination) {
-    for (const src of Object.values(destination.streets)) this.image(src)
+    for (const src of Object.values(this.streetsOf(destination))) this.image(src)
+  }
+
+  // Ảnh phố theo giờ: bật "Mặt phố sống động" thì lấy bản 1120 px nếu điểm đến có
+  private streetsOf(destination: Destination) {
+    return (this.facadeOn && destination.streetsHd) || destination.streets
+  }
+
+  setFacade(on: boolean) {
+    if (on === this.facadeOn) return
+    this.facadeOn = on
+    const next = this.image(this.streetsOf(this.destination)[this.time])
+    if (next !== this.street) {
+      this.prevStreet = ready(this.street) ? this.street : this.prevStreet
+      this.street = next
+      this.fade = 0
+    }
+    this.dirty = true
   }
 
   private image(src: string) {
@@ -1190,18 +1211,21 @@ export class ChillScene {
     // Mưa gió mạnh, sương gần như lặng
     const force = this.weather === 'rain' ? 1.5 : this.weather === 'mist' ? 0.35 : 1
     const sheen = this.weather === 'clear' && this.time !== 'night'
-    const bx = ((t * 70) % (width + 300)) - 150
+    // Số đo theo ảnh 560 px; ảnh nét 1120 px (Mặt phố sống động) nhân theo tỉ lệ để lúa
+    // lắc y như cũ trên màn hình
+    const s = width / 560
+    const bx = ((t * 70 * s) % (width + 300 * s)) - 150 * s
     for (let y = y0; y < y1; y++) {
       const depth = (y - y0) / (y1 - y0)
-      const amp = (0.4 + 1.8 * depth * depth) * force
+      const amp = (0.4 + 1.8 * depth * depth) * force * s
       for (let x = 0; x < width; x++) {
         const p = y * width + x
         if (!w.mask[p]) continue
-        const gust = 0.6 + 0.4 * Math.sin(x * 0.013 - t * 0.7)
-        const dx = Math.round(amp * gust * Math.sin(x * 0.09 - t * 2.4 + y * 0.11))
+        const gust = 0.6 + 0.4 * Math.sin((x / s) * 0.013 - t * 0.7)
+        const dx = Math.round(amp * gust * Math.sin((x / s) * 0.09 - t * 2.4 + (y / s) * 0.11))
         const sx = Math.min(width - 1, Math.max(0, x - dx))
         const q = (w.mask[y * width + sx] ? y * width + sx : p) * 4
-        const k = sheen ? 1 + 0.12 * Math.exp(-(((x - bx - (y - y0) * 0.5) / 38) ** 2)) : 1
+        const k = sheen ? 1 + 0.12 * Math.exp(-(((x - bx - (y - y0) * 0.5) / (38 * s)) ** 2)) : 1
         out[p * 4] = data[q] * k
         out[p * 4 + 1] = data[q + 1] * k
         out[p * 4 + 2] = data[q + 2] * k
@@ -1503,6 +1527,11 @@ export class ChillScene {
     this.updateCat(dt)
 
     if (rainy) this.rain.update(dt)
+    if (this.facadeOn && ready(this.street)) {
+      const d = this.destination
+      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [])
+      this.facade.update(dt)
+    }
   }
 
   // Xe: bám xe phía trước bằng gia tốc (tăng tốc chậm, phanh nhanh hơn) thay vì đổi tốc độ tức thì
@@ -2151,6 +2180,7 @@ export class ChillScene {
       gc.clip()
       gc.setTransform(RES * k, 0, 0, RES * k, RES * (x - STREET_IMG.x * k), RES * (y - top * k))
       gc.drawImage(this.streetSource(img), STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
+      if (this.facadeOn) this.facade.draw(gc, STREET_IMG, this.windDir)
       const counter = this.ctx
       this.ctx = gc
       // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
@@ -2500,6 +2530,7 @@ export class ChillScene {
     if (ready(this.street)) {
       ctx.globalAlpha = this.prevStreet ? this.fade : 1
       this.drawStreet(this.street, street, view)
+      if (this.facadeOn) this.facade.draw(ctx, street, this.windDir)
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)

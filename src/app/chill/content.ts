@@ -2,6 +2,7 @@ import {DESTINATIONS, type Destination} from '@/components/chill/destinations'
 import {STATIONS, TRACKS, type StationId, type Track} from '@/components/chill/tracks'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import type {ChillUpdate} from '@/components/chill/Changelog'
+import type {NeonSign} from '@/components/chill/facade'
 
 // Nội dung của /chill và /chill/embed: nhạc, điểm đến, nhật ký thay đổi.
 //
@@ -32,7 +33,9 @@ const CHILL_QUERY = `{
     scenery,
     "morning": morning.asset->url,
     "afternoon": afternoon.asset->url,
-    "night": night.asset->url
+    "night": night.asset->url,
+    "minWidth": math::min([morning.asset->metadata.dimensions.width, afternoon.asset->metadata.dimensions.width, night.asset->metadata.dimensions.width]),
+    "signs": signs[defined(text)]{text, x, y, color, mode}
   },
   "updates": *[_type == "chillUpdate" && defined(title) && defined(date) && count(items) > 0]
     | order(date desc, _createdAt desc)[0...12] {
@@ -57,7 +60,8 @@ const CHILL_QUERY = `{
   "catToyOpen": *[_id == "chillSettings"][0].catToyOpen,
   "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen,
   "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen,
-  "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen
+  "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen,
+  "facadeOpen": *[_id == "chillSettings"][0].facadeOpen
 }`
 
 type ChillContent = {
@@ -73,6 +77,8 @@ type ChillContent = {
     morning: string
     afternoon: string
     night: string
+    minWidth?: number | null
+    signs?: NeonSign[] | null
   }[]
   shelfOpen?: boolean | null
   playCountsOpen?: boolean | null
@@ -81,11 +87,23 @@ type ChillContent = {
   seatPickOpen?: boolean | null
   streetMotionOpen?: boolean | null
   miniPlayerOpen?: boolean | null
+  facadeOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
 // Sanity CDN tự cắt/thu nhỏ ảnh về đúng khung phố của canvas (560×238)
 const sceneUrl = (url: string) => `${url}?w=560&h=238&fit=crop&fm=webp&q=90`
+// Bản nét (1120×476 = 4 px mỗi ô lưới, đúng mật độ sprite) — chỉ khi cả 3 ảnh gốc đủ
+// lớn; ảnh gốc 560 px mà bắt CDN phóng lên thì chỉ nhoè thêm
+const sceneHdUrl = (url: string) => `${url}?w=1120&h=476&fit=crop&fm=webp&q=90`
+// Cảnh có ảnh gốc chỉ 560 px: bản vẽ lại 1120 px (Nano Banana 2.1, cùng bố cục, vạch vỉa hè /
+// làn xe giữ nguyên) nằm trong /public, ưu tiên hơn ảnh Studio khi bật "Mặt phố sống động"
+const LOCAL_HD = new Set(['saigon', 'hue', 'dalat', 'nhatrang', 'cantho', 'tiengiang'])
+const localHd = (id: string) => ({
+  morning: `/chill/scenes/hd/${id}-morning.webp`,
+  afternoon: `/chill/scenes/hd/${id}-afternoon.webp`,
+  night: `/chill/scenes/hd/${id}-night.webp`,
+})
 
 function isTimeZone(tz?: string): tz is string {
   if (!tz) return false
@@ -123,6 +141,8 @@ export async function getChillContent(revalidate: number) {
     laneShift: d.laneShift,
     scenery: d.scenery === 'countryside' || d.scenery === 'railway' ? d.scenery : 'street',
     streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
+    streetsHd: LOCAL_HD.has(d.id) ? localHd(d.id) : (d.minWidth ?? 0) >= 1120 ? {morning: sceneHdUrl(d.morning), afternoon: sceneHdUrl(d.afternoon), night: sceneHdUrl(d.night)} : undefined,
+    signs: d.signs?.length ? d.signs : undefined,
   }))
   const destinations: Destination[] = [...(fromStudioDest.length ? fromStudioDest : DESTINATIONS)]
   // Chỉ máy dev: thêm cảnh đồng miền Tây (ảnh local, đang làm) để thử trước khi đưa lên Studio
@@ -172,5 +192,7 @@ export async function getChillContent(revalidate: number) {
   const streetMotionOn = content.streetMotionOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MOTION === '1')
   // Thu nhỏ quán thành cửa sổ nổi (Document PiP) + Media Session. Máy dev: CHILL_DEV_MINI=1
   const miniPlayerOn = content.miniPlayerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MINI === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn}
+  // Mặt phố sống động (ảnh nét, đèn đêm, neon, bóng mây). Máy dev: CHILL_DEV_FACADE=1
+  const facadeOn = content.facadeOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_FACADE === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn}
 }

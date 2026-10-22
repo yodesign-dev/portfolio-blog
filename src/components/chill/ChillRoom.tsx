@@ -217,6 +217,7 @@ export function ChillRoom({
   seatPickOn = false,
   streetMotionOn = false,
   miniPlayerOn = false,
+  facadeOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -237,6 +238,9 @@ export function ChillRoom({
   // Thu nhỏ quán thành cửa sổ nổi (Document PiP) + tên trạm / ảnh / tua trên màn hình khoá
   // (Studio "Chill · Cài đặt"), mặc định tắt. ?mini=1 / ?mini=0 trên URL ghi đè
   miniPlayerOn?: boolean
+  // Mặt phố sống động: ảnh nét, đèn đêm, neon, bóng mây (Studio "Chill · Cài đặt"), mặc
+  // định tắt. ?facade=1 / ?facade=0 trên URL ghi đè để so trước / sau
+  facadeOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -605,6 +609,11 @@ export function ChillRoom({
     const motion = new URLSearchParams(window.location.search).get('motion')
     sceneRef.current?.setStreetMotion(motion ? motion === '1' : streetMotionOn)
   }, [streetMotionOn])
+
+  useEffect(() => {
+    const facade = new URLSearchParams(window.location.search).get('facade')
+    sceneRef.current?.setFacade(facade ? facade === '1' : facadeOn)
+  }, [facadeOn])
 
   // Màn dọc: vào quán rồi thì phóng to cảnh; bàn nhóm cần thấy đủ 4 ghế nên thu về như cũ
   useEffect(() => {
