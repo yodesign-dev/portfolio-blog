@@ -3642,7 +3642,7 @@ export function ChillRoom({
                 <Segmented options={TIMES.map((o) => ({...o, label: t.room.times[o.value]}))} value={time} onChange={setTime} />
               </Field>
               <Field label={t.room.weather}>
-                <Segmented options={WEATHERS.map((o) => ({...o, label: t.room.weathers[o.value]}))} value={weather} onChange={setWeather} />
+                <Segmented options={WEATHERS.map((o) => ({...o, label: t.room.weathersShort[o.value]}))} value={weather} onChange={setWeather} />
               </Field>
               {theme === 'cafe' && (
                 <Field
@@ -4009,7 +4009,7 @@ function Segmented<T extends string>({
           }`}
         >
           {o.icon}
-          {o.label}
+          <span className="truncate whitespace-nowrap">{o.label}</span>
         </button>
       ))}
     </div>

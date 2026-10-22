@@ -92,6 +92,8 @@ const en = {
     travelMin: (n: number) => `${n} min`,
     times: {morning: 'Morning', afternoon: 'Afternoon', night: 'Night'},
     weathers: {clear: 'Clear', rain: 'Rain', mist: 'Mist'},
+    // Nhãn ngắn cho ô chọn thời tiết trong Cài đặt (3 ô chia đều, hẹp)
+    weathersShort: {clear: 'Clear', rain: 'Rain', mist: 'Mist'},
     walls: {brick: 'Brick', glass: 'Glass'},
     ambience: {street: 'Street sounds', rain: 'Rain on the awning', quiet: 'Quiet room'},
     themes: {cafe: 'Café window', balcony: 'Balcony', desk: 'Night desk'},
@@ -675,6 +677,7 @@ const vi: typeof en = {
     travelMin: (n) => `${n} phút`,
     times: {morning: 'Sáng', afternoon: 'Chiều', night: 'Tối'},
     weathers: {clear: 'Trời quang', rain: 'Mưa', mist: 'Sương'},
+    weathersShort: {clear: 'Quang', rain: 'Mưa', mist: 'Sương'},
     walls: {brick: 'Tường gạch', glass: 'Vách kính'},
     ambience: {street: 'Tiếng phố', rain: 'Mưa trên mái hiên', quiet: 'Phòng yên tĩnh'},
     themes: {cafe: 'Cửa sổ quán', balcony: 'Ban công', desk: 'Bàn đêm'},

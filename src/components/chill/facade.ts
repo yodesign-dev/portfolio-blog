@@ -1,9 +1,9 @@
 // Mặt phố sống động (/chill, sau công tắc Studio facadeOpen): lớp vẽ chồng lên ảnh phố.
 //
 // - Đêm: tự dò ô cửa sổ đang sáng trên ảnh (pixel vàng ấm, trên vỉa hè, gom theo 8
-//   hướng) — không cần đánh dấu tay. Khoảng 1/3 ô to có người tắt đèn đi ngủ rồi bật
+//   hướng) — không cần đánh dấu tay. Khoảng một nửa số phòng có người tắt đèn rồi bật
 //   lại, 1 ô xem TV (ánh xanh chập chờn), 1–2 ô đèn tuýp nháy mấy lần mới sáng hẳn,
-//   quầng sáng quanh ô thở rất nhẹ.
+//   quầng sáng quanh ô thở chậm.
 // - Đêm: bảng hiệu neon chữ pixel 3×5 có dấu tiếng Việt, đặt trong Studio ("Mặt phố" của
 //   từng điểm đến) hoặc theo SIGN_DEFAULTS bên dưới.
 // - Ngày trời quang: bóng mây trôi chậm qua mặt phố; chiều thì thỉnh thoảng một vệt nắng
@@ -159,7 +159,7 @@ export class Facade {
   private clock = 0
   private tvLevel = 1
   private tvNext = 0
-  private nextGlint = 12
+  private nextGlint = 4
   private glintT = -1
   private band: HTMLCanvasElement | null = null
   private props: PropSpot[] = []
@@ -259,12 +259,13 @@ export class Facade {
         blobs.push({pts, x0, y0, x1, y1, role: room ? 'toggle' : 'still', on: true, level: 1, next: 0, ph: this.rng() * 6, sputter: -1})
       }
       const rooms = blobs.filter((b) => b.role === 'toggle')
-      for (const b of rooms) if (this.rng() > 0.35) b.role = 'still'
+      for (const b of rooms) if (this.rng() > 0.55) b.role = 'still'
       const big = [...rooms].sort((p, q) => q.pts.length - p.pts.length)
       if (big.length >= 6) big[3].role = 'tv'
       for (const b of [big[1], big[5]]) if (b) b.role = 'tube'
       for (const b of blobs) {
-        b.next = b.role === 'tube' ? 30 + this.rng() * 90 : 20 + this.rng() * 120
+        // Lần đổi đầu tiên đến sớm để khách vừa vào đã thấy phố sống
+        b.next = b.role === 'tube' ? 6 + this.rng() * 20 : 3 + this.rng() * 40
         for (const q of b.pts) {
           const i = q * 4
           // Tắt đèn: lòng cửa sổ về xanh tối của đêm
@@ -310,8 +311,8 @@ export class Facade {
           b.next -= dt
           if (b.next <= 0) {
             b.on = !b.on
-            // Tắt 15–60 giây, sáng 1–4 phút
-            b.next = b.on ? 60 + this.rng() * 180 : 15 + this.rng() * 45
+            // Tắt 8–30 giây, sáng 25–90 giây — nhiều phòng cùng đổi nên cứ vài giây lại có 1 nhà
+            b.next = b.on ? 25 + this.rng() * 65 : 8 + this.rng() * 22
             if (b.on && b.role === 'tube') b.sputter = this.clock
           }
         }
@@ -326,7 +327,7 @@ export class Facade {
       }
       this.tvNext -= dt
       if (this.tvNext <= 0) {
-        this.tvLevel = 0.55 + this.rng() * 0.45
+        this.tvLevel = 0.35 + this.rng() * 0.65
         this.tvNext = 0.08 + this.rng() * 0.35
       }
     }
@@ -336,7 +337,7 @@ export class Facade {
         if (this.glintT > 2.6) this.glintT = -1
       } else if ((this.nextGlint -= dt) <= 0) {
         this.glintT = 0
-        this.nextGlint = 25 + this.rng() * 25
+        this.nextGlint = 10 + this.rng() * 15
       }
     }
   }
@@ -448,10 +449,10 @@ export class Facade {
       if (k < 0.05) continue
       const cx = r.x + ((b.x0 + b.x1 + 1) / 2) * sx
       const cy = r.y + ((b.y0 + b.y1 + 1) / 2) * sy
-      const rad = Math.max(b.x1 - b.x0, b.y1 - b.y0, 4) * sx * 1.4
-      const breath = 0.85 + 0.15 * Math.sin(this.clock * 0.9 + b.ph)
+      const rad = Math.max(b.x1 - b.x0, b.y1 - b.y0, 4) * sx * 2
+      const breath = 0.75 + 0.25 * Math.sin(this.clock * 0.9 + b.ph)
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
-      g.addColorStop(0, b.role === 'tv' ? `rgba(120,160,255,${(0.16 * k).toFixed(3)})` : `rgba(255,205,120,${(0.1 * k * breath).toFixed(3)})`)
+      g.addColorStop(0, b.role === 'tv' ? `rgba(120,160,255,${(0.3 * k).toFixed(3)})` : `rgba(255,205,120,${(0.18 * k * breath).toFixed(3)})`)
       g.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.globalAlpha = alpha
       ctx.fillStyle = g
@@ -493,15 +494,20 @@ export class Facade {
       }
       ctx.fillStyle = `rgb(${Math.round(cr * 0.3)},${Math.round(cg * 0.25)},${Math.round(cb * 0.35)})`
       for (const [x, y, i] of px) if (!lit(i)) ctx.fillRect(ox + x * p, oy + y * p, p, p)
+      // Quầng ống neon: mỗi pixel sáng loang 1 pixel ra xung quanh (vẽ trước, nằm dưới lõi)
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.fillStyle = `rgba(${cr},${cg},${cb},0.22)`
+      for (const [x, y, i] of px) if (lit(i)) ctx.fillRect(ox + (x - 1) * p, oy + (y - 1) * p, p * 3, p * 3)
+      ctx.globalCompositeOperation = 'source-over'
       ctx.fillStyle = `rgb(${Math.min(255, cr + 40)},${Math.min(255, cg + 110)},${Math.min(255, cb + 70)})`
       for (const [x, y, i] of px) if (lit(i)) ctx.fillRect(ox + x * p, oy + y * p, p, p)
       if (!any) return
       ctx.globalCompositeOperation = 'lighter'
       const cx = ox + (width / 2) * p
       const cy = oy + 2.5 * p
-      const rad = Math.max(width * p * 0.75, 8)
+      const rad = Math.max(width * p * 1.1, 12)
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
-      g.addColorStop(0, `rgba(${cr},${cg},${cb},0.26)`)
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},0.4)`)
       g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`)
       ctx.fillStyle = g
       ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2)
@@ -510,24 +516,24 @@ export class Facade {
     })
   }
 
-  // 2 đám bóng mây mềm trôi theo gió; trời (¼ trên ảnh) không có bóng
+  // 3 đám bóng mây mềm trôi theo gió; trời (¼ trên ảnh) không có bóng
   private drawClouds(ctx: CanvasRenderingContext2D, r: {x: number; y: number; w: number; h: number}, wind: number) {
     ctx.save()
     ctx.beginPath()
     ctx.rect(r.x, r.y + r.h * 0.3, r.w, r.h * 0.7)
     ctx.clip()
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const span = r.w * 2.2
-      const along = (this.clock * 3.2 + i * span * 0.5) % span
+      const along = (this.clock * 5 + i * span * 0.34) % span
       const cx = wind > 0 ? r.x - r.w * 0.6 + along : r.x + r.w * 1.6 - along
-      const cy = r.y + r.h * (0.55 + 0.12 * i)
-      const rx = r.w * (0.32 + 0.08 * i)
+      const cy = r.y + r.h * (0.5 + 0.1 * i)
+      const rx = r.w * (0.26 + 0.06 * i)
       ctx.save()
       ctx.translate(cx, cy)
       ctx.scale(1, 0.45)
       const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx)
-      g.addColorStop(0, 'rgba(30,36,70,0.13)')
-      g.addColorStop(0.6, 'rgba(30,36,70,0.07)')
+      g.addColorStop(0, 'rgba(30,36,70,0.22)')
+      g.addColorStop(0.6, 'rgba(30,36,70,0.12)')
       g.addColorStop(1, 'rgba(30,36,70,0)')
       ctx.fillStyle = g
       ctx.fillRect(-rx, -rx, rx * 2, rx * 2)
@@ -552,7 +558,7 @@ export class Facade {
     const g = bc.createLinearGradient(bx - half, 0, bx + half, a.h * 0.25)
     const peak = Math.sin(Math.PI * e)
     g.addColorStop(0, 'rgba(255,240,200,0)')
-    g.addColorStop(0.5, `rgba(255,240,200,${(0.5 * peak).toFixed(3)})`)
+    g.addColorStop(0.5, `rgba(255,240,200,${(0.75 * peak).toFixed(3)})`)
     g.addColorStop(1, 'rgba(255,240,200,0)')
     bc.fillStyle = g
     bc.fillRect(0, 0, a.w, a.h)
