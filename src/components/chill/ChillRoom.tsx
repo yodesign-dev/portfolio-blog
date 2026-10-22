@@ -26,6 +26,7 @@ import {useChillApp, useInstall} from './install'
 import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mix, type MixChannel, type MixPreset} from './mix'
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {Focus} from './Focus'
+import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
 import {loadMe, onMeChange} from './identity'
@@ -214,6 +215,7 @@ export function ChillRoom({
   catToyOn = false,
   seatPickOn = false,
   streetMotionOn = false,
+  miniPlayerOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -231,6 +233,9 @@ export function ChillRoom({
   // Người, xe, chó ngoài phố chuyển động mượt (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?motion=1 / ?motion=0 trên URL ghi đè để so trước / sau
   streetMotionOn?: boolean
+  // Thu nhỏ quán thành cửa sổ nổi (Document PiP) + tên trạm / ảnh / tua trên màn hình khoá
+  // (Studio "Chill · Cài đặt"), mặc định tắt. ?mini=1 / ?mini=0 trên URL ghi đè
+  miniPlayerOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -245,6 +250,10 @@ export function ChillRoom({
   const sceneRef = useRef<ChillScene | null>(null)
   const audioRef = useRef<ChillAudio | null>(null)
   const scenePausedRef = useRef(false)
+  // Vẽ 1 khung cảnh (giới hạn ~30fps, true = vừa vẽ) — vòng lặp của trang hoặc của cửa sổ nổi gọi
+  const drawRef = useRef<(now: number) => boolean>(() => false)
+  // Cửa sổ nổi đang mở thì nó giữ nhịp vẽ (rAF của tab gốc đứng khi tab bị ẩn)
+  const miniRef = useRef(false)
   // Tính lại vùng bấm (mèo, cuốn sổ) — gán trong effect dựng cảnh
   const fitRef = useRef<() => void>(() => {})
   // Toạ độ màn hình (clientX/Y) → px gốc 640×360 của cảnh — tính lại mỗi lần `fit`
@@ -494,11 +503,15 @@ export function ChillRoom({
     let raf = 0
     let lastDraw = 0
     scene.frame(performance.now())
-    const loop = (now: number) => {
-      raf = requestAnimationFrame(loop)
-      if (scenePausedRef.current || now - lastDraw < 33) return
+    drawRef.current = (now: number) => {
+      if (scenePausedRef.current || now - lastDraw < 33) return false
       lastDraw = now
       scene.frame(now)
+      return true
+    }
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop)
+      if (!miniRef.current) drawRef.current(now)
     }
     raf = requestAnimationFrame(loop)
     // Canvas vẽ ở bội số nguyên của 640×360 vừa đủ phủ khung hiển thị (px thiết bị)
@@ -1541,20 +1554,104 @@ export function ChillRoom({
     }
   }, [playing])
 
+  // ---------- Cửa sổ nổi (MiniPlayer.tsx) ----------
+
+  // Công tắc Studio (?mini=1 / ?mini=0 ghi đè) · trình duyệt có Document PiP không
+  const [miniFlag, setMiniFlag] = useState(false)
+  const [canMini, setCanMini] = useState(false)
+  const [miniWin, setMiniWin] = useState<Window | null>(null)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('mini')
+    const on = param ? param === '1' : miniPlayerOn
+    /* eslint-disable react-hooks/set-state-in-effect -- đọc URL + khả năng trình duyệt sau khi hydrate */
+    setMiniFlag(on)
+    setCanMini(on && canMiniPlayer())
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [miniPlayerOn])
+
   // Phím media trên bàn phím / màn hình khoá điều khiển được nhạc
   useEffect(() => {
     if (!('mediaSession' in navigator) || !started) return
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title,
-      artist: 'Chill for work',
-      album: track.mood,
-    })
+    // Công tắc cửa sổ nổi bật: thêm trạm, điểm đến và ảnh quán
+    const stationName = STATIONS.find((st) => st.id === stationOf(track))?.label ?? ''
+    navigator.mediaSession.metadata = new MediaMetadata(
+      miniFlag
+        ? {
+            title: track.title,
+            artist: `${stationName} · Lofi Pixel Cafe`,
+            album: destinations[destIndex]?.name,
+            artwork: [
+              {src: '/chill/app/icon-192.png', sizes: '192x192', type: 'image/png'},
+              {src: '/chill/app/icon-512.png', sizes: '512x512', type: 'image/png'},
+            ],
+          }
+        : {title: track.title, artist: 'Chill for work', album: track.mood}
+    )
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
     navigator.mediaSession.setActionHandler('play', togglePlay)
     navigator.mediaSession.setActionHandler('pause', togglePlay)
     navigator.mediaSession.setActionHandler('nexttrack', next)
     navigator.mediaSession.setActionHandler('previoustrack', prev)
-  }, [started, playing, track, togglePlay, next, prev])
+  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex])
+
+  const openMini = useCallback(
+    (from: 'button' | 'auto') => {
+      openMiniWindow()
+        .then((win) => {
+          if (!win) return
+          miniRef.current = true
+          setMiniWin(win)
+          trackEvent({name: 'Chill Mini', props: {from}})
+        })
+        .catch(() => {})
+    },
+    []
+  )
+  const closeMini = useCallback(() => {
+    miniRef.current = false
+    setMiniWin(null)
+  }, [])
+  const toggleRain = useCallback(() => setWeather((w) => (w === 'rain' ? 'clear' : 'rain')), [])
+  // Rời trang khi cửa sổ nổi còn mở → đóng luôn
+  useEffect(() => () => miniWin?.close(), [miniWin])
+
+  // Màn hình khoá / thông báo / Control Center: thanh tua. Chrome còn tự mở cửa sổ nổi khi
+  // khách chuyển tab lúc nhạc đang phát (nếu khách cho phép)
+  useEffect(() => {
+    if (!miniFlag || !('mediaSession' in navigator) || !started) return
+    const ms = navigator.mediaSession
+    const set = (action: string, handler: MediaSessionActionHandler | null) => {
+      try {
+        ms.setActionHandler(action as MediaSessionAction, handler)
+      } catch {
+        // Trình duyệt chưa biết hành động này
+      }
+    }
+    set('seekto', (d) => {
+      const audio = audioRef.current
+      if (!audio || d.seekTime === undefined) return
+      audio.seek(d.seekTime)
+      setPosition(d.seekTime)
+    })
+    if (canMini) set('enterpictureinpicture', () => openMini('auto'))
+    return () => {
+      set('seekto', null)
+      set('enterpictureinpicture', null)
+    }
+  }, [miniFlag, canMini, started, openMini])
+
+  // Vị trí bài cho thanh tua — trình duyệt tự chạy tiếp, chỉ cần báo lại khi đổi bài / dừng / tua
+  useEffect(() => {
+    if (!miniFlag || !('mediaSession' in navigator) || !started) return
+    const audio = audioRef.current
+    const d = audio?.duration() ?? duration
+    if (!audio || !Number.isFinite(d) || d <= 0) return
+    try {
+      navigator.mediaSession.setPositionState({duration: d, position: Math.min(d, audio.position()), playbackRate: 1})
+    } catch {
+      // position > duration lúc vừa đổi bài
+    }
+  }, [miniFlag, started, playing, index, duration])
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
     const audio = audioRef.current
@@ -2161,6 +2258,31 @@ export function ChillRoom({
         }
       />
       </div>
+
+      {/* Cửa sổ nổi đang mở: tab gốc nhắc chỗ quán đang phát + nút đưa về */}
+      {miniWin && (
+        <>
+          <MiniPlayer
+            win={miniWin}
+            source={canvasRef}
+            draw={drawRef}
+            title={track.title}
+            station={`${stationLabel} · ${dest.name}`}
+            playing={playing}
+            rain={weather === 'rain'}
+            onTogglePlay={togglePlay}
+            onNext={next}
+            onToggleRain={toggleRain}
+            onClose={closeMini}
+          />
+          <div role="status" className="absolute left-1/2 top-16 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/60 py-1.5 pl-4 pr-1.5 text-sm text-[#f3ece4] backdrop-blur">
+            {t.room.miniHere}
+            <button type="button" onClick={() => miniWin.close()} className="rounded-full bg-[#e8b27d] px-3 py-1 text-xs font-medium text-[#1a1410] transition hover:bg-[#f0c494]">
+              {t.room.miniBack}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Zen: công tắc nổi một mình ở góc, chỉ hiện khi vừa nhích chuột / chạm */}
       {zen && (
@@ -2862,6 +2984,13 @@ export function ChillRoom({
           <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}
           </span>
+          {canMini && (
+            <span className="hidden sm:contents">
+              <StageButton label={t.room.miniOpen} onClick={() => (miniWin ? miniWin.close() : openMini('button'))}>
+                <MiniPlayerIcon />
+              </StageButton>
+            </span>
+          )}
           {canFullscreen && (
             <span className="hidden sm:contents">
               <StageButton label={fullscreen ? t.room.exitFullscreen : t.room.fullscreen} onClick={toggleFullscreen}>
@@ -4023,6 +4152,15 @@ function FullscreenIcon() {
   return (
     <svg {...iconProps} width={14} height={14}>
       <path d="M8 3H3v5M21 8V3h-5M16 21h5v-5M3 16v5h5" />
+    </svg>
+  )
+}
+
+function MiniPlayerIcon() {
+  return (
+    <svg {...iconProps} width={14} height={14}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor" stroke="none" />
     </svg>
   )
 }

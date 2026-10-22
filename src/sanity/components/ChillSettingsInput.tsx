@@ -26,6 +26,7 @@ type Value = {
   catToyOpen?: boolean
   seatPickOpen?: boolean
   streetMotionOpen?: boolean
+  miniPlayerOpen?: boolean
   questOpen?: boolean
   questSeason?: string
   questTitle?: string
@@ -47,7 +48,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'miniPlayerOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -60,6 +61,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'diaryOpen', icon: '📓', title: 'Bảng nhật ký', short: '2 mẩu giấy mỗi ngày, treo 7 ngày', desc: 'Mỗi khách viết 2 mẩu giấy một ngày, cả quán đọc trong một tuần.', delay: '30 giây'},
       {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', short: 'Anh / Chị ở màn chào', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', delay: '1 phút'},
       {key: 'streetMotionOpen', icon: '🛵', title: 'Phố chuyển động mượt', short: 'Xe nảy, nan bánh quay, người nhún bước', desc: 'Người, chó, xe ngoài phố chuyển động mượt hơn: xe nảy nhẹ theo nhịp riêng và qua mối nối mặt đường, ô tô chúi mũi khi phanh, nan xe đạp / xích lô quay, người nhún theo bước, dừng có hãm, đứng so le trên vỉa hè. Tắt là về như cũ. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
+      {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
     ],
   },
   {

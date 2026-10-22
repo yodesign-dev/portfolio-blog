@@ -56,7 +56,8 @@ const CHILL_QUERY = `{
   "questOpen": *[_id == "chillSettings"][0].questOpen,
   "catToyOpen": *[_id == "chillSettings"][0].catToyOpen,
   "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen,
-  "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen
+  "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen,
+  "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen
 }`
 
 type ChillContent = {
@@ -79,6 +80,7 @@ type ChillContent = {
   catToyOpen?: boolean | null
   seatPickOpen?: boolean | null
   streetMotionOpen?: boolean | null
+  miniPlayerOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -168,5 +170,7 @@ export async function getChillContent(revalidate: number) {
   const seatPickOn = content.seatPickOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SEAT === '1')
   // Người, xe, chó ngoài phố chuyển động mượt (nảy, nan quay, nhún bước). Máy dev: CHILL_DEV_MOTION=1
   const streetMotionOn = content.streetMotionOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MOTION === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn}
+  // Thu nhỏ quán thành cửa sổ nổi (Document PiP) + Media Session. Máy dev: CHILL_DEV_MINI=1
+  const miniPlayerOn = content.miniPlayerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MINI === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn}
 }

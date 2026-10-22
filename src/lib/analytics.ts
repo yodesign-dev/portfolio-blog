@@ -52,6 +52,7 @@ export type AnalyticsEvent =
   // Khung nhúng /chill/embed: hiện lên / bấm phát lần đầu / bấm sang quán đầy đủ.
   // `host` = site đang nhúng (vd www.notion.so), "direct" = mở thẳng link không qua khung
   | {name: 'Chill Embed'; props: {action: 'view' | 'play' | 'open'; host: string}}
+  | {name: 'Chill Mini'; props: {from: 'button' | 'auto'}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

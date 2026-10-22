@@ -22,6 +22,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {themeColor: '#16131a'}
 
 export default async function ChillPage() {
-  const {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn} = await getChillContent(revalidate)
-  return <ChillRoom tracks={tracks} destinations={destinations} updates={updates} shelfOn={shelfOn} playCountsOn={playCountsOn} questOn={questOn} catToyOn={catToyOn} seatPickOn={seatPickOn} streetMotionOn={streetMotionOn} />
+  const {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn} = await getChillContent(revalidate)
+  return <ChillRoom tracks={tracks} destinations={destinations} updates={updates} shelfOn={shelfOn} playCountsOn={playCountsOn} questOn={questOn} catToyOn={catToyOn} seatPickOn={seatPickOn} streetMotionOn={streetMotionOn} miniPlayerOn={miniPlayerOn} />
 }
