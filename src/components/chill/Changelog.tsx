@@ -208,12 +208,16 @@ export function Changelog({
   updates,
   unseen,
   onAction,
+  canAction = () => true,
 }: {
   open: boolean
   onClose: () => void
   updates: ChillUpdate[]
   unseen: Set<string>
   onAction: (action: string) => void
+  // Trình duyệt này làm được hành động của nút "Thử ngay" không (vd. cửa sổ nổi chỉ có trên
+  // Chrome / Edge máy tính) — không được thì ẩn nút, bài vẫn hiện
+  canAction?: (action: string) => boolean
 }) {
   const t = useT()
   const lang = useLang()
@@ -320,7 +324,7 @@ export function Changelog({
                     ))}
                   </ul>
 
-                  {u.action && (
+                  {u.action && canAction(u.action) && (
                     <div className="mt-4 flex justify-end">
                       <button
                         type="button"

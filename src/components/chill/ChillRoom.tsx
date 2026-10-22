@@ -1433,6 +1433,7 @@ export function ChillRoom({
       setPanelOpen(true)
     } else if (kind === 'chat') setChatOpen(true)
     else if (kind === 'zen' && !zen) toggleZen()
+    else if (kind === 'mini' && canMini && !miniWin) openMini('update')
     else if (kind === 'phin') {
       // Ngắm cảnh giấu cả thanh trên → tắt trước rồi mới mở bảng phin
       if (zen) toggleZen()
@@ -1565,7 +1566,8 @@ export function ChillRoom({
     const on = param ? param === '1' : miniPlayerOn
     /* eslint-disable react-hooks/set-state-in-effect -- đọc URL + khả năng trình duyệt sau khi hydrate */
     setMiniFlag(on)
-    setCanMini(on && canMiniPlayer())
+    // Nút Thu nhỏ chỉ có trên màn rộng (thanh trên điện thoại đã chật)
+    setCanMini(on && canMiniPlayer() && window.matchMedia('(min-width: 640px)').matches)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [miniPlayerOn])
 
@@ -1595,17 +1597,18 @@ export function ChillRoom({
   }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex])
 
   const openMini = useCallback(
-    (from: 'button' | 'auto') => {
+    (from: 'button' | 'auto' | 'guide' | 'update') => {
       openMiniWindow()
         .then((win) => {
           if (!win) return
           miniRef.current = true
           setMiniWin(win)
+          markTried('mini')
           trackEvent({name: 'Chill Mini', props: {from}})
         })
         .catch(() => {})
     },
-    []
+    [markTried]
   )
   const closeMini = useCallback(() => {
     miniRef.current = false
@@ -1768,6 +1771,7 @@ export function ChillRoom({
     diary: guideTried.includes('diary'),
     settings: settingsSeen,
     shelf: shelf.owned.length > 0 || guideTried.includes('shelf'),
+    mini: guideTried.includes('mini'),
   }
   // Phòng không có ly, đang xem bàn nhóm, Studio tắt nhật ký → bỏ qua món đó
   const guideCan: Record<GuideStep, boolean> = {
@@ -1777,6 +1781,7 @@ export function ChillRoom({
     diary: diaryAvailable,
     settings: true,
     shelf: shelfOn && !groupView,
+    mini: canMini,
   }
   const guideNext = guideShown.length < GUIDE_PER_VISIT ? (GUIDE_ORDER.find((s) => guideCan[s] && !guideDone[s] && !guideShown.includes(s)) ?? null) : null
   const activeGuide = guide && guideCan[guide.step] && (guide.forced || !guideDone[guide.step]) ? guide.step : null
@@ -2988,11 +2993,30 @@ export function ChillRoom({
             {clock}
           </span>
           {canMini && (
-            <span className="hidden sm:contents">
+            <div className="relative hidden sm:block">
               <StageButton label={t.room.miniOpen} onClick={() => (miniWin ? miniWin.close() : openMini('button'))}>
                 <MiniPlayerIcon />
               </StageButton>
-            </span>
+              {guideOn('mini') && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-md border-2 border-[#e8b27d]" />}
+              {/* Lời mời làm quen (guide.ts) ngay dưới nút, cùng kiểu bong bóng Ngắm cảnh */}
+              {guideOn('mini') && (
+                <button
+                  type="button"
+                  role="status"
+                  onClick={() => openMini('guide')}
+                  className="absolute right-0 top-full z-40 mt-2 flex w-[min(260px,calc(100vw-24px))] items-start gap-2 rounded-xl border border-[#e8b27d]/30 bg-[#1b1a21]/95 p-3 text-left shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md motion-safe:animate-[chill-pop_0.25s_ease-out]"
+                >
+                  <span aria-hidden className="mt-0.5 text-sm leading-none">
+                    🪟
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#e8b27d]">{t.room.miniHintLabel}</span>
+                    <span className="mt-0.5 block text-sm leading-snug text-[#ede6dd]">{t.room.miniHint}</span>
+                    <span className="mt-1 block text-xs text-[#f3cfa8]">{t.room.miniTry}</span>
+                  </span>
+                </button>
+              )}
+            </div>
           )}
           {canFullscreen && (
             <span className="hidden sm:contents">
@@ -3290,6 +3314,7 @@ export function ChillRoom({
         updates={updates}
         unseen={updatesSeen.unseen}
         onAction={runAction}
+        canAction={(action) => action !== 'mini' || canMini}
       />
 
       {/* Bảng cài đặt: sheet trượt lên trên điện thoại, drawer bên phải trên desktop.
