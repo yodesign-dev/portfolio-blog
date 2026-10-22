@@ -1611,7 +1611,8 @@ export function ChillRoom({
     miniRef.current = false
     setMiniWin(null)
   }, [])
-  const toggleRain = useCallback(() => setWeather((w) => (w === 'rain' ? 'clear' : 'rain')), [])
+  // Bấm 1 bài trong danh sách của cửa sổ nổi: bài đang phát thì phát/dừng
+  const pickMini = useCallback((i: number) => (i === index && started ? togglePlay() : playAt(i)), [index, started, togglePlay, playAt])
   // Rời trang khi cửa sổ nổi còn mở → đóng luôn
   useEffect(() => () => miniWin?.close(), [miniWin])
 
@@ -2266,13 +2267,14 @@ export function ChillRoom({
             win={miniWin}
             source={canvasRef}
             draw={drawRef}
-            title={track.title}
+            tracks={tracks}
+            index={index}
             station={`${stationLabel} · ${dest.name}`}
             playing={playing}
-            rain={weather === 'rain'}
             onTogglePlay={togglePlay}
+            onPrev={prev}
             onNext={next}
-            onToggleRain={toggleRain}
+            onPick={pickMini}
             onClose={closeMini}
           />
           <div role="status" className="absolute left-1/2 top-16 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/60 py-1.5 pl-4 pr-1.5 text-sm text-[#f3ece4] backdrop-blur">
