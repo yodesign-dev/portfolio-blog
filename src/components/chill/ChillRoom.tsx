@@ -2994,9 +2994,24 @@ export function ChillRoom({
           </span>
           {canMini && (
             <div className="relative hidden sm:block">
-              <StageButton label={t.room.miniOpen} onClick={() => (miniWin ? miniWin.close() : openMini('button'))}>
-                <MiniPlayerIcon />
-              </StageButton>
+              {/* Chưa thử lần nào → nút có chữ + nhãn "Mới" cho khỏi chìm giữa các nút icon */}
+              {guideTried.includes('mini') || miniWin ? (
+                <StageButton label={t.room.miniOpen} onClick={() => (miniWin ? miniWin.close() : openMini('button'))}>
+                  <MiniPlayerIcon />
+                </StageButton>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openMini('button')}
+                  aria-label={t.room.miniOpen}
+                  title={t.room.miniOpen}
+                  className="flex h-9 items-center gap-1.5 rounded-md border border-[#e8b27d]/40 bg-black/45 pl-2.5 pr-2 text-xs text-[#f3cfa8] backdrop-blur transition hover:border-[#e8b27d]/70 hover:bg-black/65"
+                >
+                  <MiniPlayerIcon />
+                  {t.room.miniLabel}
+                  <span className="rounded bg-[#e8b27d] px-1 py-px font-mono text-[9px] font-semibold uppercase tracking-wider text-[#1a1410]">{t.room.miniNew}</span>
+                </button>
+              )}
               {guideOn('mini') && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-md border-2 border-[#e8b27d]" />}
               {/* Lời mời làm quen (guide.ts) ngay dưới nút, cùng kiểu bong bóng Ngắm cảnh */}
               {guideOn('mini') && (
