@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "CHILL_BASE=http://localhost:3000 node build.mjs --watch",
+    "dev": "CHILL_BASE=${CHILL_BASE:-http://localhost:3000} node build.mjs --watch",
     "zip": "node build.mjs --zip",
     "typecheck": "tsc -p ."
   },

@@ -34,7 +34,10 @@ let prefs: Prefs
 let stations: Station[] = []
 let now: NowPlaying | null = null
 
-const send = (cmd: BgCommand) => chrome.runtime.sendMessage(cmd)
+const send = async (cmd: BgCommand) => {
+  const res = (await chrome.runtime.sendMessage(cmd)) as {ok: boolean} | undefined
+  if (res && !res.ok) showError(`Không kết nối được quán (${new URL(BASE).host}) — thử lại sau`)
+}
 
 const clock = (s: number) => {
   const t = Math.max(0, Math.floor(s || 0))

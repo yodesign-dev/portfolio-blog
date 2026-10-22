@@ -84,9 +84,14 @@ chrome.runtime.onMessage.addListener((msg: BgCommand | StatusMessage, _sender, r
     return
   }
   if (msg.target !== 'background') return
-  handle(msg)
-    .catch((error) => console.error('Lofi Pixel Cafe:', error))
-    .finally(() => reply({ok: true}))
+  // Lỗi (mất mạng, server không chạy) → báo về popup để hiện cho khách, không chỉ ghi log
+  handle(msg).then(
+    () => reply({ok: true}),
+    (error) => {
+      console.warn('Lofi Pixel Cafe:', error)
+      reply({ok: false})
+    },
+  )
   return true
 })
 
