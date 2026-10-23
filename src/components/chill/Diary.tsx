@@ -37,8 +37,6 @@ const BOOK_MAX = 400
 // Xấp giấy ghim trên khung cửa: lật qua bấy nhiêu mẩu mới nhất, mỗi mẩu hiện chừng này lâu
 // Mẩu "người trước để lại" đã chọn cho lần ghé này (tải lại trang vẫn giữ mẩu đó)
 const PICK_KEY = 'chill:diary-pick'
-// Chọn trong bấy nhiêu mẩu mới nhất mà khách chưa đọc
-const PICK_POOL = 5
 // Mẩu chưa từng thấy thì lấp lánh bấy lâu từ lúc mẩu giấy hiện ra
 const SPARKLE_MS = 9000
 
@@ -196,27 +194,28 @@ export function Diary({
   const unseen = (room?.notes ?? []).some((n) => n.ts > store.seen && !store.mine.some((m) => m.id === n.id))
 
   // Mẩu "người ngồi trước để lại cho bạn": mỗi lần ghé quán đưa đúng 1 mẩu, không phải mẩu
-  // của chính mình. Ưu tiên mẩu khách chưa đọc (bốc ngẫu nhiên trong vài mẩu mới nhất), đọc
-  // hết rồi thì bốc ngẫu nhiên trong cả tuần; quán chưa có mẩu nào → câu của mèo quán (null).
+  // của chính mình — mẩu mới nhất khách chưa đọc. Đọc hết rồi (hoặc quán chưa có mẩu nào)
+  // → câu của mèo quán (null), đang ngồi mà có mẩu mới thì đổi sang mẩu đó.
   // Mẩu "cất vào sổ" không lên đây.
   const others = useMemo(() => notes.filter((n) => n.kind !== 'book' && !n.mine).sort((a, b) => b.ts - a.ts), [notes])
   const [pick, setPick] = useState<{id: string | null; fresh: boolean} | null>(null)
   useEffect(() => {
     if (!room?.open) return
-    if (pick && (pick.id === null ? others.length === 0 : others.some((n) => n.id === pick.id))) return
+    if (pick && (pick.id === null ? others.every((n) => store.read.includes(n.id)) : others.some((n) => n.id === pick.id))) return
     let id: string | null = null
     let fresh = false
-    try {
-      const kept = sessionStorage.getItem(PICK_KEY)
-      if (kept && others.some((n) => n.id === kept)) id = kept
-    } catch {
-      // Chặn storage → mỗi lần tải lại bốc mẩu khác, không sao
-    }
-    if (!id && others.length) {
-      const unread = others.filter((n) => !store.read.includes(n.id)).slice(0, PICK_POOL)
-      const from = unread.length ? unread : others
-      id = from[Math.floor(Math.random() * from.length)].id
-      fresh = unread.length > 0
+    const unread = others.find((n) => !store.read.includes(n.id))
+    if (!unread) {
+      // Tải lại trang mà chưa có mẩu mới → giữ mẩu đã đưa trong lần ghé này
+      try {
+        const kept = sessionStorage.getItem(PICK_KEY)
+        if (kept && others.some((n) => n.id === kept)) id = kept
+      } catch {
+        // Chặn storage → đưa câu của mèo quán, không sao
+      }
+    } else {
+      id = unread.id
+      fresh = true
       try {
         sessionStorage.setItem(PICK_KEY, id)
       } catch {
