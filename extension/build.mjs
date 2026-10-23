@@ -67,5 +67,9 @@ if (watch) {
     rmSync(file, {force: true})
     execFileSync('zip', ['-qr', file, '.'], {cwd: out})
     console.log(`Gói nộp Web Store: ${file}`)
+    // Trả "key" lại cho dist: nạp tay thư mục này vẫn giữ ID đã khai ở CORS của Sanity
+    const manifest = JSON.parse(readFileSync(join(out, 'manifest.json'), 'utf8'))
+    manifest.key = readFileSync(join(here, 'dev-key.txt'), 'utf8').trim()
+    writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2))
   }
 }
