@@ -72,6 +72,34 @@ def big(m, minpx):
     return out
 
 
+def enclosed(m, wall, maxpx):
+    # Các mảng của m nhỏ hơn maxpx px mà xung quanh toàn là `wall` (không chạm mép ảnh)
+    h, w = m.shape
+    seen = np.zeros_like(m)
+    out = np.zeros_like(m)
+    for y, x in zip(*np.nonzero(m)):
+        if seen[y, x]:
+            continue
+        q = deque([(y, x)])
+        seen[y, x] = True
+        pts, ok = [], True
+        while q:
+            cy, cx = q.popleft()
+            pts.append((cy, cx))
+            for ny, nx in ((cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)):
+                if not (0 <= ny < h and 0 <= nx < w):
+                    ok = False
+                elif m[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    q.append((ny, nx))
+                elif not m[ny, nx] and not wall[ny, nx]:
+                    ok = False
+        if ok and len(pts) < maxpx:
+            ys, xs = zip(*pts)
+            out[list(ys), list(xs)] = True
+    return out
+
+
 def lavender(a):
     return (a[..., 2] > a[..., 1] + 12) & (a[..., 0] > a[..., 1] + 5) & (a[..., :3].max(-1) > 110)
 
@@ -100,6 +128,9 @@ def build_static(nano, orig, boy_sheet, video):
     in_pane = (xs >= PANE_X[0] - 3) & (xs <= PANE_X[1] + 3) & (ys <= PANE_Y1 + 3) & ~in_scr
     checker = (spread(reg) < 30) & (reg.min(-1) > 100)
     keep = big(in_pane & ~checker, 400)
+    # Mảng sáng ít màu nằm lọt giữa người (quai / đệm tai nghe màu kem) không phải caro: mảng nhỏ,
+    # mọi pixel quanh nó là người hoặc ngoài ô kính → giữ, không đục lỗ
+    keep |= enclosed(in_pane & ~keep, keep | ~in_pane, 200)
     blk = out[Y0:Y0 + H, X0:X0 + W]
     blk[~in_pane, :3] = reg[~in_pane]
     blk[~in_pane, 3] = 255
@@ -161,7 +192,9 @@ def build_sheets(static, orig, boy, fr, work):
     pane = (ro[..., 3] == 0) | (st_a == 0) | geo
 
     r, g, b = fr[..., 0], fr[..., 1], fr[..., 2]
-    green = ((g > r + 45) & (g > b + 35)) | (pane[None] & (g > r + 15) & (g > b + 5))
+    # Xanh lẫn nhẹ (viền) chỉ coi là nền ở chỗ ảnh tĩnh trong suốt; chỗ ảnh tĩnh có người, tóc / tai
+    # nghe ám xanh vẫn là người (khử xanh ở dưới), không đục lỗ
+    green = ((g > r + 45) & (g > b + 35)) | ((pane & (st_a == 0))[None] & (g > r + 15) & (g > b + 5))
     sx0, sy0, sx1, sy1 = SCR[0] - X0, SCR[1] - Y0, SCR[2] - X0, SCR[3] - Y0
     in_rect = np.zeros((H, W), bool)
     in_rect[sy0:sy1, sx0:sx1] = True
@@ -246,6 +279,12 @@ def build_sheets(static, orig, boy, fr, work):
         bot[H - 4:] = True
         lf = (f[..., 2] > f[..., 1] + 12) & (f[..., 0] > f[..., 1] + 5)
         f[bot & lf & lav_st] = st_rgb[bot & lf & lav_st]
+        # Khe hở nhỏ lọt giữa người (vd. kẽ giữa đuôi tóc và lưng, video hở nền xanh vài khung) →
+        # vá bằng màu xung quanh thay vì để lỗ nhìn thấu ra phố
+        gap = enclosed(mask & ~a, a, 25)
+        if gap.any():
+            f = inpaint(f, gap).astype(int)
+            a |= gap
         a[H - 2:] = False
         # Khử lem xanh còn lại; pixel tối (gọng kính, viền tóc) kéo hẳn kênh xanh lá về r/b
         lim = np.maximum(f[..., 0], f[..., 2]) + 4
