@@ -1,0 +1,10 @@
+/* Bố cục ảnh Chrome Web Store — xem render.mjs */
+@font-face { font-family: 'Pixelify Sans'; src: url('../../public/fonts/PixelifySans.ttf'); }
+* { box-sizing: border-box; margin: 0; }
+html, body { background: #16131a; color: #f3ece4; font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif; overflow: hidden; }
+.frame { position: relative; overflow: hidden; background: #16131a; }
+.bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.pix { font-family: 'Pixelify Sans', monospace; font-weight: 500; }
+.popup { position: absolute; border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+.accent { color: #e8b27d; }
+.muted { color: #d8cfc5; }

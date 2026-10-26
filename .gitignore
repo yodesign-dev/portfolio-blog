@@ -50,3 +50,4 @@ next-env.d.ts
 /extension/dist
 /extension/node_modules
 /extension/*.zip
+/extension/store/src/popup@2x.png
