@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Mulish, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Analytics } from "@vercel/analytics/next";
+import { SiteAnalytics } from "@/components/SiteAnalytics";
 import { draftMode } from "next/headers";
 import { VisualEditing } from "next-sanity/visual-editing";
 import { SiteChrome } from "@/components/SiteChrome";
@@ -73,7 +73,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <SiteChrome showResume={hasPublicResume}>{children}</SiteChrome>
-        <Analytics />
+        <SiteAnalytics />
         {isDraftMode && (
           <>
             <VisualEditing />
