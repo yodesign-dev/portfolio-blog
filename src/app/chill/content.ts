@@ -61,7 +61,8 @@ const CHILL_QUERY = `{
   "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen,
   "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen,
   "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen,
-  "facadeOpen": *[_id == "chillSettings"][0].facadeOpen
+  "facadeOpen": *[_id == "chillSettings"][0].facadeOpen,
+  "highlandOpen": *[_id == "chillSettings"][0].highlandOpen
 }`
 
 type ChillContent = {
@@ -88,6 +89,7 @@ type ChillContent = {
   streetMotionOpen?: boolean | null
   miniPlayerOpen?: boolean | null
   facadeOpen?: boolean | null
+  highlandOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -194,5 +196,7 @@ export async function getChillContent(revalidate: number) {
   const miniPlayerOn = content.miniPlayerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MINI === '1')
   // Mặt phố sống động (ảnh nét, đèn đêm, neon, bóng mây). Máy dev: CHILL_DEV_FACADE=1
   const facadeOn = content.facadeOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_FACADE === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn}
+  // Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ). Máy dev: CHILL_DEV_HIGHLAND=1
+  const highlandOn = content.highlandOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_HIGHLAND === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn}
 }

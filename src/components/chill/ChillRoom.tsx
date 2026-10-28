@@ -211,6 +211,7 @@ export function ChillRoom({
   streetMotionOn = false,
   miniPlayerOn = false,
   facadeOn = false,
+  highlandOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -234,6 +235,9 @@ export function ChillRoom({
   // Mặt phố sống động: ảnh nét, đèn đêm, neon, bóng mây (Studio "Chill · Cài đặt"), mặc
   // định tắt. ?facade=1 / ?facade=0 trên URL ghi đè để so trước / sau
   facadeOn?: boolean
+  // Đà Lạt sương mù: ảnh mới, sương trôi, khói ống khói, kính mờ (Studio "Chill · Cài đặt"),
+  // mặc định tắt. ?highland=1 / ?highland=0 trên URL ghi đè để so trước / sau
+  highlandOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -607,6 +611,11 @@ export function ChillRoom({
     const facade = new URLSearchParams(window.location.search).get('facade')
     sceneRef.current?.setFacade(facade ? facade === '1' : facadeOn)
   }, [facadeOn])
+
+  useEffect(() => {
+    const highland = new URLSearchParams(window.location.search).get('highland')
+    sceneRef.current?.setHighland(highland ? highland === '1' : highlandOn)
+  }, [highlandOn])
 
   // Màn dọc: vào quán rồi thì phóng to cảnh; bàn nhóm cần thấy đủ 4 ghế nên thu về như cũ
   useEffect(() => {

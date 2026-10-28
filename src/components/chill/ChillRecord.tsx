@@ -66,14 +66,17 @@ function readSetup(destinations: Destination[]): Setup {
 
 // streetMotionOn: công tắc Studio "Phố chuyển động mượt"; ?motion=1 / ?motion=0 ghi đè
 // facadeOn: công tắc Studio "Mặt phố sống động"; ?facade=1 / ?facade=0 ghi đè
+// highlandOn: công tắc Studio "Đà Lạt sương mù"; ?highland=1 / ?highland=0 ghi đè
 export function ChillRecord({
   destinations,
   streetMotionOn = false,
   facadeOn = false,
+  highlandOn = false,
 }: {
   destinations: Destination[]
   streetMotionOn?: boolean
   facadeOn?: boolean
+  highlandOn?: boolean
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -142,6 +145,8 @@ export function ChillRecord({
       scene.setStreetMotion(motion ? motion === '1' : streetMotionOn)
       const facade = new URLSearchParams(window.location.search).get('facade')
       scene.setFacade(facade ? facade === '1' : facadeOn)
+      const highland = new URLSearchParams(window.location.search).get('highland')
+      scene.setHighland(highland ? highland === '1' : highlandOn)
       scene.setAtmosphere(setup.time ?? timeOfDay(setup.dest.timeZone), setup.weather, setup.dest)
       fit()
       raf = requestAnimationFrame(loop)
@@ -155,7 +160,7 @@ export function ChillRecord({
       ro.disconnect()
       sceneRef.current = null
     }
-  }, [setup, streetMotionOn, facadeOn])
+  }, [setup, streetMotionOn, facadeOn, highlandOn])
 
   useEffect(() => {
     if (setup) sceneRef.current?.setAtmosphere(time, setup.weather, setup.dest)

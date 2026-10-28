@@ -27,6 +27,7 @@ type Value = {
   seatPickOpen?: boolean
   streetMotionOpen?: boolean
   facadeOpen?: boolean
+  highlandOpen?: boolean
   miniPlayerOpen?: boolean
   questOpen?: boolean
   questSeason?: string
@@ -49,7 +50,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'miniPlayerOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -63,6 +64,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', short: 'Anh / Chị ở màn chào', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', delay: '1 phút'},
       {key: 'streetMotionOpen', icon: '🛵', title: 'Phố chuyển động mượt', short: 'Xe nảy, nan bánh quay, người nhún bước', desc: 'Người, chó, xe ngoài phố chuyển động mượt hơn: xe nảy nhẹ theo nhịp riêng và qua mối nối mặt đường, ô tô chúi mũi khi phanh, nan xe đạp / xích lô quay, người nhún theo bước, dừng có hãm, đứng so le trên vỉa hè. Tắt là về như cũ. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'facadeOpen', icon: '🏮', title: 'Mặt phố sống động', short: 'Ảnh phố nét hơn, đèn đêm, neon, bóng mây', desc: 'Cả 9 cảnh dùng ảnh phố 1120 px nét gấp đôi. Cờ, quần áo phơi, đèn lồng đung đưa ở Sài Gòn, Huế, Hà Nội đường tàu, Tiền Giang. Đêm: cửa sổ tự tắt bật lác đác, một nhà xem TV, đèn tuýp nháy khi bật, bảng hiệu neon (đặt ở Điểm đến › Mặt phố). Ngày trời quang: bóng mây trôi qua, chiều có vệt nắng lóe. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
+      {key: 'highlandOpen', icon: '🌲', title: 'Đà Lạt sương mù', short: 'Ảnh Đà Lạt mới, sương trôi, khói ống khói, kính mờ', desc: 'Cảnh Đà Lạt dùng bộ ảnh mới: đồi thông nhiều lớp chìm trong sương, biệt thự Pháp có ống khói, màu lạnh và nhạt. Sương trôi chậm ngang phố, khói bay lên từ ống khói (sáng, tối), đêm có quầng sương quanh đèn đường, mép kính quán mờ hơi nước và lâu lâu một giọt chảy xuống. Chỉ ảnh hưởng Đà Lạt. Áp dụng cả trang quay /chill/record. Thử trước bằng ?highland=1.', delay: '1 phút'},
       {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
     ],
   },

@@ -27,6 +27,7 @@ import {Cat, CAT_SRC, type ToyEvent} from './cat'
 import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
+import {HIGHLAND, Highland, highlandStreets} from './highland'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
 import {seatArt, themeById, type CharacterVideo, type Seat, type SheetSpec, type Theme, type ThemeId} from './themes'
@@ -561,6 +562,9 @@ export class ChillScene {
   // Mặt phố sống động (công tắc Studio facadeOpen): ảnh phố 1120 px, đèn đêm, neon, bóng mây
   private facadeOn = false
   private facade = new Facade(Math.random)
+  // Đà Lạt sương mù (công tắc Studio highlandOpen): ảnh mới, sương trôi, khói, kính mờ
+  private highlandOn = false
+  private highland = new Highland()
   private movers: Mover[] = []
   private rain: Rain
   private notes: Note[] = []
@@ -729,7 +733,20 @@ export class ChillScene {
 
   // Ảnh phố theo giờ: bật "Mặt phố sống động" thì lấy bản 1120 px nếu điểm đến có
   private streetsOf(destination: Destination) {
+    if (this.highlandOn && HIGHLAND[destination.id]) return highlandStreets(destination.id)
     return (this.facadeOn && destination.streetsHd) || destination.streets
+  }
+
+  setHighland(on: boolean) {
+    if (on === this.highlandOn) return
+    this.highlandOn = on
+    const next = this.image(this.streetsOf(this.destination)[this.time])
+    if (next !== this.street) {
+      this.prevStreet = ready(this.street) ? this.street : this.prevStreet
+      this.street = next
+      this.fade = 0
+    }
+    this.dirty = true
   }
 
   setFacade(on: boolean) {
@@ -1532,6 +1549,8 @@ export class ChillScene {
       this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [])
       this.facade.update(dt)
     }
+    this.highland.set(this.highlandOn ? this.destination.id : '', this.time, this.weather)
+    this.highland.update(dt, this.windDir)
   }
 
   // Xe: bám xe phía trước bằng gia tốc (tăng tốc chậm, phanh nhanh hơn) thay vì đổi tốc độ tức thì
@@ -2181,6 +2200,7 @@ export class ChillScene {
       gc.setTransform(RES * k, 0, 0, RES * k, RES * (x - STREET_IMG.x * k), RES * (y - top * k))
       gc.drawImage(this.streetSource(img), STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
       if (this.facadeOn) this.facade.draw(gc, STREET_IMG, this.windDir)
+      this.highland.draw(gc, STREET_IMG, this.windDir)
       const counter = this.ctx
       this.ctx = gc
       // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
@@ -2531,6 +2551,7 @@ export class ChillScene {
       ctx.globalAlpha = this.prevStreet ? this.fade : 1
       this.drawStreet(this.street, street, view)
       if (this.facadeOn) this.facade.draw(ctx, street, this.windDir)
+      this.highland.draw(ctx, street, this.windDir)
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)
@@ -2571,6 +2592,8 @@ export class ChillScene {
       ctx.fillRect(view.x, view.y, view.w, view.h)
     }
 
+    // Đà Lạt: mép kính mờ hơi nước (ban công không có kính)
+    if (panes.length) this.highland.drawGlass(ctx, view)
     // Kính cửa: vệt phản chiếu chéo + giọt nước khi mưa (ban công không có kính)
     ctx.fillStyle = 'rgba(255,255,255,0.05)'
     for (const pane of panes) {
