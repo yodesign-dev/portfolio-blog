@@ -6,6 +6,8 @@
 //
 // - Mẩu giấy ghim ở góc trái trên cảnh (từ sm trở lên): câu của quán hôm nay + số mẩu —
 //   bấm vào là mở bảng. Điện thoại chật nên chỉ có nút tròn ở hàng nút góc phải dưới.
+//   Studio bật "Mẩu ghi chú kiểu mới" (hoặc ?slip=new) → mẩu nhỏ dán băng keo, tự xoay vòng
+//   qua vài mẩu khách + câu mèo quán + câu hỏi của quán (?slip=old để xem lại kiểu cũ).
 // - Bảng = 1 cuốn sổ lò xo mở trên bàn (kiểu bullet journal): giấy kẻ ô, chữ viết tay, mỗi
 //   ngày 1 mục, mỗi mẩu của khách là 1 gạch đầu dòng. Không tim, không xếp hạng, không
 //   cuộn vô tận — cố ý không giống danh sách bài.
@@ -34,7 +36,13 @@ const STORE_KEY = 'chill:diary'
 const ME_KEY = 'chill:chat-me'
 // Sổ riêng giữ tối đa bấy nhiêu mẩu gần nhất
 const BOOK_MAX = 400
-// Xấp giấy ghim trên khung cửa: lật qua bấy nhiêu mẩu mới nhất, mỗi mẩu hiện chừng này lâu
+// Mẩu ghi chú kiểu mới: xoay qua tối đa bấy nhiêu mẩu khách, mỗi mẩu hiện chừng này lâu
+// (hết 1 vòng thì chậm gấp đôi), hiện đủ lâu chừng này mới tính là đã đọc
+const SLIP_GUESTS = 3
+const SLIP_MS = 12_000
+const SLIP_READ_MS = 4000
+// Mẩu cũ bung khỏi băng keo trong chừng này rồi mẩu mới mới dán vào
+const SLIP_OUT_MS = 350
 // Mẩu "người trước để lại" đã chọn cho lần ghé này (tải lại trang vẫn giữ mẩu đó)
 const PICK_KEY = 'chill:diary-pick'
 // Mẩu chưa từng thấy thì lấp lánh bấy lâu từ lúc mẩu giấy hiện ra
@@ -46,7 +54,7 @@ type MyNote = DiaryNote & {kind: Kind}
 type ShownNote = DiaryNote & {kind?: Kind; mine?: boolean}
 // `read` = id các mẩu quán đã đưa cho khách này đọc (mẩu "người trước để lại")
 type Store = {mine: MyNote[]; hidden: string[]; seen: number; read: string[]}
-type Room = {open: boolean; notes: DiaryNote[]; cafe: {vi: string; en: string} | null; quote: Quote | null}
+type Room = {open: boolean; slipNew: boolean; notes: DiaryNote[]; cafe: {vi: string; en: string} | null; quote: Quote | null}
 
 const EMPTY: Store = {mine: [], hidden: [], seen: 0, read: []}
 
@@ -61,6 +69,8 @@ const PAPER: Record<Mood, {bg: string; ink: string; soft: string}> = {
 }
 // Giấy kem của mẩu mèo quán trên khung cửa
 const PIN_PAPER = {bg: '#fbf1d2', ink: '#2a1a10', soft: '#9a6a45'}
+// Giấy trắng ngà của câu hỏi của quán (mẩu ghi chú kiểu mới)
+const QUESTION_PAPER = {bg: '#f3efe4', ink: '#2a1a10', soft: '#7a6a55'}
 
 function loadStore(): Store {
   try {
@@ -102,6 +112,7 @@ export function Diary({
   hidden,
   dimmed,
   slipHidden,
+  brewing = false,
   hint,
   onAvailable,
 }: {
@@ -115,6 +126,8 @@ export function Diary({
   dimmed: boolean
   // Chỗ góc trái trên đang có thứ khác (nút "Về chỗ cửa sổ" của bàn nhóm)
   slipHidden: boolean
+  // Đang chạy phin → mẩu ghi chú kiểu mới thu lại chỉ còn miếng băng keo
+  brewing?: boolean
   // Lời mời viết nhật ký cho người chưa mở sổ lần nào (xem guide.ts) — bong bóng cạnh nút
   hint?: string | null
   // Studio có đang mở bảng nhật ký không
@@ -127,11 +140,15 @@ export function Diary({
   const [now, setNow] = useState(0)
   const [mood, setMood] = useState<Mood | null>(null)
   const [composing, setComposing] = useState(false)
+  // ?slip=new / ?slip=old để so trên máy; không có thì theo công tắc Studio
+  const [slipParam, setSlipParam] = useState<boolean | null>(null)
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     setStore(loadStore())
     setNow(Date.now())
+    const param = new URLSearchParams(window.location.search).get('slip')
+    setSlipParam(param === 'new' ? true : param === 'old' ? false : null)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
@@ -147,7 +164,7 @@ export function Diary({
     try {
       const res = await fetch('/api/chill-diary')
       const data = (await res.json()) as Room
-      setRoom({open: data.open === true, notes: data.notes ?? [], cafe: data.cafe ?? null, quote: data.quote ?? null})
+      setRoom({open: data.open === true, slipNew: data.slipNew === true, notes: data.notes ?? [], cafe: data.cafe ?? null, quote: data.quote ?? null})
       setNow(Date.now())
     } catch {
       // Mạng chập chờn — lần sau hỏi lại
@@ -198,9 +215,10 @@ export function Diary({
   // → câu của mèo quán (null), đang ngồi mà có mẩu mới thì đổi sang mẩu đó.
   // Mẩu "cất vào sổ" không lên đây.
   const others = useMemo(() => notes.filter((n) => n.kind !== 'book' && !n.mine).sort((a, b) => b.ts - a.ts), [notes])
+  const slipNew = slipParam ?? room?.slipNew === true
   const [pick, setPick] = useState<{id: string | null; fresh: boolean} | null>(null)
   useEffect(() => {
-    if (!room?.open) return
+    if (!room?.open || slipNew) return
     if (pick && (pick.id === null ? others.every((n) => store.read.includes(n.id)) : others.some((n) => n.id === pick.id))) return
     let id: string | null = null
     let fresh = false
@@ -226,7 +244,7 @@ export function Diary({
       update((s) => (s.read.includes(picked) ? s : {...s, read: [...s.read, picked].slice(-400)}))
     }
     setPick({id, fresh})
-  }, [room?.open, others, pick, store.read, update])
+  }, [room?.open, slipNew, others, pick, store.read, update])
   // Mẩu chưa từng thấy → lấp lánh 1 lúc kể từ khi mẩu giấy hiện ra trước mắt khách
   const [sparkle, setSparkle] = useState(false)
   const slipShown = Boolean(pick?.fresh) && !hidden && !slipHidden && !open
@@ -239,6 +257,70 @@ export function Diary({
       window.clearTimeout(off)
     }
   }, [slipShown, pick?.id])
+
+  // Mẩu ghi chú kiểu mới — xấp xoay vòng của lần ghé này: tối đa 3 mẩu khách (chưa đọc trước,
+  // mới nhất trước; không bao giờ mẩu của mình hay mẩu cất sổ), rồi câu mèo quán, câu hỏi của
+  // quán hôm nay. Thứ tự giữ nguyên cả lần ghé (đọc rồi không bị xếp lại); đang ngồi mà có
+  // mẩu mới thì mẩu đó lên đầu và hiện ngay.
+  const [deck, setDeck] = useState<string[] | null>(null)
+  // Mẩu chưa đọc lúc vào xấp → lấp lánh lần đầu hiện ra
+  const [fresh, setFresh] = useState<string[]>([])
+  const [at, setAt] = useState(0)
+  const [round, setRound] = useState(0)
+  const [leaving, setLeaving] = useState(false)
+  // Đang rê chuột / Tab tới mẩu → dừng xoay
+  const [hold, setHold] = useState(false)
+  useEffect(() => {
+    if (!room?.open || !slipNew) return
+    const unread = others.filter((n) => !store.read.includes(n.id) && !deck?.includes(n.id))
+    /* eslint-disable react-hooks/set-state-in-effect -- xếp xấp mẩu khi có dữ liệu / mẩu mới */
+    if (deck === null) {
+      const read = others.filter((n) => store.read.includes(n.id))
+      setDeck([...unread, ...read].slice(0, SLIP_GUESTS).map((n) => n.id))
+      setFresh(unread.slice(0, SLIP_GUESTS).map((n) => n.id))
+    } else if (unread.length) {
+      const ids = unread.slice(0, SLIP_GUESTS).map((n) => n.id)
+      setDeck([...ids, ...deck].slice(0, SLIP_GUESTS))
+      setFresh((f) => [...f, ...ids])
+      setAt(0)
+      setLeaving(false)
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [room?.open, slipNew, others, store.read, deck])
+  const slipKeys = useMemo(() => {
+    if (!deck || !today) return []
+    return [...deck.filter((id) => others.some((n) => n.id === id)), 'cafe', ...(cafeQuestionOf(today) ? ['question'] : [])]
+  }, [deck, others, today])
+  const slipKey = slipKeys.length ? slipKeys[at % slipKeys.length] : null
+  const slipUp = slipNew && Boolean(room?.open) && !hidden && !slipHidden && !open && slipKey !== null
+  const slipLive = slipUp && !brewing
+  useEffect(() => {
+    if (!slipLive || slipKeys.length < 2) return
+    if (leaving) {
+      const id = window.setTimeout(() => {
+        const next = (at + 1) % slipKeys.length
+        setFresh((f) => f.filter((k) => k !== slipKey))
+        setAt(next)
+        if (next === 0) setRound((r) => r + 1)
+        setLeaving(false)
+      }, SLIP_OUT_MS)
+      return () => window.clearTimeout(id)
+    }
+    if (hold) return
+    let id = 0
+    // Tab trình duyệt bị ẩn thì chờ tiếp, không lật khi không ai xem
+    const wait = () => {
+      id = window.setTimeout(() => (document.visibilityState === 'visible' ? setLeaving(true) : wait()), round > 0 ? SLIP_MS * 2 : SLIP_MS)
+    }
+    wait()
+    return () => window.clearTimeout(id)
+  }, [slipLive, slipKeys.length, slipKey, leaving, hold, at, round])
+  // Mẩu khách hiện đủ 4 giây mới tính là đã đọc
+  useEffect(() => {
+    if (!slipLive || !slipKey || !deck?.includes(slipKey) || store.read.includes(slipKey)) return
+    const id = window.setTimeout(() => update((s) => (s.read.includes(slipKey) ? s : {...s, read: [...s.read, slipKey].slice(-400)})), SLIP_READ_MS)
+    return () => window.clearTimeout(id)
+  }, [slipLive, slipKey, deck, store.read, update])
 
   useEffect(() => {
     onAvailable?.(room?.open ?? false)
@@ -277,6 +359,16 @@ export function Diary({
   const weekCount = notes.filter((n) => n.kind !== 'book').length
   const clock = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh'})
   const shown = notes.filter((n) => !mood || n.mood === mood)
+  // Mẩu ghi chú kiểu mới đang hiện: mẩu khách / câu mèo quán / câu hỏi của quán
+  const slipNote = slipKey && slipKey !== 'cafe' && slipKey !== 'question' ? (others.find((n) => n.id === slipKey) ?? null) : null
+  const slipQuestion = slipKey === 'question' ? cafeQuestionOf(today) : null
+  const slipPaper = slipNote ? PAPER[slipNote.mood] : slipQuestion ? QUESTION_PAPER : PIN_PAPER
+  const slipText = slipNote ? slipNote.text : slipQuestion ? slipQuestion[lang] || slipQuestion.vi : cafeText
+  const slipDay = slipNote?.day ?? today
+  const openToWrite = () => {
+    setOpen(true)
+    if (left > 0) setComposing(true)
+  }
 
   return (
     <>
@@ -307,6 +399,8 @@ export function Diary({
           slot,
         )}
 
+      {!slipNew && (
+        <>
       {/* Mẩu giấy ghim trên khung cửa: mẩu "người ngồi trước để lại cho bạn" — mỗi lần ghé 1 mẩu,
           kèm câu hỏi của quán mà mẩu đó trả lời; bấm vào là mở sổ để viết lại cho người sau.
           Các tờ ló ra phía sau cho biết trong sổ còn mẩu khác. Vẽ cùng kiểu với đồ vật trong
@@ -393,6 +487,80 @@ export function Diary({
           <span className="mt-0.5 line-clamp-2 break-words text-[12px] font-semibold leading-[16px]">{top ? top.text : cafeText}</span>
         </span>
       </button>
+        </>
+      )}
+
+      {/* Mẩu ghi chú kiểu mới: mẩu giấy nhỏ dán băng keo lên khung cửa (điện thoại: trên mặt quầy,
+          phía trên hàng nút), tự xoay qua xấp mẩu của lần ghé — mẩu cũ bung khỏi băng keo, mẩu
+          mới lắc nhẹ rồi đứng yên. Rê chuột / Tab tới thì dừng và hiện nút viết. Đang chạy phin
+          thì chỉ còn miếng băng keo kèm số mẩu, bấm vào vẫn mở sổ */}
+      {slipNew && (
+        <div
+          onMouseEnter={() => setHold(true)}
+          onMouseLeave={() => setHold(false)}
+          onFocus={() => setHold(true)}
+          onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setHold(false)}
+          className={`group/slip absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+204px)] left-3 z-10 w-[200px] transition-opacity duration-300 sm:bottom-auto sm:left-[26px] sm:top-[4.75rem] sm:w-[164px] ${
+            slipUp ? (dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100') : 'pointer-events-none opacity-0'
+          }`}
+        >
+          {slipLive && slipKey && fresh.includes(slipKey) && <Sparkles />}
+          <button
+            key={slipKey ?? 'none'}
+            type="button"
+            onClick={openToWrite}
+            tabIndex={brewing ? -1 : 0}
+            aria-label={`${slipNote ? t.diary.slipAria : slipQuestion ? t.diary.slipQuestion : t.diary.slipFromCat}: ${slipText}`}
+            className={`relative block w-full origin-top border-2 border-[#2a1a10] px-2.5 pb-2 pt-2 text-left shadow-[3px_4px_0_rgba(42,26,16,0.45)] transition duration-[350ms] ease-[cubic-bezier(0.3,1.4,0.5,1)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d] motion-safe:animate-[chill-slip-in_0.5s_cubic-bezier(0.3,1.4,0.5,1)] sm:px-[11px] sm:pb-[9px] sm:pt-[13px] ${
+              brewing
+                ? 'pointer-events-none -translate-y-2 scale-y-[0.2] opacity-0'
+                : leaving
+                  ? 'opacity-0 motion-safe:translate-x-2.5 motion-safe:-translate-y-1.5 motion-safe:rotate-[9deg]'
+                  : '-rotate-[1.5deg] sm:-rotate-[2.5deg]'
+            }`}
+            style={{background: slipPaper.bg, color: slipPaper.ink}}
+          >
+            <span className="hidden items-center justify-between gap-1.5 font-mono text-[8px] uppercase tracking-[0.08em] sm:flex" style={{color: slipPaper.soft}}>
+              <span className="truncate">{slipNote ? t.diary.slipFrom : slipQuestion ? t.diary.slipQuestion : t.diary.slipFromCat}</span>
+              <span className="shrink-0 tabular-nums">{slipNote && slipNote.day === today ? clock(slipNote.ts) : `${slipDay.slice(8, 10)}.${slipDay.slice(5, 7)}`}</span>
+            </span>
+            <span className={`${hand.className} line-clamp-2 break-words text-[12px] font-semibold leading-[16px] sm:mt-1 sm:line-clamp-3 sm:min-h-[51px] sm:text-[12.5px] sm:leading-[17px]`}>{slipText}</span>
+            <span className="mt-1.5 hidden items-center justify-between gap-2 sm:flex" style={{color: slipPaper.soft}}>
+              <span className="min-w-0 truncate text-[10px] font-semibold">{slipNote ? `— ${slipNote.name || t.diary.guest} ${MOOD_ICON[slipNote.mood]}` : ''}</span>
+              {slipKeys.length > 1 && (
+                <span role="img" aria-label={t.diary.slipOf((at % slipKeys.length) + 1, slipKeys.length)} className="flex shrink-0 gap-[3px]">
+                  {slipKeys.map((k) => (
+                    <span key={k} className={`h-1 w-1 bg-current ${k === slipKey ? '' : 'opacity-30'}`} />
+                  ))}
+                </span>
+              )}
+            </span>
+          </button>
+          {/* Miếng băng keo pixel dán mẩu lên khung cửa */}
+          <button
+            type="button"
+            onClick={openToWrite}
+            tabIndex={brewing ? 0 : -1}
+            aria-hidden={!brewing}
+            aria-label={brewing ? `${t.diary.title}: ${t.diary.slipTape(weekCount)}` : undefined}
+            className={`absolute left-1/2 top-[-7px] z-20 flex h-3 min-w-9 -translate-x-1/2 -rotate-3 items-center justify-center whitespace-nowrap border border-[#2a1a10]/35 bg-[repeating-linear-gradient(90deg,rgba(232,178,125,0.88)_0_6px,rgba(240,194,148,0.88)_6px_12px)] px-1.5 font-mono text-[9px] font-bold text-[#2a1a10] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:top-[-9px] sm:h-[17px] sm:min-w-[54px] ${
+              brewing ? 'cursor-pointer' : 'pointer-events-none'
+            }`}
+          >
+            {brewing && `✎ ${t.diary.slipTape(weekCount)}`}
+          </button>
+          <button
+            type="button"
+            onClick={openToWrite}
+            tabIndex={brewing ? -1 : 0}
+            className={`absolute left-2 top-full mt-1.5 hidden whitespace-nowrap border-[1.5px] border-[#2a1a10] bg-[#e8b27d] px-[7px] py-[3px] text-[10.5px] font-bold text-[#2a1a10] transition duration-200 hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:block ${
+              brewing ? 'pointer-events-none opacity-0' : 'pointer-events-none -translate-y-1 opacity-0 group-hover/slip:pointer-events-auto group-hover/slip:translate-y-0 group-hover/slip:opacity-100 group-focus-within/slip:pointer-events-auto group-focus-within/slip:translate-y-0 group-focus-within/slip:opacity-100'
+            }`}
+          >
+            {left > 0 ? t.diary.slipLeave : t.diary.slipWeek(weekCount)}
+          </button>
+        </div>
+      )}
 
       <section
         id="chill-diary"

@@ -3315,6 +3315,8 @@ export function ChillRoom({
         dimmed={hideUi}
         hidden={!entered || panelOpen || volumeOpen || showHintTip}
         slipHidden={groupView}
+        // Đang pha phin (giờ nghỉ có nhãn ☕ thì vẫn hiện mẩu cho khách đọc)
+        brewing={focusLabel !== null && !focusLabel.startsWith('☕')}
         hint={guideOn('diary') ? t.room.guideDiary : null}
         onAvailable={setDiaryAvailable}
       />

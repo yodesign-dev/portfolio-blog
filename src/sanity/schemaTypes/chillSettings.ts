@@ -21,6 +21,7 @@ export default defineType({
       validation: (rule) => rule.integer().min(2).max(12),
     }),
     defineField({name: 'diaryOpen', title: 'Mở bảng nhật ký', type: 'boolean', initialValue: false}),
+    defineField({name: 'slipNewOpen', title: 'Mẩu ghi chú kiểu mới (dán băng keo, xoay vòng)', type: 'boolean', initialValue: false}),
     defineField({name: 'shelfOpen', title: 'Mở kệ sưu tầm', type: 'boolean', initialValue: false}),
     defineField({name: 'playCountsOpen', title: 'Đếm và hiện lượt nghe', type: 'boolean', initialValue: false}),
     defineField({name: 'catToyOpen', title: 'Cần câu lông vũ trêu mèo', type: 'boolean', initialValue: false}),

@@ -21,6 +21,7 @@ type Value = {
   groupTableOpen?: boolean
   groupMaxMembers?: number
   diaryOpen?: boolean
+  slipNewOpen?: boolean
   shelfOpen?: boolean
   playCountsOpen?: boolean
   catToyOpen?: boolean
@@ -50,7 +51,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -61,6 +62,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'chatOpen', icon: '💬', title: 'Phòng chat', short: 'Khách nhắn tin với nhau', desc: 'Khách nhắn tin với nhau trong quán. Tắt khi bị spam: nút chat ẩn đi, tin cũ tự xoá sau 24 giờ.', delay: '30 giây'},
       {key: 'groupTableOpen', icon: '🪑', title: 'Bàn nhóm', short: 'Tạo bàn, mời bạn qua link', desc: 'Khách tạo bàn, mời bạn qua link và ngồi chung một bàn.', delay: '30 giây'},
       {key: 'diaryOpen', icon: '📓', title: 'Bảng nhật ký', short: '2 mẩu giấy mỗi ngày, treo 7 ngày', desc: 'Mỗi khách viết 2 mẩu giấy một ngày, cả quán đọc trong một tuần.', delay: '30 giây'},
+      {key: 'slipNewOpen', icon: '🩹', title: 'Mẩu ghi chú kiểu mới', short: 'Mẩu nhỏ dán băng keo, tự xoay vòng', desc: 'Mẩu giấy góc trái trên cảnh gọn lại (dán băng keo, bỏ đinh ghim) và tự xoay qua tối đa 5 mẩu: 3 mẩu khách mới nhất, câu mèo quán, câu hỏi của quán. Rê chuột thì dừng, đang chạy phin thì chỉ còn miếng băng keo. Cần bật Bảng nhật ký. Thử trước bằng ?slip=new.', delay: '30 giây'},
       {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', short: 'Anh / Chị ở màn chào', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', delay: '1 phút'},
       {key: 'streetMotionOpen', icon: '🛵', title: 'Phố chuyển động mượt', short: 'Xe nảy, nan bánh quay, người nhún bước', desc: 'Người, chó, xe ngoài phố chuyển động mượt hơn: xe nảy nhẹ theo nhịp riêng và qua mối nối mặt đường, ô tô chúi mũi khi phanh, nan xe đạp / xích lô quay, người nhún theo bước, dừng có hãm, đứng so le trên vỉa hè. Tắt là về như cũ. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'facadeOpen', icon: '🏮', title: 'Mặt phố sống động', short: 'Ảnh phố nét hơn, đèn đêm, neon, bóng mây', desc: 'Cả 9 cảnh dùng ảnh phố 1120 px nét gấp đôi. Cờ, quần áo phơi, đèn lồng đung đưa ở Sài Gòn, Huế, Hà Nội đường tàu, Tiền Giang. Đêm: cửa sổ tự tắt bật lác đác, một nhà xem TV, đèn tuýp nháy khi bật, bảng hiệu neon (đặt ở Điểm đến › Mặt phố). Ngày trời quang: bóng mây trôi qua, chiều có vệt nắng lóe. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
