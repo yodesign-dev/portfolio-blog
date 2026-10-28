@@ -1342,6 +1342,11 @@ function Compose({open, question, onDone, onCancel}: {open: boolean; question: s
     if (!sitekey) return
     widget.current = window.turnstile.render(box.current, {
       sitekey,
+      // Thẻ Ghi chú phải nằm gọn trong 1 trang sổ: khung xác minh chỉ hiện khi Cloudflare cần
+      // khách bấm, còn lại chạy ngầm (khung luôn hiện cao ~65px, đẩy nút Gửi ra khỏi trang)
+      appearance: 'interaction-only',
+      size: 'flexible',
+      theme: 'light',
       callback: (tk: string) => {
         setToken(tk)
         setError('')

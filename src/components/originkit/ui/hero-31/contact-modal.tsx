@@ -13,7 +13,14 @@ declare global {
     turnstile?: {
       render: (
         container: string | HTMLElement,
-        options: { sitekey: string; callback: (token: string) => void; "error-callback"?: () => void }
+        options: {
+          sitekey: string;
+          callback: (token: string) => void;
+          "error-callback"?: () => void;
+          appearance?: "always" | "execute" | "interaction-only";
+          size?: "normal" | "flexible" | "compact";
+          theme?: "auto" | "light" | "dark";
+        }
       ) => string;
       reset: (widgetId?: string) => void;
       remove: (widgetId?: string) => void;
