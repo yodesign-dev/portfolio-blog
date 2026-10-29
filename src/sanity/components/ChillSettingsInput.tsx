@@ -30,6 +30,7 @@ type Value = {
   facadeOpen?: boolean
   highlandOpen?: boolean
   miniPlayerOpen?: boolean
+  sleepTimerOpen?: boolean
   questOpen?: boolean
   questSeason?: string
   questTitle?: string
@@ -51,7 +52,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -68,6 +69,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'facadeOpen', icon: '🏮', title: 'Mặt phố sống động', short: 'Ảnh phố nét hơn, đèn đêm, neon, bóng mây', desc: 'Cả 9 cảnh dùng ảnh phố 1120 px nét gấp đôi. Cờ, quần áo phơi, đèn lồng đung đưa ở Sài Gòn, Huế, Hà Nội đường tàu, Tiền Giang. Đêm: cửa sổ tự tắt bật lác đác, một nhà xem TV, đèn tuýp nháy khi bật, bảng hiệu neon (đặt ở Điểm đến › Mặt phố). Ngày trời quang: bóng mây trôi qua, chiều có vệt nắng lóe. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'highlandOpen', icon: '🌲', title: 'Đà Lạt sương mù', short: 'Ảnh Đà Lạt mới, sương trôi, khói ống khói, kính mờ', desc: 'Cảnh Đà Lạt dùng bộ ảnh mới: đồi thông nhiều lớp chìm trong sương, biệt thự Pháp có ống khói, màu lạnh và nhạt. Sương trôi chậm ngang phố, khói bay lên từ ống khói (sáng, tối), đêm có quầng sương quanh đèn đường, mép kính quán mờ hơi nước và lâu lâu một giọt chảy xuống. Chỉ ảnh hưởng Đà Lạt. Áp dụng cả trang quay /chill/record. Thử trước bằng ?highland=1.', delay: '1 phút'},
       {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
+      {key: 'sleepTimerOpen', icon: '🌙', title: 'Hẹn giờ tắt nhạc', short: 'Nút trăng: tắt nhạc sau 15/30/60/90 phút', desc: 'Nút trăng cạnh nút Cài đặt dưới thanh nhạc: chọn 15 / 30 / 60 / 90 phút, nút hiện số phút còn lại. 60 giây cuối nhạc và tiếng nền nhỏ dần rồi dừng hẳn, bấm phát là nghe lại. Lần đầu khách vào trạm Night & Sleep, bảng chọn tự mở để gợi ý. Thử trước bằng ?sleep=1.', delay: '1 phút'},
     ],
   },
   {

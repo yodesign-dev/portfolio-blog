@@ -8,11 +8,12 @@ import type {NeonSign} from '@/components/chill/facade'
 //
 // Nhạc + điểm đến quản lý trong Sanity Studio. Code (tracks.ts / destinations.ts)
 // chỉ còn vài bài + Hà Nội dự phòng, dùng khi Sanity không trả về gì.
-// Chỉ lấy bản đã đủ file/ảnh và không bị "Ẩn khỏi trang" — riêng điểm đến, máy dev
-// bật CHILL_DEV_HIDDEN=1 thì lấy cả điểm đến đang ẩn để thử (vd cảnh mới chưa mở cho khách).
+// Chỉ lấy bản đã đủ file/ảnh và không bị "Ẩn khỏi trang" — máy dev
+// bật CHILL_DEV_HIDDEN=1 thì lấy cả điểm đến lẫn bài nhạc đang ẩn để thử (vd cảnh mới, trạm
+// nhạc mới chưa mở cho khách).
 const CHILL_QUERY = `{
-  "tracks": *[_type == "chillTrack" && hidden != true && (defined(audio.asset) || defined(localFile))]
-    | order(select(station == "acoustic" => 0, station == "focus" => 1, station == "sax" => 2, station == "lofi" => 3, station == "study" => 4, 5) asc,
+  "tracks": *[_type == "chillTrack" && ($showHidden || hidden != true) && (defined(audio.asset) || defined(localFile))]
+    | order(select(station == "acoustic" => 0, station == "focus" => 1, station == "night" => 2, station == "sax" => 3, station == "lofi" => 4, station == "study" => 5, 6) asc,
             coalesce(order, 9999) asc, _createdAt asc) {
     "id": coalesce(key.current, _id),
     title,
@@ -62,7 +63,8 @@ const CHILL_QUERY = `{
   "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen,
   "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen,
   "facadeOpen": *[_id == "chillSettings"][0].facadeOpen,
-  "highlandOpen": *[_id == "chillSettings"][0].highlandOpen
+  "highlandOpen": *[_id == "chillSettings"][0].highlandOpen,
+  "sleepTimerOpen": *[_id == "chillSettings"][0].sleepTimerOpen
 }`
 
 type ChillContent = {
@@ -90,6 +92,7 @@ type ChillContent = {
   miniPlayerOpen?: boolean | null
   facadeOpen?: boolean | null
   highlandOpen?: boolean | null
+  sleepTimerOpen?: boolean | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -198,5 +201,7 @@ export async function getChillContent(revalidate: number) {
   const facadeOn = content.facadeOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_FACADE === '1')
   // Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ). Máy dev: CHILL_DEV_HIGHLAND=1
   const highlandOn = content.highlandOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_HIGHLAND === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn}
+  // Hẹn giờ tắt nhạc 15/30/60/90 phút. Máy dev: CHILL_DEV_SLEEP=1
+  const sleepTimerOn = content.sleepTimerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SLEEP === '1')
+  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn}
 }

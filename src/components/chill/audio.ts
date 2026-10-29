@@ -6,6 +6,7 @@
 //                        ↘ reverb ──────────────────┘
 //   ambience (mưa / tiếng phố / tiếng quán / mèo gừ gừ) → gain riêng từng kênh → loa
 //   (âm lượng riêng, không theo nhạc — xem mix.ts)
+//   "loa" ở trên = out: 1 gain chung để hẹn giờ tắt nhạc làm nhỏ dần cả nhạc lẫn tiếng nền
 
 import type {SynthSpec, Track} from './tracks'
 import type {Mix} from './mix'
@@ -92,6 +93,8 @@ export class ChillAudio {
   private ctx: AudioContext | null = null
   private catCtx: AudioContext | null = null
   private master!: GainNode
+  // Cổng ra chung của nhạc + tiếng nền (không gồm tiếng mèo / chuông phin) — hẹn giờ tắt nhạc
+  private out!: GainNode
   private analyser!: AnalyserNode
   private tone!: BiquadFilterNode
   private reverb!: ConvolverNode
@@ -151,7 +154,9 @@ export class ChillAudio {
     this.analyser = ctx.createAnalyser()
     this.analyser.fftSize = 64
     this.analyser.smoothingTimeConstant = 0.8
-    this.analyser.connect(ctx.destination)
+    this.out = ctx.createGain()
+    this.out.connect(ctx.destination)
+    this.analyser.connect(this.out)
 
     this.master = ctx.createGain()
     this.master.gain.value = this.volume * this.volume
@@ -213,7 +218,7 @@ export class ChillAudio {
     rainLp.frequency.value = 5000
     this.rainGain = ctx.createGain()
     this.rainGain.gain.value = 0
-    rain.connect(rainHp).connect(rainLp).connect(this.rainGain).connect(ctx.destination)
+    rain.connect(rainHp).connect(rainLp).connect(this.rainGain).connect(this.out)
     rain.start()
 
     const street = ctx.createBufferSource()
@@ -224,7 +229,7 @@ export class ChillAudio {
     streetLp.frequency.value = 500
     this.streetGain = ctx.createGain()
     this.streetGain.gain.value = 0
-    street.connect(streetLp).connect(this.streetGain).connect(ctx.destination)
+    street.connect(streetLp).connect(this.streetGain).connect(this.out)
     street.start()
 
     // Âm thanh ngoài phố (xe chạy qua, còi, chó sủa): lọc bớt treble như nghe
@@ -234,13 +239,13 @@ export class ChillAudio {
     sfxLp.frequency.value = 1800
     this.sfxGain = ctx.createGain()
     this.sfxGain.gain.value = 0
-    sfxLp.connect(this.sfxGain).connect(ctx.destination)
+    sfxLp.connect(this.sfxGain).connect(this.out)
     this.sfxIn = sfxLp
 
     // Tiếng quán: nút gain có sẵn, file chỉ tải khi thanh trượt > 0 (startCafe)
     this.cafeGain = ctx.createGain()
     this.cafeGain.gain.value = 0
-    this.cafeGain.connect(ctx.destination)
+    this.cafeGain.connect(this.out)
 
     // Mèo gừ gừ liên tục (như catSound 'purr' nhưng lặp mãi): tiếng ồn trầm, nhịp ~25 lần/
     // giây, phập phồng theo hơi thở ~3 giây một nhịp
@@ -266,7 +271,7 @@ export class ChillAudio {
     breathLfo.connect(breathDepth).connect(breath.gain)
     this.purrGain = ctx.createGain()
     this.purrGain.gain.value = 0
-    purr.connect(purrLp).connect(rumble).connect(breath).connect(this.purrGain).connect(ctx.destination)
+    purr.connect(purrLp).connect(rumble).connect(breath).connect(this.purrGain).connect(this.out)
     purr.start()
     rumbleLfo.start()
     breathLfo.start()
@@ -422,6 +427,26 @@ export class ChillAudio {
   setVolume(value: number) {
     this.volume = value
     if (this.ctx) this.master.gain.setTargetAtTime(value * value, this.ctx.currentTime, 0.05)
+  }
+
+  // Hẹn giờ tắt nhạc: từ `fadeAt` giây nữa, nhạc + tiếng nền nhỏ dần trong `fade` giây tới
+  // im hẳn. Lên lịch luôn trên Web Audio nên tab chạy nền (timer JS bị bóp) vẫn nhỏ dần đúng
+  // giờ; nơi gọi tự dừng nhạc khi hết giờ. Im tới khi wake() (phát lại / huỷ hẹn giờ)
+  sleep(fadeAt: number, fade: number) {
+    if (!this.ctx) return
+    const now = this.ctx.currentTime
+    const g = this.out.gain
+    g.cancelScheduledValues(now)
+    g.setValueAtTime(g.value, now)
+    g.setValueAtTime(g.value, now + Math.max(0, fadeAt))
+    g.linearRampToValueAtTime(0, now + Math.max(0, fadeAt) + fade)
+  }
+
+  wake() {
+    if (!this.ctx) return
+    const now = this.ctx.currentTime
+    this.out.gain.cancelScheduledValues(now)
+    this.out.gain.setTargetAtTime(1, now, 0.1)
   }
 
   setAmbience(level: number, kind: Ambience, start = false) {

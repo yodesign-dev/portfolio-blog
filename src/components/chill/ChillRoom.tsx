@@ -67,6 +67,10 @@ const TOY_TIP_MS = 3500
 const TOY_SEEN_KEY = 'chill:toy-seen'
 const TOY_HINT_DELAY_MS = 3000
 const TOY_HINT_MS = 6000
+// Hẹn giờ tắt nhạc: các mốc chọn được · giây nhỏ dần cuối cùng · đã tự mở gợi ý ở trạm Night & Sleep chưa
+const SLEEP_MINUTES = [15, 30, 60, 90]
+const SLEEP_FADE_S = 60
+const SLEEP_HINT_KEY = 'chill:sleep-hint'
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
 // Đã mở cuốn sổ "Việc hôm nay" trên quầy lần nào chưa (chưa → sao lấp lánh + nhãn gợi ý)
@@ -212,6 +216,7 @@ export function ChillRoom({
   miniPlayerOn = false,
   facadeOn = false,
   highlandOn = false,
+  sleepTimerOn = false,
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -238,6 +243,9 @@ export function ChillRoom({
   // Đà Lạt sương mù: ảnh mới, sương trôi, khói ống khói, kính mờ (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?highland=1 / ?highland=0 trên URL ghi đè để so trước / sau
   highlandOn?: boolean
+  // Hẹn giờ tắt nhạc 15/30/60/90 phút (Studio "Chill · Cài đặt"), mặc định tắt.
+  // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
+  sleepTimerOn?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -415,7 +423,8 @@ export function ChillRoom({
     if (prefs.time && ['morning', 'afternoon', 'night'].includes(prefs.time)) setTime(prefs.time)
     if (prefs.weather && ['clear', 'rain', 'mist'].includes(prefs.weather)) setWeather(prefs.weather)
     if (typeof prefs.shuffle === 'boolean') setShuffle(prefs.shuffle)
-    const savedStation = STATIONS.find((st) => st.id === prefs.station)?.id
+    // Trạm đã lưu mà giờ không còn bài (mọi bài bị ẩn trong Studio) → như chưa chọn
+    const savedStation = STATIONS.find((st) => st.id === prefs.station && tracks.some((t) => stationOf(t) === st.id))?.id
     // Không có lựa chọn cũ thì mở trạm có bài đầu tiên (ưu tiên Café Acoustic)
     const firstStation = savedStation ?? STATIONS.find((st) => tracks.some((t) => stationOf(t) === st.id))?.id ?? 'lofi'
     setStation(saved >= 0 ? stationOf(tracks[saved]) : firstStation)
@@ -1364,10 +1373,64 @@ export function ChillRoom({
 
   // ---------- Điều khiển nhạc ----------
 
+  // Hẹn giờ tắt nhạc: nút trăng cạnh Cài đặt, chọn 15/30/60/90 phút. 60 giây cuối nhạc + tiếng
+  // nền nhỏ dần (lên lịch trên Web Audio nên tab chạy nền vẫn đúng giờ), hết giờ thì dừng nhạc
+  // và im hẳn tới khi bấm phát lại (`slept`). Lần đầu vào trạm Night & Sleep tự mở bảng chọn
+  const [sleepFlag, setSleepFlag] = useState(false)
+  const [sleepEnd, setSleepEnd] = useState<number | null>(null)
+  const [sleepLeft, setSleepLeft] = useState(0)
+  const [sleepOpen, setSleepOpen] = useState(false)
+  const slept = useRef(false)
+  // Điện thoại chật: nút trăng chỉ hiện khi đang nghe trạm Night & Sleep hoặc đang hẹn giờ,
+  // và lúc đó nhường chỗ nút "bài trước" cho tên bài
+  const sleepOnPhone = playingStation === 'night' || sleepEnd !== null || sleepOpen
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('sleep')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setSleepFlag(param ? param === '1' : sleepTimerOn)
+  }, [sleepTimerOn])
+  // AudioContext chỉ có sau lần phát đầu → lên lịch lại khi bắt đầu phát
+  useEffect(() => {
+    if (sleepEnd === null || !started) return
+    const left = (sleepEnd - Date.now()) / 1000
+    audioRef.current?.sleep(left - SLEEP_FADE_S, Math.min(SLEEP_FADE_S, Math.max(left, 0)))
+  }, [sleepEnd, started])
+  useEffect(() => {
+    if (sleepEnd === null) return
+    const id = window.setInterval(() => {
+      const left = sleepEnd - Date.now()
+      if (left > 0) return setSleepLeft(Math.ceil(left / 60_000))
+      audioRef.current?.pause()
+      setPlaying(false)
+      slept.current = true
+      setSleepEnd(null)
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [sleepEnd])
+  // `at` = giờ bấm (ms), lấy từ sự kiện bấm để render không gọi Date.now()
+  const startSleep = (minutes: number, at: number) => {
+    setSleepEnd(at + minutes * 60_000)
+    setSleepLeft(minutes)
+    setSleepOpen(false)
+    trackEvent({name: 'Chill Sleep Timer', props: {minutes}})
+  }
+  const cancelSleep = () => {
+    setSleepEnd(null)
+    setSleepOpen(false)
+    audioRef.current?.wake()
+  }
+  // Hết giờ rồi bấm phát lại → mở lại tiếng
+  const wakeIfSlept = (audio: ChillAudio) => {
+    if (!slept.current) return
+    slept.current = false
+    audio.wake()
+  }
+
   // crossfade: bài đang phát nhỏ dần, bài mới to dần (chuyển bài tự động / đổi trạm)
   const playAt = useCallback((i: number, crossfade = false) => {
     const audio = audioRef.current
     if (!audio) return
+    wakeIfSlept(audio)
     const next = tracks[i]
     audio.play(next, crossfade)
     setIndex(i)
@@ -1416,6 +1479,14 @@ export function ChillRoom({
   const changeStation = (id: StationId) => {
     if (id === station) return
     setStation(id)
+    if (id === 'night' && sleepFlag && sleepEnd === null) {
+      try {
+        if (!localStorage.getItem(SLEEP_HINT_KEY)) {
+          localStorage.setItem(SLEEP_HINT_KEY, '1')
+          setSleepOpen(true)
+        }
+      } catch {}
+    }
     if (started) return
     const first = tracks.findIndex((t) => stationOf(t) === id)
     if (first < 0) return
@@ -1474,6 +1545,7 @@ export function ChillRoom({
       audio.pause()
       setPlaying(false)
     } else {
+      wakeIfSlept(audio)
       audio.resume()
       setPlaying(true)
     }
@@ -2375,15 +2447,15 @@ export function ChillRoom({
                 {STATIONS.map((st) => {
                   const count = tracks.filter((t) => stationOf(t) === st.id).length
                   const on = st.id === station
+                  if (count === 0) return null
                   return (
                     <button
                       key={st.id}
                       type="button"
                       role="radio"
                       aria-checked={on}
-                      disabled={count === 0}
                       onClick={() => changeStation(st.id)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                      className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
                         on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
                     >
@@ -3125,9 +3197,11 @@ export function ChillRoom({
         >
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              <RoundButton label={t.room.prev} onClick={prev}>
-                <PrevIcon />
-              </RoundButton>
+              <span className={sleepFlag && sleepOnPhone ? 'hidden sm:contents' : 'contents'}>
+                <RoundButton label={t.room.prev} onClick={prev}>
+                  <PrevIcon />
+                </RoundButton>
+              </span>
               <button
                 type="button"
                 onClick={togglePlay}
@@ -3191,6 +3265,58 @@ export function ChillRoom({
                 </div>
               )}
             </div>
+            {sleepFlag && (
+              <div className={`relative shrink-0 ${sleepOnPhone ? '' : 'hidden sm:block'}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVolumeOpen(false)
+                    setSleepOpen((o) => !o)
+                  }}
+                  aria-label={sleepEnd === null ? t.room.sleep : t.room.sleepLeft(sleepLeft)}
+                  title={sleepEnd === null ? t.room.sleep : t.room.sleepLeft(sleepLeft)}
+                  aria-expanded={sleepOpen}
+                  aria-controls="chill-sleep"
+                  className={`flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border px-2.5 transition ${
+                    sleepOpen || sleepEnd !== null
+                      ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
+                      : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <MoonIcon />
+                  {sleepEnd !== null && <span className="font-mono text-[11px] tabular-nums">{sleepLeft}′</span>}
+                </button>
+                {sleepOpen && (
+                  <div
+                    id="chill-sleep"
+                    className="absolute bottom-full right-0 mb-3 w-60 rounded-xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md"
+                  >
+                    <p className="text-xs text-[#a79e94]">{sleepEnd === null ? t.room.sleepHint : t.room.sleepLeft(sleepLeft)}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {SLEEP_MINUTES.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={(e) => startSleep(m, performance.timeOrigin + e.timeStamp)}
+                          className="rounded-full border border-white/10 px-3 py-1.5 text-[13px] text-[#ede6dd] transition hover:border-[#e8b27d]/60 hover:text-[#f3cfa8]"
+                        >
+                          {t.room.sleepMin(m)}
+                        </button>
+                      ))}
+                      {sleepEnd !== null && (
+                        <button
+                          type="button"
+                          onClick={cancelSleep}
+                          className="rounded-full border border-white/10 px-3 py-1.5 text-[13px] text-[#a79e94] transition hover:border-white/25 hover:text-[#ede6dd]"
+                        >
+                          {t.room.sleepOff}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Người chưa mở cài đặt lần nào thấy vòng cam + gợi ý */}
             <div className="relative shrink-0">
               <button
@@ -3457,15 +3583,15 @@ export function ChillRoom({
                 {STATIONS.map((st) => {
                   const count = tracks.filter((t) => stationOf(t) === st.id).length
                   const on = st.id === station
+                  if (count === 0) return null
                   return (
                     <button
                       key={st.id}
                       type="button"
                       role="radio"
                       aria-checked={on}
-                      disabled={count === 0}
                       onClick={() => changeStation(st.id)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                      className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
                         on
                           ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
                           : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'

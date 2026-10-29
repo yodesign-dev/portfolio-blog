@@ -19,12 +19,15 @@ export type SynthSpec = {
   tone: number
 }
 
-// Trạm nhạc theo mood — mỗi trạm phát liền mạch, các bài chồng mờ vào nhau
-export type StationId = 'acoustic' | 'focus' | 'sax' | 'lofi' | 'study'
+// Trạm nhạc theo mood — mỗi trạm phát liền mạch, các bài chồng mờ vào nhau. Trạm chưa có
+// bài nào (hoặc mọi bài đang ẩn trong Studio) thì không hiện tab
+export type StationId = 'acoustic' | 'focus' | 'night' | 'sax' | 'lofi' | 'study'
 
 export const STATIONS: {id: StationId; label: string; short: string}[] = [
   {id: 'acoustic', label: 'Café Acoustic', short: 'Acoustic'},
   {id: 'focus', label: 'Deep Focus', short: 'Focus'},
+  // Nhạc ngủ: bài dài ~8 phút (ghép 3 đoạn Lyria), không trống, êm, cuối bài nhỏ dần 60 giây
+  {id: 'night', label: 'Night & Sleep', short: 'Sleep'},
   {id: 'sax', label: 'Sax Lounge', short: 'Sax'},
   {id: 'lofi', label: 'Lo-fi', short: 'Lo-fi'},
   {id: 'study', label: 'Study Beats', short: 'Study'},

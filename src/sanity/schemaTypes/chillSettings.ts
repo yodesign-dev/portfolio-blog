@@ -30,6 +30,7 @@ export default defineType({
     defineField({name: 'highlandOpen', title: 'Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ)', type: 'boolean', initialValue: false}),
     defineField({name: 'streetMotionOpen', title: 'Chuyển động phố mượt (người, xe, chó)', type: 'boolean', initialValue: false}),
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
+    defineField({name: 'sleepTimerOpen', title: 'Hẹn giờ tắt nhạc', type: 'boolean', initialValue: false}),
     // Thử thách chung "Cả quán cùng pha phin" (xem src/app/api/chill-quest/route.ts)
     defineField({name: 'questOpen', title: 'Mở thử thách chung', type: 'boolean', initialValue: false}),
     defineField({name: 'questSeason', title: 'Mã mùa', type: 'string', initialValue: 'mua-1', description: 'Đổi mã (vd. mua-2) là bắt đầu mùa mới, bộ đếm và phiếu về 0.', validation: (rule) => rule.regex(/^[a-z0-9-]{1,24}$/)}),

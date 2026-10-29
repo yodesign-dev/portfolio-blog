@@ -53,6 +53,8 @@ export type AnalyticsEvent =
   // `host` = site đang nhúng (vd www.notion.so), "direct" = mở thẳng link không qua khung
   | {name: 'Chill Embed'; props: {action: 'view' | 'play' | 'open'; host: string}}
   | {name: 'Chill Mini'; props: {from: 'button' | 'auto' | 'guide' | 'update'}}
+  // Hẹn giờ tắt nhạc: số phút chọn
+  | {name: 'Chill Sleep Timer'; props: {minutes: number}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {
