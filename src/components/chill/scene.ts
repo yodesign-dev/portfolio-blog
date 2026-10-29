@@ -2589,8 +2589,12 @@ export class ChillScene {
       this.rain.drawOutside(ctx, this.time === 'night')
       ctx.restore()
     } else if (this.weather === 'mist') {
-      ctx.fillStyle = this.time === 'night' ? 'rgba(150,160,190,0.35)' : 'rgba(236,238,240,0.5)'
-      ctx.fillRect(view.x, view.y, view.w, view.h)
+      // Đà Lạt có màn sương riêng (xa dày, gần mỏng) thay cho lớp phủ đều
+      if (this.highland.active) this.highland.drawMistWash(ctx, view, street)
+      else {
+        ctx.fillStyle = this.time === 'night' ? 'rgba(150,160,190,0.35)' : 'rgba(236,238,240,0.5)'
+        ctx.fillRect(view.x, view.y, view.w, view.h)
+      }
     }
 
     // Đà Lạt: mép kính mờ hơi nước (ban công không có kính)

@@ -5,8 +5,10 @@
 //   (thị trấn, sườn đồi) phủ dày, vật gần, tối (cột điện, thông, mái nhà) gần như không phủ.
 //   Sáng: biển sương trắng ấm; tối: sương mỏng xanh lạnh dưới thung lũng, đèn đường hắt
 //   vàng vào; chiều: không sương. 2 tầng nhiễu trôi khác tốc độ → sương thành cụm cuộn
-//   chậm. Ô 2 px ảnh, mờ 4 bậc (đêm 8 bậc) có chấm lưới Bayer → mềm mà vẫn ra pixel.
-// - Khói: ống khói biệt thự nhả từng cụm khói bay lên, nở ra, nghiêng theo gió (sáng, tối).
+//   chậm. Ô 2 px ảnh, mờ 16 bậc, vẽ ra có làm mịn → sương mềm, không lấm tấm hạt.
+// - Trời sương (weather mist): thay lớp phủ trắng đều của scene bằng màn sương xa dày, gần
+//   mỏng — thị trấn, núi chìm trong sương, vỉa hè và người đi đường vẫn rõ.
+// - Khói: ống khói biệt thự nhả từng cụm khói tròn mềm, bay lên chậm, nở ra, lắc nhẹ theo gió.
 // - Đèn đường: đêm / sương thì có quầng sương quanh bóng đèn.
 // - Kính quán: mép kính mờ hơi nước, lâu lâu một giọt chảy xuống (trời mưa thì đã có mưa).
 //
@@ -154,8 +156,8 @@ export class Highland {
   // Sáng dày, tối mỏng, chiều không; trời sương dày hơn, mưa thì thôi
   private fogStrength() {
     if (this.weather === 'rain' || this.time === 'afternoon') return 0
-    const k = this.time === 'night' ? 0.65 : 1.25
-    return this.weather === 'mist' ? k * 1.3 : k
+    const k = this.time === 'night' ? 0.65 : 1.1
+    return this.weather === 'mist' ? k * 1.1 : k
   }
 
   // Tính lại lớp sương (12 lần/giây là đủ — sương trôi rất chậm)
@@ -176,7 +178,7 @@ export class Highland {
     const d = img.data
     const bands = night ? cfg.fog.night : cfg.fog.morning
     const col = night ? [126, 142, 182] : [246, 243, 238]
-    const lvls = night ? 8 : 4
+    const lvls = 16
     const breath = 0.85 + 0.15 * Math.sin(this.clock * 0.1)
     const t = this.clock
     for (let y = 0; y < GH; y++) {
@@ -238,14 +240,16 @@ export class Highland {
       this.paintFog()
     }
     if (this.smoky() && (this.nextPuff -= dt) <= 0) {
-      this.nextPuff = 0.35 + Math.random() * 0.4
-      for (const c of this.cfg.chimneys) this.puffs.push({x: c.x, y: c.y, age: 0, life: 6 + Math.random() * 3, r: 3})
+      this.nextPuff = 0.45 + Math.random() * 0.3
+      for (const c of this.cfg.chimneys) this.puffs.push({x: c.x + (Math.random() - 0.5) * 3, y: c.y, age: 0, life: 7 + Math.random() * 3, r: 4})
     }
     for (const p of this.puffs) {
       p.age += dt
-      p.y -= dt * 9
-      p.x += dt * (4 + p.age * 1.5) * (wind || 1)
-      p.r = 3 + p.age * 2.2
+      // Bốc lên chậm dần, nghiêng dần sang trái, lắc nhẹ. Luôn sang trái bất kể gió: ống khói
+      // nằm sát thanh gỗ giữa 2 ô kính quán, trôi sang phải là khuất sau khung
+      p.y -= dt * 10 * (1 - p.age / (p.life * 2))
+      p.x -= dt * (1 + p.age * 1.3 - Math.sin(this.clock * 0.9 + p.life) * 1.5)
+      p.r = 6 + p.age * 3.4
     }
     this.puffs = this.puffs.filter((p) => p.age < p.life)
   }
@@ -256,18 +260,28 @@ export class Highland {
     if (!cfg) return
     const s = r.w / 1120
     const night = this.time === 'night'
-    if (this.fogShown && this.fogCanvas) ctx.drawImage(this.fogCanvas, r.x, r.y, r.w, r.h)
-    // Khói ống khói: cụm vuông mờ, càng lên càng nở và nhạt
+    const smooth = ctx.imageSmoothingEnabled
+    if (this.fogShown && this.fogCanvas) {
+      ctx.imageSmoothingEnabled = true
+      ctx.drawImage(this.fogCanvas, r.x, r.y, r.w, r.h)
+      ctx.imageSmoothingEnabled = smooth
+    }
+    // Khói ống khói: cụm tròn mềm, càng lên càng nở và nhạt
     if (this.puffs.length) {
       // Trời sáng gần trắng: khói ngày phải xám hơn nền mới thấy
-      const smoke = night ? '170,175,195' : '168,164,168'
+      const smoke = night ? '176,182,204' : '150,146,152'
       for (const p of this.puffs) {
         const k = p.age / p.life
-        const a = Math.round((1 - k) * (k < 0.1 ? k * 10 : 1) * 0.7 * 16) / 16
-        if (a <= 0) continue
-        const q = Math.max(2, Math.round(p.r / 2) * 2)
-        ctx.fillStyle = `rgba(${smoke},${a.toFixed(3)})`
-        ctx.fillRect(r.x + (p.x - q / 2) * s, r.y + (p.y - q / 2) * s, q * s, q * s)
+        const a = (1 - k) * Math.min(1, k * 5) * 0.55
+        if (a <= 0.01) continue
+        const cx = r.x + p.x * s
+        const cy = r.y + p.y * s
+        const rad = p.r * s
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
+        g.addColorStop(0, `rgba(${smoke},${a.toFixed(3)})`)
+        g.addColorStop(1, `rgba(${smoke},0)`)
+        ctx.fillStyle = g
+        ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2)
       }
     }
     // Quầng sương quanh đèn đường
@@ -285,6 +299,21 @@ export class Highland {
         ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2)
       }
     }
+  }
+
+  // Trời sương: màn sương xa dày (trời, núi, thị trấn), gần mỏng (lan can, vỉa hè, đường) —
+  // thay lớp phủ đều của scene. v = khung nhìn, r = chỗ ảnh phố (lưới cảnh)
+  drawMistWash(ctx: CanvasRenderingContext2D, v: {x: number; y: number; w: number; h: number}, r: {y: number; h: number}) {
+    const night = this.time === 'night'
+    const c = night ? '140,152,186' : this.time === 'afternoon' ? '240,226,232' : '238,240,242'
+    const [far, near] = night ? [0.22, 0.05] : [0.34, 0.07]
+    const breathe = 1 + 0.08 * Math.sin(this.clock * 0.15)
+    const g = ctx.createLinearGradient(0, r.y + r.h * 0.2, 0, r.y + r.h * 0.78)
+    g.addColorStop(0, `rgba(${c},${(far * breathe).toFixed(3)})`)
+    g.addColorStop(0.6, `rgba(${c},${(far * 0.75 * breathe).toFixed(3)})`)
+    g.addColorStop(1, `rgba(${c},${near})`)
+    ctx.fillStyle = g
+    ctx.fillRect(v.x, v.y, v.w, v.h)
   }
 
   // Lớp mờ hơi nước vẽ sẵn (chỉ đổi khi đổi khung kính / giờ): ô 2 px đệm (½ ô lưới), mờ 8 bậc
