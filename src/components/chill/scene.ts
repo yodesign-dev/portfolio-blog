@@ -1546,7 +1546,8 @@ export class ChillScene {
     if (rainy) this.rain.update(dt)
     if (this.facadeOn && ready(this.street)) {
       const d = this.destination
-      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [])
+      const panorama = this.highlandOn && !!HIGHLAND[d.id]
+      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [], !panorama)
       this.facade.update(dt)
     }
     this.highland.set(this.highlandOn ? this.destination.id : '', this.time, this.weather)
@@ -2200,7 +2201,7 @@ export class ChillScene {
       gc.setTransform(RES * k, 0, 0, RES * k, RES * (x - STREET_IMG.x * k), RES * (y - top * k))
       gc.drawImage(this.streetSource(img), STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
       if (this.facadeOn) this.facade.draw(gc, STREET_IMG, this.windDir)
-      this.highland.draw(gc, STREET_IMG, this.windDir)
+      this.highland.draw(gc, STREET_IMG)
       const counter = this.ctx
       this.ctx = gc
       // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
@@ -2551,7 +2552,7 @@ export class ChillScene {
       ctx.globalAlpha = this.prevStreet ? this.fade : 1
       this.drawStreet(this.street, street, view)
       if (this.facadeOn) this.facade.draw(ctx, street, this.windDir)
-      this.highland.draw(ctx, street, this.windDir)
+      this.highland.draw(ctx, street)
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)

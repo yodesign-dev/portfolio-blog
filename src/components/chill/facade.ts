@@ -163,6 +163,7 @@ export class Facade {
   private glintT = -1
   private band: HTMLCanvasElement | null = null
   private props: PropSpot[] = []
+  private sweep = true
   private propsImg: HTMLImageElement | null = null
   private propsTinted: HTMLCanvasElement | null = null
   private propsKey = ''
@@ -172,11 +173,14 @@ export class Facade {
   }
 
   // Gọi khi đổi ảnh phố / giờ / thời tiết / điểm đến
-  set(img: HTMLImageElement, time: TimeOfDay, weather: Weather, signs: NeonSign[], props: PropSpot[] = []) {
+  // sweep = false: cảnh toàn cảnh đồi (Đà Lạt sương mù) — không bóng mây / vệt nắng quét,
+  // vì phủ cả thung lũng lẫn quán cùng lúc trông như đèn chiếu chạy ngang
+  set(img: HTMLImageElement, time: TimeOfDay, weather: Weather, signs: NeonSign[], props: PropSpot[] = [], sweep = true) {
     this.time = time
     this.weather = weather
     this.signs = signs
     this.props = props
+    this.sweep = sweep
     if (this.a?.img === img) return
     const slot: Analysis = {img, w: 0, h: 0, blobs: [], dark: null, tv: null, glint: null}
     this.a = slot
@@ -352,7 +356,7 @@ export class Facade {
       this.drawSigns(ctx, r)
       return
     }
-    if (this.weather !== 'clear') return
+    if (this.weather !== 'clear' || !this.sweep) return
     this.drawClouds(ctx, r, wind)
     if (a?.glint && this.glintT >= 0 && this.time === 'afternoon') this.drawGlint(ctx, a, r)
   }
