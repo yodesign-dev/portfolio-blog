@@ -1,5 +1,5 @@
 import {DESTINATIONS, type Destination} from '@/components/chill/destinations'
-import {STATIONS, TRACKS, type StationId, type Track} from '@/components/chill/tracks'
+import {NEW_TRACK_DAYS, STATIONS, TRACKS, type StationId, type Track} from '@/components/chill/tracks'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import type {ChillUpdate} from '@/components/chill/Changelog'
 import type {NeonSign} from '@/components/chill/facade'
@@ -20,6 +20,7 @@ const CHILL_QUERY = `{
     mood,
     station,
     duration,
+    _createdAt,
     "src": coalesce(audio.asset->url, localFile)
   },
   "destinations": *[_type == "chillDestination" && ($showHidden || hidden != true) && defined(slug.current)
@@ -68,7 +69,7 @@ const CHILL_QUERY = `{
 }`
 
 type ChillContent = {
-  tracks: {id: string; title: string; mood?: string; station?: string; duration?: number; src: string}[]
+  tracks: {id: string; title: string; mood?: string; station?: string; duration?: number; _createdAt?: string; src: string}[]
   destinations: {
     id: string
     name: string
@@ -133,6 +134,7 @@ export async function getChillContent(revalidate: number) {
     duration: t.duration ?? 0,
     src: t.src,
     station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,
+    isNew: t._createdAt ? Date.now() - Date.parse(t._createdAt) < NEW_TRACK_DAYS * 86_400_000 : undefined,
   }))
   // Sanity lỗi / chưa có bài nào → bộ dự phòng trong code
   const tracks: Track[] = fromStudio.length ? fromStudio : TRACKS

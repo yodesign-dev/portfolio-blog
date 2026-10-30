@@ -42,7 +42,11 @@ export type Track = {
   src?: string
   synth?: SynthSpec
   station?: StationId // bỏ trống = 'lofi'
+  // Upload chưa quá NEW_TRACK_DAYS ngày → nhãn "Mới" trong danh sách (content.ts tính phía server)
+  isNew?: boolean
 }
+
+export const NEW_TRACK_DAYS = 7
 
 export const stationOf = (t: Track): StationId => t.station ?? 'lofi'
 

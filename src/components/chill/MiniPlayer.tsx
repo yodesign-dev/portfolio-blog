@@ -15,7 +15,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {useT} from './i18n'
-import {HotBadge, PlayMeter, type PlayStat} from './PlayMeter'
+import {HotBadge, NewBadge, PlayMeter, type PlayStat} from './PlayMeter'
 import {STATIONS, stationOf, type StationId, type Track} from './tracks'
 
 type DocumentPiP = {
@@ -280,6 +280,7 @@ export function MiniPlayer({
                     <span className="font-mono text-[11px] tabular-nums text-[#a79e94]">{active && playing ? '♪' : String(pos + 1).padStart(2, '0')}</span>
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span className={`truncate text-[13px] ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                      <NewBadge track={tr} />
                       <HotBadge stat={plays?.get(tr.id)} />
                     </span>
                     <span className="flex items-center gap-2 font-mono text-[11px] tabular-nums text-[#a79e94]">

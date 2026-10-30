@@ -3,6 +3,7 @@
 // - Dưới PLAY_COUNT_SHOW lượt: 3 vạch mức nghe so với bài nhiều nhất cùng trạm, không lộ số
 // - Từ PLAY_COUNT_SHOW lượt: hiện số "1,2k lượt nghe"
 // - 3 bài nhiều nhất mỗi trạm (từ PLAY_HOT_MIN lượt) có nhãn "Nghe nhiều"
+// Kèm nhãn "Mới" cho bài upload chưa quá NEW_TRACK_DAYS ngày (không cần công tắc)
 // Dùng chung cho danh sách điện thoại, tab Nhạc máy tính và cửa sổ nổi (MiniPlayer).
 
 import {useLang, useT, type Lang} from './i18n'
@@ -65,6 +66,15 @@ export function PlayMeter({stat}: {stat?: PlayStat}) {
 }
 
 // Nhãn nhỏ cạnh tên / dòng phụ của bài nằm trong top trạm
+// Màu bạc hà để khác nhãn "Nghe nhiều" (cam)
+export function NewBadge({track}: {track: Track}) {
+  const t = useT()
+  if (!track.isNew) return null
+  return (
+    <span className="shrink-0 rounded-full border border-[#9fdcbc]/35 bg-[#9fdcbc]/10 px-1.5 text-[10.5px] leading-4 text-[#9fdcbc]">{t.room.newTrack}</span>
+  )
+}
+
 export function HotBadge({stat}: {stat?: PlayStat}) {
   const t = useT()
   if (!stat?.hot) return null

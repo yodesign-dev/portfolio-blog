@@ -33,7 +33,7 @@ import {NameField} from './NameField'
 import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
-import {HotBadge, PlayMeter, playStats} from './PlayMeter'
+import {HotBadge, NewBadge, PlayMeter, playStats} from './PlayMeter'
 import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
 const PREFS_KEY = 'chill:prefs'
@@ -71,6 +71,14 @@ const TOY_HINT_MS = 6000
 const SLEEP_MINUTES = [15, 30, 60, 90]
 const SLEEP_FADE_S = 60
 const SLEEP_HINT_KEY = 'chill:sleep-hint'
+// Đã mở bảng hẹn giờ lần nào chưa (chưa → vòng cam quanh nút trăng)
+const SLEEP_SEEN_KEY = 'chill:sleep-seen'
+// Gợi ý buổi tối: từ 21:00 tới 4:00, nghe liền chừng này mà chưa hẹn giờ thì mời 1 lần / tối
+const SLEEP_NUDGE_KEY = 'chill:sleep-nudge'
+const SLEEP_NUDGE_AFTER_MS = 10 * 60_000
+const SLEEP_NUDGE_MS = 8000
+// Trạm đã xem lứa bài mới nào (chấm bạc hà trên tab trạm, xem newKeys)
+const NEW_SEEN_KEY = 'chill:new-seen'
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
 const LAST_VISIT_KEY = 'chill:last-visit'
 // Đã mở cuốn sổ "Việc hôm nay" trên quầy lần nào chưa (chưa → sao lấp lánh + nhãn gợi ý)
@@ -1381,9 +1389,49 @@ export function ChillRoom({
   const [sleepLeft, setSleepLeft] = useState(0)
   const [sleepOpen, setSleepOpen] = useState(false)
   const slept = useRef(false)
+  const [sleepSeen, setSleepSeen] = useState(true)
+  const [sleepNudge, setSleepNudge] = useState(false)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+      setSleepSeen(localStorage.getItem(SLEEP_SEEN_KEY) === '1')
+    } catch {}
+  }, [])
+  const openSleep = () => {
+    setSleepOpen(true)
+    setSleepNudge(false)
+    setSleepSeen(true)
+    try {
+      localStorage.setItem(SLEEP_SEEN_KEY, '1')
+    } catch {}
+  }
+  // Gợi ý buổi tối: đếm từ lúc bắt đầu phát liền mạch, mỗi phút xem đã đủ 10 phút + đúng giờ chưa
+  useEffect(() => {
+    if (!sleepFlag || !playing || sleepEnd !== null) return
+    const since = Date.now()
+    const id = window.setInterval(() => {
+      const now = new Date()
+      const h = now.getHours()
+      if (now.getTime() - since < SLEEP_NUDGE_AFTER_MS || (h >= 4 && h < 21)) return
+      // "Tối nay" kéo tới 4 giờ sáng
+      const night = new Date(now.getTime() - 4 * 3_600_000).toDateString()
+      try {
+        if (localStorage.getItem(SLEEP_NUDGE_KEY) === night) return
+        localStorage.setItem(SLEEP_NUDGE_KEY, night)
+      } catch {}
+      window.clearInterval(id)
+      setSleepNudge(true)
+    }, 60_000)
+    return () => window.clearInterval(id)
+  }, [sleepFlag, playing, sleepEnd])
+  useEffect(() => {
+    if (!sleepNudge) return
+    const id = window.setTimeout(() => setSleepNudge(false), SLEEP_NUDGE_MS)
+    return () => window.clearTimeout(id)
+  }, [sleepNudge])
   // Điện thoại chật: nút trăng chỉ hiện khi đang nghe trạm Night & Sleep hoặc đang hẹn giờ,
   // và lúc đó nhường chỗ nút "bài trước" cho tên bài
-  const sleepOnPhone = playingStation === 'night' || sleepEnd !== null || sleepOpen
+  const sleepOnPhone = playingStation === 'night' || sleepEnd !== null || sleepOpen || sleepNudge
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('sleep')
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
@@ -1483,7 +1531,7 @@ export function ChillRoom({
       try {
         if (!localStorage.getItem(SLEEP_HINT_KEY)) {
           localStorage.setItem(SLEEP_HINT_KEY, '1')
-          setSleepOpen(true)
+          openSleep()
         }
       } catch {}
     }
@@ -1516,6 +1564,12 @@ export function ChillRoom({
       setPanelOpen(true)
     } else if (kind === 'chat') setChatOpen(true)
     else if (kind === 'zen' && !zen) toggleZen()
+    else if (kind === 'sleep' && sleepFlag) {
+      // Nút trăng nằm trên thanh nhạc → tắt Ngắm cảnh; có trạm Night & Sleep thì chuyển sang luôn
+      if (zen) toggleZen()
+      if (tracks.some((tr) => stationOf(tr) === 'night')) changeStation('night')
+      openSleep()
+    }
     else if (kind === 'mini' && canMini && !miniOpen) openMini('update')
     else if (kind === 'phin') {
       // Ngắm cảnh giấu cả thanh trên → tắt trước rồi mới mở bảng phin
@@ -2055,6 +2109,43 @@ export function ChillRoom({
   const [zenTip, setZenTip] = useState(false)
   // Thanh nhạc gọn trong Ngắm cảnh: mở danh sách bài (giữ thanh hiện trong lúc chọn)
   const [zenList, setZenList] = useState(false)
+
+  // Chấm bạc hà trên tab trạm có bài "Mới" mà khách chưa mở danh sách trạm đó. Mỗi trạm 1 mã
+  // theo lứa bài mới (số bài + bài cuối) → thêm bài nữa thì chấm hiện lại
+  const newKeys = useMemo(() => {
+    const keys = new Map<StationId, string>()
+    for (const st of STATIONS) {
+      const fresh = tracks.filter((tr) => tr.isNew && stationOf(tr) === st.id)
+      if (fresh.length) keys.set(st.id, `${st.id}:${fresh.length}:${fresh[fresh.length - 1].id}`)
+    }
+    return keys
+  }, [tracks])
+  const [newSeen, setNewSeen] = useState<string[] | null>(null)
+  useEffect(() => {
+    let seen: string[] = []
+    try {
+      const raw = JSON.parse(localStorage.getItem(NEW_SEEN_KEY) ?? '[]') as unknown
+      if (Array.isArray(raw)) seen = raw.filter((k): k is string => typeof k === 'string')
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
+    setNewSeen(seen)
+  }, [])
+  // Đang thấy danh sách trạm nào thì coi như đã xem lứa bài mới của trạm đó
+  const listOpen = (panelOpen && panelTab === 'music') || zenList
+  useEffect(() => {
+    const key = newKeys.get(station)
+    if (!listOpen || !key || !newSeen || newSeen.includes(key)) return
+    const next = [...newSeen.filter((k) => !k.startsWith(`${station}:`)), key]
+    try {
+      localStorage.setItem(NEW_SEEN_KEY, JSON.stringify(next))
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ghi nhận vừa xem danh sách
+    setNewSeen(next)
+  }, [listOpen, station, newKeys, newSeen])
+  const hasUnseenNew = (id: StationId) => {
+    const key = newKeys.get(id)
+    return Boolean(key && newSeen && !newSeen.includes(key))
+  }
   const zenBarRef = useRef<HTMLDivElement>(null)
   // Danh sách đang mở: chạm / bấm ra ngoài thanh nhạc là đóng (khỏi phải bấm lại nút)
   useEffect(() => {
@@ -2248,7 +2339,7 @@ export function ChillRoom({
   const mixPreset = presetOf(mix)
   const progress = duration ? Math.min(1, position / duration) : 0
   const stationLabel = STATIONS.find((st) => st.id === playingStation)?.label ?? ''
-  const hideUi = idle && started && !panelOpen && !volumeOpen && !showHintTip && !wishOpen && !todayOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
+  const hideUi = idle && started && !panelOpen && !volumeOpen && !sleepOpen && !sleepNudge && !showHintTip && !wishOpen && !todayOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
   const guideVisible = entered && !zen && !guideBusy && (activeGuide === 'settings' || !hideUi)
@@ -2460,6 +2551,12 @@ export function ChillRoom({
                       }`}
                     >
                       {st.short}
+                      {hasUnseenNew(st.id) && (
+                        <>
+                          <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
+                          <span className="sr-only">, {t.room.newInStation}</span>
+                        </>
+                      )}
                     </button>
                   )
                 })}
@@ -2482,6 +2579,7 @@ export function ChillRoom({
                         </span>
                         <span className="flex min-w-0 items-center gap-1.5">
                           <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                          <NewBadge track={tr} />
                           <HotBadge stat={plays?.get(tr.id)} />
                         </span>
                         <span className="flex flex-col items-end">
@@ -3271,21 +3369,35 @@ export function ChillRoom({
                   type="button"
                   onClick={() => {
                     setVolumeOpen(false)
-                    setSleepOpen((o) => !o)
+                    if (sleepOpen) setSleepOpen(false)
+                    else openSleep()
                   }}
                   aria-label={sleepEnd === null ? t.room.sleep : t.room.sleepLeft(sleepLeft)}
                   title={sleepEnd === null ? t.room.sleep : t.room.sleepLeft(sleepLeft)}
                   aria-expanded={sleepOpen}
                   aria-controls="chill-sleep"
-                  className={`flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border px-2.5 transition ${
-                    sleepOpen || sleepEnd !== null
+                  aria-describedby={sleepNudge ? 'chill-sleep-nudge' : undefined}
+                  className={`relative flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border px-2.5 transition ${
+                    sleepOpen || sleepEnd !== null || !sleepSeen
                       ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
                       : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
                   }`}
                 >
+                  {/* Chưa mở bảng hẹn giờ lần nào → vòng cam như nút Cài đặt */}
+                  {!sleepSeen && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-full border-2 border-[#e8b27d]" />}
                   <MoonIcon />
                   {sleepEnd !== null && <span className="font-mono text-[11px] tabular-nums">{sleepLeft}′</span>}
                 </button>
+                {sleepNudge && !sleepOpen && (
+                  <button
+                    id="chill-sleep-nudge"
+                    type="button"
+                    onClick={openSleep}
+                    className="absolute bottom-full right-0 mb-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:right-4 after:top-full after:border-[6px] after:border-transparent after:border-t-[#e8b27d] after:content-['']"
+                  >
+                    {t.room.sleepNudge}
+                  </button>
+                )}
                 {sleepOpen && (
                   <div
                     id="chill-sleep"
@@ -3598,6 +3710,12 @@ export function ChillRoom({
                       }`}
                     >
                       {st.short}
+                      {hasUnseenNew(st.id) && (
+                        <>
+                          <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
+                          <span className="sr-only">, {t.room.newInStation}</span>
+                        </>
+                      )}
                     </button>
                   )
                 })}
@@ -3637,6 +3755,7 @@ export function ChillRoom({
                         <span className="min-w-0">
                           <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
                           <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#a79e94]">
+                            <NewBadge track={tr} />
                             <HotBadge stat={plays?.get(tr.id)} />
                             <span className="truncate">{tr.mood}</span>
                           </span>
