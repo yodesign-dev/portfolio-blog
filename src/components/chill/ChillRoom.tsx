@@ -73,10 +73,12 @@ const SLEEP_FADE_S = 60
 const SLEEP_HINT_KEY = 'chill:sleep-hint'
 // Đã mở bảng hẹn giờ lần nào chưa (chưa → vòng cam quanh nút trăng)
 const SLEEP_SEEN_KEY = 'chill:sleep-seen'
-// Gợi ý buổi tối: từ 21:00 tới 4:00, nghe liền chừng này mà chưa hẹn giờ thì mời 1 lần / tối
+// Thẻ gợi ý lúc trời tối (cảnh đang là Đêm, hoặc đồng hồ máy 21:00–4:00): nghe liền chừng này
+// mà chưa hẹn giờ thì mời 1 lần / tối, thẻ nằm chừng này (rê chuột lên thì giữ nguyên)
 const SLEEP_NUDGE_KEY = 'chill:sleep-nudge'
-const SLEEP_NUDGE_AFTER_MS = 10 * 60_000
-const SLEEP_NUDGE_MS = 8000
+const SLEEP_NUDGE_AFTER_MS = 2 * 60_000
+const SLEEP_NUDGE_MS = 20_000
+const SLEEP_NUDGE_PICKS = [30, 60]
 // Trạm đã xem lứa bài mới nào (chấm bạc hà trên tab trạm, xem newKeys)
 const NEW_SEEN_KEY = 'chill:new-seen'
 // Lần ghé trước (ms) — để biết khách quay lại sau bao lâu (event Chill Visit)
@@ -1391,6 +1393,9 @@ export function ChillRoom({
   const slept = useRef(false)
   const [sleepSeen, setSleepSeen] = useState(true)
   const [sleepNudge, setSleepNudge] = useState(false)
+  const [sleepNudgeHover, setSleepNudgeHover] = useState(false)
+  // Giờ tắt nhạc dạng 23:40 — tính lúc bấm chọn để render không phải đọc đồng hồ
+  const [sleepEndLabel, setSleepEndLabel] = useState('')
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
@@ -1405,14 +1410,16 @@ export function ChillRoom({
       localStorage.setItem(SLEEP_SEEN_KEY, '1')
     } catch {}
   }
-  // Gợi ý buổi tối: đếm từ lúc bắt đầu phát liền mạch, mỗi phút xem đã đủ 10 phút + đúng giờ chưa
+  // Thẻ gợi ý lúc trời tối: đếm từ lúc bắt đầu phát liền mạch (hoặc lúc cảnh chuyển sang Đêm),
+  // nửa phút xem 1 lần đã đủ lâu + trời tối chưa
   useEffect(() => {
     if (!sleepFlag || !playing || sleepEnd !== null) return
     const since = Date.now()
     const id = window.setInterval(() => {
       const now = new Date()
       const h = now.getHours()
-      if (now.getTime() - since < SLEEP_NUDGE_AFTER_MS || (h >= 4 && h < 21)) return
+      const dark = time === 'night' || h >= 21 || h < 4
+      if (now.getTime() - since < SLEEP_NUDGE_AFTER_MS || !dark) return
       // "Tối nay" kéo tới 4 giờ sáng
       const night = new Date(now.getTime() - 4 * 3_600_000).toDateString()
       try {
@@ -1421,14 +1428,14 @@ export function ChillRoom({
       } catch {}
       window.clearInterval(id)
       setSleepNudge(true)
-    }, 60_000)
+    }, 30_000)
     return () => window.clearInterval(id)
-  }, [sleepFlag, playing, sleepEnd])
+  }, [sleepFlag, playing, sleepEnd, time])
   useEffect(() => {
-    if (!sleepNudge) return
+    if (!sleepNudge || sleepNudgeHover) return
     const id = window.setTimeout(() => setSleepNudge(false), SLEEP_NUDGE_MS)
     return () => window.clearTimeout(id)
-  }, [sleepNudge])
+  }, [sleepNudge, sleepNudgeHover])
   // Điện thoại chật: nút trăng chỉ hiện khi đang nghe trạm Night & Sleep hoặc đang hẹn giờ,
   // và lúc đó nhường chỗ nút "bài trước" cho tên bài
   const sleepOnPhone = playingStation === 'night' || sleepEnd !== null || sleepOpen || sleepNudge
@@ -1457,9 +1464,16 @@ export function ChillRoom({
   }, [sleepEnd])
   // `at` = giờ bấm (ms), lấy từ sự kiện bấm để render không gọi Date.now()
   const startSleep = (minutes: number, at: number) => {
-    setSleepEnd(at + minutes * 60_000)
+    const end = new Date(at + minutes * 60_000)
+    setSleepEnd(end.getTime())
+    setSleepEndLabel(`${end.getHours()}:${String(end.getMinutes()).padStart(2, '0')}`)
     setSleepLeft(minutes)
     setSleepOpen(false)
+    setSleepNudge(false)
+    setSleepSeen(true)
+    try {
+      localStorage.setItem(SLEEP_SEEN_KEY, '1')
+    } catch {}
     trackEvent({name: 'Chill Sleep Timer', props: {minutes}})
   }
   const cancelSleep = () => {
@@ -3378,33 +3392,69 @@ export function ChillRoom({
                   aria-controls="chill-sleep"
                   aria-describedby={sleepNudge ? 'chill-sleep-nudge' : undefined}
                   className={`relative flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border px-2.5 transition ${
-                    sleepOpen || sleepEnd !== null || !sleepSeen
-                      ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
-                      : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
+                    sleepNudge || !sleepSeen
+                      ? 'chill-moon-glow border-[#f6d58a]/70 bg-[#f6d58a]/15 text-[#fbe3a6]'
+                      : sleepOpen || sleepEnd !== null
+                        ? 'border-[#f6d58a]/50 bg-[#f6d58a]/10 text-[#fbe3a6] shadow-[0_0_14px_-2px_rgba(246,213,138,0.45)]'
+                        : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
                   }`}
                 >
-                  {/* Chưa mở bảng hẹn giờ lần nào → vòng cam như nút Cài đặt */}
-                  {!sleepSeen && <span aria-hidden className="chill-ring pointer-events-none absolute inset-0 rounded-full border-2 border-[#e8b27d]" />}
-                  <MoonIcon />
+                  {/* Chưa mở bảng hẹn giờ lần nào / đang mời lúc trời tối → quầng trăng thở + sao pixel */}
+                  {(sleepNudge || !sleepSeen) && (
+                    <>
+                      <i aria-hidden className="chill-star pointer-events-none absolute -right-1 -top-1" />
+                      <i aria-hidden className="chill-star pointer-events-none absolute -left-1.5 top-1 [animation-delay:0.7s]" />
+                      <i aria-hidden className="chill-star pointer-events-none absolute -bottom-1 right-1 [animation-delay:1.3s]" />
+                    </>
+                  )}
+                  <span className={sleepNudge ? 'chill-moon-wiggle inline-flex' : 'inline-flex'}>
+                    <MoonIcon />
+                  </span>
                   {sleepEnd !== null && <span className="font-mono text-[11px] tabular-nums">{sleepLeft}′</span>}
                 </button>
                 {sleepNudge && !sleepOpen && (
-                  <button
+                  <div
                     id="chill-sleep-nudge"
-                    type="button"
-                    onClick={openSleep}
-                    className="absolute bottom-full right-0 mb-3 whitespace-nowrap rounded-lg bg-[#e8b27d] px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:right-4 after:top-full after:border-[6px] after:border-transparent after:border-t-[#e8b27d] after:content-['']"
+                    role="status"
+                    onPointerEnter={() => setSleepNudgeHover(true)}
+                    onPointerLeave={() => setSleepNudgeHover(false)}
+                    className="absolute bottom-full right-0 mb-3 w-64 rounded-xl border border-[#f6d58a]/30 bg-[#1d1830]/95 p-3.5 shadow-[0_16px_44px_-14px_rgba(0,0,0,0.9),0_0_30px_-12px_rgba(246,213,138,0.5)] backdrop-blur-md motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:right-4 after:top-full after:border-[7px] after:border-transparent after:border-t-[#1d1830] after:content-['']"
                   >
-                    {t.room.sleepNudge}
-                  </button>
+                    <p className="text-sm font-semibold text-[#fbe3a6]">🌙 {t.room.nudgeTitle}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-[#cfc6bb]">{t.room.nudgeBody}</p>
+                    <div className="mt-3 flex items-center gap-1.5">
+                      {SLEEP_NUDGE_PICKS.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={(e) => startSleep(m, performance.timeOrigin + e.timeStamp)}
+                          className="rounded-full bg-[#f6d58a] px-3 py-1.5 text-[13px] font-semibold text-[#2a1a10] transition hover:bg-[#fbe3a6]"
+                        >
+                          {t.room.sleepMin(m)}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setSleepNudge(false)}
+                        className="ml-auto px-2 py-1.5 text-[13px] text-[#a79e94] transition hover:text-[#ede6dd]"
+                      >
+                        {t.room.nudgeLater}
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {sleepOpen && (
                   <div
                     id="chill-sleep"
-                    className="absolute bottom-full right-0 mb-3 w-60 rounded-xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md"
+                    className="absolute bottom-full right-0 mb-3 w-64 rounded-xl border border-white/10 bg-[#16131a]/95 p-3.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md"
                   >
-                    <p className="text-xs text-[#a79e94]">{sleepEnd === null ? t.room.sleepHint : t.room.sleepLeft(sleepLeft)}</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <p className="text-sm font-semibold text-[#fbe3a6]">🌙 {t.room.sleep}</p>
+                    {sleepEnd === null ? (
+                      <p className="mt-1 text-xs leading-relaxed text-[#a79e94]">{t.room.sleepDesc}</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-[#cfc6bb]">{t.room.sleepEndsAt(sleepEndLabel, sleepLeft)}</p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
                       {SLEEP_MINUTES.map((m) => (
                         <button
                           key={m}

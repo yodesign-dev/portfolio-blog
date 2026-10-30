@@ -134,7 +134,33 @@ body {
   100% { opacity: 0; transform: scale(1.6); }
 }
 .chill-ring { animation: chill-ring 1.8s ease-out infinite; }
+/* Nút trăng (/chill hẹn giờ tắt nhạc): quầng trăng thở chậm, sao pixel lấp lánh, trăng lắc 1 lần */
+@keyframes chill-moon-glow {
+  0%, 100% { box-shadow: 0 0 10px -2px rgba(246, 213, 138, 0.35), 0 0 0 0 rgba(246, 213, 138, 0.25); }
+  50% { box-shadow: 0 0 24px 2px rgba(246, 213, 138, 0.6), 0 0 0 6px rgba(246, 213, 138, 0); }
+}
+.chill-moon-glow { animation: chill-moon-glow 2.4s ease-in-out infinite; }
+@keyframes chill-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  40%, 60% { opacity: 1; transform: scale(1); }
+}
+/* Sao 4 cánh vẽ bằng ô vuông 2px + box-shadow, đúng chất pixel của quán */
+.chill-star {
+  width: 2px; height: 2px; background: #fbe3a6;
+  box-shadow: 2px 0 #fbe3a6, -2px 0 #fbe3a6, 0 2px #fbe3a6, 0 -2px #fbe3a6;
+  animation: chill-twinkle 2s ease-in-out infinite;
+}
+@keyframes chill-moon-wiggle {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-14deg); }
+  45% { transform: rotate(10deg); }
+  70% { transform: rotate(-5deg); }
+}
+.chill-moon-wiggle { animation: chill-moon-wiggle 0.9s ease-in-out 1; }
 @media (prefers-reduced-motion: reduce) {
+  .chill-moon-glow { animation: none; box-shadow: 0 0 16px 0 rgba(246, 213, 138, 0.45); }
+  .chill-star { animation: none; opacity: 0.8; }
+  .chill-moon-wiggle { animation: none; }
   .chill-ring { animation: none; opacity: 0; }
 }
 
