@@ -270,22 +270,25 @@ export function Diary({
   const [leaving, setLeaving] = useState(false)
   // Đang rê chuột / Tab tới mẩu → dừng xoay
   const [hold, setHold] = useState(false)
+  // Mẩu đã có lúc xếp xấp (kể cả mẩu không vừa xấp 3) — chỉ mẩu tới SAU đó mới được đẩy lên đầu.
+  // Không có cái này thì khách có hơn 3 mẩu chưa đọc làm xấp đổi qua đổi lại vô hạn
+  const known = useRef<Set<string> | null>(null)
   useEffect(() => {
     if (!room?.open || !slipNew) return
-    const unread = others.filter((n) => !store.read.includes(n.id) && !deck?.includes(n.id))
-    /* eslint-disable react-hooks/set-state-in-effect -- xếp xấp mẩu khi có dữ liệu / mẩu mới */
+    const unread = others.filter((n) => !store.read.includes(n.id) && !deck?.includes(n.id) && !known.current?.has(n.id))
     if (deck === null) {
       const read = others.filter((n) => store.read.includes(n.id))
+      known.current = new Set(others.map((n) => n.id))
       setDeck([...unread, ...read].slice(0, SLIP_GUESTS).map((n) => n.id))
       setFresh(unread.slice(0, SLIP_GUESTS).map((n) => n.id))
     } else if (unread.length) {
+      for (const n of unread) known.current?.add(n.id)
       const ids = unread.slice(0, SLIP_GUESTS).map((n) => n.id)
       setDeck([...ids, ...deck].slice(0, SLIP_GUESTS))
       setFresh((f) => [...f, ...ids])
       setAt(0)
       setLeaving(false)
     }
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [room?.open, slipNew, others, store.read, deck])
   const slipKeys = useMemo(() => {
     if (!deck || !today) return []
