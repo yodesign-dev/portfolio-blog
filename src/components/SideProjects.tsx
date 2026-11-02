@@ -32,8 +32,9 @@ function shortDate(date: string) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', timeZone: 'UTC'})
 }
 
+// Link chữ cao 44 px trên mobile cho dễ bấm, từ sm trở lên về đúng cỡ chữ
 const ctaClass =
-  'inline-flex text-sm font-semibold text-brand transition-colors hover:text-brand-hover focus-visible:underline'
+  'inline-flex min-h-11 items-center text-sm font-semibold text-brand transition-colors hover:text-brand-hover focus-visible:underline sm:min-h-0'
 
 export async function SideProjects() {
   const cafe = await sanityFetch<CafeInfo>({query: CAFE_QUERY, revalidate: 300}).catch(() => null)
@@ -86,7 +87,7 @@ export async function SideProjects() {
                 Updated {shortDate(latest.date)} · {latest.titleEn?.trim() || latest.title}
               </p>
             )}
-            <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="mt-2 flex flex-wrap items-center gap-x-6 sm:mt-5 sm:gap-y-2">
               <Link href="/chill" className={ctaClass}>
                 Take a seat →
               </Link>
@@ -94,7 +95,7 @@ export async function SideProjects() {
                 href={CHILL_EXTENSION_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 focus-visible:underline"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 focus-visible:underline sm:min-h-0"
               >
                 Chrome extension ↗
               </a>
@@ -109,7 +110,7 @@ export async function SideProjects() {
             alt="Hanoi Café Workspace Notion template: a live café window above Today and Quick notes"
             label="Notion template · Free"
             title="Hanoi Café Workspace"
-            body="The café window inside Notion, above your top 3 for today and a goal for each day of the week. English and Vietnamese."
+            body="The café window inside Notion, above your top 3 for today. English and Vietnamese."
             cta="Duplicate for free ↗"
           />
           <SmallCard
@@ -145,13 +146,13 @@ function SmallCard({
   cta: string
 }) {
   return (
-    <article className="grid grid-cols-1 items-start gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+    <article className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-4 sm:gap-5">
       <CoverLink href={href} src={src} alt={alt} />
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{label}</p>
         <h3 className="mt-1.5 text-lg font-semibold leading-snug text-neutral-900">{title}</h3>
         <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
-        <a href={href} target="_blank" rel="noopener noreferrer" className={`mt-3 ${ctaClass}`}>
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`sm:mt-3 ${ctaClass}`}>
           {cta}
         </a>
       </div>
@@ -174,7 +175,7 @@ function CoverLink({href, src, alt}: {href: string; src: string; alt: string}) {
           src={src}
           alt={alt}
           fill
-          sizes="(min-width: 1152px) 210px, (min-width: 640px) 40vw, 100vw"
+          sizes="(min-width: 1152px) 210px, (min-width: 768px) 20vw, 40vw"
           className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03] motion-reduce:transform-none"
         />
       </span>

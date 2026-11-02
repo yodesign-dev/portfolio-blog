@@ -6,6 +6,7 @@ import {urlFor} from '@/sanity/lib/image'
 // thiệu"). Chưa có bài nào thì cả mục ẩn. Từ 3 bài: dải thẻ chạy ngang liên tục,
 // mép mờ dần, dừng khi rê chuột (mẫu Testimonial của Superdesign, dựng lại bằng
 // CSS). Ít hơn 3 bài: thẻ đứng yên. Giảm chuyển động: dải đứng yên, cuộn ngang tay.
+// Dưới md: vuốt tay từng thẻ, vì màn cảm ứng không rê chuột để dừng dải chạy mà đọc được.
 
 type Testimonial = {
   _id: string
@@ -47,17 +48,17 @@ export async function Testimonials() {
           ))}
         </ul>
       ) : (
-        <div className="group mt-10 overflow-hidden py-2 [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] motion-reduce:overflow-x-auto">
+        <div className="group mt-10 overflow-hidden py-2 [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] motion-reduce:overflow-x-auto max-md:snap-x max-md:snap-mandatory max-md:scroll-pl-6 max-md:overflow-x-auto max-md:[mask-image:none] max-md:[scrollbar-width:none] sm:max-md:scroll-pl-8">
           {/* Danh sách nhân đôi, trượt đúng nửa chiều dài rồi lặp → liền mạch.
-              Bản sao ẩn với trình đọc màn hình, không nhận Tab, ẩn hẳn khi giảm chuyển động. */}
+              Bản sao ẩn với trình đọc màn hình, không nhận Tab, ẩn hẳn khi giảm chuyển động hoặc khi vuốt tay. */}
           <ul
-            className="flex w-max gap-6 px-3 animate-[testimonial-marquee_var(--marquee-duration)_linear_infinite] group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused] motion-reduce:animate-none motion-reduce:px-6"
+            className="flex w-max gap-6 px-3 animate-[testimonial-marquee_var(--marquee-duration)_linear_infinite] group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused] motion-reduce:animate-none motion-reduce:px-6 max-md:animate-none max-md:gap-4 max-md:px-6 sm:max-md:px-8"
             style={{'--marquee-duration': `${items.length * 9}s`} as React.CSSProperties}
           >
             {[...items, ...items].map((item, i) => {
               const copy = i >= items.length
               return (
-                <li key={`${item._id}-${i}`} aria-hidden={copy || undefined} className={`w-[300px] shrink-0 sm:w-[360px] ${copy ? 'motion-reduce:hidden' : ''}`}>
+                <li key={`${item._id}-${i}`} aria-hidden={copy || undefined} className={`w-[300px] shrink-0 sm:w-[360px] max-md:w-[80vw] max-md:max-w-[360px] max-md:snap-start ${copy ? 'motion-reduce:hidden max-md:hidden' : ''}`}>
                   <Card item={item} copy={copy} />
                 </li>
               )
