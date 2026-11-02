@@ -33,7 +33,7 @@ const client = createClient({
   useCdn: false,
 })
 
-const STATIONS = ['acoustic', 'focus', 'night', 'sax', 'lofi', 'study']
+const STATIONS = ['acoustic', 'noel', 'focus', 'night', 'sax', 'lofi', 'study']
 const FFMPEG = process.env.FFMPEG || 'ffmpeg'
 const slug = (s) =>
   s

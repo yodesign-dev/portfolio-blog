@@ -19,6 +19,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Mở phòng Balcony', value: 'room:balcony'},
   {title: 'Mở phòng Night desk', value: 'room:desk'},
   {title: 'Chuyển kênh Café Acoustic', value: 'station:acoustic'},
+  {title: 'Chuyển kênh Christmas Café (chỉ có trong mùa Noel)', value: 'station:noel'},
   {title: 'Chuyển kênh Deep Focus', value: 'station:focus'},
   {title: 'Chuyển kênh Night & Sleep', value: 'station:night'},
   {title: 'Chuyển kênh Sax Lounge', value: 'station:sax'},

@@ -3,7 +3,7 @@ import {NEW_TRACK_DAYS, STATIONS, TRACKS, type StationId, type Track} from '@/co
 import {sanityFetch} from '@/sanity/lib/fetch'
 import type {ChillUpdate} from '@/components/chill/Changelog'
 import type {NeonSign} from '@/components/chill/facade'
-import {ALL_LAYERS, NOEL_2026, type Season, type SeasonLayers, type SeasonMoment} from '@/components/chill/season'
+import {ALL_LAYERS, NOEL_2026, activeSeason, type Season, type SeasonLayers, type SeasonMoment} from '@/components/chill/season'
 import {isLiveUrl, type ChillLive} from '@/components/chill/live'
 
 // Nội dung của /chill và /chill/embed: nhạc, điểm đến, nhật ký thay đổi.
@@ -15,7 +15,7 @@ import {isLiveUrl, type ChillLive} from '@/components/chill/live'
 // nhạc mới chưa mở cho khách).
 const CHILL_QUERY = `{
   "tracks": *[_type == "chillTrack" && ($showHidden || hidden != true) && (defined(audio.asset) || defined(localFile))]
-    | order(select(station == "acoustic" => 0, station == "focus" => 1, station == "night" => 2, station == "sax" => 3, station == "lofi" => 4, station == "study" => 5, 6) asc,
+    | order(select(station == "acoustic" => 0, station == "noel" => 1, station == "focus" => 2, station == "night" => 3, station == "sax" => 4, station == "lofi" => 5, station == "study" => 6, 7) asc,
             coalesce(order, 9999) asc, _createdAt asc) {
     "id": coalesce(key.current, _id),
     title,
@@ -149,14 +149,27 @@ export async function getChillContent(revalidate: number) {
     (): ChillContent => ({tracks: [], destinations: [], updates: []})
   )
 
-  const fromStudio: Track[] = content.tracks.map((t) => ({
+  // Theme theo mùa: công tắc tổng + lịch trong "Chill · Mùa". Máy dev: CHILL_DEV_SEASON=1 dùng lịch Noel 2026
+  const seasons: Season[] =
+    process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SEASON === '1'
+      ? [NOEL_2026]
+      : content.seasonsOpen === true
+        ? (content.seasons ?? []).filter((s) => s.pack === 'noel').map((s) => ({id: s.id, pack: 'noel', start: s.start, end: s.end, layers: {...ALL_LAYERS, ...s.layers}, moments: s.moments ?? []}))
+        : []
+  // Trạm Noel chỉ có bài trong mùa, nên ngoài mùa không hiện tab (kể cả extension). Bài upload từ
+  // trước nên nhãn "Mới" tính từ ngày vào mùa. Máy dev: CHILL_DEV_HIDDEN=1 thấy luôn để thử
+  const now = Date.now()
+  const season = activeSeason(seasons, now)
+  const noelNew = season ? now - Date.parse(season.start) < NEW_TRACK_DAYS * 86_400_000 : false
+
+  const fromStudio: Track[] = content.tracks.filter((t) => t.station !== 'noel' || season || showHidden).map((t) => ({
     id: t.id,
     title: t.title,
     mood: t.mood ?? '',
     duration: t.duration ?? 0,
     src: t.src,
     station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,
-    isNew: t._createdAt ? Date.now() - Date.parse(t._createdAt) < NEW_TRACK_DAYS * 86_400_000 : undefined,
+    isNew: t.station === 'noel' ? noelNew : t._createdAt ? now - Date.parse(t._createdAt) < NEW_TRACK_DAYS * 86_400_000 : undefined,
   }))
   // Sanity lỗi / chưa có bài nào → bộ dự phòng trong code
   const tracks: Track[] = fromStudio.length ? fromStudio : TRACKS
@@ -227,13 +240,6 @@ export async function getChillContent(revalidate: number) {
   const highlandOn = content.highlandOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_HIGHLAND === '1')
   // Hẹn giờ tắt nhạc 15/30/60/90 phút. Máy dev: CHILL_DEV_SLEEP=1
   const sleepTimerOn = content.sleepTimerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SLEEP === '1')
-  // Theme theo mùa: công tắc tổng + lịch trong "Chill · Mùa". Máy dev: CHILL_DEV_SEASON=1 dùng lịch Noel 2026
-  const seasons: Season[] =
-    process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SEASON === '1'
-      ? [NOEL_2026]
-      : content.seasonsOpen === true
-        ? (content.seasons ?? []).filter((s) => s.pack === 'noel').map((s) => ({id: s.id, pack: 'noel', start: s.start, end: s.end, layers: {...ALL_LAYERS, ...s.layers}, moments: s.moments ?? []}))
-        : []
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
   return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn}

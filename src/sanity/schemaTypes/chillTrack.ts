@@ -9,6 +9,7 @@ import {defineField, defineType} from 'sanity'
 
 export const STATION_OPTIONS = [
   {title: 'Café Acoustic', value: 'acoustic'},
+  {title: 'Christmas Café (chỉ hiện trong mùa Noel)', value: 'noel'},
   {title: 'Deep Focus', value: 'focus'},
   {title: 'Night & Sleep', value: 'night'},
   {title: 'Sax Lounge', value: 'sax'},
