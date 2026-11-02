@@ -38,6 +38,9 @@ export type CharacterVideo = {
   // Đoạn cầm ly uống trong video (giây); ngoài đoạn này là gõ phím, lặp nhiều vòng
   // rồi mới phát đoạn uống
   sip: [number, number]
+  // Mùa Noel: sheet quàng khăn cùng cấu trúc hi / lo, và quầng đèn ban đêm cùng số khung với hi
+  // (scripts/chill-noel-art.py)
+  noel?: {hi: string; lo: string; glow: SheetSpec}
 }
 
 export type CharacterFrames = {
@@ -122,6 +125,11 @@ export const THEMES: Theme[] = [
       lo: {src: '/chill/scenes/interior-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
       duration: 121 / 12,
       sip: [0.75, 6.8],
+      noel: {
+        hi: '/chill/scenes/interior-loop-noel@2x.webp',
+        lo: '/chill/scenes/interior-loop-noel.webp',
+        glow: {src: '/chill/scenes/interior-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
+      },
     },
     // Nữ G2 (tóc dài buộc thấp, kính, cardigan tím): Nano Banana 2 + Kling O1 Pro, cùng động tác
     girl: {
@@ -133,6 +141,11 @@ export const THEMES: Theme[] = [
         lo: {src: '/chill/scenes/interior-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
         duration: 121 / 12,
         sip: [2.4, 7.7],
+        noel: {
+          hi: '/chill/scenes/interior-girl-loop-noel@2x.webp',
+          lo: '/chill/scenes/interior-girl-loop-noel.webp',
+          glow: {src: '/chill/scenes/interior-girl-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
+        },
       },
     },
     screen: {x: 436, y: 219, w: 88, h: 49},
@@ -171,6 +184,11 @@ export const THEMES: Theme[] = [
       lo: {src: '/chill/scenes/room-balcony-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
       duration: 121 / 12,
       sip: [1.1, 9.1],
+      noel: {
+        hi: '/chill/scenes/room-balcony-loop-noel@2x.webp',
+        lo: '/chill/scenes/room-balcony-loop-noel.webp',
+        glow: {src: '/chill/scenes/room-balcony-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
+      },
     },
     screen: null,
     screenBehind: false,
@@ -211,6 +229,11 @@ export const THEMES: Theme[] = [
       lo: {src: '/chill/scenes/room-desk-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
       duration: 121 / 12,
       sip: [1.62, 8.3],
+      noel: {
+        hi: '/chill/scenes/room-desk-loop-noel@2x.webp',
+        lo: '/chill/scenes/room-desk-loop-noel.webp',
+        glow: {src: '/chill/scenes/room-desk-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
+      },
     },
     // Lòng màn hình (đã khoét khỏi ảnh tĩnh, dải màn xám cũ trong video đã xoá). Vai người
     // vẽ sẵn trong ảnh tĩnh nên màn vẽ dưới ảnh, viền laptop che phần thừa

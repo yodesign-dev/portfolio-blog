@@ -23,12 +23,12 @@
 //   chờ → mèo → cần câu trên tay người xem → hơi
 //   cà phê, nốt nhạc → ánh đèn
 
-import {Cat, CAT_SRC, type ToyEvent} from './cat'
+import {Cat, CAT_NOEL_SRC, CAT_SRC, type ToyEvent} from './cat'
 import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
 import {HIGHLAND, Highland, highlandStreets} from './highland'
-import {Noel, makeCatHat, type NoelConfig} from './noel'
+import {Noel, type NoelConfig} from './noel'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
 import {seatArt, themeById, type CharacterVideo, type Seat, type SheetSpec, type Theme, type ThemeId} from './themes'
@@ -568,8 +568,11 @@ export class ChillScene {
   private highland = new Highland()
   // Trang trí theo mùa (season.ts), null = quán thường
   private noel: Noel | null = null
-  private noelHat: HTMLCanvasElement | null = null
-  private noelHatOn = false
+  // Mèo và người ngồi quàng khăn mùa Noel; tải khi cần, xong mới đổi để khỏi nháy trống
+  private noelCat: HTMLImageElement | null = null
+  private noelCatOn = false
+  private noelSeatOn = false
+  private noelGlow: HTMLImageElement | null = null
   private movers: Mover[] = []
   private rain: Rain
   private notes: Note[] = []
@@ -603,7 +606,9 @@ export class ChillScene {
   private last = 0
   private clock = 0
 
-  constructor(canvas: HTMLCanvasElement) {
+  // noelSeat: đang trong mùa thì tải thẳng sheet quàng khăn, khỏi tải bản thường rồi đổi
+  constructor(canvas: HTMLCanvasElement, {noelSeat = false}: {noelSeat?: boolean} = {}) {
+    this.noelSeatOn = noelSeat
     this.display = canvas
     this.displayCtx = canvas.getContext('2d')!
     this.buffer = this.makeLayer()
@@ -642,7 +647,8 @@ export class ChillScene {
     if (c.kind === 'video') {
       this.charCfg = c
       this.charSpec = window.matchMedia('(min-width: 1024px)').matches ? c.hi : c.lo
-      this.charSheet = loadImage(this.charSpec.src, () => (this.dirty = true))
+      this.charSheet = loadImage(this.seatSrc(c, this.charSpec), () => (this.dirty = true))
+      this.noelGlow = this.noelSeatOn && c.noel ? loadImage(c.noel.glow.src, () => {}) : null
       this.charFrame.width = c.at.w * this.charSpec.scale
       this.charFrame.height = c.at.h * this.charSpec.scale
       this.charTime = 0
@@ -653,6 +659,26 @@ export class ChillScene {
       this.charSpec = null
       this.poseSheet = loadImage(c.src, () => (this.dirty = true))
     }
+  }
+
+  // Sheet người ngồi đúng theo mùa: bản quàng khăn cùng cấu trúc với bản thường
+  private seatSrc(c: CharacterVideo, spec: SheetSpec) {
+    if (!this.noelSeatOn || !c.noel) return spec.src
+    return spec === c.hi ? c.noel.hi : c.noel.lo
+  }
+
+  // Bật / tắt mùa khi đang ngồi: giữ khung và nhịp đang chạy, sheet mới tải xong mới đổi
+  private syncSeatSheet() {
+    const c = this.art.character
+    if (c.kind !== 'video' || !this.charSpec) return
+    const src = this.seatSrc(c, this.charSpec)
+    this.noelGlow = this.noelSeatOn && c.noel ? loadImage(c.noel.glow.src, () => {}) : null
+    const next = loadImage(src, () => {
+      if (this.seatSrc(c, this.charSpec!) !== src) return
+      this.charSheet = next
+      this.charFrameKey = ''
+      this.dirty = true
+    })
   }
 
   private makeRain() {
@@ -771,10 +797,16 @@ export class ChillScene {
     if (!cfg) this.noel = null
     else if (this.noel) this.noel.configure(cfg)
     else this.noel = new Noel(cfg)
-    const hat = !!cfg?.layers.catHat
-    if (hat !== this.noelHatOn) {
-      this.noelHatOn = hat
+    const catOn = !!cfg?.layers.catHat
+    if (catOn !== this.noelCatOn) {
+      this.noelCatOn = catOn
+      if (catOn && !this.noelCat) this.noelCat = loadImage(CAT_NOEL_SRC, () => (this.dirty = true))
       this.dirty = true
+    }
+    const seatOn = !!cfg?.layers.seat
+    if (seatOn !== this.noelSeatOn) {
+      this.noelSeatOn = seatOn
+      this.syncSeatSheet()
     }
   }
 
@@ -885,13 +917,7 @@ export class ChillScene {
 
     // Mèo: tô sẵn cùng màu với nội thất. Người ngồi tô theo từng khung lúc vẽ
     // (sheet ×2 rất lớn — không giữ thêm 1 bản tô màu cả sheet trong bộ nhớ)
-    this.washed(this.catSheet, this.catTinted)
-    if (this.noelHatOn) {
-      const src = makeCatHat()
-      this.wash(src.getContext('2d')!, src.width, src.height)
-      this.noelHat = src
-    } else this.noelHat = null
-    this.cat.setHat(this.noelHat)
+    this.washed(this.noelCatOn && this.noelCat && ready(this.noelCat) ? this.noelCat : this.catSheet, this.catTinted)
     this.charFrameKey = ''
     this.propsKey = ''
 
@@ -995,6 +1021,21 @@ export class ChillScene {
       this.wash(c, this.charFrame.width, this.charFrame.height)
     }
     return this.charFrame
+  }
+
+  // Quầng đèn dây trên tóc và vai người ngồi, chỉ ban đêm (vẽ sau lớp màu giờ để giữ độ sáng)
+  private drawSeatGlow(ctx: CanvasRenderingContext2D, c: CharacterVideo, t: number) {
+    const glow = this.noelGlow
+    if (!this.noel || !glow || !c.noel || this.time !== 'night' || !ready(glow)) return
+    const alpha = this.noel.seatGlow(t)
+    if (alpha <= 0) return
+    const {cols, frames, fps} = c.noel.glow
+    const i = Math.min(frames - 1, Math.floor(this.charTime * fps))
+    const {at} = c
+    ctx.save()
+    ctx.globalAlpha = alpha
+    ctx.drawImage(glow, (i % cols) * at.w, Math.floor(i / cols) * at.h, at.w, at.h, at.x, at.y, at.w, at.h)
+    ctx.restore()
   }
 
   private get countryside() {
@@ -2685,6 +2726,7 @@ export class ChillScene {
         if (screen && !screenBehind) drawScreen(ctx, screen, t, this.time === 'night')
         const {at} = character
         ctx.drawImage(this.charFrameCanvas(), at.x, at.y, at.w, at.h)
+        this.drawSeatGlow(ctx, character, t)
       }
     } else if (ready(this.poseSheet) && ready(this.interior)) {
       this.drawPose(character)

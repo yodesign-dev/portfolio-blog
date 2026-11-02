@@ -12,7 +12,8 @@ const LAYERS = [
   {name: 'snow', title: 'Tuyết bọt (khoảnh khắc + sau mỗi phin)'},
   {name: 'meteors', title: 'Sao băng ban đêm'},
   {name: 'tree', title: 'Cây thông lớn dần theo phin'},
-  {name: 'catHat', title: 'Mũ len cho mèo'},
+  {name: 'catHat', title: 'Khăn len cho mèo'},
+  {name: 'seat', title: 'Khăn và ánh đèn cho người ngồi'},
   {name: 'shelf', title: 'Món kệ theo mùa'},
 ]
 

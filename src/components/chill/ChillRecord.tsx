@@ -139,7 +139,7 @@ export function ChillRecord({
 
     void import('./scene').then(({ChillScene}) => {
       if (cancelled) return
-      scene = new ChillScene(canvas)
+      scene = new ChillScene(canvas, {noelSeat: !!readSeasonPreview(window.location.search).season?.layers.seat})
       sceneRef.current = scene
       scene.setTheme(setup.theme)
       scene.setSeat(setup.seat)

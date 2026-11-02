@@ -18,7 +18,8 @@ export type SeasonLayers = {
   snow: boolean
   meteors: boolean
   tree: boolean
-  catHat: boolean
+  catHat: boolean // tên cũ: nay là khăn len của mèo
+  seat: boolean
   shelf: boolean
 }
 
@@ -31,7 +32,7 @@ export type Season = {
   moments: SeasonMoment[]
 }
 
-export const ALL_LAYERS: SeasonLayers = {lights: true, roomLights: true, snow: true, meteors: true, tree: true, catHat: true, shelf: true}
+export const ALL_LAYERS: SeasonLayers = {lights: true, roomLights: true, snow: true, meteors: true, tree: true, catHat: true, seat: true, shelf: true}
 
 // Bật trước Noel 2 tuần, tắt sau 1 tuần: 11/12/2026 00:00 → hết 1/1/2027 (giờ Việt Nam).
 // Tuyết bọt tối 24–25/12, mưa sao băng đêm 13–14/12 (đỉnh Song Tử)

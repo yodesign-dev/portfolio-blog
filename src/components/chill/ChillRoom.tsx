@@ -267,6 +267,7 @@ export function ChillRoom({
   lives?: ChillLive[]
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const initialSeasons = useRef(seasons)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
   // cao bằng khung (cắt 2 bên) và kéo ngang được. zoom = đã phóng to · pan = 0 (mép trái)
   // … 1 (mép phải, chỗ người ngồi) · panMax = quãng kéo tối đa mỗi bên (px)
@@ -524,7 +525,10 @@ export function ChillRoom({
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
-    const scene = new ChillScene(canvasRef.current!)
+    // Đang trong mùa: tải thẳng sheet người quàng khăn
+    const preview = readSeasonPreview(window.location.search)
+    const nowSeason = preview.season !== undefined ? preview.season : activeSeason(initialSeasons.current, preview.at ?? Date.now())
+    const scene = new ChillScene(canvasRef.current!, {noelSeat: !!nowSeason?.layers.seat && loadSeasonPref(nowSeason.id) !== 'off'})
     sceneRef.current = scene
     // Tiếng xe chạy qua, còi, chó sủa ngoài phố → phát qua bộ âm thanh (theo thanh Ambience)
     scene.onSound = (kind, pan, dir, len) => audioRef.current?.streetSound(kind, pan, dir, len)

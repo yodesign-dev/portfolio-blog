@@ -230,39 +230,6 @@ function starSprite(R: number) {
   return c
 }
 
-// Mũ len đỏ của mèo, px atlas (×2 so với px gốc). Tâm vành mũ ở (33, 26), xem HAT_AT trong cat.ts
-export function makeCatHat() {
-  const c = canvas(76, 40)
-  const g = c.getContext('2d')!
-  const R = '#c8352e'
-  const D = '#8f2320'
-  const L = '#e45a4c'
-  const C = '#fff6e4'
-  const S = '#d8cfbd'
-  const K = '#2a1512'
-  const r = (col: string, x: number, y: number, w: number, h: number) => {
-    g.fillStyle = col
-    g.fillRect(x - 110, y + 12, w, h)
-  }
-  r(K, 132, -10, 20, 2)
-  r(K, 124, -6, 8, 4)
-  r(K, 118, 0, 6, 12)
-  r(R, 124, -4, 40, 6)
-  r(R, 130, -8, 24, 4)
-  r(R, 120, 2, 46, 10)
-  r(L, 126, -2, 12, 4)
-  r(L, 122, 4, 8, 6)
-  r(D, 152, 4, 14, 8)
-  r(R, 152, -8, 14, 4)
-  r(R, 162, -6, 10, 6)
-  r(R, 168, -2, 6, 8)
-  r(C, 116, 10, 54, 8)
-  r(S, 116, 16, 54, 2)
-  r(C, 168, 4, 12, 12)
-  r(S, 172, 12, 8, 4)
-  return c
-}
-
 // Món treo lên cây theo thứ tự: mỗi phin xong thêm một món
 const ORNAMENTS: [number, number, string][] = [
   [-18, -44, 'gift'],
@@ -275,80 +242,120 @@ const ORNAMENTS: [number, number, string][] = [
   [0, -24, 'gift2'],
 ]
 
+// Món treo: viền tối rõ, ô 2 px, đọc được ở cỡ thật
 function ornament(g: CanvasRenderingContext2D, x: number, y: number, k: string, tip: HTMLCanvasElement) {
-  const q = (v: number) => Math.round(v * 1.5)
   const c = (col: string, a: number, b: number, w: number, h: number) => {
     g.fillStyle = col
-    g.fillRect(x + q(a), y + q(b), q(w), q(h))
+    g.fillRect(x + a, y + b, w, h)
   }
-  c('#3a2c20', 0, -4, 2, 4)
-  if (k === 'red' || k === 'gold') {
-    const m = k === 'red' ? ['#c8352e', '#8f2320', '#f08a78'] : ['#e0aa3e', '#a97a22', '#ffe29a']
-    c(m[0], -3, 0, 8, 8)
-    c(m[1], -1, 6, 6, 2)
-    c(m[1], 3, 2, 2, 4)
-    c(m[2], -1, 2, 2, 2)
-  } else if (k === 'cup') {
-    c('#f7f3e9', -4, 0, 8, 7)
-    c('#3a68b0', -4, 3, 8, 2)
-    c('#f7f3e9', 4, 1, 3, 4)
-    c('#c4baa5', -2, 7, 4, 1)
-  } else if (k === 'star') {
+  const O = '#22120f'
+  if (k === 'star') {
     g.drawImage(tip, x - 13, y - 3)
+    return
+  }
+  c(O, 0, -4, 2, 4)
+  if (k === 'red' || k === 'gold') {
+    const [m, d, l] = k === 'red' ? ['#e23a33', '#a11f25', '#ffb0a0'] : ['#f4c44a', '#b8821f', '#fff0b8']
+    c(O, -4, 0, 10, 12)
+    c(O, -6, 2, 14, 8)
+    c(m, -4, 2, 10, 8)
+    c(m, -2, 0 + 2, 6, 8)
+    c(d, 2, 6, 4, 4)
+    c(d, -2, 8, 6, 2)
+    c(l, -2, 2, 4, 2)
+  } else if (k === 'cup') {
+    c(O, -6, -2, 14, 14)
+    c(O, 8, 0, 4, 8)
+    c('#fbf6ea', -4, 0, 10, 10)
+    c('#3f74c4', -4, 4, 10, 2)
+    c('#fbf6ea', 8, 2, 2, 4)
   } else {
-    const m = k === 'gift' ? ['#e8dfc9', '#a89f8a', '#c8402f'] : ['#7fae8c', '#4d7f62', '#fff1c9']
-    c(m[0], -5, 0, 12, 10)
-    c(m[1], -3, 2, 2, 2)
-    c(m[1], 3, 6, 2, 2)
-    c(m[2], 0, 0, 2, 10)
-    c(m[2], -5, 4, 12, 2)
-    c(m[2], -2, -2, 3, 2)
-    c(m[2], 2, -2, 3, 2)
+    const [m, d, l] = k === 'gift' ? ['#f6edd8', '#c9bda2', '#d8362c'] : ['#5fbf85', '#3a8a5c', '#fff1c9']
+    c(O, -8, -2, 18, 16)
+    c(m, -6, 0, 14, 12)
+    c(d, 2, 8, 6, 4)
+    c(l, 0, 0, 2, 12)
+    c(l, -6, 4, 14, 2)
+    c(O, -5, -6, 5, 4)
+    c(O, 2, -6, 5, 4)
+    c(l, -4, -4, 3, 2)
+    c(l, 3, -4, 3, 2)
   }
 }
 
-// Cây thông nhựa: 3 tầng lá, ô 2 px, sáng phía đèn. `upto` = số món đã treo
+// Cây thông vẽ tay theo ô 2 px: 3 tầng lá viền mép răng cưa, mỗi tầng có bóng tầng trên đổ xuống,
+// sáng phía đèn, mép dưới có tuyết, dây kim tuyến chéo. `upto` = số món đã treo
+const TIERS = [[-122, -80, 28], [-98, -50, 38], [-72, -18, 48]] as const
+
+function tierEdge(x: number, bot: number, hw: number) {
+  const n = hw / 3
+  return bot - Math.round(Math.abs(Math.sin((x / n) * Math.PI)) * 3) * 2
+}
+
 function paintTree(g: CanvasRenderingContext2D, cx: number, base: number, upto: number, tip: HTMLCanvasElement) {
-  const r = rng(303)
-  const P = ['#17382b', '#22503c', '#2f6a4d', '#4b8a62']
-  g.fillStyle = '#2e1a10'
-  g.fillRect(cx - 16, base - 20, 32, 20)
-  g.fillStyle = '#b5683a'
-  g.fillRect(cx - 14, base - 18, 28, 16)
-  g.fillStyle = '#8c4b28'
-  g.fillRect(cx + 4, base - 18, 10, 16)
-  g.fillStyle = '#d68b58'
-  g.fillRect(cx - 12, base - 16, 4, 10)
-  g.fillStyle = '#2e1a10'
-  g.fillRect(cx - 18, base - 24, 36, 6)
-  g.fillStyle = '#c97a46'
-  g.fillRect(cx - 16, base - 23, 32, 4)
-  g.fillStyle = '#4a2e18'
-  g.fillRect(cx - 4, base - 34, 8, 10)
+  const OUT = '#0b2019'
+  const P = ['#14432f', '#1f6443', '#2f8a58', '#5cc07e']
+  const SNOW = '#e8f2ea'
+  const dot = (col: string, x: number, y: number, w = 2, h = 2) => {
+    g.fillStyle = col
+    g.fillRect(x, y, w, h)
+  }
+  // Chậu đất nung
+  dot('#22120f', cx - 20, base - 26, 40, 8)
+  dot('#d98a52', cx - 18, base - 24, 36, 4)
+  dot('#22120f', cx - 17, base - 18, 34, 18)
+  dot('#c0703d', cx - 15, base - 18, 30, 16)
+  dot('#964f29', cx + 5, base - 18, 10, 16)
+  dot('#e29c68', cx - 12, base - 16, 4, 10)
+  dot('#3a2415', cx - 5, base - 34, 10, 8)
   const b = base - 24
-  for (const [top, bot, hw] of [[-122, -82, 26], [-96, -48, 36], [-70, -16, 46]]) {
-    for (let y = top; y <= bot; y += 2) {
-      const k = (y - top) / (bot - top)
-      const w = Math.round(hw * k) + (Math.abs(y / 2) % 3 === 0 ? 2 : 0)
-      for (let x = -w; x <= w; x += 2) {
-        const edge = x <= -w + 1 || x >= w - 1 || y >= bot - 1
-        const l = (-x / hw) * 0.6 + (1 - k) * 0.35 + r() * 0.5
-        g.fillStyle = edge ? P[0] : l > 0.75 ? P[3] : l > 0.35 ? P[2] : P[1]
-        g.fillRect(cx + (x & ~1), b + y, 2, 2)
+  const inside = (x: number, y: number, top: number, bot: number, hw: number) => {
+    if (y < top) return false
+    const k = (y - top) / (bot - top)
+    const w = hw * Math.min(1, k)
+    return Math.abs(x) <= w && y <= tierEdge(x, bot, hw)
+  }
+  // Tầng dưới vẽ trước; viền trước rồi tới lá, tầng trên đè lên
+  TIERS.slice().reverse().forEach(([top, bot, hw], idx, arr) => {
+    const upper = arr[idx + 1]
+    for (let y = top - 2; y <= bot + 2; y += 2) {
+      for (let x = -hw - 2; x <= hw + 2; x += 2) {
+        if (inside(x, y, top, bot, hw)) continue
+        if ([[2, 0], [-2, 0], [0, 2], [0, -2]].some(([a, c]) => inside(x + a, y + c, top, bot, hw))) dot(OUT, cx + x, b + y)
       }
+    }
+    for (let y = top; y <= bot; y += 2) {
+      for (let x = -hw; x <= hw; x += 2) {
+        if (!inside(x, y, top, bot, hw)) continue
+        const edge = tierEdge(x, bot, hw)
+        const shadow = upper && y < tierEdge(x, upper[1], upper[2]) + 10
+        const l = (-x / hw) * 0.55 + 0.45
+        const needle = ((x + y) / 2) % 8 === 0
+        let col = l > 0.62 ? P[2] : l > 0.2 ? P[1] : P[0]
+        if (needle) col = l > 0.45 ? P[3] : P[1]
+        if (shadow) col = P[0]
+        if (y >= edge - 2) col = (x + hw) % 12 < 6 ? SNOW : P[3]
+        dot(col, cx + x, b + y)
+      }
+    }
+  })
+  // Dây kim tuyến chéo qua hai tầng dưới
+  for (const [x0, y0, x1] of [[-30, -60, 30], [-40, -32, 40]]) {
+    for (let x = x0; x <= x1; x += 2) {
+      const t = (x - x0) / (x1 - x0)
+      const y = Math.round(y0 + t * 12 + Math.sin(t * Math.PI) * 6) & ~1
+      dot(x % 4 === 0 ? '#ffe08a' : '#d9a640', cx + x, b + y)
     }
   }
   for (let i = 0; i < upto && i < ORNAMENTS.length; i++) ornament(g, cx + ORNAMENTS[i][0], b + ORNAMENTS[i][1] + 2, ORNAMENTS[i][2], tip)
   if (upto >= ORNAMENTS.length) {
-    g.fillStyle = '#e8dfc9'
-    g.fillRect(cx - 40, base - 12, 18, 12)
-    g.fillStyle = '#c8402f'
-    g.fillRect(cx - 32, base - 12, 3, 12)
-    g.fillRect(cx - 40, base - 7, 18, 2)
-    g.fillStyle = '#7fae8c'
-    g.fillRect(cx + 20, base - 10, 14, 10)
-    g.fillStyle = '#fff1c9'
-    g.fillRect(cx + 26, base - 10, 2, 10)
+    dot('#22120f', cx - 42, base - 14, 22, 14)
+    dot('#f6edd8', cx - 40, base - 12, 18, 12)
+    dot('#d8362c', cx - 32, base - 12, 3, 12)
+    dot('#d8362c', cx - 40, base - 7, 18, 2)
+    dot('#22120f', cx + 20, base - 12, 18, 12)
+    dot('#5fbf85', cx + 22, base - 10, 14, 10)
+    dot('#fff1c9', cx + 28, base - 10, 2, 10)
   }
   g.drawImage(tip, cx - 13, b - 136)
 }
@@ -433,6 +440,12 @@ export class Noel {
   // Phin xong: tuyết rơi 20 giây, đúng lúc khách nghỉ
   celebrate() {
     this.burst = 20
+  }
+
+  // Độ đậm quầng đèn trên người ngồi: thở chậm theo đèn dây, đứng yên khi Yên tĩnh hoặc đang pha phin
+  seatGlow(t: number) {
+    if (!this.cfg.layers.lights) return 0
+    return this.still ? 0.85 : 0.8 + 0.2 * Math.sin(t * 0.8)
   }
 
   private get still() {
@@ -561,11 +574,14 @@ export class Noel {
       ctx.globalCompositeOperation = 'source-over'
       ctx.globalAlpha = 1
     }
-    ctx.fillStyle = '#231c18'
-    ctx.fillRect(b.x, b.y - 1, 2, 2)
-    ctx.fillStyle = lv > 0.5 ? b.c : mixHex(b.c, '#6e6358', 0.45 - lv * 0.4)
-    if (b.tiny) ctx.fillRect(b.x, b.y + 1, 2, 2)
-    else {
+    // Bóng nhỏ trên cây: không đui đen, ban ngày vẫn là chấm vàng
+    if (b.tiny) {
+      ctx.fillStyle = lv > 0.5 ? b.c : '#ffd98a'
+      ctx.fillRect(b.x, b.y + 1, 2, 2)
+    } else {
+      ctx.fillStyle = '#231c18'
+      ctx.fillRect(b.x, b.y - 1, 2, 2)
+      ctx.fillStyle = lv > 0.5 ? b.c : mixHex(b.c, '#6e6358', 0.45 - lv * 0.4)
       ctx.fillRect(b.x - 1, b.y + 1, 4, 5)
       if (lv > 0.5) {
         ctx.fillStyle = '#fff6da'
@@ -701,17 +717,17 @@ export class Noel {
       const r = rng(4242)
       const [y0, y1] = R.paneY
       for (const [a, b] of R.panes) {
-        for (let y = y0; y < y1; y += 4)
-          for (let x = a; x < b; x += 4) {
-            const dB = (y1 - y) / 110
-            const dL = Math.min(x - a, b - x) / 90
-            const dT = (y - y0) / 46
-            const v = Math.min(dB + dL * 0.9, dT + dL * 1.5, 1.6)
-            const p = v < 0.28 ? 0.92 : v < 0.5 ? 0.62 : v < 0.72 ? 0.28 : v < 0.9 ? 0.07 : 0
-            if (r() < p) {
-              g.fillStyle = night ? `rgba(196,206,240,${0.4 + r() * 0.35})` : `rgba(255,255,255,${0.5 + r() * 0.4})`
-              g.fillRect(x, y, 4, 4)
-            }
+        // Lớp xịt mịn ở bốn góc: bo tròn, mép lượn theo nhiễu chậm, nhạt dần ra giữa kính
+        const corners: [number, number, number][] = [[a, y0, 64], [b, y0, 64], [a, y1, 84], [b, y1, 84]]
+        for (let y = y0; y < y1; y += 2)
+          for (let x = a; x < b; x += 2) {
+            const wob = 1 + 0.16 * Math.sin(x * 0.043 + y * 0.021) + 0.1 * Math.sin(y * 0.067 - x * 0.031)
+            let k = 0
+            for (const [cx, cy, R] of corners) k = Math.max(k, 1 - Math.hypot(x - cx, y - cy) / (R * wob))
+            if (k <= 0) continue
+            const al = k * k * (0.9 + r() * 0.2) * (night ? 0.72 : 0.95)
+            g.fillStyle = night ? `rgba(196,206,240,${al.toFixed(3)})` : `rgba(255,255,255,${al.toFixed(3)})`
+            g.fillRect(x, y, 2, 2)
           }
       }
       this.spray.set(key, c)
@@ -770,7 +786,7 @@ export class Noel {
       g.clearRect(0, 0, W, H)
       paintTree(g, cx, base, upto, this.tip)
       // Cây có đèn riêng nên tối nhẹ hơn nội thất
-      const wash = f.time === 'night' ? 'rgba(18,16,48,0.26)' : f.time === 'afternoon' ? 'rgba(255,140,70,0.1)' : null
+      const wash = f.time === 'night' ? 'rgba(18,16,48,0.1)' : f.time === 'afternoon' ? 'rgba(255,140,70,0.08)' : null
       if (wash) {
         g.globalCompositeOperation = 'source-atop'
         g.fillStyle = wash

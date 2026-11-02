@@ -71,7 +71,7 @@ export function ChillEmbed({tracks, destinations, seasons = []}: {tracks: Track[
   useEffect(() => {
     const tick = () => {
       const season = activeSeason(seasons, Date.now())
-      sceneRef.current?.setNoel(season ? {layers: {...season.layers, snow: false, meteors: false, tree: false, shelf: false}, quiet: false, foam: false, shower: false, fast: false} : null)
+      sceneRef.current?.setNoel(season ? {layers: {...season.layers, snow: false, meteors: false, tree: false, shelf: false, seat: false}, quiet: false, foam: false, shower: false, fast: false} : null)
     }
     const first = setTimeout(tick, 1500)
     const id = setInterval(tick, 60_000)

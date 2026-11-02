@@ -14,6 +14,8 @@
 import type {Wand} from './wand'
 
 export const CAT_SRC = '/chill/cat.webp'
+// Mèo quàng khăn len mùa Noel, cùng toạ độ (scripts/chill-noel-art.py)
+export const CAT_NOEL_SRC = '/chill/cat-noel.webp'
 // Atlas vẽ ×2 so với px gốc (canvas 640×360) → nét gấp đôi trên canvas đệm 1280×720
 const ATLAS_SCALE = 2
 
@@ -57,47 +59,6 @@ const FRAMES = {
 
 type Frame = keyof typeof FRAMES
 
-// Mũ Noel: tâm vành mũ trên đỉnh đầu từng khung (px trong khung atlas), góc nghiêng (radian).
-// null = đầu khuất, không đội
-const HAT_AT: Record<Frame, [number, number, number?] | null> = {
-  sleep: [143, 14],
-  stir: [133, 8],
-  tail: [151, 17],
-  look: [135, 10],
-  'stretch-0': [140, 12],
-  'stretch-1': [115, 80],
-  'stretch-2': [103, 77],
-  'stretch-3': [143, 14],
-  'groom-0': [123, 10],
-  'groom-1': [109, 12],
-  'groom-2': [110, 12, 0.12],
-  'groom-3': [113, 10, 0.25],
-  'groom-4': [102, 10, 0.12],
-  'groom-5': [123, 10],
-  'paw-0': [79, 16],
-  'paw-1': [81, 16],
-  'paw-2': [73, 26, -0.12],
-  'paw-3': [73, 14],
-  'paw-4': [70, 32, -0.12],
-  'paw-5': [79, 16],
-  'stalk-0': [127, 30],
-  'stalk-1': [133, 44],
-  'wiggle-0': [87, 92],
-  'wiggle-1': [90, 92],
-  'wiggle-2': [93, 90],
-  'pounce-0': [153, 12, 0.2],
-  'pounce-1': [217, 12, 0.2],
-  'pounce-2': [170, 82, 0.3],
-  'pounce-3': [163, 14],
-  'hug-0': [210, 27, 0.35],
-  'hug-1': null,
-  'head-0': [123, 14],
-  'head-1': [130, 14],
-  'head-2': [133, 12],
-}
-// Tâm vành mũ trong sprite (makeCatHat, noel.ts)
-const HAT_CX = 33
-const HAT_CY = 26
 type Step = [Frame, number] // khung, số giây
 // Trạng thái lúc có cần câu ('off' = không chơi, mèo sống theo nhịp thường)
 type Hunt = 'off' | 'sleep' | 'watch' | 'sit' | 'stalk' | 'pounce' | 'catch' | 'miss' | 'ignore' | 'turn' | 'tired' | 'home'
@@ -224,7 +185,6 @@ export class Cat {
   private mood: Mood = {night: false, rain: false, music: false}
   private purring = false
   private purrT = 0
-  private hat: HTMLCanvasElement | null = null
   action: CatAction | null = null
   // Chỗ nằm quen (chân sau, quay mặt sang phải) + khoảng bậu được đi lại khi chơi
   private rear: Pt = {x: 112, y: 296}
@@ -784,31 +744,6 @@ export class Cat {
   }
 
   // Vẽ theo px gốc 640×360 (ctx đã scale RES)
-  // Mũ theo mùa (đã tô màu theo giờ), null = đầu trần
-  setHat(hat: HTMLCanvasElement | null) {
-    this.hat = hat
-  }
-
-  // ctx đang ở chỗ vẽ khung: (dx, y) là góc trái trên khung, px gốc
-  private drawHat(ctx: CanvasRenderingContext2D, dx: number, y: number) {
-    const at = HAT_AT[this.frame]
-    if (!this.hat || !at) return
-    const [ax, ay, rot] = at
-    const px = dx + ax / ATLAS_SCALE
-    const py = y + ay / ATLAS_SCALE
-    const w = this.hat.width / ATLAS_SCALE
-    const h = this.hat.height / ATLAS_SCALE
-    if (!rot) {
-      ctx.drawImage(this.hat, px - HAT_CX / ATLAS_SCALE, py - HAT_CY / ATLAS_SCALE, w, h)
-      return
-    }
-    ctx.save()
-    ctx.translate(px, py)
-    ctx.rotate(rot)
-    ctx.drawImage(this.hat, -HAT_CX / ATLAS_SCALE, -HAT_CY / ATLAS_SCALE, w, h)
-    ctx.restore()
-  }
-
   draw(ctx: CanvasRenderingContext2D, atlas: HTMLCanvasElement) {
     if (!atlas.width) return
     const [sx, sy, sw, sh, ax] = FRAMES[this.frame]
@@ -830,14 +765,12 @@ export class Cat {
     const y = this.rear.y - h - inhale - this.lift
     if (this.dir === 1) {
       ctx.drawImage(atlas, sx, sy, sw, sh, rx - ax / ATLAS_SCALE, y, w, h + inhale)
-      this.drawHat(ctx, rx - ax / ATLAS_SCALE, y)
     } else {
       // Quay sang trái: lật khung quanh chân sau
       ctx.save()
       ctx.translate(rx, 0)
       ctx.scale(-1, 1)
       ctx.drawImage(atlas, sx, sy, sw, sh, -ax / ATLAS_SCALE, y, w, h + inhale)
-      this.drawHat(ctx, -ax / ATLAS_SCALE, y)
       ctx.restore()
     }
     this.drawHearts(ctx)
