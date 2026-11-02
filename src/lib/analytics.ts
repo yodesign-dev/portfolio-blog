@@ -57,6 +57,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Sleep Timer'; props: {minutes: number}}
   // Mùa (Noel…): view = lần đầu thấy trong lần mở trang · on / quiet / off = khách chọn · tree = treo thêm món
   | {name: 'Chill Season'; props: {season: string; action: 'view' | 'on' | 'quiet' | 'off' | 'tree'}}
+  // Huy hiệu LIVE: view = lần đầu thấy trong lần mở trang · click = bấm sang YouTube
+  | {name: 'Chill Live'; props: {id: string; state: 'on' | 'soon'; action: 'view' | 'click'}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

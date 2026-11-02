@@ -621,6 +621,15 @@ const en = {
     copy: 'Copy link',
     copied: 'Link copied ✓',
   },
+  live: {
+    on: 'Live',
+    watch: 'Watch on YouTube',
+    soon: 'Live',
+    today: 'today',
+    tomorrow: 'tomorrow',
+    onAria: 'Live now on YouTube. Opens in a new tab and pauses the café music',
+    soonAria: (day: string, time: string) => `Live on YouTube ${day} at ${time}. Opens in a new tab`,
+  },
   updates: {
     button: 'What’s new',
     unseenAria: 'What’s new — unseen update',
@@ -1218,6 +1227,15 @@ const vi: typeof en = {
     share: 'Chia sẻ',
     copy: 'Copy link',
     copied: 'Đã copy link ✓',
+  },
+  live: {
+    on: 'Đang live',
+    watch: 'Xem trên YouTube',
+    soon: 'Live',
+    today: 'hôm nay',
+    tomorrow: 'ngày mai',
+    onAria: 'Đang live trên YouTube. Mở tab mới và tạm dừng nhạc quán',
+    soonAria: (day, time) => `Live trên YouTube ${day} lúc ${time}. Mở tab mới`,
   },
   updates: {
     button: 'Có gì mới',

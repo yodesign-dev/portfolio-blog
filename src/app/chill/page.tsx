@@ -23,10 +23,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {themeColor: '#16131a'}
 
 export default async function ChillPage() {
-  const {seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn} = await getChillContent(revalidate)
+  const {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn} = await getChillContent(revalidate)
   return (
     <>
-      <ChillRoom seasons={seasons} tracks={tracks} destinations={destinations} updates={updates} shelfOn={shelfOn} playCountsOn={playCountsOn} questOn={questOn} catToyOn={catToyOn} seatPickOn={seatPickOn} streetMotionOn={streetMotionOn} miniPlayerOn={miniPlayerOn} facadeOn={facadeOn} highlandOn={highlandOn} sleepTimerOn={sleepTimerOn} />
+      <ChillRoom lives={lives} seasons={seasons} tracks={tracks} destinations={destinations} updates={updates} shelfOn={shelfOn} playCountsOn={playCountsOn} questOn={questOn} catToyOn={catToyOn} seatPickOn={seatPickOn} streetMotionOn={streetMotionOn} miniPlayerOn={miniPlayerOn} facadeOn={facadeOn} highlandOn={highlandOn} sleepTimerOn={sleepTimerOn} />
       <GoogleTag />
     </>
   )

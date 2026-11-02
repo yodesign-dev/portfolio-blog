@@ -4,6 +4,7 @@ import {sanityFetch} from '@/sanity/lib/fetch'
 import type {ChillUpdate} from '@/components/chill/Changelog'
 import type {NeonSign} from '@/components/chill/facade'
 import {ALL_LAYERS, NOEL_2026, type Season, type SeasonLayers, type SeasonMoment} from '@/components/chill/season'
+import {isLiveUrl, type ChillLive} from '@/components/chill/live'
 
 // Nội dung của /chill và /chill/embed: nhạc, điểm đến, nhật ký thay đổi.
 //
@@ -75,6 +76,13 @@ const CHILL_QUERY = `{
     end,
     layers,
     "moments": moments[defined(kind) && defined(start) && defined(end)]{kind, start, end}
+  },
+  "liveOpen": *[_id == "chillSettings"][0].liveOpen,
+  "lives": *[_type == "chillLive" && enabled == true && defined(url) && defined(start) && defined(end)] | order(start desc)[0...6] {
+    "id": _id,
+    url,
+    start,
+    end
   }
 }`
 
@@ -106,6 +114,8 @@ type ChillContent = {
   sleepTimerOpen?: boolean | null
   seasonsOpen?: boolean | null
   seasons?: {id: string; pack?: string; start: string; end: string; layers?: Partial<SeasonLayers> | null; moments?: SeasonMoment[] | null}[] | null
+  liveOpen?: boolean | null
+  lives?: ChillLive[] | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -224,5 +234,7 @@ export async function getChillContent(revalidate: number) {
       : content.seasonsOpen === true
         ? (content.seasons ?? []).filter((s) => s.pack === 'noel').map((s) => ({id: s.id, pack: 'noel', start: s.start, end: s.end, layers: {...ALL_LAYERS, ...s.layers}, moments: s.moments ?? []}))
         : []
-  return {seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn}
+  // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
+  const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn}
 }

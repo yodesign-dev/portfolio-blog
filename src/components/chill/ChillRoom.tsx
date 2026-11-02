@@ -31,6 +31,8 @@ import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {MiniVideo, canVideoPiP} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
+import {LiveBadge} from './LiveBadge'
+import type {ChillLive} from './live'
 import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
@@ -229,6 +231,7 @@ export function ChillRoom({
   highlandOn = false,
   sleepTimerOn = false,
   seasons = [],
+  lives = [],
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -260,6 +263,8 @@ export function ChillRoom({
   sleepTimerOn?: boolean
   // Lịch mùa (Noel…) từ Studio, máy khách tự so giờ, xem season.ts
   seasons?: Season[]
+  // Lịch live YouTube từ Studio, máy khách tự so giờ, xem live.ts
+  lives?: ChillLive[]
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -3166,6 +3171,7 @@ export function ChillRoom({
             <ArrowIcon dir="left" />
             <span className="max-sm:sr-only">Bin Nguyen</span>
           </Link>
+          <LiveBadge lives={lives} onJoin={() => { if (playing) togglePlay() }} />
           {/* Điện thoại: tên điểm đến nằm hàng riêng dưới hàng nút (chỗ bên trái hẹp); từ sm
               trở lên nằm cùng hàng. Cụm này chỉ là nhãn thông tin, không có nút bấm */}
           {/* Điện thoại: hàng này chỉ là 1 dòng chú thích trơn (điểm đến · giờ · số người), không

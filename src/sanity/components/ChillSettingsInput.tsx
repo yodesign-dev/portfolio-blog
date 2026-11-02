@@ -32,6 +32,7 @@ type Value = {
   miniPlayerOpen?: boolean
   sleepTimerOpen?: boolean
   seasonsOpen?: boolean
+  liveOpen?: boolean
   questOpen?: boolean
   questSeason?: string
   questTitle?: string
@@ -53,7 +54,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen'
+type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -72,6 +73,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
       {key: 'sleepTimerOpen', icon: '🌙', title: 'Hẹn giờ tắt nhạc', short: 'Nút trăng: tắt nhạc sau 15/30/60/90 phút', desc: 'Nút trăng cạnh nút Cài đặt dưới thanh nhạc: chọn 15 / 30 / 60 / 90 phút, nút hiện số phút còn lại. 60 giây cuối nhạc và tiếng nền nhỏ dần rồi dừng hẳn, bấm phát là nghe lại. Lần đầu khách vào trạm Night & Sleep, bảng chọn tự mở để gợi ý. Thử trước bằng ?sleep=1.', delay: '1 phút'},
       {key: 'seasonsOpen', icon: '🎄', title: 'Theme theo mùa', short: 'Công tắc tổng, ngày bật tắt ở mục Mùa', desc: 'Công tắc tổng cho trang trí theo mùa. Ngày bắt đầu, kết thúc và từng lớp đặt trong mục Chill · Mùa: đến ngày tự bật, hết ngày tự tắt, không cần deploy. Xem trước không cần bật: ?season=noel, thêm &at=2026-12-24T20:00 để giả giờ. Khách tắt riêng được trong Cài đặt › Không khí.', delay: '1 phút'},
+      {key: 'liveOpen', icon: '🔴', title: 'Huy hiệu LIVE', short: 'Báo buổi live YouTube, lịch ở mục Live', desc: 'Công tắc tổng cho huy hiệu trên thanh trên cùng của quán. Giờ và link đặt trong mục Chill · Live: 24 giờ trước hiện "Live hôm nay 20:00", tới giờ hiện "Đang live", hết giờ tự ẩn. Khách bấm thì nhạc quán tạm dừng và YouTube mở ở tab mới. Thử trước bằng ?live=1 hoặc ?live=soon.', delay: '1 phút'},
     ],
   },
   {
