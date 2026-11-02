@@ -64,6 +64,7 @@ export const NAV_LINKS = [
 // Side projects — dùng ở mục Side projects trang chủ và cột riêng ở Footer
 export const NOTION_TEMPLATE_URL = 'https://grand-dust-291.notion.site/Hanoi-Caf-Workspace-3f9a4ffd358081cb9b9cdc607f19c49d'
 export const YOUTUBE_URL = 'https://www.youtube.com/@lofipixel.cafevn'
+export const CHILL_EXTENSION_URL = 'https://chromewebstore.google.com/detail/gidomdfggefliiidbfijmknejmjafafi'
 export const SIDE_PROJECT_LINKS: {label: string; href: string; external?: boolean}[] = [
   {label: 'Lofi Pixel Café', href: '/chill'},
   {label: 'Notion template', href: NOTION_TEMPLATE_URL, external: true},

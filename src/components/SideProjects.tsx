@@ -2,25 +2,48 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {TeaserWindow} from '@/components/chill/TeaserWindow'
-import {NOTION_TEMPLATE_URL, YOUTUBE_URL} from '@/lib/site'
+import {CHILL_EXTENSION_URL, NOTION_TEMPLATE_URL, YOUTUBE_URL} from '@/lib/site'
 
-// Mục "Side projects" trang chủ (thay khối giới thiệu /chill cũ): quán lofi, Notion
-// template và kênh YouTube — 3 thẻ ngang hàng, cùng khung tối kiểu pixel café.
-// Thẻ quán gắn bản cập nhật mới nhất trong nhật ký thay đổi (Studio: "Chill · Nhật ký
-// thay đổi"), đăng bản mới là trang chủ tự đổi theo.
+// Mục "Side projects" trang chủ (thay khối giới thiệu /chill cũ): quán lofi là thẻ lớn,
+// Notion template và kênh YouTube là 2 thẻ nhỏ mọc ra từ quán, cùng khung tối kiểu pixel café.
+// Số liệu và bản cập nhật của quán đọc từ Studio ("Chill · Nhật ký thay đổi", nhạc, điểm đến)
+// với cùng điều kiện như /chill, nên đăng bài hay thêm cảnh là trang chủ tự đổi theo.
 
+// Bản cập nhật ưu tiên loại "new": cùng ngày có bản chỉnh nhỏ thì vẫn nêu tính năng mới.
+// Trạm Noel không tính vì ngoài mùa khách không thấy.
+const CAFE_QUERY = `{
+  "latest": *[_type == "chillUpdate" && defined(title) && defined(date) && count(items) > 0]
+    | order(select(kind == "new" => 0, 1) asc, date desc, _createdAt desc)[0]{title, titleEn, date},
+  "places": count(*[_type == "chillDestination" && hidden != true && defined(slug.current)
+    && defined(morning.asset) && defined(afternoon.asset) && defined(night.asset)]),
+  "tracks": count(*[_type == "chillTrack" && hidden != true && station != "noel" && (defined(audio.asset) || defined(localFile))]),
+  "updates": count(*[_type == "chillUpdate" && defined(title) && defined(date) && count(items) > 0])
+}`
 
-const LATEST_UPDATE_QUERY = `*[_type == "chillUpdate"] | order(date desc)[0]{title, titleEn, date}`
-
-type LatestUpdate = {title: string; titleEn?: string; date: string} | null
+type CafeInfo = {
+  latest: {title: string; titleEn?: string; date: string} | null
+  places: number
+  tracks: number
+  updates: number
+}
 
 function shortDate(date: string) {
   // date dạng YYYY-MM-DD — đọc theo UTC để không lệch ngày theo múi giờ server
   return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', timeZone: 'UTC'})
 }
 
+const ctaClass =
+  'inline-flex text-sm font-semibold text-brand transition-colors hover:text-brand-hover focus-visible:underline'
+
 export async function SideProjects() {
-  const latest = await sanityFetch<LatestUpdate>({query: LATEST_UPDATE_QUERY, revalidate: 300}).catch(() => null)
+  const cafe = await sanityFetch<CafeInfo>({query: CAFE_QUERY, revalidate: 300}).catch(() => null)
+  const latest = cafe?.latest
+  // Sanity lỗi thì số về 0: ẩn hẳn, không hiện "0 tracks"
+  const stats = [
+    {value: cafe?.places, label: 'places'},
+    {value: cafe?.tracks, label: 'tracks'},
+    {value: cafe?.updates, label: 'updates shipped'},
+  ].filter((stat) => stat.value)
 
   return (
     <section id="side-projects" aria-labelledby="side-projects-title" className="scroll-mt-24 bg-neutral-50">
@@ -34,28 +57,69 @@ export async function SideProjects() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-8">
-          <Card
-            media={<TeaserWindow />}
-            label="Web app · Live"
-            title="Lofi Pixel Café"
-            body="A phin coffee timer by a café window in Hà Nội, with lo-fi music, street sounds and a table to work alongside friends."
-            update={latest ? `Updated ${shortDate(latest.date)} · ${latest.titleEn?.trim() || latest.title}` : undefined}
-            cta={{href: '/chill', label: 'Take a seat →'}}
-          />
-          <Card
-            media={<CoverLink href={NOTION_TEMPLATE_URL} src="/side/notion-template.jpg" alt="Hanoi Café Workspace Notion template: a live café window above Today and Quick notes" />}
+        <article className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
+          <TeaserWindow />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Web app · Live · Free</p>
+            <h3 className="mt-1.5 text-2xl font-semibold leading-snug text-neutral-900">Lofi Pixel Café</h3>
+            <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">
+              A focus timer that&apos;s a phin dripping coffee, by a café window in Vietnam. Pick a place, put on lo-fi,
+              and work beside friends at the same table.
+            </p>
+            {stats.length > 0 && (
+              <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="flex flex-col-reverse">
+                    <dt className="text-sm text-neutral-500">{stat.label}</dt>
+                    <dd className="text-2xl font-semibold tracking-tight text-neutral-900">{stat.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p className="mt-5 text-[15px] leading-relaxed text-neutral-600">
+              <span className="font-medium text-neutral-900">Product, design and build:</span> Bin. Art and music made
+              with AI, every feature behind its own switch.
+            </p>
+            {latest && (
+              <p className="mt-3 flex items-start gap-2 text-sm font-medium text-neutral-800">
+                <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                Updated {shortDate(latest.date)} · {latest.titleEn?.trim() || latest.title}
+              </p>
+            )}
+            <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
+              <Link href="/chill" className={ctaClass}>
+                Take a seat →
+              </Link>
+              <a
+                href={CHILL_EXTENSION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 focus-visible:underline"
+              >
+                Chrome extension ↗
+              </a>
+            </div>
+          </div>
+        </article>
+
+        <div className="mt-10 grid grid-cols-1 gap-8 border-t border-neutral-200 pt-10 md:grid-cols-2">
+          <SmallCard
+            href={NOTION_TEMPLATE_URL}
+            src="/side/notion-template.jpg"
+            alt="Hanoi Café Workspace Notion template: a live café window above Today and Quick notes"
             label="Notion template · Free"
             title="Hanoi Café Workspace"
-            body="The café window inside Notion — music, rain and the train street on top of your top 3 for today and a goal for each day of the week. English and Vietnamese."
-            cta={{href: NOTION_TEMPLATE_URL, label: 'Duplicate for free ↗', external: true}}
+            body="The café window inside Notion, above your top 3 for today and a goal for each day of the week. English and Vietnamese."
+            cta="Duplicate for free ↗"
           />
-          <Card
-            media={<CoverLink href={YOUTUBE_URL} src="/side/youtube-hanoi-night.jpg" alt="Lofi Pixel Cafe video thumbnail: Hanoi rainy night, lo-fi for study and relax" />}
+          <SmallCard
+            href={YOUTUBE_URL}
+            src="/side/youtube-hanoi-night.jpg"
+            alt="Lofi Pixel Cafe video thumbnail: Hanoi rainy night, lo-fi for study and relax"
             label="YouTube channel"
             title="Lofi Pixel Cafe"
-            body="Lo-fi mixes recorded straight from the café window — like a rainy night in Hà Nội — to study or work to."
-            cta={{href: YOUTUBE_URL, label: 'Listen on YouTube ↗', external: true}}
+            body="Lo-fi mixes recorded straight from the café window, to study or work to."
+            cta="Listen on YouTube ↗"
           />
         </div>
       </div>
@@ -63,51 +127,39 @@ export async function SideProjects() {
   )
 }
 
-function Card({
-  media,
+function SmallCard({
+  href,
+  src,
+  alt,
   label,
   title,
   body,
-  update,
   cta,
 }: {
-  media: React.ReactNode
+  href: string
+  src: string
+  alt: string
   label: string
   title: string
   body: string
-  update?: string
-  cta: {href: string; label: string; external?: boolean}
+  cta: string
 }) {
-  const ctaClass =
-    'mt-5 inline-flex text-sm font-semibold text-brand transition-colors hover:text-brand-hover focus-visible:underline'
   return (
-    <article className="flex flex-col">
-      {media}
-      <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-neutral-400">{label}</p>
-      <h3 className="mt-1.5 text-lg font-semibold leading-snug text-neutral-900">{title}</h3>
-      <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
-      {update && (
-        <p className="mt-3 flex items-start gap-2 text-sm font-medium text-neutral-800">
-          <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-          {update}
-        </p>
-      )}
-      <div className="mt-auto">
-        {cta.external ? (
-          <a href={cta.href} target="_blank" rel="noopener noreferrer" className={ctaClass}>
-            {cta.label}
-          </a>
-        ) : (
-          <Link href={cta.href} className={ctaClass}>
-            {cta.label}
-          </Link>
-        )}
+    <article className="grid grid-cols-1 items-start gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <CoverLink href={href} src={src} alt={alt} />
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{label}</p>
+        <h3 className="mt-1.5 text-lg font-semibold leading-snug text-neutral-900">{title}</h3>
+        <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`mt-3 ${ctaClass}`}>
+          {cta}
+        </a>
       </div>
     </article>
   )
 }
 
-// Ảnh bìa trong cùng khung tối với ô cửa sổ quán (TeaserWindow) để 3 thẻ đồng bộ
+// Ảnh bìa trong cùng khung tối với ô cửa sổ quán (TeaserWindow) để các thẻ đồng bộ
 function CoverLink({href, src, alt}: {href: string; src: string; alt: string}) {
   return (
     <a
@@ -122,7 +174,7 @@ function CoverLink({href, src, alt}: {href: string; src: string; alt: string}) {
           src={src}
           alt={alt}
           fill
-          sizes="(min-width: 1152px) 352px, (min-width: 768px) 33vw, 100vw"
+          sizes="(min-width: 1152px) 210px, (min-width: 640px) 40vw, 100vw"
           className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03] motion-reduce:transform-none"
         />
       </span>
