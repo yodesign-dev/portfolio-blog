@@ -141,6 +141,8 @@ export function ChillRecord({
       if (cancelled) return
       scene = new ChillScene(canvas, {noelSeat: !!readSeasonPreview(window.location.search).season?.layers.seat})
       sceneRef.current = scene
+      if (new URLSearchParams(window.location.search).get('train') === 'now') scene.callTrain()
+      if (new URLSearchParams(window.location.search).get('santa') === 'now') scene.callSanta()
       scene.setTheme(setup.theme)
       scene.setSeat(setup.seat)
       scene.setMusic(true)

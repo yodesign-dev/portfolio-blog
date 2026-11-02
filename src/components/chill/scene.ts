@@ -198,7 +198,53 @@ const VIGNETTES = {
       {until: 6.8, frame: 4},
     ],
   },
+  // Mùa Noel: ông già Noel giao quà bằng xe máy (Nano Banana 2.1 từ shipper, cùng dáng), tấp
+  // vào lề gọi điện cho khách rồi cười chạy tiếp
+  santaBike: {
+    src: '/chill/scenes/group/santa-bike.webp',
+    w: 56,
+    h: 87,
+    anchor: 47.5,
+    walk: [0],
+    stride: 0,
+    speed: 28,
+    exitSpeed: 30,
+    brake: 18,
+    dir: -1,
+    ground: SIDEWALK_Y + 4,
+    ride: true,
+    stops: [97, 216],
+    beats: [
+      {until: 0.9, frame: 1},
+      {until: 4.4, frame: 2, fps: 1.6, bob: true},
+      {until: 6.0, frame: 3, fps: 5, bob: true},
+      {until: 8.4, frame: 2, fps: 1.6, bob: true},
+      {until: 9.2, frame: 1},
+    ],
+  },
+  // Phố đường tàu không có xe: ông đi bộ vác bao quà trên vỉa hè, dừng xem địa chỉ rồi vẫy tay.
+  // 5 khung: bước × 3 · xem giấy · vẫy tay
+  santaWalk: {
+    src: '/chill/scenes/group/santa-walk.webp',
+    w: 40,
+    h: 68,
+    anchor: 25,
+    walk: [0, 1, 2, 1],
+    stride: 3,
+    speed: 8,
+    exitSpeed: 8,
+    brake: 40,
+    dir: 1,
+    ground: SIDEWALK_Y,
+    stops: [103, 228],
+    beats: [
+      {until: 2.8, frame: 3},
+      {until: 4.8, frame: 4, fps: 3, bob: true},
+      {until: 5.2, frame: 3},
+    ],
+  },
 } satisfies Record<string, VignetteSpec>
+const SANTA_KINDS: VignetteKind[] = ['santaBike', 'santaWalk']
 type VignetteKind = keyof typeof VIGNETTES
 // Bảng menu (chữ A) trên vỉa hè bên kia đường, bên trái chỗ cặp đôi dừng lại đọc
 const MENU_BOARD_X = 214
@@ -551,6 +597,8 @@ export class ChillScene {
   private vignette: {kind: VignetteKind; x: number; target: number; speed: number; step: number; stopT: number; leaving: boolean} | null =
     null
   private nextVignette = 10
+  // Ông già Noel: vài phút một lần, chen vào lượt cảnh nhỏ kế tiếp
+  private nextSanta = 45
   private busy = false
   private lastVignette: VignetteKind | null = null
   private vignetteImgs: Partial<Record<VignetteKind, {img: HTMLImageElement; tinted: HTMLCanvasElement | null; key: string}>> = {}
@@ -1054,6 +1102,12 @@ export class ChillScene {
   }
 
   // Gọi tàu tới ngay (vd ?train=now khi quay clip) — áp dụng khi đang ở phố đường tàu
+  // ?santa=now: gọi ông già Noel ra ngay để xem
+  callSanta() {
+    this.nextSanta = 0
+    this.nextVignette = Math.min(this.nextVignette, 1)
+  }
+
   callTrain() {
     this.trainCalled = true
   }
@@ -1141,6 +1195,7 @@ export class ChillScene {
         for (const [wx, wy, ww, wh] of u.windows) ctx.fillRect(x + wx * w, y + wy * h, ww * w, wh * h)
         ctx.globalCompositeOperation = 'source-over'
       }
+      this.noel?.drawTrainUnit(ctx, i === 0, x, y, w, h)
       ctx.restore()
       if (i === 0 && (night || rainy || this.weather === 'mist')) this.drawTrainLamp(tr.dir, x, y, w, h, base)
       front = tr.dir > 0 ? left - TRAIN.gap : left + w + TRAIN.gap
@@ -2395,17 +2450,24 @@ export class ChillScene {
     // Đổi sang cảnh đồng quê giữa chừng → cảnh nhỏ của phố biến mất
     if (this.countryside) this.vignette = null
     // Phố đường tàu không có xe → bỏ cảnh anh shipper chạy xe máy
-    if (this.railway && this.vignette?.kind === 'shipper') this.vignette = null
+    if (this.railway && (this.vignette?.kind === 'shipper' || this.vignette?.kind === 'santaBike')) this.vignette = null
+    // Hết mùa hoặc tắt lớp: ông đi luôn
+    if (this.vignette && SANTA_KINDS.includes(this.vignette.kind) && !this.noel) this.vignette = null
     const v = this.vignette
     if (!v) {
       if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain' || this.countryside) return
-      for (const kind of Object.keys(VIGNETTES) as VignetteKind[]) this.vignetteLayer(kind)
+      const santaOn = !!this.noel?.santaOn
+      const santaKind: VignetteKind | null = santaOn ? (this.railway ? 'santaWalk' : 'santaBike') : null
+      for (const kind of Object.keys(VIGNETTES) as VignetteKind[]) if (!SANTA_KINDS.includes(kind) || kind === santaKind) this.vignetteLayer(kind)
+      if (santaOn) this.nextSanta -= dt
       this.nextVignette -= dt
       if (this.nextVignette > 0) return
       this.nextVignette = this.busy ? 12 + this.rng() * 8 : 30 + this.rng() * 20
       // Không lặp lại cảnh vừa xem
-      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette && !(this.railway && k === 'shipper'))
-      const kind = pick(this.rng, kinds)
+      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette && !SANTA_KINDS.includes(k) && !(this.railway && k === 'shipper'))
+      const santaDue = santaKind && this.nextSanta <= 0
+      if (santaDue) this.nextSanta = this.busy ? 20 + this.rng() * 15 : 180 + this.rng() * 180
+      const kind = santaDue ? santaKind : pick(this.rng, kinds)
       this.lastVignette = kind
       const spec: VignetteSpec = VIGNETTES[kind]
       const x = spec.dir > 0 ? -12 : SCENE_W + 12

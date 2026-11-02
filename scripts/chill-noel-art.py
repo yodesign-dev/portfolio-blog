@@ -7,6 +7,8 @@
 #
 #   python3 scripts/chill-noel-art.py cat
 #   python3 scripts/chill-noel-art.py seat cafe-boy
+#   python3 scripts/chill-noel-art.py santa-bike <ảnh Nano Banana>   ra scenes/group/santa-bike.webp, 4 khung như shipper
+#   python3 scripts/chill-noel-art.py santa-walk <ảnh Nano Banana>   ra scenes/group/santa-walk.webp, 5 khung
 #
 # Sheet người ngồi: ô cuối là mặt nạ khoét ảnh nội thất. Khăn nằm ngoài vùng khoét cũ nên mặt nạ
 # được nới ra đúng bằng khăn, ảnh nội thất giữ nguyên. Người giữ nguyên từng khung, chỉ vẽ khăn
@@ -315,9 +317,129 @@ def build_seat(name):
     build_glow(cfg, hi)
 
 
+# Ông già Noel xe máy, ảnh Nano Banana 2.1 từ shipper.webp: 3168×1344, nền xanh, 4 khung cách đều.
+# Khung đầu vẽ sót râu và lệch màu thùng quà nên lấy đầu và thùng từ khung 2, cùng dáng ngồi ở trên
+def key_green(im):
+    a = np.asarray(im.convert('RGBA')).astype(int).copy()
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    # Chỉ nền xanh chói; thùng quà xanh thẫm giữ nguyên
+    bg = (g > 170) & (r < 110) & (b < 110)
+    a[bg] = 0
+    # Khử viền xanh lem ngay sát nền
+    near = np.asarray(Image.fromarray((bg * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+    spill = near & ~bg & (g > r + 20) & (g > b + 20)
+    a[..., 1] = np.where(spill, (r + b) // 2, g)
+    return Image.fromarray(a.astype(np.uint8))
+
+
+def largest_part(solid):
+    h, w = solid.shape
+    seen = np.zeros(solid.shape, bool)
+    best = np.zeros(solid.shape, bool)
+    best_n = 0
+    for sy, sx in zip(*np.nonzero(solid)):
+        if seen[sy, sx]:
+            continue
+        part = [(sy, sx)]
+        seen[sy, sx] = True
+        for y, x in part:
+            for ny in range(max(0, y - 1), min(h, y + 2)):
+                for nx in range(max(0, x - 1), min(w, x + 2)):
+                    if solid[ny, nx] and not seen[ny, nx]:
+                        seen[ny, nx] = True
+                        part.append((ny, nx))
+        if len(part) > best_n:
+            best_n = len(part)
+            best = np.zeros(solid.shape, bool)
+            ys, xs = zip(*part)
+            best[list(ys), list(xs)] = True
+    return best
+
+
+def build_santa_bike(raw_path):
+    raw = key_green(Image.open(raw_path))
+    # Mốc tính theo ảnh ½ cỡ (1584×672) rồi nhân đôi
+    cuts = [0, 411, 800, 1195, 1584]
+    cells = [raw.crop((cuts[i] * 2, 0, cuts[i + 1] * 2, 1344)) for i in range(4)]
+    # Đầu + thùng quà của khung 2 sang khung 1
+    dx = 395 * 2
+    first = cells[0]
+    for box in ((110 * 2, 10 * 2, 262 * 2, 182 * 2), (10 * 2, 135 * 2, 140 * 2, 378 * 2)):
+        x0, y0, x1, y1 = box
+        patch = raw.crop((x0 + dx, y0, x1 + dx, y1))
+        first.paste((0, 0, 0, 0), box)
+        first.alpha_composite(patch, (x0, y0))
+    W, H, Z = 56, 87, 14.7
+    out = Image.new('RGBA', (W * 4, H), (0, 0, 0, 0))
+    for i, c in enumerate(cells):
+        # Mép phải bánh trước: chỉ xét các hàng bánh xe, thùng quà khung sau có thể lấn vào ô này
+        bx = c.crop((0, 1000, c.width, 1344)).getbbox()
+        # Bánh trước sát mép phải, đáy khung theo ảnh gốc
+        crop = c.crop((bx[2] - int(W * Z), 1344 - int(H * Z) - 8, bx[2], 1344 - 8))
+        a = np.asarray(crop.resize((W, H), Image.LANCZOS)).copy()
+        a[..., 3] = np.where(a[..., 3] > 110, 255, 0)
+        a[~largest_part(a[..., 3] > 0)] = 0  # sót của khung bên cạnh
+        out.paste(Image.fromarray(a), (i * W, 0))
+    path = os.path.join(SCENES, 'group', 'santa-bike.webp')
+    out.save(path, 'WEBP', lossless=True, method=6)
+    print(path, out.size, os.path.getsize(path))
+
+
+# Ông già Noel đi bộ vác bao quà (phố đường tàu). Ảnh AI có 6 khung nhưng 4 khung đi gần như một
+# dáng, khung đầu sót râu, nên dựng lại bước đi từ khung 2: dang chân · chân khép (chân của khung 5)
+# · dang chân đổi bên (lật chân quanh hông). Ra 5 ô: dang · khép · dang đổi bên · xem giấy · vẫy tay.
+# Toạ độ theo ảnh ½ cỡ, căn khoá thắt lưng vào cùng một cột
+def build_santa_walk(raw_path):
+    raw = key_green(Image.open(raw_path))
+    half = raw.resize((1584, 672), Image.NEAREST)
+    HEM = 414
+    TOP, BOTTOM = 18, 662
+    L, R = 200, 112  # bề rộng về hai bên khoá thắt lưng
+    def cell(buckle):
+        return half.crop((buckle - L, TOP, buckle + R, BOTTOM))
+    stride = cell(463)
+    stand = cell(1212)
+    stand.paste((0, 0, 0, 0), (L + 94, 0, L + R, stand.height))  # bao quà của khung sau lấn vào
+    wave = cell(1462)
+    hem = HEM - TOP
+    def with_legs(legs):
+        out = stride.copy()
+        a = np.asarray(out).copy()
+        # Giữ bàn tay buông ở bên phải, xoá phần chân cũ
+        keep_hand = np.zeros(a.shape[:2], bool)
+        keep_hand[hem:hem + 26, L + 18:] = True
+        a[hem:][~keep_hand[hem:]] = 0
+        out = Image.fromarray(a)
+        out.alpha_composite(legs.crop((0, hem, legs.width, legs.height)), (0, hem))
+        return out
+    closed = with_legs(stand)
+    # Lật chân quanh hông (cách khoá thắt lưng 20 về sau)
+    hip = L - 20
+    mirrored = stride.crop((0, hem, stride.width, stride.height)).transpose(Image.FLIP_LEFT_RIGHT)
+    legs = Image.new('RGBA', stride.size, (0, 0, 0, 0))
+    legs.alpha_composite(mirrored, (0, hem))
+    legs = legs.transform(legs.size, Image.AFFINE, (1, 0, stride.width - 2 * hip, 0, 1, 0), Image.NEAREST)
+    other = with_legs(legs)
+    frames = [stride, closed, other, stand, wave]
+    W, H = 40, 68
+    out = Image.new('RGBA', (W * len(frames), H), (0, 0, 0, 0))
+    for i, f in enumerate(frames):
+        a = np.asarray(f.resize((W, H), Image.LANCZOS)).copy()
+        a[..., 3] = np.where(a[..., 3] > 110, 255, 0)
+        a[~largest_part(a[..., 3] > 0)] = 0
+        out.paste(Image.fromarray(a), (i * W, 0))
+    path = os.path.join(SCENES, 'group', 'santa-walk.webp')
+    out.save(path, 'WEBP', lossless=True, method=6)
+    print(path, out.size, os.path.getsize(path))
+
+
 if __name__ == '__main__':
     if sys.argv[1:2] == ['cat']:
         build_cat()
+    elif sys.argv[1:2] == ['santa-bike']:
+        build_santa_bike(sys.argv[2])
+    elif sys.argv[1:2] == ['santa-walk']:
+        build_santa_walk(sys.argv[2])
     elif sys.argv[1:2] == ['seat']:
         build_seat(sys.argv[2])
     else:

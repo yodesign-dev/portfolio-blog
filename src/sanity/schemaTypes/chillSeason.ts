@@ -14,6 +14,8 @@ const LAYERS = [
   {name: 'tree', title: 'Cây thông lớn dần theo phin'},
   {name: 'catHat', title: 'Khăn len cho mèo'},
   {name: 'seat', title: 'Khăn và ánh đèn cho người ngồi'},
+  {name: 'santa', title: 'Ông già Noel đi giao quà'},
+  {name: 'trainLights', title: 'Tàu mang đèn (phố đường tàu)'},
   {name: 'shelf', title: 'Món kệ theo mùa'},
 ]
 

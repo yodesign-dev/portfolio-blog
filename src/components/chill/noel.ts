@@ -442,6 +442,61 @@ export class Noel {
     this.burst = 20
   }
 
+  // Ông già Noel chỉ đi ngang khi khách không pha phin, không chọn Yên tĩnh
+  get santaOn() {
+    return this.cfg.layers.santa && !this.still
+  }
+
+  // Một đầu máy hoặc toa tàu mang dây đèn dọc mép mái, đầu máy thêm vòng nguyệt quế. Vẽ theo ô
+  // lưới phố, trong hệ của drawTrain nên tàu đi ngược chiều tự lật theo
+  drawTrainUnit(ctx: CanvasRenderingContext2D, loco: boolean, x: number, y: number, w: number, h: number) {
+    if (!this.f || !this.cfg.layers.trainLights) return
+    const lv = this.level()
+    const still = this.still
+    const COLORS = ['#ffc16e', '#ff5a4c', '#ffc16e', '#6ee39a']
+    const top = y + h * (loco ? 0.12 : 0.145)
+    const x0 = x + w * 0.04
+    const x1 = x + w * (loco ? 0.84 : 0.96)
+    const spans = Math.max(1, Math.round((x1 - x0) / 5))
+    const step = (x1 - x0) / spans
+    const sag = (u: number) => Math.sin(((u - x0) / step) * Math.PI) ** 2 * 0.9
+    ctx.fillStyle = 'rgba(24,18,16,0.9)'
+    for (let u = x0; u < x1; u += 0.25) ctx.fillRect(u, top + sag(u), 0.25, 0.25)
+    const bulbs = spans * 2
+    for (let i = 0; i <= bulbs; i++) {
+      const u = x0 + (i * (x1 - x0)) / bulbs
+      const v = top + sag(u) + 0.25
+      const c = COLORS[i % COLORS.length]
+      const breath = still ? 0.82 : 0.66 + 0.34 * Math.sin(this.clock * 1.1 + i * 2.1)
+      if (lv > 0.05) {
+        const R = 2.6
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.globalAlpha = Math.min(1, 0.7 * breath * lv)
+        ctx.drawImage(glowSprite(c), u - R + 0.25, v - R + 0.25, R * 2, R * 2)
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.globalAlpha = 1
+      }
+      ctx.fillStyle = lv > 0.5 ? c : mixHex(c, '#6e6358', 0.3)
+      ctx.fillRect(u, v, 0.5, 0.5)
+    }
+    if (loco) this.drawWreath(ctx, x + w * 0.865, y + h * 0.47, lv > 0.5)
+  }
+
+  private drawWreath(ctx: CanvasRenderingContext2D, cx: number, cy: number, night: boolean) {
+    const q = 0.25
+    const dim = (c: string) => (night ? mixHex(c, '#1a1a3a', 0.35) : c)
+    const rows = ['..oooo..', '.oGGGGo.', 'oGLooGGo', 'oGo..oGo', 'oGo..oGo', 'oGGooGLo', '.oGRRGo.', '..oRRo..']
+    const pal: Record<string, string> = {o: '#10261b', G: '#2f8a58', L: '#5cc07e', R: '#e23a33'}
+    rows.forEach((r, j) => {
+      for (let i = 0; i < r.length; i++) {
+        const c = pal[r[i]]
+        if (!c) continue
+        ctx.fillStyle = dim(c)
+        ctx.fillRect(cx + (i - 4) * q, cy + (j - 4) * q, q, q)
+      }
+    })
+  }
+
   // Độ đậm quầng đèn trên người ngồi: thở chậm theo đèn dây, đứng yên khi Yên tĩnh hoặc đang pha phin
   seatGlow(t: number) {
     if (!this.cfg.layers.lights) return 0
