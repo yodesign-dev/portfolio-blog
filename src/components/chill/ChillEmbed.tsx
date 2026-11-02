@@ -15,6 +15,7 @@ import {ChillAudio} from './audio'
 import type {Destination} from './destinations'
 import {useLang} from './i18n'
 import type {ChillScene, TimeOfDay, Weather} from './scene'
+import {activeSeason, type Season} from './season'
 import {STATIONS, stationOf, type StationId, type Track} from './tracks'
 
 const POSTER = '/chill/scenes/room-cafe-thumb.webp'
@@ -60,11 +61,25 @@ function embedHost() {
   }
 }
 
-export function ChillEmbed({tracks, destinations}: {tracks: Track[]; destinations: Destination[]}) {
+export function ChillEmbed({tracks, destinations, seasons = []}: {tracks: Track[]; destinations: Destination[]; seasons?: Season[]}) {
   const t = STRINGS[useLang()]
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<ChillScene | null>(null)
+
+  // Theo lịch mùa nhưng chỉ có đèn và trang trí tĩnh: khung nhúng nằm trong trang của người khác
+  useEffect(() => {
+    const tick = () => {
+      const season = activeSeason(seasons, Date.now())
+      sceneRef.current?.setNoel(season ? {layers: {...season.layers, snow: false, meteors: false, tree: false, shelf: false}, quiet: false, foam: false, shower: false, fast: false} : null)
+    }
+    const first = setTimeout(tick, 1500)
+    const id = setInterval(tick, 60_000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(id)
+    }
+  }, [seasons])
   const audioRef = useRef<ChillAudio | null>(null)
   const [host, setHost] = useState('unknown')
   const startTracked = useRef(false)

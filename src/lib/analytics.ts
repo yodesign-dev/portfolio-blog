@@ -55,6 +55,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Mini'; props: {from: 'button' | 'auto' | 'guide' | 'update'}}
   // Hẹn giờ tắt nhạc: số phút chọn
   | {name: 'Chill Sleep Timer'; props: {minutes: number}}
+  // Mùa (Noel…): view = lần đầu thấy trong lần mở trang · on / quiet / off = khách chọn · tree = treo thêm món
+  | {name: 'Chill Season'; props: {season: string; action: 'view' | 'on' | 'quiet' | 'off' | 'tree'}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

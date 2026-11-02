@@ -10,11 +10,12 @@ import chillWish from './chillWish'
 import chillSupporter from './chillSupporter'
 import chillUpdate from './chillUpdate'
 import chillSettings from './chillSettings'
+import chillSeason from './chillSeason'
 import chillNote from './chillNote'
 import chillLegal from './chillLegal'
 import testimonial from './testimonial'
 
 export const schema: {types: SchemaTypeDefinition[]} = {
   // ⬇️ CẬP NHẬT: thêm timelineYear vào danh sách types
-  types: [post, resume, tool, timelineYear, chillTrack, chillDestination, chillWish, chillSupporter, chillUpdate, chillSettings, chillNote, chillLegal, testimonial],
+  types: [post, resume, tool, timelineYear, chillTrack, chillDestination, chillWish, chillSupporter, chillUpdate, chillSettings, chillSeason, chillNote, chillLegal, testimonial],
 }

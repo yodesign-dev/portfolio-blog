@@ -28,6 +28,7 @@ import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
 import {HIGHLAND, Highland, highlandStreets} from './highland'
+import {Noel, makeCatHat, type NoelConfig} from './noel'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
 import {seatArt, themeById, type CharacterVideo, type Seat, type SheetSpec, type Theme, type ThemeId} from './themes'
@@ -565,6 +566,10 @@ export class ChillScene {
   // Đà Lạt sương mù (công tắc Studio highlandOpen): ảnh mới, sương trôi, khói, kính mờ
   private highlandOn = false
   private highland = new Highland()
+  // Trang trí theo mùa (season.ts), null = quán thường
+  private noel: Noel | null = null
+  private noelHat: HTMLCanvasElement | null = null
+  private noelHatOn = false
   private movers: Mover[] = []
   private rain: Rain
   private notes: Note[] = []
@@ -761,6 +766,30 @@ export class ChillScene {
     this.dirty = true
   }
 
+  // Mùa Noel: null = tắt, hết mùa là sạch vì mọi thứ chỉ vẽ đè
+  setNoel(cfg: NoelConfig | null) {
+    if (!cfg) this.noel = null
+    else if (this.noel) this.noel.configure(cfg)
+    else this.noel = new Noel(cfg)
+    const hat = !!cfg?.layers.catHat
+    if (hat !== this.noelHatOn) {
+      this.noelHatOn = hat
+      this.dirty = true
+    }
+  }
+
+  setNoelBrewing(on: boolean) {
+    this.noel?.setBrewing(on)
+  }
+
+  setNoelTree(count: number, animate = false) {
+    this.noel?.setTree(count, animate)
+  }
+
+  celebrateNoel() {
+    this.noel?.celebrate()
+  }
+
   private image(src: string) {
     let img = this.images.get(src)
     if (!img) {
@@ -857,6 +886,12 @@ export class ChillScene {
     // Mèo: tô sẵn cùng màu với nội thất. Người ngồi tô theo từng khung lúc vẽ
     // (sheet ×2 rất lớn — không giữ thêm 1 bản tô màu cả sheet trong bộ nhớ)
     this.washed(this.catSheet, this.catTinted)
+    if (this.noelHatOn) {
+      const src = makeCatHat()
+      this.wash(src.getContext('2d')!, src.width, src.height)
+      this.noelHat = src
+    } else this.noelHat = null
+    this.cat.setHat(this.noelHat)
     this.charFrameKey = ''
     this.propsKey = ''
 
@@ -1552,6 +1587,19 @@ export class ChillScene {
     }
     this.highland.set(this.highlandOn ? this.destination.id : '', this.time, this.weather)
     this.highland.update(dt, this.windDir)
+    if (this.noel) {
+      const id = this.destination.id
+      this.noel.update(dt, {
+        time: this.time,
+        weather: this.weather,
+        theme: this.theme.id,
+        streetDy: this.theme.streetDy * SCALE * RES,
+        view: {x: this.theme.view.x * SCALE * RES, y: this.theme.view.y * SCALE * RES, w: this.theme.view.w * SCALE * RES, h: this.theme.view.h * SCALE * RES},
+        place: this.highlandOn && HIGHLAND[id] ? `${id}-mist` : id === 'hanoi' ? 'saigon' : id,
+        street: ready(this.street) ? this.street : null,
+        paused: this.paused,
+      })
+    }
   }
 
   // Xe: bám xe phía trước bằng gia tốc (tăng tốc chậm, phanh nhanh hơn) thay vì đổi tốc độ tức thì
@@ -2597,6 +2645,7 @@ export class ChillScene {
       }
     }
 
+    this.noel?.drawStreet(ctx)
     // Đà Lạt: mép kính mờ hơi nước (ban công không có kính)
     if (panes.length) this.highland.drawGlass(ctx, view)
     // Kính cửa: vệt phản chiếu chéo + giọt nước khi mưa (ban công không có kính)
@@ -2615,6 +2664,7 @@ export class ChillScene {
       this.rain.drawGlass(ctx, this.buffer, this.time === 'night')
       ctx.restore()
     }
+    this.noel?.drawGlass(ctx)
     ctx.restore()
 
     const {screen, screenBehind} = this.theme
@@ -2639,10 +2689,12 @@ export class ChillScene {
     } else if (ready(this.poseSheet) && ready(this.interior)) {
       this.drawPose(character)
     }
+    if (ready(this.interior)) this.noel?.drawRoomBack(ctx, (c, w, h) => this.wash(c, w, h))
     if (ready(this.interior)) this.drawTip(ctx, t)
     if (this.toyProp && !this.wand && ready(this.interior)) drawWandProp(ctx, this.theme.toy, t, this.time === 'night')
     this.cat.draw(ctx, this.catTinted)
     this.wand?.draw(ctx, t, this.time === 'night')
+    if (ready(this.interior)) this.noel?.drawRoomFront(ctx)
     if (this.friendLights !== null && this.theme.id === 'cafe') this.drawFriendLights(ctx, t)
     if (this.weather === 'rain') this.rain.drawRoomFlash(ctx, SCENE_W * SCALE, SCENE_H * SCALE)
     ctx.restore()

@@ -14,12 +14,16 @@
 //   label=0                      ẩn tên điểm đến góc trên
 //   mark=0                       ẩn dòng applebin.me/chill góc dưới
 //   busy=0                       cảnh nhỏ ngoài phố đến thưa như trang thường
+//   season=noel                  trang trí Noel. Trang quay không theo lịch: video thường quay
+//                                tháng 12 không bị dính Noel, muốn có phải ghi rõ trên link
+//   tree=0–8                     số món trên cây thông · foam=1 tuyết bọt · fx=fast sao băng dày
 // Khi cảnh đã vẽ xong, thẻ ngoài cùng có data-ready="1" (để biết lúc bắt đầu quay).
 
 import {useEffect, useRef, useState} from 'react'
 import type {Destination} from './destinations'
 import type {ChillScene, TimeOfDay, Weather} from './scene'
 import {SEATS, type Seat, type ThemeId} from './themes'
+import {readSeasonPreview, TREE_MAX} from './season'
 
 const TIMES: TimeOfDay[] = ['morning', 'afternoon', 'night']
 const WEATHERS: Weather[] = ['clear', 'rain', 'mist']
@@ -147,6 +151,12 @@ export function ChillRecord({
       scene.setFacade(facade ? facade === '1' : facadeOn)
       const highland = new URLSearchParams(window.location.search).get('highland')
       scene.setHighland(highland ? highland === '1' : highlandOn)
+      const search = new URLSearchParams(window.location.search)
+      const preview = readSeasonPreview(window.location.search)
+      if (preview.season) {
+        scene.setNoel({layers: preview.season.layers, quiet: false, foam: search.get('foam') === '1', shower: search.get('shower') === '1', fast: preview.fast})
+        scene.setNoelTree(Math.min(TREE_MAX, Math.max(0, Number(search.get('tree')) || 0)))
+      }
       scene.setAtmosphere(setup.time ?? timeOfDay(setup.dest.timeZone), setup.weather, setup.dest)
       fit()
       raf = requestAnimationFrame(loop)

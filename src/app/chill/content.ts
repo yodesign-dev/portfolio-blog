@@ -3,6 +3,7 @@ import {NEW_TRACK_DAYS, STATIONS, TRACKS, type StationId, type Track} from '@/co
 import {sanityFetch} from '@/sanity/lib/fetch'
 import type {ChillUpdate} from '@/components/chill/Changelog'
 import type {NeonSign} from '@/components/chill/facade'
+import {ALL_LAYERS, NOEL_2026, type Season, type SeasonLayers, type SeasonMoment} from '@/components/chill/season'
 
 // Nội dung của /chill và /chill/embed: nhạc, điểm đến, nhật ký thay đổi.
 //
@@ -65,7 +66,16 @@ const CHILL_QUERY = `{
   "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen,
   "facadeOpen": *[_id == "chillSettings"][0].facadeOpen,
   "highlandOpen": *[_id == "chillSettings"][0].highlandOpen,
-  "sleepTimerOpen": *[_id == "chillSettings"][0].sleepTimerOpen
+  "sleepTimerOpen": *[_id == "chillSettings"][0].sleepTimerOpen,
+  "seasonsOpen": *[_id == "chillSettings"][0].seasonsOpen,
+  "seasons": *[_type == "chillSeason" && enabled == true && defined(start) && defined(end) && defined(key.current)] | order(start asc) {
+    "id": key.current,
+    pack,
+    start,
+    end,
+    layers,
+    "moments": moments[defined(kind) && defined(start) && defined(end)]{kind, start, end}
+  }
 }`
 
 type ChillContent = {
@@ -94,6 +104,8 @@ type ChillContent = {
   facadeOpen?: boolean | null
   highlandOpen?: boolean | null
   sleepTimerOpen?: boolean | null
+  seasonsOpen?: boolean | null
+  seasons?: {id: string; pack?: string; start: string; end: string; layers?: Partial<SeasonLayers> | null; moments?: SeasonMoment[] | null}[] | null
   updates: (Omit<ChillUpdate, 'image'> & {image?: {url: string; mimeType?: string; w?: number; h?: number} | null})[]
 }
 
@@ -205,5 +217,12 @@ export async function getChillContent(revalidate: number) {
   const highlandOn = content.highlandOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_HIGHLAND === '1')
   // Hẹn giờ tắt nhạc 15/30/60/90 phút. Máy dev: CHILL_DEV_SLEEP=1
   const sleepTimerOn = content.sleepTimerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SLEEP === '1')
-  return {tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn}
+  // Theme theo mùa: công tắc tổng + lịch trong "Chill · Mùa". Máy dev: CHILL_DEV_SEASON=1 dùng lịch Noel 2026
+  const seasons: Season[] =
+    process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SEASON === '1'
+      ? [NOEL_2026]
+      : content.seasonsOpen === true
+        ? (content.seasons ?? []).filter((s) => s.pack === 'noel').map((s) => ({id: s.id, pack: 'noel', start: s.start, end: s.end, layers: {...ALL_LAYERS, ...s.layers}, moments: s.moments ?? []}))
+        : []
+  return {seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn}
 }

@@ -21,7 +21,7 @@ export const SHELF_MAX = 8
 
 type Sprite = {rows: string[]; palette: Record<string, string>}
 
-export type ItemKind = 'regular' | 'place' | 'rain' | 'mist' | 'night'
+export type ItemKind = 'regular' | 'place' | 'rain' | 'mist' | 'night' | 'season'
 
 export type ShelfItem = Sprite & {
   id: string
@@ -29,6 +29,8 @@ export type ShelfItem = Sprite & {
   // regular: số phin đã xong để có món này · place: id điểm đến (Studio)
   phins?: number
   places?: string[]
+  // season: bộ trang trí của mùa (season.ts), hết mùa không nhận được nữa, món đã có vẫn giữ
+  season?: string
 }
 
 const O = '#2e211b'
@@ -545,7 +547,122 @@ export const ITEMS: ShelfItem[] = [
       '...oooooooooooooo....',
     ],
   },
+  // ---------- Món theo mùa, Noel ----------
+  {
+    id: 'noel-star',
+    kind: 'season',
+    season: 'noel',
+    palette: {o: '#8a5e22', W: '#fff1c9', h: '#fffbe8', s: '#ecd19a', r: '#c8402f'},
+    rows: [
+      '.........o..........',
+      '........oho.........',
+      '........oWo.........',
+      '.......oWWWo........',
+      '.......oWsWo........',
+      'ooooooooWsWoooooooo.',
+      '.ohWWWWWWsWWWWWWso..',
+      '..ohWWWWWsWWWWWso...',
+      '...oWWWWWsWWWWso....',
+      '....oWWWWsWWWso.....',
+      '....oWWWWWWWWso.....',
+      '...oWWWWooWWWWso....',
+      '...oWWoo..ooWWso....',
+      '..oWoo......ooso....',
+      '..oo..........oo....',
+      '.........r..........',
+      '.........r..........',
+      '........rrr.........',
+    ],
+  },
+  {
+    id: 'noel-log',
+    kind: 'season',
+    season: 'noel',
+    palette: {o: '#2e1a10', B: '#6b3d1f', b: '#8a5430', c: '#472611', C: '#a8723f', O: '#d9a96b', W: '#fff6e4', g: '#4f9a6b', r: '#c8352e'},
+    rows: [
+      '........gg.r........',
+      '.......ggWrr........',
+      '......oWWWWo........',
+      '...oooWWWWWWooo.....',
+      '..oBBBBBBBBBBBBoo...',
+      '.oBbBcBbBBcBbBBBCo..',
+      '.oBBbBBBcBBBbBcOCOo.',
+      '.oBcBBbBBBcBBBcOcCo.',
+      '.oBBBcBbBBBbBBcOCOo.',
+      '.oBbBBBBcBBBBBBcOo..',
+      '..ooooooooooooooo...',
+      '.oWWWWWWWWWWWWWWWWo.',
+      '..oooooooooooooooo..',
+    ],
+  },
+  {
+    id: 'noel-gift',
+    kind: 'season',
+    season: 'noel',
+    palette: {o: '#3a2c20', N: '#e8dfc9', n: '#a89f8a', r: '#c8402f', R: '#8f2320'},
+    rows: [
+      '.....rr....rr.......',
+      '....r..r..r..r......',
+      '.....rr.rr.rr.......',
+      '.oooooooRroooooooo..',
+      '.oNnNNnNRrNnNnNNno..',
+      '.oooooooRroooooooo..',
+      '..oNnNnNRrNNnNNno...',
+      '..onNNNnRrNnNNnNo...',
+      '..oNNnNNRrNNNnNNo...',
+      '..RrrrrrRrrrrrrrR...',
+      '..oNnNNnRrNnNNnNo...',
+      '..onNNnNRrNNnNNno...',
+      '..oNNnNNRrNnNNNNo...',
+      '..oooooooooooooo....',
+    ],
+  },
+  {
+    id: 'noel-hat',
+    kind: 'season',
+    season: 'noel',
+    palette: {o: '#2a1512', R: '#c8352e', L: '#e45a4c', D: '#8f2320', C: '#fff6e4', S: '#d8cfbd'},
+    rows: [
+      '......oooo..........',
+      '....ooRRRRoo........',
+      '...oLLRRRRRRoo......',
+      '..oLLRRRRRRRRRoo....',
+      '..oLRRRRRRRRRRDDo...',
+      '.oRRRRRRRRRRRRDDDo..',
+      '.oRRRRRRRRRRRRDooDo.',
+      '.oRRRRRRRRRRRDo.oCCo',
+      'oCCCCCCCCCCCCCCo.oCo',
+      'oCCCCCCCCCCCCCCo.oo.',
+      'oSSSSSSSSSSSSSSo....',
+      '.oooooooooooooo.....',
+    ],
+  },
+  {
+    id: 'noel-cocoa',
+    kind: 'season',
+    season: 'noel',
+    palette: {o: '#2e211b', W: '#f7f3e9', s: '#c4baa5', C: '#5a3418', c: '#7a4a24', M: '#fff6e4', k: '#a8723f', r: '#c8402f', g: '#4f9a6b'},
+    rows: [
+      '.......k............',
+      '......k.............',
+      '.......kk...........',
+      '...ooooMMMoooo......',
+      '..oWMMMMCMMMMWo.....',
+      '..oWcCCCCCCCcWo.....',
+      '..oWWWWWWWWWWWoooo..',
+      '..oWrWWgWWrWWgsoWWo.',
+      '..oWWWWWWWWWWWso.oWo',
+      '..oWgWWrWWgWWrsooWo.',
+      '..oWWWWWWWWWWWsoWo..',
+      '...osWWWWWWWWsooo...',
+      '....ossssssssso.....',
+      '.....oooooooo.......',
+    ],
+  },
 ]
+
+// Món theo mùa: chỉ hiện trong sổ khi đang tới mùa hoặc khách đã có
+export const visibleItems = (s: ShelfState, season: string | null) => ITEMS.filter((i) => i.kind !== 'season' || i.season === season || s.owned.some((o) => o.id === i.id))
 
 export const itemById = (id: string) => ITEMS.find((i) => i.id === id)
 const REGULAR = ITEMS.filter((i) => i.kind === 'regular')
@@ -607,7 +724,7 @@ function save(s: ShelfState) {
   }
 }
 
-export type Moment = {phins: number; place: string | undefined; weather: Weather; time: TimeOfDay}
+export type Moment = {phins: number; place: string | undefined; weather: Weather; time: TimeOfDay; season?: string}
 
 // Món cho phin vừa xong (`phins` = tổng số phin đã xong, tính cả phin này); null = lần này chưa có
 export function pickGift(s: ShelfState, m: Moment): ShelfItem | null {
@@ -615,6 +732,9 @@ export function pickGift(s: ShelfState, m: Moment): ShelfItem | null {
   if (!s.owned.length) return REGULAR[0]
   const have = new Set(s.owned.map((o) => o.id))
   const fresh = (i: ShelfItem) => !have.has(i.id)
+  // Món mùa trước: hết mùa là lỡ
+  const seasonal = m.season ? ITEMS.find((i) => fresh(i) && i.kind === 'season' && i.season === m.season) : null
+  if (seasonal) return seasonal
   const special = ITEMS.find(
     (i) =>
       fresh(i) &&

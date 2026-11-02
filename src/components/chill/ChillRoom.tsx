@@ -25,6 +25,7 @@ import {Shelf} from './ShelfBook'
 import {useChillApp, useInstall} from './install'
 import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mix, type MixChannel, type MixPreset} from './mix'
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
+import {TREE_MAX, activeSeason, loadSeasonPref, loadTree, momentOn, readSeasonPreview, saveSeasonPref, saveTree, type Season, type SeasonPref} from './season'
 import {Focus} from './Focus'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {MiniVideo, canVideoPiP} from './MiniVideo'
@@ -227,6 +228,7 @@ export function ChillRoom({
   facadeOn = false,
   highlandOn = false,
   sleepTimerOn = false,
+  seasons = [],
 }: {
   tracks?: Track[]
   destinations?: Destination[]
@@ -256,6 +258,8 @@ export function ChillRoom({
   // Hẹn giờ tắt nhạc 15/30/60/90 phút (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
   sleepTimerOn?: boolean
+  // Lịch mùa (Noel…) từ Studio, máy khách tự so giờ, xem season.ts
+  seasons?: Season[]
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
@@ -635,6 +639,82 @@ export function ChillRoom({
     const highland = new URLSearchParams(window.location.search).get('highland')
     sceneRef.current?.setHighland(highland ? highland === '1' : highlandOn)
   }, [highlandOn])
+
+  // ---------- Theme theo mùa ----------
+  const [seasonList, setSeasonList] = useState(seasons)
+  const [season, setSeason] = useState<Season | null>(null)
+  const [seasonNow, setSeasonNow] = useState(0)
+  const [seasonPref, setSeasonPref] = useState<SeasonPref>('on')
+  const [treeCount, setTreeCount] = useState(0)
+  const seasonFast = useRef(false)
+
+  // So giờ mỗi phút: đúng giờ là đổi, kể cả tab đang mở. ?season= / ?at= để xem trước
+  useEffect(() => {
+    const preview = readSeasonPreview(window.location.search)
+    seasonFast.current = preview.fast
+    const tick = () => {
+      const now = preview.at ?? Date.now()
+      setSeasonNow(now)
+      setSeason(preview.season !== undefined ? preview.season : activeSeason(seasonList, now))
+    }
+    tick()
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [seasonList])
+
+  // Tab mở nhiều ngày: 30 phút hỏi lại lịch một lần để nút tắt khẩn cấp trong Studio có tác dụng
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.hidden) return
+      fetch('/api/chill-season')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: {seasons?: Season[]} | null) => {
+          if (d?.seasons) setSeasonList(d.seasons)
+        })
+        .catch(() => {})
+    }, 30 * 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const seasonId = season?.id
+  useEffect(() => {
+    if (!seasonId) return
+    /* eslint-disable react-hooks/set-state-in-effect -- lựa chọn của khách chỉ đọc được trên trình duyệt */
+    setSeasonPref(loadSeasonPref(seasonId))
+    setTreeCount(loadTree(seasonId))
+    /* eslint-enable react-hooks/set-state-in-effect */
+    trackEvent({name: 'Chill Season', props: {season: seasonId, action: 'view'}})
+  }, [seasonId])
+
+  const seasonOn = !!season && seasonPref !== 'off'
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    if (!season || seasonPref === 'off') {
+      scene.setNoel(null)
+      return
+    }
+    scene.setNoel({
+      layers: season.layers,
+      quiet: seasonPref === 'quiet',
+      foam: momentOn(season, 'foam', seasonNow),
+      shower: momentOn(season, 'meteors', seasonNow),
+      fast: seasonFast.current,
+    })
+    scene.setNoelTree(treeCount)
+  }, [season, seasonPref, seasonNow, treeCount])
+
+  // Đang pha phin: đèn đứng yên, không sao băng, tuyết thưa (giờ nghỉ hiện "☕")
+  useEffect(() => {
+    sceneRef.current?.setNoelBrewing(focusLabel !== null && !focusLabel.startsWith('☕'))
+  }, [focusLabel, seasonOn])
+
+  const chooseSeasonPref = useCallback((pref: SeasonPref) => {
+    if (!seasonId) return
+    setSeasonPref(pref)
+    saveSeasonPref(seasonId, pref)
+    trackEvent({name: 'Chill Season', props: {season: seasonId, action: pref}})
+  }, [seasonId])
 
   // Màn dọc: vào quán rồi thì phóng to cảnh; bàn nhóm cần thấy đủ 4 ghế nên thu về như cũ
   useEffect(() => {
@@ -1235,15 +1315,26 @@ export function ChillRoom({
     setRegular((r) => addPhin(r, minutes))
     setBookNudge(true)
     void onQuestDone()
+    // Mùa: tuyết rơi 20 giây đúng lúc nghỉ, treo thêm một món lên cây
+    if (seasonOn && seasonId && season) {
+      if (season.layers.snow) sceneRef.current?.celebrateNoel()
+      if (season.layers.tree && treeCount < TREE_MAX) {
+        const n = treeCount + 1
+        sceneRef.current?.setNoelTree(n, true)
+        setTreeCount(n)
+        saveTree(seasonId, n)
+        trackEvent({name: 'Chill Season', props: {season: seasonId, action: 'tree'}})
+      }
+    }
     if (!shelfOn) return
     // Mèo mang ra 1 món cho kệ (nếu tới lượt) — hiện trong bảng tổng kết phin
-    const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time})
+    const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time, season: seasonOn && season?.layers.shelf ? season.pack : undefined})
     if (!item) return
     if (!shelf.owned.length) sayCat(t.shelf.firstGift)
     setShelf(addItem(shelf, item.id, new Date(), {place: destId, weather, time, phin: regular.phins + 1}))
     setGift(item.id)
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
-  }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time, onQuestDone])
+  }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time, onQuestDone, seasonOn, seasonId, season, treeCount])
 
   // Hết giờ nghỉ giữa 2 phin: chuông khác + mèo gọi pha tiếp (không tính gì thêm)
   const onBreakDone = useCallback(() => {
@@ -3634,6 +3725,7 @@ export function ChillRoom({
         <Shelf
           open={shelfOpen}
           onClose={() => setShelfOpen(false)}
+          season={seasonOn && season?.layers.shelf ? season.pack : null}
           phins={regular.phins}
           onBrew={() => {
             setShelfOpen(false)
@@ -3987,6 +4079,12 @@ export function ChillRoom({
                 </Field>
               )}
               <SwitchRow title={t.room.pauseScene} desc={t.room.pauseSceneDesc} on={scenePaused} onToggle={() => setScenePaused((p) => !p)} />
+              {season && (
+                <Field label={t.room.seasonLabel}>
+                  <Segmented options={(['on', 'quiet', 'off'] as const).map((value) => ({value, label: t.room.seasonOptions[value], icon: null}))} value={seasonPref} onChange={chooseSeasonPref} />
+                  <p className="mt-1.5 text-xs text-[#a79e94]">{t.room.seasonDesc}</p>
+                </Field>
+              )}
               {/* Bộ trộn âm nền (mix.ts): bản trộn có sẵn + mỗi tiếng 1 thanh */}
               {/* Cả khối rộng hết bảng (không chia cột nhãn như Field) cho thanh trượt đủ dài */}
               <div>

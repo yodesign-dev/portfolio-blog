@@ -13,6 +13,6 @@ export const metadata: Metadata = {
 }
 
 export default async function ChillEmbedPage() {
-  const {tracks, destinations} = await getChillContent(revalidate)
-  return <ChillEmbed tracks={tracks} destinations={destinations} />
+  const {seasons, tracks, destinations} = await getChillContent(revalidate)
+  return <ChillEmbed seasons={seasons} tracks={tracks} destinations={destinations} />
 }

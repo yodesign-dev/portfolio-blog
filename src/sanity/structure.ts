@@ -151,6 +151,8 @@ export const structure: StructureResolver = (S) =>
             ]),
         ),
       S.documentTypeListItem('chillDestination').title('Điểm đến').icon(EarthGlobeIcon),
+      // Theme theo mùa: đến ngày tự bật, hết ngày tự tắt
+      S.documentTypeListItem('chillSeason').title('Mùa').icon(CalendarIcon),
       // Nhật ký thay đổi: trùng tên nút "Có gì mới" trên trang /chill
       S.documentTypeListItem('chillUpdate').title('Có gì mới').icon(SparklesIcon),
       // /chill/terms và /chill/privacy
@@ -174,6 +176,6 @@ export const structure: StructureResolver = (S) =>
         .child(S.document().title('Resume').schemaType('resume').documentId('resume')),
 
       ...S.documentTypeListItems().filter(
-        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillNote', 'chillLegal', 'testimonial'].includes(listItem.getId() as string),
+        (listItem) => !['post', 'resume', 'tool', 'timelineYear', 'chillTrack', 'chillDestination', 'chillWish', 'chillSupporter', 'chillUpdate', 'chillSettings', 'chillSeason', 'chillNote', 'chillLegal', 'testimonial'].includes(listItem.getId() as string),
       ),
     ])

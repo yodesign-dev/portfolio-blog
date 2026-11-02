@@ -15,17 +15,18 @@
 
 import {useEffect, useRef, useState, type CSSProperties, type ReactNode} from 'react'
 import {useT} from './i18n'
-import {ITEMS, drawItem, itemById, nextRegular, phinsLeft, rarityOf, spriteSize, type GiftContext, type Rarity, type ShelfItem, type ShelfState} from './shelf'
+import {drawItem, itemById, nextRegular, phinsLeft, rarityOf, spriteSize, visibleItems, type GiftContext, type Rarity, type ShelfItem, type ShelfState} from './shelf'
 
 // Màu khung theo độ hiếm
 const RARITY_COLOR: Record<Rarity, string> = {common: '#a8784a', place: '#d0864c', rare: '#f2cf6b'}
 
 // Biểu tượng điều kiện 7×7 vẽ bằng ô vuông (emoji 🌫 không có trên mọi máy)
-const COND_ICONS: Record<'cup' | 'pin' | 'rain' | 'mist' | 'night', {rows: string[]; palette: Record<string, string>}> = {
+const COND_ICONS: Record<'cup' | 'pin' | 'rain' | 'mist' | 'night' | 'season', {rows: string[]; palette: Record<string, string>}> = {
   cup: {rows: ['.......', '.ooooo.', '.oooooo', '.ooooo.o', '.oooooo', '..ooo..', '.......'], palette: {o: '#e6cfae'}},
   pin: {rows: ['..ooo..', '.orrro.', '.orrro.', '..ooo..', '...o...', '...o...', '...o...'], palette: {o: '#e6cfae', r: '#d4553a'}},
   rain: {rows: ['...b...', '..bbb..', '.bbbbb.', '.bbbbb.', '..bbb..', '.......', '.......'], palette: {b: '#8fc4ff'}},
   mist: {rows: ['.......', '.ggggg.', '.......', 'ggggg..', '.......', '..ggggg', '.......'], palette: {g: '#d8d2c6'}},
+  season: {rows: ['...y...', '..yyy..', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', '.......'], palette: {y: '#fff1c9'}},
   night: {rows: ['..yyy..', '.yy....', 'yy.....', 'yy.....', 'yy.....', '.yy....', '..yyy..'], palette: {y: '#f2cf6b'}},
 }
 function CondIcon({item}: {item: ShelfItem}) {
@@ -63,6 +64,7 @@ export function Shelf({
   slots,
   placeName,
   phins,
+  season,
   onBrew,
 }: {
   open: boolean
@@ -77,6 +79,8 @@ export function Shelf({
   placeName: (id: string) => string
   // Tổng số phin đã xong (thẻ khách quen) — cho thanh tiến độ món tiếp theo
   phins: number
+  // Bộ trang trí của mùa đang chạy: món mùa đó hiện trong sổ
+  season: string | null
   // Nút "Pha một phin": đóng kệ, mở đồng hồ phin
   onBrew: () => void
 }) {
@@ -87,6 +91,7 @@ export function Shelf({
   }, [open])
 
   const owned = new Map(state.owned.map((o) => [o.id, o.at]))
+  const items = visibleItems(state, season)
   const next = nextRegular(state)
   // Chưa chọn gì → chọn sẵn món tiếp theo để khách biết mình đang nhắm tới gì
   const pick = selected ? itemById(selected) : next
@@ -145,7 +150,7 @@ export function Shelf({
         <ItemIcon id="porcelain-cup" scale={1} className="mt-1 shrink-0" />
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold tracking-tight text-[#fbf1d2]">{t.shelf.title}</h2>
-          <p className="mt-0.5 text-xs text-[#e6cfae]">{t.shelf.count(owned.size, ITEMS.length)}</p>
+          <p className="mt-0.5 text-xs text-[#e6cfae]">{t.shelf.count(owned.size, items.length)}</p>
         </div>
         <button
           ref={closeRef}
@@ -177,7 +182,8 @@ export function Shelf({
           <CollectorCard
             item={pick}
             have={owned.has(pick.id)}
-            number={ITEMS.indexOf(pick) + 1}
+            number={items.indexOf(pick) + 1}
+            total={items.length}
             label={owned.has(pick.id) ? t.shelf.items[pick.id]?.name : pick.id === next?.id ? t.shelf.next : t.shelf.unknown}
           >
             {owned.has(pick.id) ? (
@@ -227,7 +233,7 @@ export function Shelf({
         <p className="mt-2 text-[11px] leading-snug text-[#e6cfae]/80">{t.shelf.rare}</p>
 
         <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
-          {ITEMS.map((item) => {
+          {items.map((item) => {
             const have = owned.has(item.id)
             const at = shownAt(item.id)
             const hidden = at >= slots
@@ -267,7 +273,7 @@ export function Shelf({
                     />
                   )}
                   <span aria-hidden className="absolute left-1.5 top-1 font-mono text-[9px] text-[#fbf1d2]/40">
-                    {String(ITEMS.indexOf(item) + 1).padStart(2, '0')}
+                    {String(items.indexOf(item) + 1).padStart(2, '0')}
                   </span>
                   {r !== 'common' && <span aria-hidden className="absolute bottom-1.5 right-1.5 h-1.5 w-1.5 rotate-45 bg-[var(--frame)]" />}
                   {unseen.has(item.id) && (
@@ -302,7 +308,7 @@ export function Shelf({
 
 // Thẻ sưu tầm của món đang chọn: số thứ tự, nhãn độ hiếm, món lơ lửng trên đế gỗ (rất hiếm có
 // tia sáng xoay phía sau). Món chưa có thì hiện bóng tối
-function CollectorCard({item, have, number, label, children}: {item: ShelfItem; have: boolean; number: number; label?: string; children: ReactNode}) {
+function CollectorCard({item, have, number, total, label, children}: {item: ShelfItem; have: boolean; number: number; total: number; label?: string; children: ReactNode}) {
   const t = useT()
   const r = rarityOf(item)
   const stage =
@@ -318,7 +324,7 @@ function CollectorCard({item, have, number, label, children}: {item: ShelfItem; 
       aria-live="polite"
     >
       <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-[#8a6a50]">
-        <span>{t.shelf.number(number, ITEMS.length)}</span>
+        <span>{t.shelf.number(number, total)}</span>
         <span className="rounded-full px-2 py-0.5 font-bold text-[#2a1a10]" style={{background: RARITY_COLOR[r]}}>
           {t.shelf.rarity[r]}
         </span>
