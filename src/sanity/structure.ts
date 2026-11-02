@@ -151,10 +151,21 @@ export const structure: StructureResolver = (S) =>
             ]),
         ),
       S.documentTypeListItem('chillDestination').title('Điểm đến').icon(EarthGlobeIcon),
-      // Theme theo mùa: đến ngày tự bật, hết ngày tự tắt
-      S.documentTypeListItem('chillSeason').title('Mùa').icon(CalendarIcon),
-      // Buổi live YouTube: huy hiệu LIVE tự hiện và tự ẩn theo giờ
-      S.documentTypeListItem('chillLive').title('Live').icon(PlayIcon),
+      // Những gì chạy theo lịch, công tắc tổng ở tab Sự kiện của Cài đặt
+      S.listItem()
+        .title('Sự kiện')
+        .id('chillEvents')
+        .icon(CalendarIcon)
+        .child(
+          S.list()
+            .title('Sự kiện')
+            .items([
+              // Theme theo mùa: đến ngày tự bật, hết ngày tự tắt
+              S.documentTypeListItem('chillSeason').title('Mùa').icon(CalendarIcon),
+              // Buổi live YouTube: huy hiệu LIVE tự hiện và tự ẩn theo giờ
+              S.documentTypeListItem('chillLive').title('Live').icon(PlayIcon),
+            ]),
+        ),
       // Nhật ký thay đổi: trùng tên nút "Có gì mới" trên trang /chill
       S.documentTypeListItem('chillUpdate').title('Có gì mới').icon(SparklesIcon),
       // /chill/terms và /chill/privacy

@@ -1,12 +1,15 @@
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import {Badge, Box, Button, Card, Flex, Grid, Stack, Switch, Tab, TabList, TabPanel, Text, TextArea, TextInput} from '@sanity/ui'
-import {set, unset, useEditState, type ObjectInputProps} from 'sanity'
+import {set, unset, useClient, useEditState, type ObjectInputProps} from 'sanity'
+import {IntentLink} from 'sanity/router'
 
-// Form riêng cho "Chill · Cài đặt" (thay form mặc định của Sanity), chia ba tab:
+// Form riêng cho "Chill · Cài đặt" (thay form mặc định của Sanity), chia bốn tab:
 //
-// - Tính năng: công tắc thành hàng gọn chia nhóm — biểu tượng, tên, 1 dòng ngắn + thời gian
-//   có hiệu lực, chấm Bật / Tắt, công tắc. Bấm vào hàng để đọc mô tả đầy đủ. Tuỳ chọn đi kèm
-//   (số người mỗi bàn) nằm dưới hàng, chỉ hiện khi đã bật.
+// - Cấu hình chung: công tắc tính năng thường trực, thành hàng gọn chia nhóm — biểu tượng, tên,
+//   1 dòng ngắn + thời gian có hiệu lực, chấm Bật / Tắt, công tắc. Bấm vào hàng để đọc mô tả đầy
+//   đủ. Tuỳ chọn đi kèm (số người mỗi bàn) nằm dưới hàng, chỉ hiện khi đã bật.
+// - Sự kiện: những gì chạy theo lịch. Công tắc tổng của Mùa và Live, ngay dưới là danh sách các
+//   mùa, buổi live kèm trạng thái theo giờ hiện tại, link sửa, tạo mới, xem trước.
 // - Thử thách chung: công tắc + khối Mùa + bảng lựa chọn bỏ phiếu Việt / Anh.
 // - Mẩu giấy hôm nay: mỗi loại chữ một thẻ, ô nhập bên trái, bản xem trước giống mẩu giấy
 //   trên /chill bên phải. Trạng thái "Tự động theo ngày" / "Câu riêng" + nút về câu tự động.
@@ -67,13 +70,16 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'diaryOpen', icon: '📓', title: 'Bảng nhật ký', short: '2 mẩu giấy mỗi ngày, treo 7 ngày', desc: 'Mỗi khách viết 2 mẩu giấy một ngày, cả quán đọc trong một tuần.', delay: '30 giây'},
       {key: 'slipNewOpen', icon: '🩹', title: 'Mẩu ghi chú kiểu mới', short: 'Mẩu nhỏ dán băng keo, tự xoay vòng', desc: 'Mẩu giấy góc trái trên cảnh gọn lại (dán băng keo, bỏ đinh ghim) và tự xoay qua tối đa 5 mẩu: 3 mẩu khách mới nhất, câu mèo quán, câu hỏi của quán. Rê chuột thì dừng, đang chạy phin thì chỉ còn miếng băng keo. Cần bật Bảng nhật ký. Thử trước bằng ?slip=new.', delay: '30 giây'},
       {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', short: 'Anh / Chị ở màn chào', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', delay: '1 phút'},
+      {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
+      {key: 'sleepTimerOpen', icon: '🌙', title: 'Hẹn giờ tắt nhạc', short: 'Nút trăng: tắt nhạc sau 15/30/60/90 phút', desc: 'Nút trăng cạnh nút Cài đặt dưới thanh nhạc: chọn 15 / 30 / 60 / 90 phút, nút hiện số phút còn lại. 60 giây cuối nhạc và tiếng nền nhỏ dần rồi dừng hẳn, bấm phát là nghe lại. Lần đầu khách vào trạm Night & Sleep, bảng chọn tự mở để gợi ý. Thử trước bằng ?sleep=1.', delay: '1 phút'},
+    ],
+  },
+  {
+    title: 'Cảnh phố',
+    items: [
       {key: 'streetMotionOpen', icon: '🛵', title: 'Phố chuyển động mượt', short: 'Xe nảy, nan bánh quay, người nhún bước', desc: 'Người, chó, xe ngoài phố chuyển động mượt hơn: xe nảy nhẹ theo nhịp riêng và qua mối nối mặt đường, ô tô chúi mũi khi phanh, nan xe đạp / xích lô quay, người nhún theo bước, dừng có hãm, đứng so le trên vỉa hè. Tắt là về như cũ. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'facadeOpen', icon: '🏮', title: 'Mặt phố sống động', short: 'Ảnh phố nét hơn, đèn đêm, neon, bóng mây', desc: 'Cả 9 cảnh dùng ảnh phố 1120 px nét gấp đôi. Cờ, quần áo phơi, đèn lồng đung đưa ở Sài Gòn, Huế, Hà Nội đường tàu, Tiền Giang. Đêm: cửa sổ tự tắt bật lác đác, một nhà xem TV, đèn tuýp nháy khi bật, bảng hiệu neon (đặt ở Điểm đến › Mặt phố). Ngày trời quang: bóng mây trôi qua, chiều có vệt nắng lóe. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'highlandOpen', icon: '🌲', title: 'Đà Lạt sương mù', short: 'Ảnh Đà Lạt mới, sương trôi, khói ống khói, kính mờ', desc: 'Cảnh Đà Lạt dùng bộ ảnh mới: đồi thông nhiều lớp chìm trong sương, biệt thự Pháp có ống khói, màu lạnh và nhạt. Sương trôi chậm ngang phố, khói bay lên từ ống khói (sáng, tối), đêm có quầng sương quanh đèn đường, mép kính quán mờ hơi nước và lâu lâu một giọt chảy xuống. Chỉ ảnh hưởng Đà Lạt. Áp dụng cả trang quay /chill/record. Thử trước bằng ?highland=1.', delay: '1 phút'},
-      {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
-      {key: 'sleepTimerOpen', icon: '🌙', title: 'Hẹn giờ tắt nhạc', short: 'Nút trăng: tắt nhạc sau 15/30/60/90 phút', desc: 'Nút trăng cạnh nút Cài đặt dưới thanh nhạc: chọn 15 / 30 / 60 / 90 phút, nút hiện số phút còn lại. 60 giây cuối nhạc và tiếng nền nhỏ dần rồi dừng hẳn, bấm phát là nghe lại. Lần đầu khách vào trạm Night & Sleep, bảng chọn tự mở để gợi ý. Thử trước bằng ?sleep=1.', delay: '1 phút'},
-      {key: 'seasonsOpen', icon: '🎄', title: 'Theme theo mùa', short: 'Công tắc tổng, ngày bật tắt ở mục Mùa', desc: 'Công tắc tổng cho trang trí theo mùa. Ngày bắt đầu, kết thúc và từng lớp đặt trong mục Chill · Mùa: đến ngày tự bật, hết ngày tự tắt, không cần deploy. Xem trước không cần bật: ?season=noel, thêm &at=2026-12-24T20:00 để giả giờ. Khách tắt riêng được trong Cài đặt › Không khí.', delay: '1 phút'},
-      {key: 'liveOpen', icon: '🔴', title: 'Huy hiệu LIVE', short: 'Báo buổi live YouTube, lịch ở mục Live', desc: 'Công tắc tổng cho huy hiệu trên thanh trên cùng của quán. Giờ và link đặt trong mục Chill · Live: 24 giờ trước hiện "Live hôm nay 20:00", tới giờ hiện "Đang live", hết giờ tự ẩn. Khách bấm thì nhạc quán tạm dừng và YouTube mở ở tab mới. Thử trước bằng ?live=1 hoặc ?live=soon.', delay: '1 phút'},
     ],
   },
   {
@@ -88,6 +94,9 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
 
 const FEATURES = FEATURE_GROUPS.flatMap((g) => g.items)
 
+const SEASON_SWITCH: Feature = {key: 'seasonsOpen', icon: '🎄', title: 'Theme theo mùa', short: 'Công tắc tổng, ngày bật tắt ở mục Mùa', desc: 'Công tắc tổng cho trang trí theo mùa. Ngày bắt đầu, kết thúc và từng lớp đặt trong mục Chill · Mùa: đến ngày tự bật, hết ngày tự tắt, không cần deploy. Xem trước không cần bật: ?season=noel, thêm &at=2026-12-24T20:00 để giả giờ. Khách tắt riêng được trong Cài đặt › Không khí.', delay: '1 phút'}
+const LIVE_SWITCH: Feature = {key: 'liveOpen', icon: '🔴', title: 'Huy hiệu LIVE', short: 'Báo buổi live YouTube, lịch ở mục Live', desc: 'Công tắc tổng cho huy hiệu trên thanh trên cùng của quán. Giờ và link đặt trong mục Chill · Live: 24 giờ trước hiện "Live hôm nay 20:00", tới giờ hiện "Đang live", hết giờ tự ẩn. Khách bấm thì nhạc quán tạm dừng và YouTube mở ở tab mới. Thử trước bằng ?live=1 hoặc ?live=soon.', delay: '1 phút'}
+
 const QUEST: Feature = {key: 'questOpen', icon: '☕', title: 'Cả quán cùng pha phin', short: 'Phin của mọi khách cộng vào một con số chung', desc: 'Phin của mọi khách cộng vào một con số chung. Đủ mục tiêu thì cả quán bỏ phiếu chọn thứ được mở khoá tiếp theo.', delay: '30 giây'}
 
 const QUEST_OPTS = [1, 2, 3, 4] as const
@@ -98,7 +107,8 @@ const DIARY_FIELDS: (keyof Value)[] = ['diaryNoteVi', 'diaryNoteEn', 'diaryQuote
 const DEFAULT_MAX = 8
 
 const TABS = [
-  {id: 'features', title: 'Tính năng'},
+  {id: 'features', title: 'Cấu hình chung'},
+  {id: 'events', title: 'Sự kiện'},
   {id: 'quest', title: 'Thử thách chung'},
   {id: 'diary', title: 'Mẩu giấy hôm nay'},
 ] as const
@@ -141,12 +151,15 @@ export function ChillSettingsInput(props: ObjectInputProps) {
     } catch {}
   }
 
+  const events = useEvents()
+
   const onCount = FEATURES.filter((f) => isOn(value, f.key)).length
   const questOn = isOn(value, 'questOpen')
   const diaryCustom = DIARY_FIELDS.some((f) => value[f])
 
   const tabStatus: Record<TabId, {text: string; tone: 'positive' | 'default' | 'caution'; pending: boolean}> = {
     features: {text: `${onCount} / ${FEATURES.length} đang bật`, tone: onCount ? 'positive' : 'default', pending: anyPending([...FEATURES.map((f) => f.key), 'groupMaxMembers'])},
+    events: eventsTabStatus(events, anyPending(['seasonsOpen', 'liveOpen'])),
     quest: {text: `${value.questTitle || 'Mùa 1'} · ${questOn ? 'bật' : 'tắt'}`, tone: questOn ? 'positive' : 'default', pending: anyPending(QUEST_FIELDS)},
     diary: {text: diaryCustom ? 'Câu riêng' : 'Tự động', tone: diaryCustom ? 'caution' : 'default', pending: anyPending(DIARY_FIELDS)},
   }
@@ -214,6 +227,43 @@ export function ChillSettingsInput(props: ObjectInputProps) {
               </Card>
             </Stack>
           ))}
+        </Stack>
+      </TabPanel>
+
+      {/* ---------- Sự kiện ---------- */}
+      <TabPanel id="chill-panel-events" aria-labelledby="chill-tab-events" hidden={tab !== 'events'}>
+        <Stack gap={5}>
+          <Text size={1} muted style={{lineHeight: 1.5, maxWidth: 560}}>
+            Những gì chạy theo lịch: đến giờ tự bật, hết giờ tự tắt, không cần deploy. Công tắc tổng ở đây phải bật và Publish thì lịch bên dưới mới có tác dụng.
+          </Text>
+          <EventGroup
+            title="Mùa"
+            feature={SEASON_SWITCH}
+            on={isOn(value, 'seasonsOpen')}
+            pending={pending('seasonsOpen')}
+            readOnly={readOnly}
+            onToggle={() => put('seasonsOpen', !isOn(value, 'seasonsOpen'))}
+            type="chillSeason"
+            items={events?.seasons}
+            now={events?.now ?? 0}
+            newLabel="Thêm mùa"
+            empty="Chưa có mùa nào."
+            preview={(e) => (e.pack ? `/chill?season=${e.pack}` : '/chill')}
+          />
+          <EventGroup
+            title="Live YouTube"
+            feature={LIVE_SWITCH}
+            on={isOn(value, 'liveOpen')}
+            pending={pending('liveOpen')}
+            readOnly={readOnly}
+            onToggle={() => put('liveOpen', !isOn(value, 'liveOpen'))}
+            type="chillLive"
+            items={events?.lives}
+            now={events?.now ?? 0}
+            newLabel="Thêm buổi live"
+            empty="Chưa có buổi live nào."
+            preview={() => '/chill?live=soon'}
+          />
         </Stack>
       </TabPanel>
 
@@ -357,6 +407,141 @@ export function ChillSettingsInput(props: ObjectInputProps) {
           />
         </Stack>
       </TabPanel>
+    </Stack>
+  )
+}
+
+type EventDoc = {_id: string; title?: string; enabled?: boolean; start?: string; end?: string; pack?: string}
+// now: giờ lúc đọc danh sách, để trạng thái không đổi giữa các lần vẽ
+type Events = {seasons: EventDoc[]; lives: EventDoc[]; now: number}
+
+const EVENTS_QUERY = `{
+  "seasons": *[_type == "chillSeason" && !(_id in path("drafts.**"))] | order(start desc){_id, title, enabled, start, end, pack},
+  "lives": *[_type == "chillLive" && !(_id in path("drafts.**"))] | order(start desc)[0...8]{_id, title, enabled, start, end}
+}`
+
+// Danh sách mùa, buổi live đã Publish; sửa ở trang khác rồi quay lại vẫn đúng
+function useEvents() {
+  const client = useClient({apiVersion: '2024-01-01'})
+  const [events, setEvents] = useState<Events | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      client.fetch<Omit<Events, 'now'>>(EVENTS_QUERY).then((r) => {
+        if (alive) setEvents({...r, now: Date.now()})
+      }, () => {})
+    }
+    load()
+    const sub = client.listen('*[_type in ["chillSeason", "chillLive"]]', {}, {visibility: 'query'}).subscribe(load)
+    return () => {
+      alive = false
+      sub.unsubscribe()
+    }
+  }, [client])
+  return events
+}
+
+type EventState = 'off' | 'running' | 'next' | 'past' | 'unset'
+
+function eventState(e: EventDoc, now: number): EventState {
+  if (!e.start || !e.end) return 'unset'
+  if (e.enabled === false) return 'off'
+  if (now < Date.parse(e.start)) return 'next'
+  return now < Date.parse(e.end) ? 'running' : 'past'
+}
+
+const STATE_BADGE: Record<EventState, {text: string; tone: 'positive' | 'primary' | 'default' | 'caution'}> = {
+  running: {text: 'Đang chạy', tone: 'positive'},
+  next: {text: 'Sắp tới', tone: 'primary'},
+  past: {text: 'Đã qua', tone: 'default'},
+  off: {text: 'Đã tắt', tone: 'caution'},
+  unset: {text: 'Thiếu ngày', tone: 'caution'},
+}
+
+function eventsTabStatus(events: Events | null, pendingAny: boolean): {text: string; tone: 'positive' | 'default' | 'caution'; pending: boolean} {
+  const all = events ? [...events.seasons, ...events.lives] : []
+  const now = events?.now ?? 0
+  const running = all.filter((e) => eventState(e, now) === 'running').length
+  const next = all.filter((e) => eventState(e, now) === 'next').length
+  if (running) return {text: `${running} đang chạy`, tone: 'positive', pending: pendingAny}
+  return {text: next ? `${next} sắp tới` : 'Chưa có lịch', tone: 'default', pending: pendingAny}
+}
+
+const dayTime = (iso?: string) => (iso ? new Date(iso).toLocaleString('vi-VN', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '—')
+
+// Một loại sự kiện: công tắc tổng + các mục theo lịch
+function EventGroup({
+  title,
+  feature,
+  on,
+  pending,
+  readOnly,
+  onToggle,
+  type,
+  items,
+  now,
+  newLabel,
+  empty,
+  preview,
+}: {
+  title: string
+  feature: Feature
+  on: boolean
+  pending: boolean
+  readOnly: boolean
+  onToggle: () => void
+  type: 'chillSeason' | 'chillLive'
+  items: EventDoc[] | undefined
+  now: number
+  newLabel: string
+  empty: string
+  preview: (e: EventDoc) => string
+}) {
+  return (
+    <Stack gap={3}>
+      <GroupLabel>{title}</GroupLabel>
+      <Card radius={3} border overflow="hidden">
+        <FeatureRow f={feature} first on={on} pending={pending} readOnly={readOnly} onToggle={onToggle} />
+        {!on && (items?.length ?? 0) > 0 && (
+          <Card borderTop padding={3} paddingX={4} tone="caution">
+            <Text size={1} style={{lineHeight: 1.5}}>
+              Công tắc tổng đang tắt: khách chưa thấy các mục bên dưới, kể cả khi đến giờ.
+            </Text>
+          </Card>
+        )}
+        {items?.map((e) => {
+          const badge = STATE_BADGE[eventState(e, now)]
+          return (
+            <Card key={e._id} borderTop padding={3} paddingX={4}>
+              <Flex align="center" gap={3} wrap="wrap">
+                <Stack gap={2} flex={1} style={{minWidth: 200}}>
+                  <Text size={1} weight="semibold" textOverflow="ellipsis">
+                    {e.title || 'Chưa đặt tên'}
+                  </Text>
+                  <Text size={1} muted style={{fontVariantNumeric: 'tabular-nums'}}>
+                    {dayTime(e.start)} → {dayTime(e.end)}
+                  </Text>
+                </Stack>
+                <Badge tone={badge.tone} fontSize={0}>
+                  {badge.text}
+                </Badge>
+                <Button as="a" href={preview(e)} target="_blank" rel="noreferrer" mode="bleed" fontSize={1} padding={2} text="Xem trước" />
+                <Button as={IntentLink} {...{intent: 'edit', params: {id: e._id, type}}} mode="ghost" fontSize={1} padding={2} text="Sửa" />
+              </Flex>
+            </Card>
+          )
+        })}
+        {items && items.length === 0 && (
+          <Card borderTop padding={3} paddingX={4}>
+            <Text size={1} muted>
+              {empty}
+            </Text>
+          </Card>
+        )}
+        <Card borderTop padding={3} paddingX={4}>
+          <Button as={IntentLink} {...{intent: 'create', params: {type}}} mode="ghost" fontSize={1} padding={2} text={newLabel} />
+        </Card>
+      </Card>
     </Stack>
   )
 }

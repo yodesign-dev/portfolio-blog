@@ -23,10 +23,16 @@ export default defineType({
   name: 'chillSeason',
   title: 'Chill · Mùa',
   type: 'document',
+  groups: [
+    {name: 'schedule', title: 'Lịch', default: true},
+    {name: 'layers', title: 'Các lớp'},
+    {name: 'moments', title: 'Khoảnh khắc'},
+  ],
   fields: [
-    defineField({name: 'title', title: 'Tên', type: 'string', initialValue: 'Noel 2026', validation: (rule) => rule.required().max(40)}),
+    defineField({name: 'title', title: 'Tên', type: 'string', group: 'schedule', initialValue: 'Noel 2026', validation: (rule) => rule.required().max(40)}),
     defineField({
       name: 'key',
+      group: 'schedule',
       title: 'Mã mùa',
       type: 'slug',
       description: 'Khách tắt riêng và số món trên cây lưu theo mã này. Mỗi năm một mã mới, vd noel-2027.',
@@ -35,6 +41,7 @@ export default defineType({
     }),
     defineField({
       name: 'pack',
+      group: 'schedule',
       title: 'Bộ trang trí',
       type: 'string',
       description: 'Bộ art có sẵn trong code.',
@@ -42,22 +49,23 @@ export default defineType({
       initialValue: 'noel',
       validation: (rule) => rule.required(),
     }),
-    defineField({name: 'enabled', title: 'Bật mùa này', type: 'boolean', initialValue: false, description: 'Tắt khẩn cấp: bỏ chọn rồi Publish. Khách thấy sau khoảng 1 phút, tab đang mở sau tối đa 30 phút.'}),
-    defineField({name: 'start', title: 'Bắt đầu', type: 'datetime', initialValue: '2026-12-10T17:00:00.000Z', description: 'Mặc định 00:00 ngày 11/12/2026 giờ Việt Nam, trước Noel 2 tuần.', validation: (rule) => rule.required()}),
-    defineField({name: 'end', title: 'Kết thúc', type: 'datetime', initialValue: '2027-01-01T17:00:00.000Z', description: 'Mặc định 00:00 ngày 2/1/2027 giờ Việt Nam, sau Noel 1 tuần.', validation: (rule) => rule.required().custom((end, ctx) => {
+    defineField({name: 'enabled', group: 'schedule', title: 'Bật mùa này', type: 'boolean', initialValue: false, description: 'Tắt khẩn cấp: bỏ chọn rồi Publish. Khách thấy sau khoảng 1 phút, tab đang mở sau tối đa 30 phút.'}),
+    defineField({name: 'start', group: 'schedule', title: 'Bắt đầu', type: 'datetime', initialValue: '2026-12-10T17:00:00.000Z', description: 'Mặc định 00:00 ngày 11/12/2026 giờ Việt Nam, trước Noel 2 tuần.', validation: (rule) => rule.required()}),
+    defineField({name: 'end', group: 'schedule', title: 'Kết thúc', type: 'datetime', initialValue: '2027-01-01T17:00:00.000Z', description: 'Mặc định 00:00 ngày 2/1/2027 giờ Việt Nam, sau Noel 1 tuần.', validation: (rule) => rule.required().custom((end, ctx) => {
       const start = (ctx.document as {start?: string} | undefined)?.start
       return !start || !end || Date.parse(end as string) > Date.parse(start) ? true : 'Kết thúc phải sau Bắt đầu'
     })}),
     defineField({
       name: 'layers',
+      group: 'layers',
       title: 'Các lớp',
       description: 'Bỏ chọn để tắt riêng một lớp.',
       type: 'object',
-      options: {collapsible: true, collapsed: true},
       fields: LAYERS.map((l) => defineField({...l, type: 'boolean', initialValue: true})),
     }),
     defineField({
       name: 'moments',
+      group: 'moments',
       title: 'Khoảnh khắc',
       type: 'array',
       initialValue: [
