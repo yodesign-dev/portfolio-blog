@@ -30,13 +30,25 @@ export type Destination = {
   // "railway" = phố đường tàu: ray thay cho 2 làn xe, không xe cộ, chỉ người đi bộ +
   // đoàn tàu chạy qua vài phút một lần (TRAIN trong scene.ts)
   scenery?: 'street' | 'countryside' | 'railway'
+  // Điểm đến theo lịch (Xóm đạo mùa Noel): chỉ có trong khoảng này, máy khách tự so giờ
+  showFrom?: string
+  showUntil?: string
+  // Nhãn trên thẻ chọn điểm đến
+  badge?: 'noel'
 }
+
+// Điểm đến thường luôn mở. now = 0 (chưa biết giờ, lúc render trên server) thì cảnh theo lịch chưa hiện
+export const destOpen = (d: Destination, now: number) =>
+  (!d.showFrom || (now > 0 && Date.parse(d.showFrom) <= now)) && (!d.showUntil || (now > 0 && now < Date.parse(d.showUntil)))
 
 const local = (id: string): Record<TimeOfDay, string> => ({
   morning: `/chill/scenes/${id}-morning.webp`,
   afternoon: `/chill/scenes/${id}-afternoon.webp`,
   night: `/chill/scenes/${id}-night.webp`,
 })
+
+// Các điểm đến đang mở lúc này, cho trang và API không có danh sách theo giờ phía máy khách
+export const openDestinations = (list: Destination[]) => list.filter((d) => destOpen(d, Date.now()))
 
 export const DESTINATIONS: Destination[] = [
   {id: 'hanoi', name: 'Hà Nội', region: 'Việt Nam', timeZone: 'Asia/Ho_Chi_Minh', streets: local('hanoi')},

@@ -35,6 +35,9 @@ const CHILL_QUERY = `{
     tilt,
     laneShift,
     scenery,
+    showFrom,
+    showUntil,
+    badge,
     "morning": morning.asset->url,
     "afternoon": afternoon.asset->url,
     "night": night.asset->url,
@@ -100,6 +103,9 @@ type ChillContent = {
     afternoon: string
     night: string
     minWidth?: number | null
+    showFrom?: string | null
+    showUntil?: string | null
+    badge?: string | null
     signs?: NeonSign[] | null
   }[]
   shelfOpen?: boolean | null
@@ -185,6 +191,9 @@ export async function getChillContent(revalidate: number) {
     streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
     streetsHd: LOCAL_HD.has(d.id) ? localHd(d.id) : (d.minWidth ?? 0) >= 1120 ? {morning: sceneHdUrl(d.morning), afternoon: sceneHdUrl(d.afternoon), night: sceneHdUrl(d.night)} : undefined,
     signs: d.signs?.length ? d.signs : undefined,
+    showFrom: d.showFrom ?? undefined,
+    showUntil: d.showUntil ?? undefined,
+    badge: d.badge === 'noel' ? 'noel' : undefined,
   }))
   const destinations: Destination[] = [...(fromStudioDest.length ? fromStudioDest : DESTINATIONS)]
   // Chỉ máy dev: thêm cảnh đồng miền Tây (ảnh local, đang làm) để thử trước khi đưa lên Studio

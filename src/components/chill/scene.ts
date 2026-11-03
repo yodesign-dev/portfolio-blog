@@ -1209,7 +1209,8 @@ export class ChillScene {
       const [g0, g1] = LEAF.gust
       this.nextGust = g0 + this.rng() * (g1 - g0)
       if (this.rng() < 0.15) this.windDir = this.windDir > 0 ? -1 : 1
-      if (this.weather !== 'rain') {
+      // Xóm đạo không có cây bên đường, lá bay thành vật lạ giữa nhà cửa
+      if (this.weather !== 'rain' && !this.destination.badge) {
         const palette = LEAF_COLORS[this.destination.id] ?? LEAF_COLORS.default
         const [c0, c1] = LEAF.count
         let n = c0 + Math.floor(this.rng() * (c1 - c0 + 1))
@@ -1678,7 +1679,7 @@ export class ChillScene {
     if (this.facadeOn && ready(this.street)) {
       const d = this.destination
       const panorama = this.highlandOn && !!HIGHLAND[d.id]
-      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [], !panorama)
+      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [], !panorama, !d.badge)
       this.facade.update(dt)
     }
     this.highland.set(this.highlandOn ? this.destination.id : '', this.time, this.weather)

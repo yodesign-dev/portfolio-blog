@@ -1,3 +1,4 @@
+import {openDestinations} from '@/components/chill/destinations'
 import type {Metadata} from 'next'
 import {ChillEmbed} from '@/components/chill/ChillEmbed'
 import {getChillContent} from '../content'
@@ -14,5 +15,5 @@ export const metadata: Metadata = {
 
 export default async function ChillEmbedPage() {
   const {seasons, tracks, destinations} = await getChillContent(revalidate)
-  return <ChillEmbed seasons={seasons} tracks={tracks} destinations={destinations} />
+  return <ChillEmbed seasons={seasons} tracks={tracks} destinations={openDestinations(destinations)} />
 }

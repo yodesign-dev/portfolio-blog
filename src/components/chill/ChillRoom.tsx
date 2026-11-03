@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
-import {DESTINATIONS, type Destination} from './destinations'
+import {DESTINATIONS, destOpen, type Destination} from './destinations'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
@@ -218,7 +218,7 @@ function readPrefs(): Partial<Prefs> {
 // Mặc định dùng bộ có sẵn trong code; page.tsx truyền thêm nội dung từ Sanity
 export function ChillRoom({
   tracks = TRACKS,
-  destinations = DESTINATIONS,
+  destinations: allDestinations = DESTINATIONS,
   updates = [],
   shelfOn = false,
   playCountsOn = false,
@@ -268,6 +268,21 @@ export function ChillRoom({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const initialSeasons = useRef(seasons)
+  // Điểm đến theo lịch (Xóm đạo): máy khách so giờ mỗi phút, ?at= để xem trước. Danh sách chỉ đổi
+  // khi có cảnh mở hoặc đóng, nên các effect theo danh sách không chạy lại mỗi phút
+  const [placeClock, setPlaceClock] = useState(0)
+  useEffect(() => {
+    const at = readSeasonPreview(window.location.search).at
+    const tick = () => setPlaceClock(at ?? Date.now())
+    tick()
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const openPlaces = allDestinations.filter((d) => destOpen(d, placeClock)).map((d) => d.id).join()
+  const destinations = useMemo(() => {
+    const open = openPlaces.split(',')
+    return allDestinations.filter((d) => open.includes(d.id))
+  }, [allDestinations, openPlaces])
   // Khung chứa cảnh. Màn dọc: khung nằm giữa thanh trên và thanh nhạc; cảnh phóng to cho
   // cao bằng khung (cắt 2 bên) và kéo ngang được. zoom = đã phóng to · pan = 0 (mép trái)
   // … 1 (mép phải, chỗ người ngồi) · panMax = quãng kéo tối đa mỗi bên (px)
@@ -325,6 +340,8 @@ export function ChillRoom({
   const [scenePaused, setScenePaused] = useState(false)
   const [clock, setClock] = useState('')
   const [destIndex, setDestIndex] = useState(0)
+  const savedPlace = useRef<string | null>(null)
+  const placeNow = useRef<string | null>(null)
   const [travel, setTravel] = useState(5)
   const [theme, setTheme] = useState<ThemeId>('cafe')
   // Người ngồi khách chọn; Studio tắt thì cảnh luôn là nam (lựa chọn cũ vẫn giữ trong prefs)
@@ -419,7 +436,7 @@ export function ChillRoom({
   const playingStation = stationOf(track)
   const playingList = tracks.filter((tr) => stationOf(tr) === playingStation)
   const playingPos = playingList.indexOf(track)
-  const dest = destinations[destIndex]
+  const dest = destinations[destIndex] ?? destinations[0]
   const nextDest = destinations[(destIndex + 1) % destinations.length]
 
   // Khôi phục lựa chọn lần trước (chạy sau hydrate để HTML server/client khớp nhau)
@@ -455,8 +472,7 @@ export function ChillRoom({
         setDuration(tracks[first].duration)
       }
     }
-    const savedDest = destinations.findIndex((d) => d.id === prefs.destination)
-    if (savedDest >= 0) setDestIndex(savedDest)
+    savedPlace.current = prefs.destination ?? null
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
     if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
     if (SEATS.includes(prefs.seat!)) setSeat(prefs.seat!)
@@ -495,7 +511,21 @@ export function ChillRoom({
       }
       trackEvent({name: 'Chill Visit', props: {visitor, ref: visitRef()}})
     }
-  }, [tracks, destinations])
+  }, [tracks, allDestinations])
+
+  // Danh sách đổi khi cảnh theo lịch mở / đóng: giữ khách ở đúng cảnh đang ngồi; cảnh vừa đóng thì
+  // về cảnh đầu. Lựa chọn đã lưu cũng đi qua đây, vì lúc đầu trang chưa biết giờ
+  useEffect(() => {
+    const want = savedPlace.current ?? placeNow.current
+    if (placeClock > 0) savedPlace.current = null
+    if (!want) return
+    const i = destinations.findIndex((d) => d.id === want)
+    if (i >= 0) setDestIndex(i)
+    else if (placeClock > 0) setDestIndex(0)
+  }, [destinations, placeClock, loaded])
+  useEffect(() => {
+    placeNow.current = dest?.id ?? null
+  }, [dest?.id])
 
   useEffect(() => {
     if (!loaded) return
@@ -3750,7 +3780,7 @@ export function ChillRoom({
           }}
           onToggle={(id) => setShelf((s) => toggleShown(s, id))}
           slots={themeById(theme).shelf.length}
-          placeName={(id) => destinations.find((d) => d.id === id)?.name ?? ''}
+          placeName={(id) => allDestinations.find((d) => d.id === id)?.name ?? ''}
         />
       )}
 
@@ -3992,6 +4022,14 @@ export function ChillRoom({
                           loading="lazy"
                           className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
                         />
+                        {d.badge === 'noel' && (
+                          <span className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded bg-[#be2c28] px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#fff4dc]">
+                            <svg aria-hidden viewBox="0 0 10 10" className="h-2 w-2 fill-current">
+                              <path d="M5 0l1.4 3.3L10 3.6 7.3 6l.8 3.6L5 7.7 1.9 9.6 2.7 6 0 3.6l3.6-.3z" />
+                            </svg>
+                            {t.room.noelTag}
+                          </span>
+                        )}
                         {active && (
                           <span className="absolute right-1.5 top-1.5 rounded bg-[#e8b27d] px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#2a1a10]">
                             {t.room.now}

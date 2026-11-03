@@ -71,6 +71,26 @@ export default defineType({
       description: 'Tạm gỡ điểm đến khỏi danh sách mà không cần xoá.',
     }),
     defineField({
+      name: 'showFrom',
+      title: 'Chỉ hiện từ',
+      type: 'datetime',
+      group: 'content',
+      description: 'Điểm đến theo mùa: để trống là luôn hiện. Máy khách tự so giờ, không cần deploy.',
+    }),
+    defineField({
+      name: 'showUntil',
+      title: 'Chỉ hiện đến',
+      type: 'datetime',
+      group: 'content',
+    }),
+    defineField({
+      name: 'badge',
+      title: 'Nhãn trên thẻ',
+      type: 'string',
+      group: 'content',
+      options: {list: [{title: 'Noel', value: 'noel'}], layout: 'radio'},
+    }),
+    defineField({
       name: 'scenery',
       title: 'Kiểu cảnh',
       type: 'string',

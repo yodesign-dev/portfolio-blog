@@ -175,7 +175,7 @@ export class Facade {
   // Gọi khi đổi ảnh phố / giờ / thời tiết / điểm đến
   // sweep = false: cảnh toàn cảnh đồi (Đà Lạt sương mù) — không bóng mây / vệt nắng quét,
   // vì phủ cả thung lũng lẫn quán cùng lúc trông như đèn chiếu chạy ngang
-  set(img: HTMLImageElement, time: TimeOfDay, weather: Weather, signs: NeonSign[], props: PropSpot[] = [], sweep = true) {
+  set(img: HTMLImageElement, time: TimeOfDay, weather: Weather, signs: NeonSign[], props: PropSpot[] = [], sweep = true, windows = true) {
     this.time = time
     this.weather = weather
     this.signs = signs
@@ -189,6 +189,12 @@ export class Facade {
     cors.onload = () => {
       if (this.a !== slot) return
       this.analyze(slot, cors)
+      // Ảnh có đèn vẽ sẵn: sao, hang đá sáng dễ bị nhận nhầm là cửa sổ rồi tự tắt thành mảng đen
+      if (!windows) {
+        slot.blobs = []
+        slot.dark = null
+        slot.tv = null
+      }
     }
     cors.src = img.src
   }

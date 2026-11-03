@@ -11,6 +11,7 @@
 import type {TimeOfDay, Weather} from './scene'
 import type {ThemeId} from './themes'
 import type {SeasonLayers} from './season'
+import {XOM_DAO_BULBS} from './xom-dao-bulbs'
 
 export type NoelConfig = {
   layers: SeasonLayers
@@ -181,11 +182,18 @@ function glowSprite(color: string) {
   return c
 }
 
-type Bulb = {x: number; y: number; c: string; p: number; s: number; tiny?: boolean}
+type Bulb = {x: number; y: number; c: string; p: number; s: number; tiny?: boolean; soft?: boolean}
+
+// Cảnh đèn vẽ sẵn trong ảnh: không treo thêm, chỉ cho đèn có sẵn lấp lánh, và chỉ ban đêm
+const BAKED_LIGHTS: Record<string, [number, number, number][]> = {'xom-dao': XOM_DAO_BULBS}
+const BAKED_COLORS = ['#ffd98a', '#ff5a4c', '#6ee39a', '#7ab8ff']
 
 function bulbsOf(place: string) {
   const r = rng(place.length * 977 + place.charCodeAt(0) * 31 + 7)
   const out: Bulb[] = []
+  for (const [x, y, c] of BAKED_LIGHTS[place] ?? []) {
+    out.push({x: x + IMG_DX, y: y + IMG_DY - 1, c: BAKED_COLORS[c], p: r() * 6.28, s: 0.35 + r() * 0.45, tiny: true, soft: true})
+  }
   ;(WIRES[place] ?? []).forEach((w, k) => {
     for (let x = w[0][0] + (k ? 13 : 0); x <= w[w.length - 1][0]; x += 26) {
       out.push({x: x + IMG_DX, y: Math.round(lerp(w, x)) + IMG_DY + 2, c: COLORS[Math.floor(r() * COLORS.length)], p: r() * 6.28, s: 0.35 + r() * 0.35})
@@ -624,7 +632,8 @@ export class Noel {
     if (lv > 0.05) {
       const R = (b.tiny ? 11 : 20) * (0.92 + 0.08 * breath)
       ctx.globalCompositeOperation = 'lighter'
-      ctx.globalAlpha = Math.min(1, 0.62 * breath * lv)
+      // Đèn vẽ sẵn trong ảnh đã có quầng, thêm nhiều sẽ loá cả cảnh
+      ctx.globalAlpha = Math.min(1, (b.soft ? 0.14 : 0.62) * breath * lv)
       ctx.drawImage(glowSprite(b.c), b.x - R + 1, b.y + 2 - R, R * 2, R * 2)
       ctx.globalCompositeOperation = 'source-over'
       ctx.globalAlpha = 1
@@ -664,7 +673,7 @@ export class Noel {
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     this.drawMeteor(ctx, f)
-    if (this.cfg.layers.lights) {
+    if (this.cfg.layers.lights && (!BAKED_LIGHTS[f.place] || f.time === 'night')) {
       let list = this.bulbs.get(f.place)
       if (!list) {
         list = bulbsOf(f.place)

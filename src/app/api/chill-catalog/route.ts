@@ -1,3 +1,4 @@
+import {openDestinations} from "@/components/chill/destinations";
 import {NextResponse} from "next/server";
 import {getChillContent} from "@/app/chill/content";
 import {STATIONS, stationOf} from "@/components/chill/tracks";
@@ -20,7 +21,7 @@ export async function GET() {
       // Chỉ trạm đang có bài — trạm mới (vd Night & Sleep) hiện trong extension khi bỏ ẩn bài trong Studio
       stations: STATIONS.filter((st) => tracks.some((t) => stationOf(t) === st.id)),
       tracks,
-      destinations: destinations.map(({id, name, region, timeZone, streets}) => ({id, name, region, timeZone, streets})),
+      destinations: openDestinations(destinations).map(({id, name, region, timeZone, streets}) => ({id, name, region, timeZone, streets})),
     },
     {
       headers: {
