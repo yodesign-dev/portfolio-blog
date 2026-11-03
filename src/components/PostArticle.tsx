@@ -27,6 +27,9 @@ const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
   role,
   company,
   year,
+  caseProblem,
+  caseDecision,
+  caseRoleSummary,
   impact[]{_key, value, label},
   "more": *[
     _type == "post" &&
@@ -53,6 +56,9 @@ export type Post = {
   role?: string
   company?: string
   year?: string
+  caseProblem?: string
+  caseDecision?: string
+  caseRoleSummary?: string
   impact?: ImpactMetric[]
   more?: {
     _id: string
@@ -265,11 +271,26 @@ function CaseStudyMeta({post}: {post: Post}) {
     {label: 'Year', value: post.year},
   ].filter((fact) => fact.value)
   const impact = post.impact ?? []
+  const glance = [
+    {label: 'Problem', value: post.caseProblem},
+    {label: 'Decision', value: post.caseDecision},
+    {label: 'My role', value: post.caseRoleSummary},
+  ].filter((item) => item.value)
 
-  if (facts.length === 0 && impact.length === 0) return null
+  if (facts.length === 0 && impact.length === 0 && glance.length === 0) return null
 
   return (
     <div className="mt-8 border-y border-neutral-200 py-6">
+      {glance.length > 0 && (
+        <dl className="mb-6 grid grid-cols-1 gap-5 rounded-xl bg-brand/5 p-5 sm:grid-cols-3 sm:p-6">
+          {glance.map((item) => (
+            <div key={item.label}>
+              <dt className="text-xs font-semibold uppercase tracking-widest text-brand">{item.label}</dt>
+              <dd className="mt-1.5 text-[15px] font-medium leading-snug text-neutral-900">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       {facts.length > 0 && (
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
           {facts.map((fact) => (

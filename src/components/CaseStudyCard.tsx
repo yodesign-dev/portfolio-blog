@@ -89,3 +89,48 @@ export function CaseStudyCard({study, priority = false}: {study: CaseStudy; prio
     </Link>
   )
 }
+
+// Hàng ngang ở mục Selected work trang chủ: case study là bằng chứng chính nên lớn hơn
+// thẻ Behance. Điện thoại: ảnh trên, chữ dưới.
+export function CaseStudyRow({study, priority = false}: {study: CaseStudy; priority?: boolean}) {
+  const imageUrl = study.mainImage
+    ? urlFor(study.mainImage)?.width(1200).height(750).fit('crop').url()
+    : null
+  const meta = [study.company, study.year].filter(Boolean).join(' · ')
+
+  return (
+    <Link
+      href={`/work/${study.slug.current}`}
+      className="group grid grid-cols-1 items-center gap-5 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10"
+    >
+      <div className="overflow-hidden rounded-xl bg-neutral-100 transition duration-300 ease-out group-hover:-translate-y-0.5 motion-reduce:transform-none">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={study.mainImage?.alt || study.title}
+            width={1200}
+            height={750}
+            sizes="(min-width: 1152px) 640px, (min-width: 768px) 58vw, 100vw"
+            priority={priority}
+            className="aspect-[16/10] w-full object-cover"
+          />
+        ) : (
+          <div className="aspect-[16/10] w-full" />
+        )}
+      </div>
+      <div>
+        {meta && <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{meta}</p>}
+        <h3 className="mt-2 text-2xl font-semibold leading-snug tracking-tight text-neutral-900 transition-colors group-hover:text-brand sm:text-3xl">
+          {study.title}
+        </h3>
+        {study.excerpt && <p className="mt-3 text-base leading-relaxed text-neutral-600">{study.excerpt}</p>}
+        <p className="mt-5 text-sm font-semibold text-brand">
+          Read case study{' '}
+          <span aria-hidden="true" className="inline-block transition-transform group-hover:translate-x-1">
+            →
+          </span>
+        </p>
+      </div>
+    </Link>
+  )
+}

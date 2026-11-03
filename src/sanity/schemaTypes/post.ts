@@ -275,6 +275,31 @@ export default defineType({
       description: 'VD: 2025 hoặc 2024 – 2025',
       hidden: ({document}) => !document?.isCaseStudy,
     }),
+    // Khối tóm tắt đầu trang case study, cho người chỉ đọc lướt
+    defineField({
+      name: 'caseProblem',
+      title: 'Tóm tắt: Problem',
+      type: 'string',
+      group: 'caseStudy',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(120),
+    }),
+    defineField({
+      name: 'caseDecision',
+      title: 'Tóm tắt: Decision',
+      type: 'string',
+      group: 'caseStudy',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(120),
+    }),
+    defineField({
+      name: 'caseRoleSummary',
+      title: 'Tóm tắt: My role',
+      type: 'string',
+      group: 'caseStudy',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(120),
+    }),
     defineField({
       name: 'impact',
       title: 'Kết quả (Impact)',

@@ -126,7 +126,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
 
           <div className="flex flex-col items-center gap-8 md:items-start">
             <p className="max-w-xl text-center text-lg leading-relaxed text-white/85 md:text-left md:text-xl">
-              I design end-to-end products and build AI into every step — research synthesis, wireframes, and high-fidelity prototypes.
+              10+ years designing products in recruitment, marketplaces, e-commerce and delivery. Now using AI from research to shipped product.
             </p>
 
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">

@@ -1,59 +1,24 @@
 'use client'
 
-import {useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import Link from 'next/link'
+import {getCalApi} from '@calcom/embed-react'
 import {useContactModal} from '@/components/originkit/ui/hero-31/contact-modal-context'
-import {CONTACT_EMAIL, NAV_LINKS, SIDE_PROJECT_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
+import {CONTACT_EMAIL, LINKEDIN_URL, NAV_LINKS, SIDE_PROJECT_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
 import {trackEvent} from '@/lib/analytics'
 
 export function SiteFooter({showResume}: {showResume: boolean}) {
   const {openModal} = useContactModal()
   const navLinks = NAV_LINKS.filter((link) => showResume || link.href !== '/resume')
   const socialLinks = SOCIAL_LINKS.filter((link) => link.href)
-  const [copied, setCopied] = useState(false)
-
-  const copyEmail = async () => {
-    try {
-      await navigator.clipboard.writeText(CONTACT_EMAIL)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Trình duyệt chặn clipboard: địa chỉ vẫn hiện để chọn tay
-    }
-  }
 
   return (
     <footer className="mt-auto bg-ink text-white antialiased">
+      <ContactBlock showResume={showResume} onMessage={() => openModal(undefined, 'footer')} />
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 sm:grid-cols-3 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div className="sm:col-span-3 md:col-span-1">
           <p className="text-xl font-bold tracking-tight">{SITE_NAME}</p>
           <p className="mt-1 text-sm text-white/60">{SITE_ROLE}</p>
-          <p className="mt-6 max-w-sm text-base leading-relaxed text-white/80">
-            Have a project, a role, or a question? I&apos;d love to hear about it.
-          </p>
-          <button
-            type="button"
-            onClick={() => openModal(undefined, 'footer')}
-            className="mt-6 flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-sm font-bold text-ink transition hover:bg-accent-hover"
-          >
-            Get in touch
-          </button>
-          {/* Email hiện chữ + nút chép: link mailto không mở được với người dùng webmail */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-3">
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="inline-flex min-h-11 items-center text-sm text-white/80 underline decoration-white/30 underline-offset-4 [overflow-wrap:anywhere] transition hover:text-white"
-            >
-              {CONTACT_EMAIL}
-            </a>
-            <button
-              type="button"
-              onClick={copyEmail}
-              className="min-h-11 min-w-11 cursor-pointer text-sm font-semibold text-accent transition hover:text-accent-hover"
-            >
-              <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
         </div>
 
         <nav aria-label="Footer">
@@ -125,5 +90,97 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
         </div>
       </div>
     </footer>
+  )
+}
+
+// Khối liên hệ cuối mọi trang: đủ các cách trong một chỗ. Cal.com chỉ tải khi khối sắp
+// vào màn hình. Email hiện chữ + nút chép vì link mailto không mở được với người dùng webmail.
+function ContactBlock({showResume, onMessage}: {showResume: boolean; onMessage: () => void}) {
+  const blockRef = useRef<HTMLElement>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        observer.disconnect()
+        void getCalApi().then((cal) =>
+          cal('ui', {theme: 'light', styles: {branding: {brandColor: '#00ddff'}}, hideEventTypeDetails: false, layout: 'month_view'}),
+        )
+      },
+      {rootMargin: '300px'},
+    )
+    observer.observe(blockRef.current!)
+    return () => observer.disconnect()
+  }, [])
+
+  const copyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(CONTACT_EMAIL)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Trình duyệt chặn clipboard: địa chỉ vẫn hiện để chọn tay
+    }
+  }
+
+  const rowClass = 'flex min-h-14 items-center justify-between gap-4 border-b border-white/15 last:border-b-0'
+  return (
+    <section ref={blockRef} aria-labelledby="contact-title" className="border-b border-white/10">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-16 sm:px-8 md:grid-cols-2 md:gap-16 md:py-20">
+        <div>
+          <h2 id="contact-title" className="text-balance text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+            Have a project or a role in mind?
+          </h2>
+          <p className="mt-3 text-white/70">A short call is often the fastest way to start.</p>
+          <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <button
+              type="button"
+              data-cal-link="yoshark-bin/30min"
+              data-cal-config='{"layout":"month_view"}'
+              onClick={() => trackEvent({name: 'Book Call Click'})}
+              className="flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-sm font-bold text-ink transition hover:bg-accent-hover"
+            >
+              Book a 30-min call
+            </button>
+            <button
+              type="button"
+              onClick={onMessage}
+              className="min-h-11 cursor-pointer text-sm font-semibold text-white/80 underline decoration-white/30 underline-offset-4 transition hover:text-white"
+            >
+              Or send a message
+            </button>
+          </div>
+        </div>
+        <ul>
+          <li className={rowClass}>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="min-w-0 py-3 [overflow-wrap:anywhere] transition hover:text-accent">
+              {CONTACT_EMAIL}
+            </a>
+            <button type="button" onClick={copyEmail} className="min-h-11 min-w-11 shrink-0 cursor-pointer text-sm font-semibold text-accent transition hover:text-accent-hover">
+              <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+          </li>
+          <li className={rowClass}>
+            <a
+              href={LINKEDIN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackEvent({name: 'Social Click', props: {network: 'LinkedIn'}})}
+              className="flex flex-1 items-center justify-between py-3 transition hover:text-accent"
+            >
+              LinkedIn <span aria-hidden>↗</span>
+            </a>
+          </li>
+          {showResume && (
+            <li className={rowClass}>
+              <Link href="/resume" className="flex flex-1 items-center justify-between py-3 transition hover:text-accent">
+                Resume <span aria-hidden>→</span>
+              </Link>
+            </li>
+          )}
+        </ul>
+      </div>
+    </section>
   )
 }

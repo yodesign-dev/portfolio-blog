@@ -24,7 +24,7 @@ export const InfoBand = () => {
            About Me
           </span>
           <p className="text-lg font-medium leading-relaxed max-w-md text-white/90">
-            10+ years designing end-to-end product experiences, grounded in user research and UI/UX thinking. This past year, I&apos;ve been using AI to move faster from research to high-fidelity work.
+            I design end-to-end products, grounded in user research, and build AI into every step: research synthesis, wireframes and high-fidelity prototypes.
           </p>
         </div>
 

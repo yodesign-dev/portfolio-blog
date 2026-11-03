@@ -1,20 +1,19 @@
 import Link from 'next/link'
 import { client } from '@/sanity/lib/client'
-import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
+import { CaseStudyRow, getCaseStudies } from '@/components/CaseStudyCard'
 import { Background } from '@/components/Background'
 import { SideProjects } from '@/components/SideProjects'
 import { HowIWork } from '@/components/HowIWork'
 import { Testimonials } from '@/components/Testimonials'
 import { BehanceCard } from '@/components/BehanceArchive'
-import { getBehanceProjects } from '@/lib/behance'
+import { getBehanceProjects, showcaseNote } from '@/lib/behance'
 import { getMediumPosts } from '@/lib/medium'
 import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn import sang Hero 31
 
 export const revalidate = 60
 
-// Bài Medium không đưa ra trang chủ (vẫn có ở /blog): bài đã thành case study trên
-// site, và bài ngoài chủ đề thiết kế sản phẩm
-const HOME_WRITING_SKIP = ['freemium-for-recruiter', 'translation-industry']
+// Bài Medium đã thành case study trên site thì không đưa ra trang chủ (vẫn có ở /blog)
+const HOME_WRITING_SKIP = ['freemium-for-recruiter', 'onboarding-friction']
 
 // Trang chủ chỉ lấy bài Writing (case study đã có section Work riêng).
 const POSTS_QUERY = `*[_type == "post" && isCaseStudy != true] | order(publishedAt desc)[0...3] {
@@ -57,6 +56,31 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href: strin
   )
 }
 
+function MoreWorkItem({href, title, detail, external = false}: {href: string; title: string; detail: string; external?: boolean}) {
+  const body = (
+    <>
+      <span className="block font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
+        {title} <span aria-hidden="true">{external ? '↗' : '→'}</span>
+      </span>
+      {detail && <span className="mt-1 block text-sm text-neutral-500">{detail}</span>}
+    </>
+  )
+  const className = 'group block py-4 sm:pt-5'
+  return (
+    <li className="border-b border-neutral-200 last:border-b-0 sm:border-b-0">
+      {external ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+          {body}
+        </a>
+      ) : (
+        <Link href={href} className={className}>
+          {body}
+        </Link>
+      )}
+    </li>
+  )
+}
+
 export default async function HomePage() {
   const [studies, posts] = await Promise.all([getCaseStudies(revalidate), getPosts()])
   const featuredStudies = studies.slice(0, 3)
@@ -67,7 +91,8 @@ export default async function HomePage() {
     featuredStudies.length < 3 ? getBehanceProjects() : [],
     posts.length === 0 ? getMediumPosts() : [],
   ])
-  const featuredBehance = behance.slice(0, 3 - featuredStudies.length)
+  // Có case study: Behance chỉ còn hàng nhỏ, chừa 1 chỗ cho quán /chill
+  const featuredBehance = behance.slice(0, featuredStudies.length > 0 ? 2 : 3)
   // Writing: danh sách gọn 3 bài (ảnh bìa Medium phần lớn là ảnh chụp chữ, xếp
   // thành thẻ trông rối)
   const writing =
@@ -108,14 +133,33 @@ export default async function HomePage() {
       {(featuredStudies.length > 0 || featuredBehance.length > 0) && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
-          <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-3 sm:gap-y-12">
-            {featuredStudies.map((study) => (
-              <CaseStudyCard key={study._id} study={study} />
-            ))}
-            {featuredBehance.map((project) => (
-              <BehanceCard key={project.url} project={project} sizes="(min-width: 1152px) 352px, (min-width: 640px) 33vw, 128px" />
-            ))}
-          </div>
+          {featuredStudies.length > 0 ? (
+            <>
+              <div className="flex flex-col gap-12 md:gap-14">
+                {featuredStudies.map((study, index) => (
+                  <CaseStudyRow key={study._id} study={study} priority={index === 0} />
+                ))}
+              </div>
+              <ul className="mt-12 grid grid-cols-1 border-t border-neutral-200 sm:grid-cols-3 sm:gap-8">
+                {featuredBehance.map((project) => (
+                  <MoreWorkItem
+                    key={project.url}
+                    href={project.url}
+                    external
+                    title={project.title}
+                    detail={[showcaseNote(project.url)?.tags[1], project.year].filter(Boolean).join(' · ')}
+                  />
+                ))}
+                <MoreWorkItem href="/chill" title="Lofi Pixel Café" detail="Built with AI · Live" />
+              </ul>
+            </>
+          ) : (
+            <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-3 sm:gap-y-12">
+              {featuredBehance.map((project) => (
+                <BehanceCard key={project.url} project={project} sizes="(min-width: 1152px) 352px, (min-width: 640px) 33vw, 128px" />
+              ))}
+            </div>
+          )}
         </section>
       )}
 

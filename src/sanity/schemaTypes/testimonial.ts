@@ -1,8 +1,7 @@
 import {defineField, defineType} from 'sanity'
 
 // Lời giới thiệu hiện ở mục "What people say" trang chủ (Testimonials.tsx).
-// Chưa có bài nào thì mục tự ẩn. Từ 3 bài trở lên: dải thẻ chạy ngang liên tục;
-// ít hơn: thẻ đứng yên.
+// Chưa có bài nào thì mục tự ẩn. Bài có "Câu nổi bật" hiện lớn ở đầu mục.
 // Chỉ đăng lời giới thiệu thật, đã được người viết đồng ý cho đăng (vd. chép từ
 // mục Recommendations trên LinkedIn).
 
@@ -18,6 +17,13 @@ export default defineType({
       rows: 4,
       description: 'Viết tiếng Anh cho đồng bộ với trang. Dài quá thì rút 1–3 câu đắt nhất.',
       validation: (Rule) => Rule.required().max(320),
+    }),
+    defineField({
+      name: 'highlight',
+      title: 'Câu nổi bật',
+      type: 'string',
+      description: 'Tuỳ chọn. Một câu trích từ lời giới thiệu, hiện lớn ở đầu mục. Chỉ cần điền cho 1 bài.',
+      validation: (Rule) => Rule.max(160),
     }),
     defineField({
       name: 'name',
