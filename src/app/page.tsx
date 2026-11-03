@@ -55,14 +55,14 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href: strin
 export default async function HomePage() {
   const [studies, posts] = await Promise.all([getCaseStudies(revalidate), getPosts()])
   const featuredStudies = studies.slice(0, 3)
-  // Sanity chưa có case study / bài viết → lấy tạm project Behance và bài
-  // Medium (giống /work và /blog), để trang chủ không nhảy thẳng từ hero
-  // xuống footer.
+  // Chưa đủ 3 case study → thêm project Behance cho đủ hàng; Sanity chưa có bài
+  // viết → lấy tạm bài Medium (giống /work và /blog), để trang chủ không nhảy
+  // thẳng từ hero xuống footer.
   const [behance, mediumPosts] = await Promise.all([
-    featuredStudies.length === 0 ? getBehanceProjects() : [],
+    featuredStudies.length < 3 ? getBehanceProjects() : [],
     posts.length === 0 ? getMediumPosts() : [],
   ])
-  const featuredBehance = behance.slice(0, 3)
+  const featuredBehance = behance.slice(0, 3 - featuredStudies.length)
   // Writing: danh sách gọn 3 bài (ảnh bìa Medium phần lớn là ảnh chụp chữ, xếp
   // thành thẻ trông rối)
   const writing =
@@ -102,11 +102,12 @@ export default async function HomePage() {
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-3 sm:gap-y-12">
-            {featuredStudies.length > 0
-              ? featuredStudies.map((study) => <CaseStudyCard key={study._id} study={study} />)
-              : featuredBehance.map((project) => (
-                  <BehanceCard key={project.url} project={project} sizes="(min-width: 1152px) 352px, (min-width: 640px) 33vw, 128px" />
-                ))}
+            {featuredStudies.map((study) => (
+              <CaseStudyCard key={study._id} study={study} />
+            ))}
+            {featuredBehance.map((project) => (
+              <BehanceCard key={project.url} project={project} sizes="(min-width: 1152px) 352px, (min-width: 640px) 33vw, 128px" />
+            ))}
           </div>
         </section>
       )}
