@@ -32,9 +32,9 @@ export default async function WorkPage() {
         {studies.length === 0 ? (
           behance.length === 0 && <p className="text-center text-neutral-400">Case studies are on their way.</p>
         ) : (
-          <div className="grid grid-cols-1 gap-x-10 gap-y-16 md:grid-cols-2">
-            {studies.map((study, index) => (
-              <CaseStudyCard key={study._id} study={study} priority={index < 2} />
+          <div className="flex flex-col gap-6">
+            {studies.map((study) => (
+              <CaseStudyCard key={study._id} study={study} />
             ))}
           </div>
         )}

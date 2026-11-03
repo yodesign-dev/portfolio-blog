@@ -1,6 +1,4 @@
 import Link from 'next/link'
-import Image from 'next/image'
-import {urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {ImpactStats, type ImpactMetric} from '@/components/ImpactStats'
 
@@ -13,6 +11,8 @@ export type CaseStudy = {
     alt?: string
   }
   excerpt?: string
+  cardProblem?: string
+  cardSolution?: string
   role?: string
   company?: string
   year?: string
@@ -25,6 +25,8 @@ const CASE_STUDIES_QUERY = `*[_type == "post" && isCaseStudy == true] | order(pu
   slug,
   mainImage,
   excerpt,
+  cardProblem,
+  cardSolution,
   role,
   company,
   year,
@@ -35,102 +37,48 @@ export async function getCaseStudies(revalidate: number): Promise<CaseStudy[]> {
   return sanityFetch<CaseStudy[]>({query: CASE_STUDIES_QUERY, revalidate})
 }
 
-export function CaseStudyCard({study, priority = false}: {study: CaseStudy; priority?: boolean}) {
-  const imageUrl = study.mainImage
-    ? urlFor(study.mainImage)?.width(1200).height(750).fit('crop').url()
-    : null
-  const meta = [study.company, study.role, study.year].filter(Boolean).join(' · ')
-  const impact = study.impact ?? []
+// Thẻ case study: đọc qua là hiểu bài toán và cách giải, nên không dùng ảnh bìa (ảnh bìa
+// chỉ còn dùng khi chia sẻ link). Bài chưa nhập Problem/Solution thì hiện mô tả ngắn.
+export function CaseStudyCard({study}: {study: CaseStudy}) {
+  const meta = [study.company, study.year].filter(Boolean).join(' · ')
+  const hasStory = study.cardProblem && study.cardSolution
 
   return (
-    <Link href={`/work/${study.slug.current}`} className="group block">
-      <div className="relative overflow-hidden rounded-xl bg-neutral-100 transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_22px_40px_-20px_rgb(11_20_50/0.45)] motion-reduce:transform-none">
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={study.mainImage?.alt || study.title}
-            width={1200}
-            height={750}
-            sizes="(min-width: 1024px) 560px, 100vw"
-            priority={priority}
-            className="aspect-[16/10] w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="aspect-[16/10] w-full" />
-        )}
-        <span
-          aria-hidden="true"
-          className="absolute bottom-3 left-3 translate-y-2 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-ink opacity-0 shadow-sm transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
-        >
-          Read case study →
-        </span>
-      </div>
-
-      {meta && (
-        <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-neutral-400">{meta}</p>
-      )}
-
-      <h3 className="mt-2 text-xl font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand sm:text-2xl">
+    <Link
+      href={`/work/${study.slug.current}`}
+      className="group block rounded-2xl border border-neutral-200 bg-white p-6 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-neutral-400 motion-reduce:transform-none sm:p-8"
+    >
+      {meta && <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{meta}</p>}
+      <h3 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-neutral-900 transition-colors group-hover:text-brand sm:text-2xl">
         {study.title}
       </h3>
 
-      {study.excerpt && (
-        <p className="mt-2 line-clamp-2 text-[15px] leading-relaxed text-neutral-600">{study.excerpt}</p>
+      {hasStory ? (
+        <div className="mt-6 grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] md:gap-3">
+          <div className="rounded-xl bg-neutral-100 p-5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Problem</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-neutral-700">{study.cardProblem}</p>
+          </div>
+          <span aria-hidden="true" className="flex items-center justify-center text-xl text-brand">
+            <span className="rotate-90 md:rotate-0">→</span>
+          </span>
+          <div className="rounded-xl bg-brand/10 p-5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-brand">Solution</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-neutral-800">{study.cardSolution}</p>
+          </div>
+        </div>
+      ) : (
+        study.excerpt && <p className="mt-3 text-base leading-relaxed text-neutral-600">{study.excerpt}</p>
       )}
 
-      <ImpactStats metrics={impact} className="mt-6" />
+      <ImpactStats metrics={study.impact ?? []} className="mt-6" />
 
-      <p className="mt-6 text-sm font-semibold text-neutral-900">
+      <p className="mt-6 text-sm font-semibold text-brand">
         Read case study{' '}
         <span aria-hidden="true" className="inline-block transition-transform group-hover:translate-x-1">
           →
         </span>
       </p>
-    </Link>
-  )
-}
-
-// Hàng ngang ở mục Selected work trang chủ: case study là bằng chứng chính nên lớn hơn
-// thẻ Behance. Điện thoại: ảnh trên, chữ dưới.
-export function CaseStudyRow({study, priority = false}: {study: CaseStudy; priority?: boolean}) {
-  const imageUrl = study.mainImage
-    ? urlFor(study.mainImage)?.width(1200).height(750).fit('crop').url()
-    : null
-  const meta = [study.company, study.year].filter(Boolean).join(' · ')
-
-  return (
-    <Link
-      href={`/work/${study.slug.current}`}
-      className="group grid grid-cols-1 items-center gap-5 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10"
-    >
-      <div className="overflow-hidden rounded-xl bg-neutral-100 transition duration-300 ease-out group-hover:-translate-y-0.5 motion-reduce:transform-none">
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={study.mainImage?.alt || study.title}
-            width={1200}
-            height={750}
-            sizes="(min-width: 1152px) 640px, (min-width: 768px) 58vw, 100vw"
-            priority={priority}
-            className="aspect-[16/10] w-full object-cover"
-          />
-        ) : (
-          <div className="aspect-[16/10] w-full" />
-        )}
-      </div>
-      <div>
-        {meta && <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{meta}</p>}
-        <h3 className="mt-2 text-2xl font-semibold leading-snug tracking-tight text-neutral-900 transition-colors group-hover:text-brand sm:text-3xl">
-          {study.title}
-        </h3>
-        {study.excerpt && <p className="mt-3 text-base leading-relaxed text-neutral-600">{study.excerpt}</p>}
-        <p className="mt-5 text-sm font-semibold text-brand">
-          Read case study{' '}
-          <span aria-hidden="true" className="inline-block transition-transform group-hover:translate-x-1">
-            →
-          </span>
-        </p>
-      </div>
     </Link>
   )
 }

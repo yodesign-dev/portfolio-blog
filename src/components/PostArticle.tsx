@@ -376,7 +376,8 @@ export function PostArticle({post}: {post: Post}) {
             <ShareButtons url={postUrl} title={post.title} />
           </div>
 
-          {mainImageUrl && (
+          {/* Case study mở bằng khối tóm tắt, ảnh đại diện chỉ dùng khi chia sẻ link */}
+          {mainImageUrl && !post.isCaseStudy && (
             <div className="mt-8 overflow-hidden rounded-lg bg-neutral-100">
               <Image
                 src={mainImageUrl}

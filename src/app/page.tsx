@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { client } from '@/sanity/lib/client'
-import { CaseStudyRow, getCaseStudies } from '@/components/CaseStudyCard'
+import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
 import { Background } from '@/components/Background'
 import { SideProjects } from '@/components/SideProjects'
 import { HowIWork } from '@/components/HowIWork'
@@ -135,9 +135,9 @@ export default async function HomePage() {
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
           {featuredStudies.length > 0 ? (
             <>
-              <div className="flex flex-col gap-12 md:gap-14">
-                {featuredStudies.map((study, index) => (
-                  <CaseStudyRow key={study._id} study={study} priority={index === 0} />
+              <div className="flex flex-col gap-6">
+                {featuredStudies.map((study) => (
+                  <CaseStudyCard key={study._id} study={study} />
                 ))}
               </div>
               <ul className="mt-12 grid grid-cols-1 border-t border-neutral-200 sm:grid-cols-3 sm:gap-8">

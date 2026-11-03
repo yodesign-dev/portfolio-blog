@@ -275,6 +275,25 @@ export default defineType({
       description: 'VD: 2025 hoặc 2024 – 2025',
       hidden: ({document}) => !document?.isCaseStudy,
     }),
+    // Thẻ case study ở trang chủ và /work: bài toán → giải pháp, thay cho ảnh bìa
+    defineField({
+      name: 'cardProblem',
+      title: 'Thẻ: Problem',
+      type: 'text',
+      rows: 3,
+      group: 'caseStudy',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(200),
+    }),
+    defineField({
+      name: 'cardSolution',
+      title: 'Thẻ: Solution',
+      type: 'text',
+      rows: 3,
+      group: 'caseStudy',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(200),
+    }),
     // Khối tóm tắt đầu trang case study, cho người chỉ đọc lướt
     defineField({
       name: 'caseProblem',
