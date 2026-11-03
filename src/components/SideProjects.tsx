@@ -82,7 +82,7 @@ export async function SideProjects() {
             )}
             <p className="mt-5 text-[15px] leading-relaxed text-neutral-600">
               <span className="font-semibold text-neutral-900">Product, design and build:</span> Bin. Art and music made
-              with AI, every feature behind its own switch.
+              with AI.
             </p>
             {latest && (
               <p className="mt-3 flex items-start gap-2 text-sm font-medium text-neutral-800">

@@ -1,14 +1,26 @@
 'use client'
 
+import {useState} from 'react'
 import Link from 'next/link'
 import {useContactModal} from '@/components/originkit/ui/hero-31/contact-modal-context'
-import {NAV_LINKS, SIDE_PROJECT_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
+import {CONTACT_EMAIL, NAV_LINKS, SIDE_PROJECT_LINKS, SITE_NAME, SITE_ROLE, SOCIAL_LINKS} from '@/lib/site'
 import {trackEvent} from '@/lib/analytics'
 
 export function SiteFooter({showResume}: {showResume: boolean}) {
   const {openModal} = useContactModal()
   const navLinks = NAV_LINKS.filter((link) => showResume || link.href !== '/resume')
   const socialLinks = SOCIAL_LINKS.filter((link) => link.href)
+  const [copied, setCopied] = useState(false)
+
+  const copyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(CONTACT_EMAIL)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Trình duyệt chặn clipboard: địa chỉ vẫn hiện để chọn tay
+    }
+  }
 
   return (
     <footer className="mt-auto bg-ink text-white antialiased">
@@ -26,6 +38,22 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
           >
             Get in touch
           </button>
+          {/* Email hiện chữ + nút chép: link mailto không mở được với người dùng webmail */}
+          <div className="mt-4 flex flex-wrap items-center gap-x-3">
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="inline-flex min-h-11 items-center text-sm text-white/80 underline decoration-white/30 underline-offset-4 [overflow-wrap:anywhere] transition hover:text-white"
+            >
+              {CONTACT_EMAIL}
+            </a>
+            <button
+              type="button"
+              onClick={copyEmail}
+              className="min-h-11 min-w-11 cursor-pointer text-sm font-semibold text-accent transition hover:text-accent-hover"
+            >
+              <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+          </div>
         </div>
 
         <nav aria-label="Footer">

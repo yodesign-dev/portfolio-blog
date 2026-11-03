@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { client } from '@/sanity/lib/client'
 import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
+import { Background } from '@/components/Background'
 import { SideProjects } from '@/components/SideProjects'
 import { HowIWork } from '@/components/HowIWork'
 import { Testimonials } from '@/components/Testimonials'
@@ -10,6 +11,10 @@ import { getMediumPosts } from '@/lib/medium'
 import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn import sang Hero 31
 
 export const revalidate = 60
+
+// Bài Medium không đưa ra trang chủ (vẫn có ở /blog): bài đã thành case study trên
+// site, và bài ngoài chủ đề thiết kế sản phẩm
+const HOME_WRITING_SKIP = ['freemium-for-recruiter', 'translation-industry']
 
 // Trang chủ chỉ lấy bài Writing (case study đã có section Work riêng).
 const POSTS_QUERY = `*[_type == "post" && isCaseStudy != true] | order(publishedAt desc)[0...3] {
@@ -74,7 +79,7 @@ export default async function HomePage() {
           date: post.publishedAt,
           source: null,
         }))
-      : mediumPosts.slice(0, 3).map((post) => ({
+      : mediumPosts.filter((post) => !HOME_WRITING_SKIP.some((word) => post.link.includes(word))).slice(0, 3).map((post) => ({
           key: post.link,
           href: post.link,
           title: post.title,
@@ -97,7 +102,9 @@ export default async function HomePage() {
       {/* 2. Đổi thẻ Hero37 cũ thành Hero31 mới */}
       <Hero31 study={heroStudy} />
 
-      {/* Thứ tự: hero → việc đã làm → cách làm → lời giới thiệu → side projects → bài viết */}
+      <Background />
+
+      {/* Thứ tự: hero → lý lịch → việc đã làm → lời giới thiệu → cách làm → side projects → bài viết */}
       {(featuredStudies.length > 0 || featuredBehance.length > 0) && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
@@ -112,10 +119,10 @@ export default async function HomePage() {
         </section>
       )}
 
-      <HowIWork />
-
       {/* Tự ẩn khi Studio chưa có lời giới thiệu nào */}
       <Testimonials />
+
+      <HowIWork />
 
       <div className="mt-24">
         <SideProjects />
@@ -123,7 +130,7 @@ export default async function HomePage() {
 
       {writing.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 py-20 sm:px-8">
-          <SectionHeading title="Latest writing" href="/blog" linkLabel="All writing" />
+          <SectionHeading title="Writing" href="/blog" linkLabel="All writing" />
           <ul className="border-t border-neutral-200">
             {writing.map((item) => {
               const content = (

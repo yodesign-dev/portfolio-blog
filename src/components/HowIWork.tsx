@@ -55,6 +55,7 @@ export function HowIWork() {
       <h2 id="how-i-work" className="mt-3 max-w-2xl text-balance text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
         From messy research to a prototype people can click.
       </h2>
+      <p className="mt-3 text-sm text-neutral-500">Notes and screens in the pictures are illustrative examples.</p>
 
       <div className="mt-12 grid grid-cols-1 gap-16 lg:grid-cols-2">
         <div className="hidden lg:block">
