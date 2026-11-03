@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {TeaserWindow} from '@/components/chill/TeaserWindow'
+import {CountUp} from '@/components/CountUp'
 import {CHILL_EXTENSION_URL, NOTION_TEMPLATE_URL, YOUTUBE_URL} from '@/lib/site'
 
 // Mục "Side projects" trang chủ (thay khối giới thiệu /chill cũ): quán lofi là thẻ lớn,
@@ -61,8 +62,8 @@ export async function SideProjects() {
         <article className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
           <TeaserWindow />
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Web app · Live · Free</p>
-            <h3 className="mt-1.5 text-2xl font-semibold leading-snug text-neutral-900">Lofi Pixel Café</h3>
+            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Web app · Live · Free</p>
+            <h3 className="mt-1.5 text-[28px] font-extrabold leading-tight tracking-tight text-neutral-900">Lofi Pixel Café</h3>
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">
               A focus timer that&apos;s a phin dripping coffee, by a café window in Vietnam. Pick a place, put on lo-fi,
               and work beside friends at the same table.
@@ -72,13 +73,15 @@ export async function SideProjects() {
                 {stats.map((stat) => (
                   <div key={stat.label} className="flex flex-col-reverse">
                     <dt className="text-sm text-neutral-500">{stat.label}</dt>
-                    <dd className="text-2xl font-semibold tracking-tight text-neutral-900">{stat.value}</dd>
+                    <dd className="text-4xl font-extrabold leading-[1.1] tracking-[-0.04em] text-neutral-900">
+                      <CountUp value={stat.value as number} />
+                    </dd>
                   </div>
                 ))}
               </dl>
             )}
             <p className="mt-5 text-[15px] leading-relaxed text-neutral-600">
-              <span className="font-medium text-neutral-900">Product, design and build:</span> Bin. Art and music made
+              <span className="font-semibold text-neutral-900">Product, design and build:</span> Bin. Art and music made
               with AI, every feature behind its own switch.
             </p>
             {latest && (
@@ -149,8 +152,8 @@ function SmallCard({
     <article className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-4 sm:gap-5">
       <CoverLink href={href} src={src} alt={alt} />
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{label}</p>
-        <h3 className="mt-1.5 text-lg font-semibold leading-snug text-neutral-900">{title}</h3>
+        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{label}</p>
+        <h3 className="mt-1.5 text-lg font-bold leading-snug text-neutral-900">{title}</h3>
         <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
         <a href={href} target="_blank" rel="noopener noreferrer" className={`sm:mt-3 ${ctaClass}`}>
           {cta}
