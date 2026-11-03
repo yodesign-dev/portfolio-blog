@@ -99,7 +99,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
           <h1
             aria-label={HEADLINE}
             style={{ "--hero-chars": HEADLINE.length } as CSSProperties}
-            className="mb-6 text-balance text-center font-display text-[clamp(32px,8vw,56px)] font-light leading-[1.08] tracking-[-0.035em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]"
+            className="mb-6 text-balance text-center font-display text-[clamp(32px,8vw,56px)] font-medium leading-[1.08] tracking-[-0.035em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]"
           >
             <TypedText from={0} to={ACCENT_START} />
             {/* Từ cuối — gạch chân vẽ tay sau khi gõ xong.

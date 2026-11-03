@@ -19,7 +19,7 @@ const mulish = Mulish({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin", "vietnamese"],
-  weight: ["300"],
+  weight: ["500"],
 });
 
 const geistMono = Geist_Mono({
