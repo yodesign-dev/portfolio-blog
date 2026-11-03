@@ -58,7 +58,7 @@ function FrameLabel({ children, className = "" }: { children: React.ReactNode; c
 
 // ---------- Câu chuyện ở khung Hi-fi: "người ra lệnh, AI làm, AI review, người quyết" ----------
 //
-// Kịch bản viết trên thang 18 "giây" (cộng 1s chờ đầu) rồi đổi sang % keyframes;
+// Kịch bản viết trên thang 18 "giây" (cộng 2.8s chờ đầu) rồi đổi sang % keyframes;
 // thời lượng phát thật là PLAYBACK_SECONDS (hiện 15s, nhanh hơn ~1.2 lần):
 //   0–4.5s    AI lướt các sticky note ở Research
 //   4.5–7.3s  Bin phác Wireframe

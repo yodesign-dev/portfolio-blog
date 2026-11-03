@@ -1,7 +1,7 @@
 // Delivered by Originkit · stack: nextjs · styling: tailwind
 "use client";
 
-import { Fragment, type CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { AvatarLoop } from "@/components/originkit/ui/hero-31/avatar-loop";
 import { InfoBand } from "@/components/originkit/ui/hero-31/info-band";
@@ -15,9 +15,40 @@ import { useContactModal } from "@/components/originkit/ui/hero-31/contact-modal
 import { SITE_NAME, SITE_ROLE } from "@/lib/site";
 import { trackEvent } from "@/lib/analytics";
 
-// Headline hiện lần lượt từng chữ (hero-word trong hero-31.css), phần
-// "with AI." tách riêng ở dưới để gắn gạch chân vẽ tay.
-const HEADLINE_WORDS = ["From", "user", "research", "to", "hi-fi", "—", "faster,"];
+// Headline gõ từng ký tự (hero-char trong hero-31.css). Từ cuối tách riêng ở
+// dưới để gắn gạch chân vẽ tay.
+const HEADLINE = "Design is intelligence made visible and accessible.";
+const ACCENT_START = HEADLINE.lastIndexOf(" ") + 1;
+
+// Gom ký tự theo từ để từ không gãy giữa chừng khi xuống dòng. Chữ chưa gõ chỉ
+// trong suốt nên vẫn giữ chỗ: tiêu đề không cao dần, phần dưới không nhảy.
+const TypedText = ({ from, to }: { from: number; to: number }) => {
+  const parts: ReactNode[] = [];
+  let word: ReactNode[] = [];
+  const char = (i: number) => (
+    <span
+      key={i}
+      className={i === HEADLINE.length - 1 ? "hero-char hero-char--last" : "hero-char"}
+      style={{ "--i": i } as CSSProperties}
+    >
+      {HEADLINE[i]}
+    </span>
+  );
+  const flushWord = (key: number) => {
+    if (word.length) parts.push(<span key={`w${key}`} className="whitespace-nowrap">{word}</span>);
+    word = [];
+  };
+  for (let i = from; i < to; i++) {
+    if (HEADLINE[i] === " ") {
+      flushWord(i);
+      parts.push(char(i));
+    } else {
+      word.push(char(i));
+    }
+  }
+  flushWord(to);
+  return <>{parts}</>;
+};
 
 // MỚI: Navbar + ContactModalProvider + ContactModal đã dời lên
 // layout.tsx (dùng chung cho mọi trang, không chỉ trang chủ). Bỏ hết
@@ -65,19 +96,16 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
           {/* H1 nói giá trị (làm gì, khác gì) thay cho slogan "Learn by
               Sharing" — người mới vào cần hiểu trong 5 giây. Slogan vẫn còn ở
               footer. text-balance để các dòng dài ngắn đều khi xuống dòng. */}
-          <h1 className="mb-6 text-balance text-center font-display text-[clamp(32px,8vw,56px)] font-light leading-[1.08] tracking-[-0.035em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]">
-            {HEADLINE_WORDS.map((word, i) => (
-              <Fragment key={word}>
-                <span className="hero-word" style={{ "--i": i } as CSSProperties}>
-                  {word}
-                </span>{" "}
-              </Fragment>
-            ))}
-            {/* "with AI." — điểm khác biệt, gạch chân vẽ tay sau khi chữ hiện xong.
+          <h1
+            aria-label={HEADLINE}
+            style={{ "--hero-chars": HEADLINE.length } as CSSProperties}
+            className="mb-6 text-balance text-center font-display text-[clamp(32px,8vw,56px)] font-light leading-[1.08] tracking-[-0.035em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]"
+          >
+            <TypedText from={0} to={ACCENT_START} />
+            {/* Từ cuối — gạch chân vẽ tay sau khi gõ xong.
                 nowrap để nét gạch không bị cắt đôi khi xuống dòng. */}
             <span className="relative inline-block whitespace-nowrap">
-              <span className="hero-word" style={{ "--i": HEADLINE_WORDS.length } as CSSProperties}>with</span>{" "}
-              <span className="hero-word" style={{ "--i": HEADLINE_WORDS.length + 1 } as CSSProperties}>AI.</span>
+              <TypedText from={ACCENT_START} to={HEADLINE.length} />
               <svg
                 aria-hidden
                 viewBox="0 0 200 16"

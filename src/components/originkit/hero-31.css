@@ -5,36 +5,63 @@
 }
 
 /*
- * Headline hero (section-hero.tsx): từng chữ mờ → rõ, trồi nhẹ lên, cách nhau
- * 70ms; xong thì nét gạch chân vẽ tay dưới "with AI." tự vẽ từ trái sang phải.
- * Chạy 1 lần khi tải trang; tắt hẳn khi người xem chọn giảm chuyển động.
+ * Headline hero (section-hero.tsx): gõ từng ký tự, cách nhau 50ms, hiện tức thì.
+ * Con trỏ khối đi theo ký tự vừa gõ, gõ xong nháy 5 lần rồi tắt (WCAG 2.2.2),
+ * sau đó nét gạch chân vẽ tay tự vẽ từ trái sang phải.
+ * --hero-chars (số ký tự) đặt ở h1. Chạy 1 lần khi tải trang; tắt hẳn khi người
+ * xem chọn giảm chuyển động.
  */
-.hero-word {
-  display: inline-block;
+.hero-char {
+  position: relative;
   opacity: 0;
-  animation: hero-word 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--i, 0) * 70ms + 150ms) forwards;
+  animation: hero-type 0s linear calc(var(--i, 0) * 50ms + 150ms) forwards;
+}
+.hero-char::after {
+  content: "";
+  position: absolute;
+  top: 0.08em;
+  left: 100%;
+  width: 0.15em;
+  height: 1em;
+  margin-left: 2px;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  animation: hero-cursor-slot 50ms steps(1) calc(var(--i, 0) * 50ms + 150ms);
+}
+.hero-char--last::after {
+  animation: hero-cursor-blink 1s steps(1) calc(var(--i, 0) * 50ms + 150ms) 5;
 }
 .hero-underline path {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: hero-draw 0.8s cubic-bezier(0.6, 0, 0.3, 1) 0.95s forwards;
+  opacity: 0; /* đầu nét tròn vẫn vẽ thành 1 chấm khi chưa tới lượt */
+  animation: hero-draw 0.8s cubic-bezier(0.6, 0, 0.3, 1) calc(var(--hero-chars, 0) * 50ms + 200ms) forwards;
 }
-@keyframes hero-word {
-  from { opacity: 0; transform: translateY(0.3em); filter: blur(6px); }
-  to   { opacity: 1; transform: none; filter: none; }
+@keyframes hero-type {
+  to { opacity: 1; }
+}
+@keyframes hero-cursor-slot {
+  from, to { opacity: 1; }
+}
+@keyframes hero-cursor-blink {
+  0% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 @keyframes hero-draw {
-  to { stroke-dashoffset: 0; }
+  from { opacity: 1; }
+  to { opacity: 1; stroke-dashoffset: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-word { animation: none; opacity: 1; }
-  .hero-underline path { animation: none; stroke-dashoffset: 0; }
+  .hero-char { animation: none; opacity: 1; }
+  .hero-char::after { display: none; }
+  .hero-underline path { animation: none; opacity: 1; stroke-dashoffset: 0; }
 }
 
 /*
  * Process canvas (process-canvas.tsx) — kịch bản thiết kế trên thang 18s, phát
- * trong --pc-loop giây (đặt ở process-canvas.tsx, mặc định 18s), bắt đầu sau 1s để người
- * xem đọc tiêu đề trước. Kịch bản chi tiết (theo giây) và keyframes của con
+ * trong --pc-loop giây (đặt ở process-canvas.tsx, mặc định 18s), bắt đầu sau 2.8s để người
+ * xem đọc tiêu đề gõ xong. Kịch bản chi tiết (theo giây) và keyframes của con
  * trỏ + khung Hi-fi (pc-ai, pc-bin, pc-m-*, pc-prompt, pc-pill…) được sinh
  * trong process-canvas.tsx; ở đây chỉ còn Research, Wireframe, viền Hi-fi:
  *   0–4.5s    AI lướt qua các sticky note ở Research (note sáng lần lượt)
@@ -44,27 +71,27 @@
  * Vị trí con trỏ là left/top theo % khung canvas.
  */
 .pc-cursor-ai {
-  animation: pc-ai var(--pc-loop, 18s) ease-in-out 1s infinite both;
+  animation: pc-ai var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
 }
 .pc-cursor-bin {
-  animation: pc-bin var(--pc-loop, 18s) ease-in-out 1s infinite both;
+  animation: pc-bin var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
 }
 .pc-note {
   /* Mỗi note sáng lên đúng lúc con trỏ AI đi qua (cách nhau 0.84/18 vòng) */
   animation: pc-note var(--pc-loop, 18s) ease-in-out infinite both;
-  animation-delay: calc(1s + var(--pc-i, 0) * var(--pc-loop, 18s) * 0.84 / 18);
+  animation-delay: calc(2.8s + var(--pc-i, 0) * var(--pc-loop, 18s) * 0.84 / 18);
 }
 .pc-wire {
-  animation: pc-wire var(--pc-loop, 18s) ease-in-out 1s infinite both;
+  animation: pc-wire var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
 }
 .pc-hifi {
-  animation: pc-hifi var(--pc-loop, 18s) ease-in-out 1s infinite both;
+  animation: pc-hifi var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
 }
 .pc-step {
   /* animation-name gán inline theo từng phần tử (xem process-canvas.tsx) */
   animation-duration: var(--pc-loop, 18s);
   animation-timing-function: ease-out;
-  animation-delay: 1s;
+  animation-delay: 2.8s;
   animation-iteration-count: infinite;
   animation-fill-mode: both;
 }
