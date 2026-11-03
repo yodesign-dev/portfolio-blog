@@ -1,7 +1,7 @@
 import {defineField, defineType} from 'sanity'
 
 // Lời giới thiệu hiện ở mục "What people say" trang chủ (Testimonials.tsx).
-// Chưa có bài nào thì mục tự ẩn. Bài có "Câu nổi bật" hiện lớn ở đầu mục.
+// Chưa có bài nào thì mục tự ẩn. Bài bật "Hiện lớn ở đầu mục" đứng đầu.
 // Chỉ đăng lời giới thiệu thật, đã được người viết đồng ý cho đăng (vd. chép từ
 // mục Recommendations trên LinkedIn).
 
@@ -22,8 +22,15 @@ export default defineType({
       name: 'highlight',
       title: 'Câu nổi bật',
       type: 'string',
-      description: 'Tuỳ chọn. Một câu trích từ lời giới thiệu, hiện lớn ở đầu mục. Chỉ cần điền cho 1 bài.',
+      description: 'Một câu trích nguyên văn từ lời giới thiệu, hiện thay cho cả đoạn ở trang chủ.',
       validation: (Rule) => Rule.max(160),
+    }),
+    defineField({
+      name: 'featured',
+      title: 'Hiện lớn ở đầu mục',
+      type: 'boolean',
+      initialValue: false,
+      description: 'Chỉ bật cho 1 bài.',
     }),
     defineField({
       name: 'name',

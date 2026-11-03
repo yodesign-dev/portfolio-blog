@@ -4,7 +4,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { AvatarLoop } from "@/components/originkit/ui/hero-31/avatar-loop";
-import { InfoBand } from "@/components/originkit/ui/hero-31/info-band";
 import {
   ProcessCanvas,
   ProcessCanvasCompact,
@@ -126,7 +125,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
 
           <div className="flex flex-col items-center gap-8 md:items-start">
             <p className="max-w-xl text-center text-lg leading-relaxed text-white/85 md:text-left md:text-xl">
-              10+ years designing products in recruitment, marketplaces, e-commerce and delivery. Now using AI from research to shipped product.
+              10+ years designing products. Now using AI from research to shipped product.
             </p>
 
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
@@ -159,10 +158,6 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
         <div className="hidden w-full md:block md:max-w-2xl lg:max-w-none">
           <ProcessCanvas study={study} />
         </div>
-      </div>
-
-      <div className="w-full">
-        <InfoBand />
       </div>
 
     </div>

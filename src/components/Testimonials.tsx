@@ -3,14 +3,15 @@ import {sanityFetch} from '@/sanity/lib/fetch'
 import {urlFor} from '@/sanity/lib/image'
 
 // Mục "What people say" trang chủ — lời giới thiệu nhập trong Studio ("Lời giới
-// thiệu"). Chưa có bài nào thì cả mục ẩn. Bài có "Câu nổi bật" hiện lớn ở đầu mục,
-// các bài còn lại là thẻ đứng yên (dưới md: vuốt ngang từng thẻ). Không dùng dải tự
+// thiệu"). Chưa có bài nào thì cả mục ẩn. Bài bật "Hiện lớn ở đầu mục" đứng đầu, các
+// bài còn lại là thẻ đứng yên. Mọi thẻ ưu tiên hiện "Câu nổi bật" cho gọn (dưới md: vuốt ngang từng thẻ). Không dùng dải tự
 // chạy nữa vì khó dừng lại đọc hết.
 
 type Testimonial = {
   _id: string
   quote: string
   highlight?: string
+  featured?: boolean
   name: string
   role?: string
   company?: string
@@ -20,13 +21,13 @@ type Testimonial = {
 }
 
 const TESTIMONIALS_QUERY = `*[_type == "testimonial" && defined(quote) && defined(name)] | order(order asc, _createdAt asc) {
-  _id, quote, highlight, name, role, company, relation, link, avatar
+  _id, quote, highlight, featured, name, role, company, relation, link, avatar
 }`
 
 export async function Testimonials() {
   const items = await sanityFetch<Testimonial[]>({query: TESTIMONIALS_QUERY, revalidate: 300}).catch(() => [])
   if (items.length === 0) return null
-  const featured = items.find((item) => item.highlight?.trim()) ?? items[0]
+  const featured = items.find((item) => item.featured) ?? items[0]
   const others = items.filter((item) => item !== featured)
 
   return (
@@ -35,7 +36,6 @@ export async function Testimonials() {
         <h2 id="testimonials-title" className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
           What people say
         </h2>
-        <p className="mt-2 text-neutral-500">Words from people I’ve worked with.</p>
       </div>
 
       <div className="mx-auto mt-10 max-w-6xl px-6 sm:px-8">
@@ -102,7 +102,7 @@ function Featured({item}: {item: Testimonial}) {
 function Card({item}: {item: Testimonial}) {
   return (
     <figure className="flex h-full flex-col rounded-2xl border border-neutral-200 bg-white p-6">
-      <blockquote className="flex-1 text-[15px] leading-relaxed text-neutral-700">“{item.quote}”</blockquote>
+      <blockquote className="flex-1 text-[15px] leading-relaxed text-neutral-700">“{item.highlight?.trim() || item.quote}”</blockquote>
       <div className="mt-6 border-t border-neutral-100 pt-5">
         <Person item={item} />
       </div>

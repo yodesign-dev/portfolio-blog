@@ -132,7 +132,6 @@ function ContactBlock({showResume, onMessage}: {showResume: boolean; onMessage: 
           <h2 id="contact-title" className="text-balance text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
             Have a project or a role in mind?
           </h2>
-          <p className="mt-3 text-white/70">A short call is often the fastest way to start.</p>
           <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
             <button
               type="button"

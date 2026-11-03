@@ -7,14 +7,11 @@ import {CHILL_EXTENSION_URL, NOTION_TEMPLATE_URL, YOUTUBE_URL} from '@/lib/site'
 
 // Mục "Side projects" trang chủ (thay khối giới thiệu /chill cũ): quán lofi là thẻ lớn,
 // Notion template và kênh YouTube là 2 thẻ nhỏ mọc ra từ quán, cùng khung tối kiểu pixel café.
-// Số liệu và bản cập nhật của quán đọc từ Studio ("Chill · Nhật ký thay đổi", nhạc, điểm đến)
-// với cùng điều kiện như /chill, nên đăng bài hay thêm cảnh là trang chủ tự đổi theo.
+// Số liệu của quán đọc từ Studio với cùng điều kiện như /chill, nên thêm cảnh hay đăng cập
+// nhật là trang chủ tự đổi theo.
 
-// Bản cập nhật ưu tiên loại "new": cùng ngày có bản chỉnh nhỏ thì vẫn nêu tính năng mới.
 // Trạm Noel không tính vì ngoài mùa khách không thấy.
 const CAFE_QUERY = `{
-  "latest": *[_type == "chillUpdate" && defined(title) && defined(date) && count(items) > 0]
-    | order(select(kind == "new" => 0, 1) asc, date desc, _createdAt desc)[0]{title, titleEn, date},
   "places": count(*[_type == "chillDestination" && hidden != true && defined(slug.current)
     && defined(morning.asset) && defined(afternoon.asset) && defined(night.asset)]),
   "tracks": count(*[_type == "chillTrack" && hidden != true && station != "noel" && (defined(audio.asset) || defined(localFile))]),
@@ -22,15 +19,9 @@ const CAFE_QUERY = `{
 }`
 
 type CafeInfo = {
-  latest: {title: string; titleEn?: string; date: string} | null
   places: number
   tracks: number
   updates: number
-}
-
-function shortDate(date: string) {
-  // date dạng YYYY-MM-DD — đọc theo UTC để không lệch ngày theo múi giờ server
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', timeZone: 'UTC'})
 }
 
 // Link chữ cao 44 px trên mobile cho dễ bấm, từ sm trở lên về đúng cỡ chữ
@@ -39,7 +30,6 @@ const ctaClass =
 
 export async function SideProjects() {
   const cafe = await sanityFetch<CafeInfo>({query: CAFE_QUERY, revalidate: 300}).catch(() => null)
-  const latest = cafe?.latest
   // Sanity lỗi thì số về 0: ẩn hẳn, không hiện "0 tracks"
   const stats = [
     {value: cafe?.places, label: 'places'},
@@ -65,8 +55,7 @@ export async function SideProjects() {
             <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Web app · Live · Free</p>
             <h3 className="mt-1.5 text-[28px] font-extrabold leading-tight tracking-tight text-neutral-900">Lofi Pixel Café</h3>
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">
-              A focus timer that&apos;s a phin dripping coffee, by a café window in Vietnam. Pick a place, put on lo-fi,
-              and work beside friends at the same table.
+              A phin coffee timer by a café window, built with AI.
             </p>
             {stats.length > 0 && (
               <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
@@ -79,16 +68,6 @@ export async function SideProjects() {
                   </div>
                 ))}
               </dl>
-            )}
-            <p className="mt-5 text-[15px] leading-relaxed text-neutral-600">
-              <span className="font-semibold text-neutral-900">Product, design and build:</span> Bin. Art and music made
-              with AI.
-            </p>
-            {latest && (
-              <p className="mt-3 flex items-start gap-2 text-sm font-medium text-neutral-800">
-                <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                Updated {shortDate(latest.date)} · {latest.titleEn?.trim() || latest.title}
-              </p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-6 sm:mt-5 sm:gap-y-2">
               <Link href="/chill" className={ctaClass}>
@@ -113,7 +92,7 @@ export async function SideProjects() {
             alt="Hanoi Café Workspace Notion template: a live café window above Today and Quick notes"
             label="Notion template · Free"
             title="Hanoi Café Workspace"
-            body="The café window inside Notion, above your top 3 for today. English and Vietnamese."
+            body="The café window inside Notion."
             cta="Duplicate for free ↗"
           />
           <SmallCard
@@ -122,7 +101,7 @@ export async function SideProjects() {
             alt="Lofi Pixel Cafe video thumbnail: Hanoi rainy night, lo-fi for study and relax"
             label="YouTube channel"
             title="Lofi Pixel Cafe"
-            body="Lo-fi mixes recorded straight from the café window, to study or work to."
+            body="Lo-fi mixes from the café window."
             cta="Listen on YouTube ↗"
           />
         </div>
