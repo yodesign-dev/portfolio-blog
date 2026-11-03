@@ -24,9 +24,9 @@ export type SynthSpec = {
 export type StationId = 'acoustic' | 'noel' | 'focus' | 'night' | 'sax' | 'lofi' | 'study'
 
 export const STATIONS: {id: StationId; label: string; short: string}[] = [
-  {id: 'acoustic', label: 'Café Acoustic', short: 'Acoustic'},
   // Chỉ có bài trong mùa Noel (content.ts lọc theo lịch "Chill · Mùa"), ngoài mùa không hiện tab
   {id: 'noel', label: 'Christmas Café', short: 'Noel'},
+  {id: 'acoustic', label: 'Café Acoustic', short: 'Acoustic'},
   {id: 'focus', label: 'Deep Focus', short: 'Focus'},
   // Nhạc ngủ: bài dài ~8 phút (ghép 3 đoạn Lyria), không trống, êm, cuối bài nhỏ dần 60 giây
   {id: 'night', label: 'Night & Sleep', short: 'Sleep'},

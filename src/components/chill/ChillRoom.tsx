@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, destOpen, type Destination} from './destinations'
@@ -463,7 +463,7 @@ export function ChillRoom({
     // Trạm đã lưu mà giờ không còn bài (mọi bài bị ẩn trong Studio) → như chưa chọn
     const savedStation = STATIONS.find((st) => st.id === prefs.station && tracks.some((t) => stationOf(t) === st.id))?.id
     // Không có lựa chọn cũ thì mở trạm có bài đầu tiên (ưu tiên Café Acoustic)
-    const firstStation = savedStation ?? STATIONS.find((st) => tracks.some((t) => stationOf(t) === st.id))?.id ?? 'lofi'
+    const firstStation = savedStation ?? STATIONS.find((st) => st.id !== 'noel' && tracks.some((t) => stationOf(t) === st.id))?.id ?? 'lofi'
     setStation(saved >= 0 ? stationOf(tracks[saved]) : firstStation)
     if (saved < 0) {
       const first = tracks.findIndex((t) => stationOf(t) === firstStation)
@@ -2692,9 +2692,15 @@ export function ChillRoom({
                       aria-checked={on}
                       onClick={() => changeStation(st.id)}
                       className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
-                        on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
+                        st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
                     >
+                      {st.id === 'noel' && (
+                        <>
+                          <NoelTabLights />
+                          <EventStar />
+                        </>
+                      )}
                       {st.short}
                       {hasUnseenNew(st.id) && (
                         <>
@@ -3887,11 +3893,15 @@ export function ChillRoom({
                       aria-checked={on}
                       onClick={() => changeStation(st.id)}
                       className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
-                        on
-                          ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
-                          : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
+                        st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
                     >
+                      {st.id === 'noel' && (
+                        <>
+                          <NoelTabLights />
+                          <EventStar />
+                        </>
+                      )}
                       {st.short}
                       {hasUnseenNew(st.id) && (
                         <>
@@ -4778,6 +4788,40 @@ function RainIcon() {
   return (
     <svg {...iconProps}>
       <path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3M16 14v6M8 14v6M12 16v6" />
+    </svg>
+  )
+}
+
+// Tab trạm Noel: viền đỏ, nền ửng đỏ sang xanh thông, dây đèn nhỏ dọc mép trên (NoelTabLights)
+const noelTabClass = (on: boolean) =>
+  `relative bg-gradient-to-r from-[#c8352e]/25 to-[#2f8a58]/25 ${on ? 'border-[#ffd98a]/70 text-[#fff1d6]' : 'border-[#d9534a]/50 text-[#f0dcc8] hover:border-[#ffd98a]/50 hover:text-[#fff1d6]'}`
+
+const NOEL_BULBS = ['#ff5a4c', '#ffc94d', '#6ee39a', '#7ab8ff', '#ff5a4c']
+
+function NoelTabLights() {
+  return (
+    <span aria-hidden className="pointer-events-none absolute -top-[3px] left-3 right-3 flex justify-between">
+      {NOEL_BULBS.map((c, i) => (
+        <span key={i} className="h-1 w-1 rounded-full motion-safe:animate-pulse" style={{background: c, boxShadow: `0 0 4px ${c}`, animationDelay: `${i * 0.37}s`}} />
+      ))}
+    </span>
+  )
+}
+
+// Sao nhiều màu của sự kiện theo mùa
+function EventStar() {
+  const id = useId()
+  return (
+    <svg aria-hidden viewBox="0 0 10 10" className="mr-1.5 inline-block h-3 w-3 -translate-y-px">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ff5a4c" />
+          <stop offset="0.4" stopColor="#ffc94d" />
+          <stop offset="0.7" stopColor="#6ee39a" />
+          <stop offset="1" stopColor="#7ab8ff" />
+        </linearGradient>
+      </defs>
+      <path fill={`url(#${id})`} d="M5 0l1.4 3.3L10 3.6 7.3 6l.8 3.6L5 7.7 1.9 9.6 2.7 6 0 3.6l3.6-.3z" />
     </svg>
   )
 }
