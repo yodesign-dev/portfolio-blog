@@ -180,7 +180,7 @@ export function BrewPlate({
   return (
     // Màn rộng: 1 hàng thấp ngang thanh nhạc để không che phin và ly trên quầy.
     // Hẹp hơn: xếp chồng (điện thoại không thấy phin trên quầy nên không vướng)
-    <div className={`${frame} relative w-full max-w-[720px] p-3 sm:px-4 lg:max-w-[920px]`}>
+    <div className={`${frame} relative w-full max-w-[720px] p-3 sm:px-4 lg:max-w-[1000px]`}>
       {asking && (
         <div role="alertdialog" aria-label={t.focus.drop} className="absolute inset-x-0 bottom-full mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#24222b] px-3 py-2.5 text-sm text-[#ede6dd] shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)]">
           <span className="mr-auto min-w-0">{t.focus.dropAsk(elapsedMin)}</span>
@@ -223,7 +223,7 @@ export function BrewPlate({
           </button>
           <CompactButton label={t.focus.compact} onClick={() => onCompact(true)} className={`${quiet} max-lg:ml-auto`} />
         </div>
-        <div className="border-t border-white/[0.08] pt-2.5 lg:w-[300px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">{music}</div>
+        <div className="border-t border-white/[0.08] pt-2.5 lg:w-[380px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">{music}</div>
       </div>
 
       <div

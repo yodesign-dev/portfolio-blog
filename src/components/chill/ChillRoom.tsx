@@ -28,6 +28,8 @@ import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} fr
 import {TREE_MAX, activeSeason, loadSeasonPref, loadTree, momentOn, readSeasonPreview, saveSeasonPref, saveTree, type Season, type SeasonPref} from './season'
 import {Focus} from './Focus'
 import {MIN_FULL_PHIN} from './BrewDesk'
+import {AddTrackButton, MusicChooser, MusicPicker, useBrewMusic} from './BrewMusic'
+import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, suggestQueue, totalSeconds, type MusicQueue} from './playlist'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {MiniVideo, canVideoPiP} from './MiniVideo'
 import {QuestCard} from './QuestCard'
@@ -334,6 +336,7 @@ export function ChillRoom({
   const [volume, setVolume] = useState(0.7)
   const [ambience, setAmbience] = useState(0.35)
   const [mix, setMix] = useState<Mix | null>(null)
+  const lastVolume = useRef(volume)
   // Cài quán thành ứng dụng (install.ts): cách cài của trình duyệt này + hướng dẫn tay đang mở
   const {mode: installMode, install} = useInstall()
   const [installHelp, setInstallHelp] = useState(false)
@@ -435,11 +438,17 @@ export function ChillRoom({
   const catSayTimers = useRef<number[]>([])
 
   const track = tracks[index]
+  // Hàng đợi của Bàn pha phin (Quán chọn giúp / danh sách tự chọn). Bài đang phát nằm trong
+  // hàng đợi thì bài tiếp, bài trước, Media Session, cửa sổ nổi đều đi theo nó; không thì theo trạm
+  const [queue, setQueue] = useState<MusicQueue | null>(null)
+  const queueIdx = useMemo(() => (queue ? queue.ids.map((id) => tracks.findIndex((tr) => tr.id === id)).filter((i) => i >= 0) : []), [queue, tracks])
+  const queueOn = queueIdx.includes(index)
+  const queueLabel = queueOn ? queue!.label : null
   // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
   // `station` chỉ là tab đang xem — bài đang phát giữ nguyên trạm của nó cho tới khi chọn bài khác
   const stationList = tracks.map((tr, i) => ({tr, i})).filter(({tr}) => stationOf(tr) === station)
   const playingStation = stationOf(track)
-  const playingList = tracks.filter((tr) => stationOf(tr) === playingStation)
+  const playingList = queueOn ? queueIdx.map((i) => tracks[i]) : tracks.filter((tr) => stationOf(tr) === playingStation)
   const playingPos = playingList.indexOf(track)
   const dest = destinations[destIndex] ?? destinations[0]
   const nextDest = destinations[(destIndex + 1) % destinations.length]
@@ -764,6 +773,36 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
     setBrewFlag(param ? param === '1' : brewDeskOn)
   }, [brewDeskOn])
+  const brewMusicApi = useBrewMusic({enabled: brewFlag, tracks, time, weather, playing})
+  // Tiếng nền riêng cho phiên + giờ nghỉ, không đụng vào bản trộn khách đã lưu
+  const brewPhase = !brewing ? null : focusLabel!.startsWith('☕') ? 'break' : 'phin'
+  const effectiveMix = useMemo(() => {
+    if (!brewPhase) return mix
+    const choice = brewMusicApi.prefs.mix
+    const base = choice === 'scene' ? mix : MIX_PRESETS[choice]
+    if (brewPhase !== 'break' || brewMusicApi.prefs.breakMode === 'keep') return base
+    const from = base ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)
+    return {...from, street: Math.min(1, from.street + 0.3)}
+  }, [brewPhase, mix, ambience, weather, brewMusicApi.prefs.mix, brewMusicApi.prefs.breakMode])
+  const effectiveVolume = brewPhase === 'break' ? (brewMusicApi.prefs.breakMode === 'duck' ? volume * 0.6 : brewMusicApi.prefs.breakMode === 'ambient' ? 0 : volume) : volume
+  useEffect(() => {
+    if (!brewFlag) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc hàng đợi đã lưu sau khi hydrate
+    setQueue(loadQueue())
+  }, [brewFlag])
+  const applyQueue = useCallback((next: MusicQueue | null) => {
+    setQueue(next)
+    saveQueue(next)
+  }, [])
+  // Sửa danh sách lúc đang phát: hàng đợi đi theo
+  const activeListKey = `list:${brewMusicApi.prefs.active}`
+  const activeListIds = brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids
+  useEffect(() => {
+    if (queue?.key !== activeListKey) return
+    const ids = activeListIds.filter((id) => tracks.some((tr) => tr.id === id))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- giữ hàng đợi khớp danh sách
+    if (ids.length && ids.join() !== queue.ids.join()) applyQueue({...queue, ids})
+  }, [activeListIds, activeListKey, queue, tracks, applyQueue])
   const onBrew = useCallback((level: number | null, paused: boolean) => {
     brewState.current = {level, paused}
     sceneRef.current?.setBrew(level, paused)
@@ -1514,16 +1553,19 @@ export function ChillRoom({
   }, [dest.scenery])
 
   useEffect(() => {
-    audioRef.current?.setVolume(volume)
-  }, [volume])
+    // Vào / ra giờ nghỉ thì nhạc nhỏ dần; khách kéo thanh thì theo tay ngay
+    const byHand = lastVolume.current !== volume
+    lastVolume.current = volume
+    audioRef.current?.setVolume(effectiveVolume, byHand ? 0.05 : 0.8)
+  }, [volume, effectiveVolume])
 
   useEffect(() => {
     audioRef.current?.setAmbience(ambience, AMBIENCE_FOR[weather].kind)
   }, [ambience, weather])
 
   useEffect(() => {
-    audioRef.current?.setMix(mix)
-  }, [mix])
+    audioRef.current?.setMix(effectiveMix)
+  }, [effectiveMix])
 
   // Giờ địa phương của điểm đến
   useEffect(() => {
@@ -1668,18 +1710,68 @@ export function ChillRoom({
   // Bài kế tiếp trong CÙNG trạm (vòng lại đầu trạm khi hết)
   const nextIndex = useCallback(
     (from: number) => {
-      const list = tracks.map((t, i) => ({t, i})).filter(({t}) => stationOf(t) === stationOf(tracks[from]))
-      if (list.length < 2) return list[0]?.i ?? from
-      const pos = list.findIndex(({i}) => i === from)
-      if (!shuffle) return list[(pos + 1) % list.length].i
+      const list = queueIdx.includes(from) ? queueIdx : tracks.flatMap((t, i) => (stationOf(t) === stationOf(tracks[from]) ? [i] : []))
+      if (list.length < 2) return list[0] ?? from
+      const pos = list.indexOf(from)
+      if (!shuffle) return list[(pos + 1) % list.length]
       let k = pos
       while (k === pos) k = Math.floor(Math.random() * list.length)
-      return list[k].i
+      return list[k]
     },
-    [shuffle, tracks]
+    [shuffle, tracks, queueIdx]
   )
 
-  const next = useCallback(() => playAt(nextIndex(index)), [index, nextIndex, playAt])
+  // Bài tự hết thì sang bài tiếp, không tính là bỏ qua
+  const nextAuto = useCallback(() => playAt(nextIndex(index)), [index, nextIndex, playAt])
+  const next = useCallback(() => {
+    // Khách bỏ qua sớm 1 bài quán chọn → lần sau ít gợi ý bài đó hơn
+    const audio = audioRef.current
+    if (queueOn && queue?.key.startsWith('suggest:') && audio && started && audio.position() < 30) addSkip(tracks[index].id)
+    playAt(nextIndex(index))
+  }, [index, nextIndex, playAt, queueOn, queue, started, tracks])
+  // Khách tự chọn 1 bài ngoài hàng đợi → thôi hàng đợi, về nghe theo trạm
+  const pickTrack = useCallback(
+    (i: number) => {
+      if (queue && !queueIdx.includes(i)) applyQueue(null)
+      playAt(i)
+    },
+    [queue, queueIdx, applyQueue, playAt]
+  )
+  useEffect(() => {
+    if (brewFlag && started) pushRecent(track.id)
+  }, [brewFlag, started, track.id])
+  // Bắt đầu phin: phát bộ nhạc đã chọn. Vẫn đang nghe đúng bộ đó thì đi tiếp, không đổi bài
+  const onBrewBegin = useCallback(
+    (manual: boolean, minutes: number) => {
+      const {source, prefs, suggestion, byId} = brewMusicApi
+      if (manual && prefs.mix !== 'scene') audioRef.current?.setMix(MIX_PRESETS[prefs.mix], true)
+      trackEvent({name: 'Chill Focus', props: {action: 'music-start', music: source, ...(source === 'suggest' ? {mood: prefs.mood} : {})}})
+      if (source === 'current') return
+      const key = source === 'suggest' ? `suggest:${prefs.mood}` : `list:${prefs.active}`
+      if (queue?.key === key && queueOn && playing) {
+        if (source !== 'suggest') return
+        const rest = queue.ids.slice(queue.ids.indexOf(track.id))
+        if (totalSeconds(rest, byId) >= minutes * 60) return
+        const more = suggestQueue({tracks, mood: prefs.mood, minutes, exclude: queue.ids, recent: loadRecent(), skips: loadSkips(), time, weather})
+        applyQueue({...queue, ids: [...queue.ids, ...more]})
+        return
+      }
+      const ids = (source === 'suggest' ? suggestion : prefs.lists[prefs.active].ids).filter((id) => byId.has(id))
+      if (!ids.length) return
+      const list = prefs.lists[prefs.active]
+      applyQueue({key, label: source === 'suggest' ? t.brew.queueLabel(t.brew.moods[prefs.mood]) : list.name, ids})
+      if (manual) playAt(tracks.findIndex((tr) => tr.id === ids[0]), playing)
+    },
+    [brewMusicApi, queue, queueOn, playing, track.id, tracks, time, weather, applyQueue, playAt, t]
+  )
+  // Đổi bộ khác lúc đang pha: bài đang phát chạy nốt, các bài sau đổi hết
+  const rerollPlaying = useCallback(() => {
+    if (!queue || !queueOn) return
+    const {prefs, minutes} = brewMusicApi
+    const more = suggestQueue({tracks, mood: prefs.mood, minutes, exclude: queue.ids, recent: loadRecent(), skips: loadSkips(), time, weather})
+    applyQueue({...queue, ids: [track.id, ...more.filter((id) => id !== track.id)]})
+    trackEvent({name: 'Chill Focus', props: {action: 'music-reroll'}})
+  }, [queue, queueOn, brewMusicApi, tracks, time, weather, track.id, applyQueue])
   const nextSmooth = useCallback(() => playAt(nextIndex(index), true), [index, nextIndex, playAt])
 
   const prev = useCallback(() => {
@@ -1689,10 +1781,10 @@ export function ChillRoom({
       setPosition(0)
       return
     }
-    const list = tracks.map((t, i) => ({t, i})).filter(({t}) => stationOf(t) === stationOf(tracks[index]))
-    const pos = list.findIndex(({i}) => i === index)
-    playAt(list[(pos - 1 + list.length) % list.length].i)
-  }, [index, playAt, started, tracks])
+    const list = queueOn ? queueIdx : tracks.flatMap((t, i) => (stationOf(t) === stationOf(tracks[index]) ? [i] : []))
+    const pos = list.indexOf(index)
+    playAt(list[(pos - 1 + list.length) % list.length])
+  }, [index, playAt, started, tracks, queueOn, queueIdx])
 
   // Đổi tab trạm chỉ đổi danh sách đang xem; bài đang phát / tạm dừng vẫn giữ nguyên. Chưa
   // phát bài nào thì bài đầu của trạm thành bài chờ, bấm Play là nghe trạm đó
@@ -1783,8 +1875,8 @@ export function ChillRoom({
     const audio = audioRef.current
     if (!audio) return
     audio.onNearEnd = nextSmooth
-    audio.onEnded = next
-  }, [next, nextSmooth])
+    audio.onEnded = nextAuto
+  }, [nextAuto, nextSmooth])
 
   useEffect(() => {
     if (!playing) return
@@ -1892,7 +1984,7 @@ export function ChillRoom({
   useEffect(() => {
     if (!('mediaSession' in navigator) || !started) return
     // Công tắc cửa sổ nổi bật: thêm trạm, điểm đến và ảnh quán
-    const stationName = STATIONS.find((st) => st.id === stationOf(track))?.label ?? ''
+    const stationName = queueLabel ?? STATIONS.find((st) => st.id === stationOf(track))?.label ?? ''
     navigator.mediaSession.metadata = new MediaMetadata(
       miniFlag
         ? {
@@ -1911,7 +2003,7 @@ export function ChillRoom({
     navigator.mediaSession.setActionHandler('pause', togglePlay)
     navigator.mediaSession.setActionHandler('nexttrack', next)
     navigator.mediaSession.setActionHandler('previoustrack', prev)
-  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex])
+  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex, queueLabel])
 
   const closeMini = useCallback(() => {
     miniRef.current = false
@@ -1959,7 +2051,7 @@ export function ChillRoom({
     else miniVideoRef.current?.close()
   }, [miniWin])
   // Bấm 1 bài trong danh sách của cửa sổ nổi: bài đang phát thì phát/dừng
-  const pickMini = useCallback((i: number) => (i === index && started ? togglePlay() : playAt(i)), [index, started, togglePlay, playAt])
+  const pickMini = useCallback((i: number) => (i === index && started ? togglePlay() : pickTrack(i)), [index, started, togglePlay, pickTrack])
   // Rời trang khi cửa sổ nổi còn mở → đóng luôn
   useEffect(() => () => miniWin?.close(), [miniWin])
   useEffect(() => () => miniVideoRef.current?.destroy(), [])
@@ -2017,12 +2109,14 @@ export function ChillRoom({
     const next = {...(mix ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)), [channel]: value}
     if (!mix) trackEvent({name: 'Chill Mix', props: {preset: 'custom'}})
     setMix(next)
+    if (brewing) brewMusicApi.setMix('scene')
     audioRef.current?.setMix(next, true)
   }
   const choosePreset = (id: MixPreset | 'scene' | 'mute') => {
     const next = id === 'scene' ? null : id === 'mute' ? SILENT : MIX_PRESETS[id]
     trackEvent({name: 'Chill Mix', props: {preset: id}})
     setMix(next)
+    if (brewing) brewMusicApi.setMix('scene')
     audioRef.current?.setMix(next, true)
   }
 
@@ -2507,10 +2601,10 @@ export function ChillRoom({
   const timeLabel = t.room.times[time]
   const weatherLabel = t.room.weathers[weather]
   const ambienceLabel = t.room.ambience[AMBIENCE_FOR[weather].kind]
-  const mixShown = mix ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)
-  const mixPreset = presetOf(mix)
+  const mixShown = effectiveMix ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)
+  const mixPreset = presetOf(effectiveMix)
   const progress = duration ? Math.min(1, position / duration) : 0
-  const stationLabel = STATIONS.find((st) => st.id === playingStation)?.label ?? ''
+  const stationLabel = queueLabel ?? STATIONS.find((st) => st.id === playingStation)?.label ?? ''
   const hideUi = idle && started && !panelOpen && !volumeOpen && !sleepOpen && !sleepNudge && !showHintTip && !wishOpen && !todayOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesSeen.toast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
@@ -2624,7 +2718,7 @@ export function ChillRoom({
   // Hàng nhạc trong tấm đồng hồ: như thanh nhạc, gọn hơn
   const brewMusic = (
     <div className="flex items-center gap-2 sm:gap-3">
-      <span className="hidden sm:contents lg:hidden">
+      <span className="hidden sm:contents xl:hidden">
         <RoundButton label={t.room.prev} onClick={prev}>
           <PrevIcon />
         </RoundButton>
@@ -2657,6 +2751,22 @@ export function ChillRoom({
         aria-label={t.room.volume}
         className="hidden w-24 accent-[#e8b27d] md:block lg:hidden"
       />
+      {queue?.key.startsWith('suggest:') && queueOn && (
+        <RoundButton label={t.brew.rerollShort} onClick={rerollPlaying}>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" aria-hidden>
+            <path d="M1.5 4.5h3l6 7h4M1.5 11.5h3l1.8-2.1M8.7 6.6l1.8-2.1h4M12.5 2.5l2 2-2 2M12.5 9.5l2 2-2 2" />
+          </svg>
+        </RoundButton>
+      )}
+      {queue?.key.startsWith('list:') && queueOn ? (
+        <RoundButton label={t.brew.openList} onClick={() => brewMusicApi.setPickerOpen(true)}>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" aria-hidden>
+            <path d="M2 4h9M2 8h9M2 12h6M13 8v5" />
+          </svg>
+        </RoundButton>
+      ) : (
+        <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(track.id)} title={track.title} onToggle={() => brewMusicApi.toggleInList(track.id)} />
+      )}
       <RoundButton
         label={t.room.settings}
         onClick={() => {
@@ -2796,7 +2906,7 @@ export function ChillRoom({
                     <li key={tr.id}>
                       <button
                         type="button"
-                        onClick={() => (active && started ? togglePlay() : playAt(i))}
+                        onClick={() => (active && started ? togglePlay() : pickTrack(i))}
                         aria-current={active ? 'true' : undefined}
                         className={`grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition ${
                           active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
@@ -2858,6 +2968,21 @@ export function ChillRoom({
       )}
 
       {/* Mọi nút / bảng nằm trong lớp này — Zen thì giấu cả lớp, cảnh + nhạc vẫn chạy */}
+      {brewFlag && brewMusicApi.pickerOpen && (
+        <MusicPicker
+          api={brewMusicApi}
+          tracks={tracks}
+          playingId={started ? track.id : null}
+          onPreview={
+            brewing
+              ? undefined
+              : (id) => {
+                  const i = tracks.findIndex((tr) => tr.id === id)
+                  if (i >= 0) pickTrack(i)
+                }
+          }
+        />
+      )}
       {/* Tấm đồng hồ của Bàn pha phin (Focus.tsx đặt vào đây). Nằm ngoài lớp giao diện vì khác
           với thanh nhạc, nó không ẩn hẳn khi khách không động chuột và vẫn hiện lúc Ngắm cảnh */}
       {brewFlag && (
@@ -3442,7 +3567,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} />} onBrewBegin={onBrewBegin} onMinutes={brewMusicApi.setMinutes} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
             <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
               <p className="text-sm text-[#f3ece4]">{t.quest.added}</p>
               <NameField label={t.name.onBoard} className="mt-1" />
@@ -3770,7 +3895,7 @@ export function ChillRoom({
           Điện thoại / màn dọc: hàng ngang nút tròn gọn ngay trên thanh nhạc.
           Màn ngang ≥1024px: cột dọc sát mép phải, đáy ngang đáy thanh nhạc (khoảng trống
           bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi */}
-      <div className={`absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end ${brewing ? 'max-lg:hidden' : ''}`}>
+      <div className={`absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end ${brewing ? 'max-xl:hidden' : ''}`}>
         <div ref={setDiarySlot} className="contents" />
         {/* Điện thoại: Góp ý + Mời bạn nằm trong Thực đơn; đang ngồi bàn nhóm thì nút bàn vẫn ở đây */}
         <div ref={setWishSlot} className="hidden sm:contents" />
@@ -4021,12 +4146,12 @@ export function ChillRoom({
                 {stationList.map(({tr, i}, pos) => {
                   const active = i === index
                   return (
-                    <li key={tr.id}>
+                    <li key={tr.id} className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => (active && started ? togglePlay() : playAt(i))}
+                        onClick={() => (active && started ? togglePlay() : pickTrack(i))}
                         aria-current={active ? 'true' : undefined}
-                        className={`grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition ${
+                        className={`grid min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition ${
                           active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
                         }`}
                       >
@@ -4046,6 +4171,7 @@ export function ChillRoom({
                           <PlayMeter stat={plays?.get(tr.id)} />
                         </span>
                       </button>
+                      {brewFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
                     </li>
                   )
                 })}

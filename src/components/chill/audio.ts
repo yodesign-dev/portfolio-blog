@@ -476,9 +476,10 @@ export class ChillAudio {
     return real && Number.isFinite(real) ? real : this.track.duration
   }
 
-  setVolume(value: number) {
+  // `fade` = hằng số thời gian (giây): kéo thanh thì theo tay, vào giờ nghỉ thì nhỏ dần
+  setVolume(value: number, fade = 0.05) {
     this.volume = value
-    if (this.ctx) this.master.gain.setTargetAtTime(value * value, this.ctx.currentTime, 0.05)
+    if (this.ctx) this.master.gain.setTargetAtTime(value * value, this.ctx.currentTime, fade)
   }
 
   // Hẹn giờ tắt nhạc: từ `fadeAt` giây nữa, nhạc + tiếng nền nhỏ dần trong `fade` giây tới

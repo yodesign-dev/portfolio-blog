@@ -86,6 +86,9 @@ export function Focus({
   zen = false,
   dimmed = false,
   onBrew,
+  musicSetup = null,
+  onBrewBegin,
+  onMinutes,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -124,6 +127,12 @@ export function Focus({
   dimmed?: boolean
   // Phin trong cảnh: tiến độ 0…1, null = không pha
   onBrew?: (level: number | null, paused: boolean) => void
+  // Mục Nhạc trong bảng chuẩn bị (BrewMusic.tsx)
+  musicSetup?: ReactNode
+  // Bắt đầu 1 phin. manual = khách vừa bấm (được phép phát nhạc), false = tự chạy vòng
+  onBrewBegin?: (manual: boolean, minutes: number) => void
+  // Độ dài đang chọn, để quán chọn bộ nhạc vừa đủ
+  onMinutes?: (minutes: number) => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -214,6 +223,10 @@ export function Focus({
     }
   }, [brew])
 
+  useEffect(() => {
+    if (brew) onMinutes?.(minutes)
+  }, [brew, minutes, onMinutes])
+
   const onOpenSignal = useEffectEvent(() => {
     if (brew && session) setCompact(false)
     else setOpen(true)
@@ -224,7 +237,9 @@ export function Focus({
   }, [openSignal])
 
   // Bắt đầu 1 phin hoặc 1 giờ nghỉ. Nghỉ dài khi vừa xong phin thứ 4, 8… của vòng
-  const begin = (kind: 'phin' | 'break', at = Date.now(), round = chainCount(chain, at)) => {
+  const begin = (kind: 'phin' | 'break', given?: number, roundGiven?: number) => {
+    const at = given ?? Date.now()
+    const round = roundGiven ?? chainCount(chain, at)
     let next: Session
     if (kind === 'break') {
       const long = round > 0 && round % LONG_EVERY === 0
@@ -244,6 +259,7 @@ export function Focus({
       // Phin ngắn không góp vào thử thách chung
       if (minutes >= MIN_FULL_PHIN) onStart?.()
       trackEvent({name: 'Chill Focus', props: {action: 'start', ...(brew ? {minutes} : {})}})
+      if (brew) onBrewBegin?.(given === undefined, minutes)
     }
     onPrime()
     setNow(at)
@@ -314,7 +330,8 @@ export function Focus({
   useEffect(() => onOpenChange(open), [open, onOpenChange])
   useEffect(() => {
     if (!open) return
-    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && close()
+    // Bảng chọn nhạc nổi riêng ngoài bảng này: bấm trong đó không đóng bảng
+    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && !(e.target as Element).closest?.('[data-brew-keep]') && close()
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
@@ -601,7 +618,7 @@ export function Focus({
                 </div>
               ) : done ? (
                 summary
-              ) : (
+              ) : brew ? null : (
                 <p className="mt-2 text-sm leading-relaxed text-[#ede6dd]">{t.focus.pitch}</p>
               )}
               <TodoList todos={todos} picked={picked} onPick={setPicked} onAdd={add} onCheck={check} onRemove={drop} />
@@ -665,6 +682,7 @@ export function Focus({
                   {minutes < MIN_FULL_PHIN && <p className="text-center text-[11px] leading-snug text-[#a79e94]">{t.focus.shortNote}</p>}
                 </div>
               )}
+              {brew && !done && musicSetup}
               {round > 0 && (
                 <div className="mt-3 flex items-center gap-2 text-xs text-[#a79e94]">
                   <span className="flex gap-1" role="img" aria-label={t.focus.chainAria(roundDots, LONG_EVERY)}>
@@ -675,11 +693,13 @@ export function Focus({
                   <span>{t.focus.chainLeft(roundDots, LONG_EVERY)}</span>
                 </div>
               )}
+              {/* Bàn pha phin: bảng dài nên nút bắt đầu luôn nằm trong tầm nhìn */}
+              <div className={brew ? 'sticky -bottom-4 z-10 -mx-4 mt-3 bg-[#1b1a21] px-4 py-3 max-sm:-bottom-[max(1rem,env(safe-area-inset-bottom))]' : ''}>
               {done && (
                 <button
                   type="button"
                   onClick={() => beginFromPanel('break')}
-                  className="mt-3 w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
+                  className="w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
                 >
                   {t.focus.takeBreak(nextBreakLong ? LONG_BREAK_MIN : BREAK_MIN, nextBreakLong)}
                 </button>
@@ -690,11 +710,12 @@ export function Focus({
                 className={
                   done
                     ? 'mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
-                    : 'mt-3 w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]'
+                    : `${brew ? '' : 'mt-3 '}w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]`
                 }
               >
                 {done ? t.focus.again : t.focus.start}
               </button>
+              </div>
               <button
                 type="button"
                 role="switch"
