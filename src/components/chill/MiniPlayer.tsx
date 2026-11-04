@@ -17,6 +17,7 @@ import {createPortal} from 'react-dom'
 import {useT} from './i18n'
 import {HotBadge, NewBadge, PlayMeter, type PlayStat} from './PlayMeter'
 import {STATIONS, stationOf, type StationId, type Track} from './tracks'
+import {PixelClock, type BrewControls, type BrewInfo} from './BrewDesk'
 
 type DocumentPiP = {
   requestWindow: (opts?: {width?: number; height?: number}) => Promise<Window>
@@ -68,6 +69,9 @@ export function MiniPlayer({
   onNext,
   onPick,
   onClose,
+  brew = null,
+  controls,
+  queue = null,
 }: {
   win: Window
   // Canvas gốc của cảnh
@@ -88,13 +92,17 @@ export function MiniPlayer({
   // Bấm 1 bài trong danh sách (bài đang phát thì phát/dừng)
   onPick: (i: number) => void
   onClose: () => void
+  // Bàn pha phin: đồng hồ và hàng đợi nhạc
+  brew?: BrewInfo | null
+  controls?: React.RefObject<BrewControls | null>
+  queue?: {label: string; indices: number[]} | null
 }) {
   const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const track = tracks[index]
   const [listOpen, setListOpen] = useState(false)
   // Tab trạm đang xem trong danh sách — mở danh sách là về trạm của bài đang phát
-  const [tab, setTab] = useState<StationId>(stationOf(track))
+  const [tab, setTab] = useState<StationId | 'queue'>(queue ? 'queue' : stationOf(track))
   const [tall, setTall] = useState(false)
 
   // Đóng cửa sổ (nút X của trình duyệt / nút về quán / tắt trang) → báo ChillRoom
@@ -129,7 +137,7 @@ export function MiniPlayer({
 
   const showList = tall || listOpen
   const openList = () => {
-    setTab(stationOf(track))
+    setTab(queue ? 'queue' : stationOf(track))
     setListOpen((o) => !o)
   }
 
@@ -174,7 +182,10 @@ export function MiniPlayer({
   }, [win, source, draw])
 
   const btn = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur transition hover:bg-black/70'
-  const list = tracks.map((tr, i) => ({tr, i})).filter(({tr}) => stationOf(tr) === tab)
+  const list = tab === 'queue' && queue ? queue.indices.map((i) => ({tr: tracks[i], i})) : tracks.map((tr, i) => ({tr, i})).filter(({tr}) => stationOf(tr) === tab)
+  const brewOn = Boolean(brew && (brew.running || brew.finished || brew.rested))
+  const blockCount = brew ? (brew.minutes > 60 ? Math.ceil(brew.minutes / 2) : brew.minutes) : 0
+  const pill = 'flex h-8 min-w-0 items-center justify-center rounded-full border border-white/20 px-2.5 text-xs text-[#ede6dd] transition hover:bg-white/10'
   const listLabel = listOpen ? t.room.miniListClose : t.room.miniList
 
   return createPortal(
@@ -183,7 +194,7 @@ export function MiniPlayer({
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" role="img" aria-label={track.title} />
         <div
           className={`absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-black/70 via-transparent to-black/30 p-2.5 transition-opacity duration-300 ${
-            playing ? 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100' : 'opacity-100'
+            playing || brewOn ? 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100' : 'opacity-100'
           }`}
         >
           <div className="flex justify-end gap-2">
@@ -200,7 +211,7 @@ export function MiniPlayer({
               </svg>
             </button>
           </div>
-          <div className="flex items-end gap-2">
+          <div className={`flex items-end gap-2 ${brewOn ? 'hidden' : ''}`}>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-white">{track.title}</p>
               <p className="truncate text-[11px] text-white/70">{station}</p>
@@ -233,9 +244,90 @@ export function MiniPlayer({
         </div>
       </div>
 
+      {brew && brewOn && (
+        <div className={`absolute inset-x-2 z-[5] rounded-xl border bg-[#16131a]/90 p-2 ${tall ? 'top-2' : 'bottom-2'} ${brew.rest || brew.finished ? 'border-[#9fd4a8]/45' : 'border-[#e8b27d]/35'}`}>
+          {brew.running ? (
+            <>
+              <div className="flex items-center gap-2">
+                <span className={`${brew.rest ? 'text-[#e3f2e5]' : 'text-[#f3cfa8]'} ${brew.paused ? 'opacity-50' : ''}`}>
+                  <PixelClock text={brew.clock} className="h-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium text-white">{track.title}</span>
+                  <span className="block truncate font-mono text-[9px] uppercase tracking-[0.12em] text-[#a79e94]">{station}</span>
+                </span>
+                <button type="button" onClick={onTogglePlay} aria-label={playing ? t.room.pause : t.room.play} title={playing ? t.room.pause : t.room.play} className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d={playing ? 'M6 4h4v16H6zM14 4h4v16h-4z' : 'M7 4.5v15l13-7.5z'} />
+                  </svg>
+                </button>
+                <button type="button" onClick={onNext} aria-label={t.room.next} title={t.room.next} className="flex size-8 shrink-0 items-center justify-center rounded-full text-[#ede6dd] transition hover:bg-white/10">
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M5 5v14l10-7L5 5Z" />
+                    <rect x="16.5" y="5" width="2.5" height="14" />
+                  </svg>
+                </button>
+                {brew.rest ? (
+                  <button type="button" onClick={() => controls?.current?.skipBreak()} className="flex h-8 shrink-0 items-center rounded-full bg-[#9fd4a8] px-2.5 text-xs font-semibold text-[#14261a] transition hover:bg-[#b3dfba]">
+                    {t.focus.again}
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => controls?.current?.togglePause()} className="flex h-8 shrink-0 items-center rounded-full bg-[#e8b27d] px-2.5 text-xs font-semibold text-[#2a1a10] transition hover:bg-[#f0c294]">
+                    {brew.paused ? t.focus.resume : t.focus.pause}
+                  </button>
+                )}
+              </div>
+              <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(brew.progress * 100)} className="mt-1.5 flex h-1.5 gap-px">
+                {Array.from({length: blockCount}).map((_, i) => (
+                  <i key={i} className={`min-w-0 flex-1 ${i < Math.floor(brew.progress * blockCount) ? (brew.rest ? 'bg-[#9fd4a8]' : 'bg-[#e8b27d]') : 'bg-white/10'}`} />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div role="status" className="grid gap-1.5">
+              <p className="text-sm font-bold text-white">{brew.finished ? t.focus.doneTitle(brew.finished.minutes) : t.focus.restedTitle}</p>
+              {brew.finished?.task && !brew.finished.taskDone && (
+                <p className="flex items-center gap-2 text-xs text-[#c9c0b6]">
+                  <span className="min-w-0 flex-1 truncate">{brew.finished.task}</span>
+                  <button type="button" onClick={() => controls?.current?.finishTask()} className="shrink-0 font-semibold text-[#f3cfa8] underline underline-offset-2">
+                    {t.todo.markDone}
+                  </button>
+                </p>
+              )}
+              <div className="flex gap-1.5">
+                {brew.finished && (
+                  <button type="button" onClick={() => controls?.current?.takeBreak()} className="flex h-8 flex-1 items-center justify-center rounded-full bg-[#9fd4a8] px-2 text-xs font-semibold text-[#14261a] transition hover:bg-[#b3dfba]">
+                    {t.focus.takeBreak(brew.nextBreak, brew.nextBreak > 5)}
+                  </button>
+                )}
+                <button type="button" onClick={() => controls?.current?.brewAgain()} className={pill}>
+                  {t.focus.again}
+                </button>
+                <button type="button" onClick={() => win.close()} className={pill}>
+                  {t.room.miniReturn}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {showList && (
         <div className={`flex min-h-0 flex-col bg-[#16131a] ${tall ? 'flex-1 border-t border-white/10' : 'absolute inset-0 z-10 bg-[#16131a]/95 backdrop-blur'}`}>
           <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto px-2.5 pb-1.5 pt-2.5 [scrollbar-width:none]" role="radiogroup" aria-label={t.room.stationAria}>
+            {queue && (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={tab === 'queue'}
+                onClick={() => setTab('queue')}
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs transition ${
+                  tab === 'queue' ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
+                }`}
+              >
+                {queue.label}
+              </button>
+            )}
             {STATIONS.map((st) => {
               const count = tracks.filter((tr) => stationOf(tr) === st.id).length
               if (!count) return null

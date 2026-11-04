@@ -52,7 +52,7 @@ export type AnalyticsEvent =
   // Khung nhúng /chill/embed: hiện lên / bấm phát lần đầu / bấm sang quán đầy đủ.
   // `host` = site đang nhúng (vd www.notion.so), "direct" = mở thẳng link không qua khung
   | {name: 'Chill Embed'; props: {action: 'view' | 'play' | 'open'; host: string}}
-  | {name: 'Chill Mini'; props: {from: 'button' | 'auto' | 'guide' | 'update'}}
+  | {name: 'Chill Mini'; props: {from: 'button' | 'auto' | 'guide' | 'update' | 'brew'}}
   // Hẹn giờ tắt nhạc: số phút chọn
   | {name: 'Chill Sleep Timer'; props: {minutes: number}}
   // Mùa (Noel…): view = lần đầu thấy trong lần mở trang · on / quiet / off = khách chọn · tree = treo thêm món

@@ -27,11 +27,11 @@ import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mi
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {TREE_MAX, activeSeason, loadSeasonPref, loadTree, momentOn, readSeasonPreview, saveSeasonPref, saveTree, type Season, type SeasonPref} from './season'
 import {Focus} from './Focus'
-import {MIN_FULL_PHIN} from './BrewDesk'
-import {AddTrackButton, MusicChooser, MusicPicker, useBrewMusic} from './BrewMusic'
+import {MIN_FULL_PHIN, type BrewControls, type BrewInfo} from './BrewDesk'
+import {AddTrackButton, MusicChooser, MusicPicker, notifyBrew, useBrewMusic} from './BrewMusic'
 import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, suggestQueue, totalSeconds, type MusicQueue} from './playlist'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
-import {MiniVideo, canVideoPiP} from './MiniVideo'
+import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
 import {LiveBadge} from './LiveBadge'
@@ -328,6 +328,8 @@ export function ChillRoom({
   const [regular, setRegular] = useState<Regular>({days: [], total: 0, phins: 0})
   const stamped = useRef(false)
   const [focusLabel, setFocusLabel] = useState<string | null>(null)
+  // Khách cho phép báo khi hết giờ (đọc qua ref vì các hàm báo xong phin khai báo trước)
+  const brewNotifyOn = useRef(false)
   // Tải lại lúc đang pha: Focus báo trước khi có cảnh, nên giữ lại để cảnh nhận khi vừa tạo
   const brewState = useRef<{level: number | null; paused: boolean}>({level: null, paused: false})
   const [focusOpen, setFocusOpen] = useState(false)
@@ -773,6 +775,11 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
     setBrewFlag(param ? param === '1' : brewDeskOn)
   }, [brewDeskOn])
+  const [brewInfo, setBrewInfo] = useState<BrewInfo | null>(null)
+  const brewControls = useRef<BrewControls | null>(null)
+  const onBrewControls = useCallback((c: BrewControls) => {
+    brewControls.current = c
+  }, [])
   const brewMusicApi = useBrewMusic({enabled: brewFlag, tracks, time, weather, playing})
   // Tiếng nền riêng cho phiên + giờ nghỉ, không đụng vào bản trộn khách đã lưu
   const brewPhase = !brewing ? null : focusLabel!.startsWith('☕') ? 'break' : 'phin'
@@ -803,6 +810,9 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- giữ hàng đợi khớp danh sách
     if (ids.length && ids.join() !== queue.ids.join()) applyQueue({...queue, ids})
   }, [activeListIds, activeListKey, queue, tracks, applyQueue])
+  useEffect(() => {
+    brewNotifyOn.current = brewFlag && brewMusicApi.prefs.notify
+  }, [brewFlag, brewMusicApi.prefs.notify])
   const onBrew = useCallback((level: number | null, paused: boolean) => {
     brewState.current = {level, paused}
     sceneRef.current?.setBrew(level, paused)
@@ -1412,6 +1422,7 @@ export function ChillRoom({
     sceneRef.current?.noticeCat()
     sayCat(t.room.catPhin)
     // Phin ngắn (độ dài tuỳ chỉnh) chỉ cộng phút: không quà kệ, không thử thách, không treo cây
+    if (brewNotifyOn.current) notifyBrew(t.brew.notifyDone(minutes), t.brew.notifyDoneBody)
     if (minutes < MIN_FULL_PHIN) {
       setRegular((r) => addMinutes(r, minutes))
       setGift(null)
@@ -1444,6 +1455,7 @@ export function ChillRoom({
   // Hết giờ nghỉ giữa 2 phin: chuông khác + mèo gọi pha tiếp (không tính gì thêm)
   const onBreakDone = useCallback(() => {
     audioRef.current?.breakChime()
+    if (brewNotifyOn.current) notifyBrew(t.brew.notifyBreak, t.brew.notifyBreakBody)
     sceneRef.current?.noticeCat()
     sayCat(t.room.catBreak)
   }, [sayCat, t])
@@ -1985,25 +1997,27 @@ export function ChillRoom({
     if (!('mediaSession' in navigator) || !started) return
     // Công tắc cửa sổ nổi bật: thêm trạm, điểm đến và ảnh quán
     const stationName = queueLabel ?? STATIONS.find((st) => st.id === stationOf(track))?.label ?? ''
+    // Đang pha phin: màn hình khoá hiện giờ còn lại, đổi mỗi phút
+    const brewLine = !brewInfo?.running ? null : brewInfo.paused ? t.brew.lockPaused : brewInfo.rest ? t.brew.lockBreak(brewInfo.leftMin) : t.brew.lockLeft(brewInfo.leftMin)
     navigator.mediaSession.metadata = new MediaMetadata(
       miniFlag
         ? {
             title: track.title,
-            artist: `${stationName} · Lofi Pixel Cafe`,
+            artist: brewLine ? `${brewLine} · ${stationName}` : `${stationName} · Lofi Pixel Cafe`,
             album: destinations[destIndex]?.name,
             artwork: [
               {src: '/chill/app/icon-192.png', sizes: '192x192', type: 'image/png'},
               {src: '/chill/app/icon-512.png', sizes: '512x512', type: 'image/png'},
             ],
           }
-        : {title: track.title, artist: 'Chill for work', album: track.mood}
+        : {title: track.title, artist: brewLine ? `${brewLine} · ${stationName}` : 'Chill for work', album: track.mood}
     )
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
     navigator.mediaSession.setActionHandler('play', togglePlay)
     navigator.mediaSession.setActionHandler('pause', togglePlay)
     navigator.mediaSession.setActionHandler('nexttrack', next)
     navigator.mediaSession.setActionHandler('previoustrack', prev)
-  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex, queueLabel])
+  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex, queueLabel, brewInfo?.running, brewInfo?.paused, brewInfo?.rest, brewInfo?.leftMin, t])
 
   const closeMini = useCallback(() => {
     miniRef.current = false
@@ -2021,7 +2035,7 @@ export function ChillRoom({
     miniVideoRef.current.prepare()
   }, [closeMini])
   const openMini = useCallback(
-    (from: 'button' | 'auto' | 'guide' | 'update') => {
+    (from: 'button' | 'auto' | 'guide' | 'update' | 'brew') => {
       const opened = () => {
         miniRef.current = true
         markTried('mini')
@@ -2556,9 +2570,10 @@ export function ChillRoom({
     return () => window.removeEventListener('keydown', onKey)
   }, [togglePlay, next, prev, toggleFullscreen, toggleZen, zenList])
 
-  // Đang phát nhạc thì giữ màn hình không tự tắt (trình duyệt tự nhả khi tab ẩn)
+  // Đang phát nhạc hoặc đang pha phin thì giữ màn hình không tự tắt (trình duyệt tự nhả khi tab ẩn)
+  const keepAwake = playing || Boolean(brewInfo?.running && !brewInfo.paused)
   useEffect(() => {
-    if (!playing || !('wakeLock' in navigator)) return
+    if (!keepAwake || !('wakeLock' in navigator)) return
     let lock: WakeLockSentinel | null = null
     let cancelled = false
     const acquire = () => {
@@ -2578,7 +2593,7 @@ export function ChillRoom({
       document.removeEventListener('visibilitychange', acquire)
       void lock?.release()
     }
-  }, [playing])
+  }, [keepAwake])
 
   // Tên bài lên tiêu đề tab — làm việc ở tab khác vẫn biết đang nghe gì
   const baseTitle = useRef('')
@@ -2820,6 +2835,9 @@ export function ChillRoom({
               plays={plays}
               index={index}
               station={`${stationLabel} · ${dest.name}`}
+              brew={brewFlag ? brewInfo : null}
+              controls={brewControls}
+              queue={queueOn && queue ? {label: queue.label, indices: queueIdx} : null}
               playing={playing}
               onTogglePlay={togglePlay}
               onPrev={prev}
@@ -2828,7 +2846,7 @@ export function ChillRoom({
               onClose={closeMini}
             />
           )}
-          <MiniVideoSync video={miniVideoRef} open={miniVideoOn} title={track.title} station={`${stationLabel} · ${dest.name}`} playing={playing} onToggle={togglePlay} />
+          <MiniVideoSync video={miniVideoRef} open={miniVideoOn} title={track.title} station={`${stationLabel} · ${dest.name}`} timer={!brewFlag || !brewInfo || !(brewInfo.running || brewInfo.finished) ? null : brewInfo.finished ? {clock: '', progress: 1, rest: true, paused: false, label: t.focus.doneTitle(brewInfo.finished.minutes)} : {clock: brewInfo.clock, progress: brewInfo.progress, rest: brewInfo.rest, paused: brewInfo.paused}} playing={playing} onToggle={togglePlay} />
           <div role="status" className="absolute left-1/2 top-16 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/60 py-1.5 pl-4 pr-1.5 text-sm text-[#f3ece4] backdrop-blur">
             {t.room.miniHere}
             <button type="button" onClick={closeAnyMini} className="rounded-full bg-[#e8b27d] px-3 py-1 text-xs font-medium text-[#1a1410] transition hover:bg-[#f0c494]">
@@ -3567,7 +3585,11 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} />} onBrewBegin={onBrewBegin} onMinutes={brewMusicApi.setMinutes} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
+            onBrewBegin(manual, minutes)
+            // Trình duyệt chỉ cho mở cửa sổ nổi ngay trong cú bấm của khách
+            if (manual && brewMusicApi.prefs.miniOnStart && miniFlag && canMini && !miniOpen) openMini('brew')
+          }} onMinutes={brewMusicApi.setMinutes} onBrewInfo={setBrewInfo} onControls={onBrewControls} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
             <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
               <p className="text-sm text-[#f3ece4]">{t.quest.added}</p>
               <NameField label={t.name.onBoard} className="mt-1" />
@@ -4831,12 +4853,13 @@ function SwitchRow({title, desc, on, onToggle}: {title: string; desc: string; on
 const docPiP = () => canMiniPlayer() && new URLSearchParams(window.location.search).get('mini') !== 'video'
 
 // Báo bài / trạm / phát-dừng cho cửa sổ nổi dạng video (MiniVideo.ts tự vẽ chữ lên khung)
-function MiniVideoSync({video, open, title, station, playing, onToggle}: {video: React.RefObject<MiniVideo | null>; open: boolean; title: string; station: string; playing: boolean; onToggle: () => void}) {
+function MiniVideoSync({video, open, title, station, playing, onToggle, timer = null}: {video: React.RefObject<MiniVideo | null>; open: boolean; title: string; station: string; playing: boolean; onToggle: () => void; timer?: MiniVideoTimer | null}) {
+  const timerKey = timer ? JSON.stringify(timer) : ''
   useEffect(() => {
     const mv = video.current
     if (!mv) return
-    mv.update({title, station, playing}, onToggle)
-  }, [video, open, title, station, playing, onToggle])
+    mv.update({title, station, playing, timer: timerKey ? (JSON.parse(timerKey) as MiniVideoTimer) : null}, onToggle)
+  }, [video, open, title, station, playing, onToggle, timerKey])
   return null
 }
 

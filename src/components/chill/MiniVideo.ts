@@ -11,6 +11,8 @@
 // - Tab ẩn: rAF đứng nên vòng vẽ chạy bằng setInterval — Safari có thể giãn nhịp, cảnh chậm
 //   lại nhưng nhạc và tên bài vẫn đúng
 
+import {drawPixelClock} from './BrewDesk'
+
 const W = 640
 const H = 360
 const FPS = 30
@@ -30,7 +32,9 @@ export const canVideoPiP = () => {
   )
 }
 
-export type MiniVideoInfo = {title: string; station: string; playing: boolean}
+// Đồng hồ phin vẽ lên khung (Bàn pha phin). label = dòng thay cho đồng hồ, vd lúc xong phin
+export type MiniVideoTimer = {clock: string; progress: number; rest: boolean; paused: boolean; label?: string}
+export type MiniVideoInfo = {title: string; station: string; playing: boolean; timer?: MiniVideoTimer | null}
 
 export class MiniVideo {
   // Cửa sổ nổi đóng (nút X / nút đưa về tab của hệ thống)
@@ -209,7 +213,29 @@ export class MiniVideo {
     g.addColorStop(1, 'rgba(0,0,0,0.72)')
     ctx.fillStyle = g
     ctx.fillRect(0, H - 110, W, 110)
-    const {title, station, playing} = this.info
+    const {title, station, playing, timer} = this.info
+    if (timer) {
+      const accent = timer.rest ? '#e3f2e5' : '#f3cfa8'
+      if (timer.label) {
+        ctx.fillStyle = 'rgba(22,19,26,0.82)'
+        ctx.fillRect(16, 16, W - 32, 56)
+        ctx.fillStyle = accent
+        ctx.font = `700 26px ${this.font}`
+        ctx.fillText(timer.label, 32, 53, W - 64)
+      } else {
+        ctx.fillStyle = 'rgba(22,19,26,0.72)'
+        ctx.fillRect(16, 16, 198, 72)
+        ctx.fillStyle = accent
+        ctx.globalAlpha = timer.paused ? 0.5 : 1
+        drawPixelClock(ctx, timer.clock, 30, 31, 6)
+        ctx.globalAlpha = 1
+        // Tiến độ sát đáy khung
+        ctx.fillStyle = 'rgba(255,255,255,0.14)'
+        ctx.fillRect(0, H - 6, W, 6)
+        ctx.fillStyle = timer.rest ? '#9fd4a8' : '#e8b27d'
+        ctx.fillRect(0, H - 6, W * timer.progress, 6)
+      }
+    }
     ctx.textBaseline = 'alphabetic'
     ctx.fillStyle = 'rgba(232,178,125,0.95)'
     ctx.font = `600 15px ${this.font}`

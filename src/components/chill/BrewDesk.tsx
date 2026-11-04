@@ -31,6 +31,51 @@ const GLYPHS: Record<string, string[]> = {
   ':': ['0', '1', '0', '0', '0', '1', '0'],
 }
 
+// Vẽ cùng bộ chữ số lên canvas (cửa sổ nổi dạng video của Safari). Trả về chiều rộng
+export function drawPixelClock(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number) {
+  let at = 0
+  for (const char of Array.from(text)) {
+    const glyph = GLYPHS[char]
+    if (!glyph) continue
+    glyph.forEach((row, r) =>
+      Array.from(row).forEach((on, c) => {
+        if (on === '1') ctx.fillRect(x + (at + c) * px, y + r * px, px, px)
+      })
+    )
+    at += glyph[0].length + 1
+  }
+  return (at - 1) * px
+}
+
+// Trạng thái phin gửi ra ngoài Focus cho cửa sổ nổi, màn hình khoá, giữ màn hình
+export type BrewInfo = {
+  clock: string
+  leftMin: number
+  progress: number
+  minutes: number
+  paused: boolean
+  rest: boolean
+  long: boolean
+  running: boolean
+  roundNow: number
+  roundDots: number
+  roundOf: number
+  task?: string
+  // Phin vừa xong, chưa bắt đầu gì tiếp
+  finished: {minutes: number; task?: string; taskDone: boolean} | null
+  rested: boolean
+  nextBreak: number
+  nextMinutes: number
+}
+
+export type BrewControls = {
+  togglePause: () => void
+  skipBreak: () => void
+  takeBreak: () => void
+  brewAgain: () => void
+  finishTask: () => void
+}
+
 export function PixelClock({text, className = ''}: {text: string; className?: string}) {
   const cells: ReactNode[] = []
   let x = 0

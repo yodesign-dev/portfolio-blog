@@ -40,6 +40,10 @@ export type BrewMusicPrefs = {
   active: number
   mix: SessionMix
   breakMode: BreakMode
+  // Mở cửa sổ nổi ngay khi bấm bắt đầu phin
+  miniOnStart: boolean
+  // Báo bằng thông báo hệ thống khi hết giờ mà khách đang ở tab khác
+  notify: boolean
 }
 
 const PREFS_KEY = 'chill:brew-music'
@@ -54,6 +58,8 @@ export const defaultPrefs = (listNames: readonly string[] = []): BrewMusicPrefs 
   active: 0,
   mix: 'scene',
   breakMode: 'duck',
+  miniOnStart: false,
+  notify: false,
 })
 
 const oneOf = <T extends string>(all: readonly T[], v: unknown, fallback: T): T => (all.includes(v as T) ? (v as T) : fallback)
@@ -78,6 +84,8 @@ export function parsePrefs(raw: unknown, listNames: readonly string[] = []): Bre
     active: Number.isInteger(active) && active >= 0 && active < LIST_SLOTS ? active : 0,
     mix: oneOf(SESSION_MIXES, o.mix, base.mix),
     breakMode: oneOf(BREAK_MODES, o.breakMode, base.breakMode),
+    miniOnStart: o.miniOnStart === true,
+    notify: o.notify === true,
   }
 }
 

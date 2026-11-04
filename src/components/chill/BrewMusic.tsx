@@ -33,6 +33,35 @@ import {STATIONS, stationOf, type StationId, type Track} from './tracks'
 
 const SHOWN_SUGGESTIONS = 4
 
+const canNotify = () => typeof window !== 'undefined' && 'Notification' in window
+
+async function askNotify(): Promise<boolean> {
+  if (!canNotify()) return false
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
+  return (await Notification.requestPermission().catch(() => 'denied')) === 'granted'
+}
+
+// Thông báo hệ thống khi hết giờ, chỉ lúc khách ở tab khác. Điện thoại cấm new Notification()
+// nên đi qua service worker nếu có. JS trong tab ẩn bị giãn nhịp nên có thể trễ tới khoảng 1 phút
+export function notifyBrew(title: string, body: string) {
+  if (!canNotify() || Notification.permission !== 'granted' || document.visibilityState === 'visible') return
+  const options = {body, icon: '/chill/app/icon-192.png', tag: 'chill-phin'}
+  const direct = () => {
+    try {
+      const n = new Notification(title, options)
+      n.onclick = () => {
+        window.focus()
+        n.close()
+      }
+    } catch {
+      // Trình duyệt không cho tạo trực tiếp: tiêu đề tab và chuông vẫn báo
+    }
+  }
+  if (!('serviceWorker' in navigator)) return direct()
+  void navigator.serviceWorker.getRegistration('/chill').then((reg) => (reg ? reg.showNotification(title, options) : direct())).catch(direct)
+}
+
 export function useBrewMusic({enabled, tracks, time, weather, playing}: {enabled: boolean; tracks: Track[]; time: string; weather: string; playing: boolean}) {
   const t = useT()
   const names = t.brew.listNames
@@ -132,6 +161,19 @@ export function useBrewMusic({enabled, tracks, time, weather, playing}: {enabled
   )
   const setMix = useCallback((mix: SessionMix) => update((p) => ({...p, mix})), [update])
   const setBreakMode = useCallback((breakMode: BreakMode) => update((p) => ({...p, breakMode})), [update])
+  const setMiniOnStart = useCallback((miniOnStart: boolean) => update((p) => ({...p, miniOnStart})), [update])
+  const [notifyBlocked, setNotifyBlocked] = useState(false)
+  // Trình duyệt chỉ cho xin quyền trong cú bấm của khách
+  const setNotify = useCallback(
+    (on: boolean) => {
+      if (!on) return update((p) => ({...p, notify: false}))
+      void askNotify().then((ok) => {
+        setNotifyBlocked(!ok)
+        update((p) => ({...p, notify: ok}))
+      })
+    },
+    [update]
+  )
 
   // Chưa chọn lần nào: đang nghe nhạc thì không đổi nhạc của khách
   const source: MusicSource = prefs.source ?? (playing ? 'current' : 'suggest')
@@ -157,6 +199,9 @@ export function useBrewMusic({enabled, tracks, time, weather, playing}: {enabled
     renameActive,
     setMix,
     setBreakMode,
+    setMiniOnStart,
+    setNotify,
+    notifyBlocked,
     setPickerOpen,
   }
 }
@@ -189,6 +234,28 @@ function Options<T extends string>({items, value, onChange, aria, columns}: {ite
   )
 }
 
+function Switch({on, title, hint, onToggle, onPrepare}: {on: boolean; title: string; hint: string; onToggle: () => void; onPrepare?: () => void}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      onPointerEnter={onPrepare}
+      onFocus={onPrepare}
+      className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+    >
+      <span aria-hidden className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${on ? 'bg-[#9fd4a8]' : 'bg-white/15'}`}>
+        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#1b1a21] transition-[left] ${on ? 'left-3.5' : 'left-0.5'}`} />
+      </span>
+      <span>
+        <span className="block text-xs text-[#ede6dd]">{title}</span>
+        <span className="block text-[11px] leading-snug text-[#a79e94]">{hint}</span>
+      </span>
+    </button>
+  )
+}
+
 function ListChips({api}: {api: BrewMusicApi}) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -210,7 +277,7 @@ function ListChips({api}: {api: BrewMusicApi}) {
 }
 
 // Trong bảng chuẩn bị phin
-export function MusicChooser({api, currentTitle, currentStation}: {api: BrewMusicApi; currentTitle: string; currentStation: string}) {
+export function MusicChooser({api, currentTitle, currentStation, canMini = false, onPrepareMini}: {api: BrewMusicApi; currentTitle: string; currentStation: string; canMini?: boolean; onPrepareMini?: () => void}) {
   const t = useT()
   const {prefs, source, suggestion, byId, minutes} = api
   const list = prefs.lists[prefs.active]
@@ -311,6 +378,8 @@ export function MusicChooser({api, currentTitle, currentStation}: {api: BrewMusi
         <p className={label}>{t.brew.breakMusic}</p>
         <Options aria={t.brew.breakMusic} columns="grid-cols-3" value={prefs.breakMode} onChange={api.setBreakMode} items={BREAK_MODES.map((id) => ({id, label: t.brew.breakModes[id]}))} />
       </div>
+      {canMini && <Switch on={prefs.miniOnStart} title={t.brew.miniOnStart} hint={t.brew.miniOnStartHint} onToggle={() => api.setMiniOnStart(!prefs.miniOnStart)} onPrepare={onPrepareMini} />}
+      {canNotify() && <Switch on={prefs.notify} title={t.brew.notify} hint={api.notifyBlocked ? t.brew.notifyBlocked : t.brew.notifyHint} onToggle={() => api.setNotify(!prefs.notify)} />}
     </div>
   )
 }

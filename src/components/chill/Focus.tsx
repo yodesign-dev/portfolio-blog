@@ -28,7 +28,7 @@ import {ITEMS} from './shelf'
 import {addTodo, doneTodayOf, loadTodos, removeTodo, setTodoDone, type Todo} from './todo'
 import {TodoList} from './TodoList'
 import {NameField} from './NameField'
-import {BrewPlate, CUSTOM_MAX, CUSTOM_MIN, CUSTOM_STEP, MIN_FULL_PHIN} from './BrewDesk'
+import {BrewPlate, CUSTOM_MAX, CUSTOM_MIN, CUSTOM_STEP, MIN_FULL_PHIN, type BrewControls, type BrewInfo} from './BrewDesk'
 
 const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
@@ -38,6 +38,8 @@ const OPTIONS = [15, 25, 45]
 const AUTO_KEY = 'chill:focus-auto'
 const CHAIN_KEY = 'chill:focus-chain'
 const COMPACT_KEY = 'chill:brew-compact'
+// Bàn pha phin: phin hết giờ lúc khách đóng trang, mở lại trong khoảng này vẫn được tính
+const LATE_GRACE = 2 * 60 * 60_000
 const BREAK_MIN = 5
 const LONG_BREAK_MIN = 15
 const LONG_EVERY = 4
@@ -89,6 +91,8 @@ export function Focus({
   musicSetup = null,
   onBrewBegin,
   onMinutes,
+  onBrewInfo,
+  onControls,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -133,6 +137,10 @@ export function Focus({
   onBrewBegin?: (manual: boolean, minutes: number) => void
   // Độ dài đang chọn, để quán chọn bộ nhạc vừa đủ
   onMinutes?: (minutes: number) => void
+  // Trạng thái phin cho cửa sổ nổi, màn hình khoá, giữ màn hình
+  onBrewInfo?: (info: BrewInfo | null) => void
+  // Nút trong cửa sổ nổi điều khiển phin
+  onControls?: (controls: BrewControls) => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -140,7 +148,7 @@ export function Focus({
   const [session, setSession] = useState<Session | null>(null)
   const [now, setNow] = useState(0)
   // Phin vừa xong (số phút + việc đã dành cho nó) — còn giữ thì bảng hiện tổng kết; đóng bảng là xoá
-  const [finished, setFinished] = useState<{minutes: number; todo?: string} | null>(null)
+  const [finished, setFinished] = useState<{minutes: number; todo?: string; late?: boolean} | null>(null)
   const [todos, setTodos] = useState<Todo[]>([])
   // Việc dành cho phin sắp pha
   const [picked, setPicked] = useState<string | null>(null)
@@ -159,6 +167,8 @@ export function Focus({
   const [compact, setCompact] = useState(false)
   // Phiên vừa kết thúc — chặn interval + visibilitychange cùng báo hết giờ 2 lần
   const endedRef = useRef(0)
+  // Phin đã hết giờ khi mở trang, chờ biết công tắc Bàn pha phin (cờ đọc sau khi hydrate)
+  const lateRef = useRef<Session | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   // Khôi phục sau khi hydrate: phút đã chọn + phiên đang chạy dở
@@ -182,6 +192,8 @@ export function Focus({
           ...(saved.kind === 'break' ? {kind: 'break' as const, ...(saved.long ? {long: true} : {})} : {}),
         })
         setNow(Date.now())
+      } else if (saved?.endsAt && saved.minutes && saved.kind !== 'break' && Date.now() - saved.endsAt <= LATE_GRACE) {
+        lateRef.current = {endsAt: saved.endsAt, minutes: saved.minutes, ...(typeof saved.todo === 'string' ? {todo: saved.todo} : {})}
       } else if (saved) store(FOCUS_KEY, null)
       /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
@@ -268,7 +280,8 @@ export function Focus({
     store(FOCUS_KEY, next)
   }
 
-  const onEnd = useEffectEvent((s: Session) => {
+  // late = phin hết giờ lúc đóng trang, vừa mở lại: tính phin nhưng không tự chạy tiếp
+  const onEnd = useEffectEvent((s: Session, late = false) => {
     if (endedRef.current === s.endsAt) return
     endedRef.current = s.endsAt
     const at = Date.now()
@@ -287,7 +300,7 @@ export function Focus({
     const nextChain = s.minutes >= MIN_FULL_PHIN ? {count: chainCount(chain, s.endsAt - s.minutes * 60_000) + 1, lastAt: at} : (chain ?? {count: 0, lastAt: at})
     setChain(nextChain)
     store(CHAIN_KEY, nextChain)
-    setFinished({minutes: s.minutes, todo: s.todo})
+    setFinished({minutes: s.minutes, todo: s.todo, ...(late ? {late} : {})})
     setAskSkipped(false)
     // Việc chưa gạch thì giữ cho phin sau
     if (s.todo) setPicked(s.todo)
@@ -295,8 +308,16 @@ export function Focus({
     setOpen(true)
     trackEvent({name: 'Chill Focus', props: {action: 'done'}})
     onDone(s.minutes)
-    if (auto) begin('break', at, nextChain.count)
+    if (auto && !late) begin('break', at, nextChain.count)
   })
+
+  // Mở lại trang sau khi phin hết giờ lúc vắng: vẫn tính phin
+  useEffect(() => {
+    if (!brew || !lateRef.current) return
+    const late = lateRef.current
+    lateRef.current = null
+    onEnd(late, true)
+  }, [brew])
 
   // Đếm theo đồng hồ thật (timer bị bóp khi tab chạy nền vẫn không lệch giờ)
   useEffect(() => {
@@ -409,6 +430,31 @@ export function Focus({
   const nextBreakLong = round > 0 && round % LONG_EVERY === 0
   const doneToday = doneTodayOf(todos)
 
+  // Gửi trạng thái ra ngoài: chỉ khi có đổi (đồng hồ đổi mỗi giây)
+  const infoKey = brew
+    ? JSON.stringify({
+        clock: clock(left),
+        leftMin: Math.ceil(left / 60_000),
+        progress,
+        minutes: session?.minutes ?? minutes,
+        paused,
+        rest: Boolean(onBreak),
+        long: Boolean(session?.long),
+        running: Boolean(session),
+        roundNow: (round % LONG_EVERY) + 1,
+        roundDots: onBreak ? roundDots : round % LONG_EVERY,
+        roundOf: LONG_EVERY,
+        task: sessionTodo?.text,
+        finished: finished && !session ? {minutes: finished.minutes, task: finishedTodo?.text, taskDone: Boolean(finishedTodo?.doneDay)} : null,
+        rested,
+        nextBreak: nextBreakLong ? LONG_BREAK_MIN : BREAK_MIN,
+        nextMinutes: minutes,
+      } satisfies BrewInfo)
+    : null
+  useEffect(() => {
+    onBrewInfo?.(infoKey ? (JSON.parse(infoKey) as BrewInfo) : null)
+  }, [infoKey, onBrewInfo])
+
   const add = (text: string) => {
     const next = addTodo(todos, text)
     if (next === todos) return
@@ -425,11 +471,25 @@ export function Focus({
     if (picked === id) setPicked(null)
   }
 
+  // Nút trong cửa sổ nổi
+  useEffect(() => {
+    onControls?.({
+      togglePause,
+      skipBreak,
+      takeBreak: () => beginFromPanel('break'),
+      brewAgain: () => beginFromPanel('phin'),
+      finishTask: () => {
+        if (finished?.todo) check(finished.todo, true)
+      },
+    })
+  })
+
   // Tổng kết phin vừa xong — hiện sau phin, và vẫn giữ trong giờ nghỉ (tự chạy vòng thì vào nghỉ ngay)
   const summary = finished && (
     <div role="status">
       <p className="mt-2 text-lg font-semibold tracking-tight text-[#f3ece4]">{t.focus.doneTitle(finished.minutes)}</p>
       {finished.minutes < MIN_FULL_PHIN && <p className="mt-1 text-xs text-[#a79e94]">{t.focus.shortNote}</p>}
+      {finished.late && <p className="mt-1 text-xs text-[#a79e94]">{t.focus.lateNote}</p>}
       {finishedTodo && (finishedTodo.doneDay || !askSkipped) && (
         <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
           <p className={`break-words text-sm leading-snug ${finishedTodo.doneDay ? 'text-[#a79e94] line-through' : 'text-[#f3ece4]'}`}>{finishedTodo.text}</p>

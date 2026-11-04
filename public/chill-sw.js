@@ -33,6 +33,17 @@ const OFFLINE_HTML = `<!doctype html>
 <script>addEventListener('online',()=>location.reload())</script>
 </body></html>`
 
+// Bấm thông báo hết giờ của Bàn pha phin → về đúng tab quán
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    self.clients.matchAll({type: 'window', includeUncontrolled: true}).then((list) => {
+      const tab = list.find((c) => new URL(c.url).pathname.startsWith('/chill'))
+      return tab ? tab.focus() : self.clients.openWindow('/chill')
+    })
+  )
+})
+
 self.addEventListener('install', (event) => {
   // Lưu sẵn icon cho màn mất sóng; vào thẳng phiên bản mới, không chờ tab cũ đóng
   event.waitUntil(caches.open(CACHE).then((c) => c.add('/chill/app/icon-192.png')).catch(() => {}))
