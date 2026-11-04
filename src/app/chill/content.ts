@@ -187,7 +187,7 @@ export async function getChillContent(revalidate: number) {
     timeZone: isTimeZone(d.timeZone) ? d.timeZone : 'Asia/Ho_Chi_Minh',
     tilt: d.tilt,
     laneShift: d.laneShift,
-    scenery: d.scenery === 'countryside' || d.scenery === 'railway' ? d.scenery : 'street',
+    scenery: d.scenery === 'countryside' || d.scenery === 'railway' || d.scenery === 'oldtown' ? d.scenery : 'street',
     streets: {morning: sceneUrl(d.morning), afternoon: sceneUrl(d.afternoon), night: sceneUrl(d.night)},
     streetsHd: LOCAL_HD.has(d.id) ? localHd(d.id) : (d.minWidth ?? 0) >= 1120 ? {morning: sceneHdUrl(d.morning), afternoon: sceneHdUrl(d.afternoon), night: sceneHdUrl(d.night)} : undefined,
     signs: d.signs?.length ? d.signs : undefined,

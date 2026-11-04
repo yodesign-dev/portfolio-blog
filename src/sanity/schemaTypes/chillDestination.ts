@@ -100,6 +100,7 @@ export default defineType({
           {title: 'Phố (ô tô, xe buýt, shipper, cặp đôi…)', value: 'street'},
           {title: 'Đồng quê (chỉ xe máy, xe đạp; lúa lắc lư theo gió)', value: 'countryside'},
           {title: 'Đường tàu (không xe cộ; đoàn tàu chạy qua vài phút một lần)', value: 'railway'},
+          {title: 'Phố cổ ven sông (cấm xe, chỉ người đi bộ; đò đi qua, đèn lồng sáng về đêm)', value: 'oldtown'},
         ],
         layout: 'radio',
       },

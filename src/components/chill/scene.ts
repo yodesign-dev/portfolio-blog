@@ -28,6 +28,7 @@ import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, type Destination} from './destinations'
 import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
 import {HIGHLAND, Highland, highlandStreets} from './highland'
+import {River} from './river'
 import {Noel, type NoelConfig} from './noel'
 import {Rain} from './rain'
 import {drawScreen} from './screen'
@@ -327,7 +328,10 @@ const ready = (img: HTMLImageElement | null): img is HTMLImageElement => !!img &
 
 // ---------- Nhân vật chuyển động ----------
 
-type Walk = 'vendor' | 'walker' | 'dog'
+const SIGHTSEERS = ['tourist', 'mapman', 'photog', 'aodai', 'elders', 'selfie', 'packer', 'lanterner'] as const
+type Sightseer = (typeof SIGHTSEERS)[number]
+type Walk = 'vendor' | 'walker' | 'dog' | Sightseer
+const isSightseer = (s: string): s is Sightseer => (SIGHTSEERS as readonly string[]).includes(s)
 
 type Mover = {
   sprite: SpriteName | Walk // xe: tên sprite · người/chó: loại, khung hình chọn lúc vẽ
@@ -438,6 +442,11 @@ const LEAF_COLORS: Record<string, [string, string][]> = {
   dalat: [
     ['#f4b9cb', '#d98ba7'],
     ['#f8d6df', '#e3a6bb'],
+  ],
+  // Cánh hoa giấy
+  hoian: [
+    ['#d9458f', '#a82c6a'],
+    ['#ec6fb0', '#c04a8c'],
   ],
   hue: [
     ['#e9572f', '#b53b1f'],
@@ -614,6 +623,7 @@ export class ChillScene {
   // Đà Lạt sương mù (công tắc Studio highlandOpen): ảnh mới, sương trôi, khói, kính mờ
   private highlandOn = false
   private highland = new Highland()
+  private river = new River()
   // Trang trí theo mùa (season.ts), null = quán thường
   private noel: Noel | null = null
   // Mèo và người ngồi quàng khăn mùa Noel; tải khi cần, xong mới đổi để khỏi nháy trống
@@ -782,11 +792,17 @@ export class ChillScene {
       this.fade = 0
     }
     const wasRailway = this.railway
+    const wasOldtown = this.oldtown
     this.time = time
     this.weather = weather
     this.destination = destination
     // Sang đồng quê: ô tô, xe buýt, xích lô đang chạy trên phố cũ biến mất luôn
     if (destination.scenery === 'countryside') this.movers = this.movers.filter((m) => !m.road || COUNTRY_BIKES.includes(m.sprite as SpriteName) || m.sprite === 'bike-poncho')
+    // Sang phố cổ: cấm xe, chó và gánh hàng cũng vắng; vừa tới đã có khách đang dạo
+    if (this.oldtown && !wasOldtown) {
+      this.movers = this.movers.filter((m) => !m.road && m.sprite === 'walker')
+      if (weather !== 'rain') for (let i = 0; i < 10; i++) this.spawnWalker(16 + this.rng() * (SCENE_W - 32))
+    }
     // Sang phố đường tàu: hết xe trên ray; vừa tới nơi thì chuyến đầu đến sớm
     if (this.railway && !wasRailway) {
       this.movers = this.movers.filter((m) => !m.road)
@@ -1092,6 +1108,10 @@ export class ChillScene {
 
   private get railway() {
     return this.destination.scenery === 'railway'
+  }
+
+  private get oldtown() {
+    return this.destination.scenery === 'oldtown'
   }
 
   // Hẹn chuyến tàu sau trong khoảng [min, max] giây, chiều chạy chọn sẵn
@@ -1608,7 +1628,7 @@ export class ChillScene {
     this.nextWalker -= dt
     if (this.nextWalker <= 0) {
       if (!rainy) this.spawnWalker()
-      this.nextWalker = 6 + this.rng() * 8
+      this.nextWalker = (6 + this.rng() * 8) * (this.oldtown ? 0.22 : 1)
     }
 
     for (const m of this.movers) {
@@ -1684,6 +1704,8 @@ export class ChillScene {
     }
     this.highland.set(this.highlandOn ? this.destination.id : '', this.time, this.weather)
     this.highland.update(dt, this.windDir)
+    this.river.set(this.destination.id, this.time, this.weather)
+    this.river.update(dt, (dir, len) => this.onSound?.('boat', 0, dir, len))
     if (this.noel) {
       const id = this.destination.id
       this.noel.update(dt, {
@@ -1742,7 +1764,7 @@ export class ChillScene {
     const rate = target < was ? 34 : 22
     m.speed = was + Math.max(-rate * dt, Math.min(rate * dt, target - was))
     if (target === 0 && m.speed < 0.05) m.speed = 0
-    m.look = m.pause > 0 && m.sprite !== 'dog' && m.phase < 0.5 && m.pause > m.pauseFor * 0.3 && m.pause < m.pauseFor * 0.7
+    m.look = m.pause > 0 && m.sprite !== 'dog' && !isSightseer(m.sprite) && m.phase < 0.5 && m.pause > m.pauseFor * 0.3 && m.pause < m.pauseFor * 0.7
   }
 
   // Người đi bộ / gánh hàng: thỉnh thoảng dừng lại. Chó: chạy, chạy chậm, dừng
@@ -1769,8 +1791,9 @@ export class ChillScene {
     }
     m.nextPause -= dt
     if (m.nextPause <= 0 && m.x > 20 && m.x < SCENE_W - 20) {
-      m.nextPause = m.sprite === 'dog' ? 4 + this.rng() * 5 : 7 + this.rng() * 10
-      m.pause = m.sprite === 'dog' ? 1.5 + this.rng() * 2.5 : 1.5 + this.rng() * 2
+      m.nextPause = m.sprite === 'dog' ? 4 + this.rng() * 5 : isSightseer(m.sprite) ? 4 + this.rng() * 5 : 7 + this.rng() * 10
+      // Khách dừng ngắm, xem bản đồ, chụp ảnh lâu hơn người đi đường
+      m.pause = m.sprite === 'dog' ? 1.5 + this.rng() * 2.5 : isSightseer(m.sprite) ? 4 + this.rng() * 4 : 1.5 + this.rng() * 2
       m.pauseFor = m.pause
       m.pose = m.sprite === 'dog' ? pick(this.rng, DOG_POSES) : null
       m.speed = 0
@@ -1791,7 +1814,7 @@ export class ChillScene {
 
   private sizeOf(m: Mover) {
     if (m.sprite === 'dog') return {w: 10, h: 7}
-    if (m.sprite === 'vendor' || m.sprite === 'walker') return {w: 14, h: 17}
+    if (m.sprite === 'vendor' || m.sprite === 'walker' || isSightseer(m.sprite)) return {w: 14, h: 17}
     return spriteSize(m.sprite)
   }
 
@@ -2084,8 +2107,8 @@ export class ChillScene {
   }
 
   private spawnVehicle(x?: number) {
-    // Phố đường tàu: lòng đường là ray, không xe nào chạy
-    if (this.railway) return
+    // Phố đường tàu: lòng đường là ray, không xe nào chạy. Phố cổ: cấm xe
+    if (this.railway || this.oldtown) return
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
     const lane = dir > 0 ? NEAR_LANE : FAR_LANE
@@ -2124,8 +2147,9 @@ export class ChillScene {
     const r = this.rng
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
     const roll = r()
-    const sprite: Walk = roll < (this.countryside ? 0.5 : 0.35) ? 'dog' : roll < (this.countryside ? 0.75 : 0.65) ? 'vendor' : 'walker'
-    const cruise = sprite === 'dog' ? 20 + r() * 8 : sprite === 'vendor' ? 5 + r() * 2 : 8 + r() * 3
+    // Phố cổ: chỉ người đi bộ, khách tham quan, người chụp ảnh
+    const sprite: Walk = this.oldtown ? (roll < 0.16 ? 'walker' : SIGHTSEERS[Math.floor(r() * SIGHTSEERS.length)]) : roll < (this.countryside ? 0.5 : 0.35) ? 'dog' : roll < (this.countryside ? 0.75 : 0.65) ? 'vendor' : 'walker'
+    const cruise = sprite === 'dog' ? 20 + r() * 8 : sprite === 'vendor' ? 5 + r() * 2 : sprite === 'elders' ? 4.5 + r() * 1.5 : isSightseer(sprite) ? 6 + r() * 2 : 8 + r() * 3
     this.movers.push({
       ...this.baseMover(),
       sprite,
@@ -2136,8 +2160,8 @@ export class ChillScene {
       speed: cruise,
       lane: SIDEWALK_Y,
       // Mượt: đứng so le 3 hàng trên vỉa hè, người lớn đi nhanh hơn (~1,1 m/s)
-      dy: -Math.floor(r() * 3),
-      pace: sprite === 'walker' ? 1.2 + r() * 0.15 : sprite === 'vendor' ? 1.15 + r() * 0.1 : 1,
+      dy: -Math.floor(r() * (this.oldtown ? 9 : 3)),
+      pace: sprite === 'walker' || isSightseer(sprite) ? 1.2 + r() * 0.15 : sprite === 'vendor' ? 1.15 + r() * 0.1 : 1,
     })
   }
 
@@ -2347,6 +2371,7 @@ export class ChillScene {
       gc.drawImage(this.streetSource(img), STREET_IMG.x, STREET_IMG.y, STREET_IMG.w, STREET_IMG.h)
       if (this.facadeOn) this.facade.draw(gc, STREET_IMG, this.windDir)
       this.highland.draw(gc, STREET_IMG)
+      this.river.draw(gc, STREET_IMG)
       const counter = this.ctx
       this.ctx = gc
       // Vỉa hè (bảng menu, người đi bộ) → cảnh nhỏ → làn xa (xe chạy qua che trước mặt)
@@ -2450,22 +2475,22 @@ export class ChillScene {
   private updateVignette(dt: number) {
     // Đổi sang cảnh đồng quê giữa chừng → cảnh nhỏ của phố biến mất
     if (this.countryside) this.vignette = null
-    // Phố đường tàu không có xe → bỏ cảnh anh shipper chạy xe máy
-    if (this.railway && (this.vignette?.kind === 'shipper' || this.vignette?.kind === 'santaBike')) this.vignette = null
+    // Phố đường tàu, phố cổ không có xe máy → bỏ cảnh anh shipper chạy xe máy
+    if ((this.railway || this.oldtown) && (this.vignette?.kind === 'shipper' || this.vignette?.kind === 'santaBike')) this.vignette = null
     // Hết mùa hoặc tắt lớp: ông đi luôn
     if (this.vignette && SANTA_KINDS.includes(this.vignette.kind) && !this.noel) this.vignette = null
     const v = this.vignette
     if (!v) {
       if (this.pan < 1 || this.groupWall !== 'glass' || this.weather === 'rain' || this.countryside) return
       const santaOn = !!this.noel?.santaOn
-      const santaKind: VignetteKind | null = santaOn ? (this.railway ? 'santaWalk' : 'santaBike') : null
+      const santaKind: VignetteKind | null = santaOn ? (this.railway || this.oldtown ? 'santaWalk' : 'santaBike') : null
       for (const kind of Object.keys(VIGNETTES) as VignetteKind[]) if (!SANTA_KINDS.includes(kind) || kind === santaKind) this.vignetteLayer(kind)
       if (santaOn) this.nextSanta -= dt
       this.nextVignette -= dt
       if (this.nextVignette > 0) return
       this.nextVignette = this.busy ? 12 + this.rng() * 8 : 30 + this.rng() * 20
       // Không lặp lại cảnh vừa xem
-      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette && !SANTA_KINDS.includes(k) && !(this.railway && k === 'shipper'))
+      const kinds = (Object.keys(VIGNETTES) as VignetteKind[]).filter((k) => k !== this.lastVignette && !SANTA_KINDS.includes(k) && !((this.railway || this.oldtown) && k === 'shipper'))
       const santaDue = santaKind && this.nextSanta <= 0
       if (santaDue) this.nextSanta = this.busy ? 20 + this.rng() * 15 : 180 + this.rng() * 180
       const kind = santaDue ? santaKind : pick(this.rng, kinds)
@@ -2705,6 +2730,7 @@ export class ChillScene {
       this.drawStreet(this.street, street, view)
       if (this.facadeOn) this.facade.draw(ctx, street, this.windDir)
       this.highland.draw(ctx, street)
+      this.river.draw(ctx, street)
       ctx.globalAlpha = 1
     }
     if (this.birds) this.drawBirds(this.birds)
@@ -2999,6 +3025,7 @@ export class ChillScene {
       const i = m.speed > 0 ? Math.floor(m.step / (m.sprite === 'vendor' ? 2.6 : 3.2)) % 4 : 1
       return `${m.sprite}-${i}` as SpriteName
     }
+    if (isSightseer(m.sprite)) return `${m.sprite}-${m.speed > 0 ? Math.floor(m.step / 3.2) % 4 : 'stop'}` as SpriteName
     if (m.sprite === 'dog') {
       // Mượt: lon ton (chậm) chỉ dùng 2 khung chân thu / chân duỗi, nhịp nhanh hơn
       if (m.speed > 0 && this.smooth && m.speed < 14) return (Math.floor(m.step / 1.6) % 2 ? 'dog-3' : 'dog-0') as SpriteName
@@ -3031,7 +3058,7 @@ export class ChillScene {
     if (!m.road) {
       if (m.speed < 0.5) return 0
       const odd = Number(name.slice(-1)) % 2 === 1
-      if (m.sprite === 'walker') return odd ? 0.25 : 0
+      if (m.sprite === 'walker' || isSightseer(m.sprite)) return odd ? 0.25 : 0
       if (m.sprite === 'vendor') return odd ? 0 : -0.25
       if (m.sprite === 'dog') return m.speed > 14 && odd ? 0.25 : 0
       return 0
@@ -3048,7 +3075,11 @@ export class ChillScene {
     const ctx = this.ctx
     const name = this.frameOf(m, t)
     const [sx, sy, sw, sh] = SPRITES[name]
-    const {w, h} = spriteSize(name)
+    const size = spriteSize(name)
+    // Phố cổ: người to hơn cho hợp cảnh; đứng xa (dy âm) nhỏ hơn một chút
+    const grow = this.oldtown && !m.road ? 1.34 + (this.smooth ? m.dy * 0.012 : 0) : 1
+    const w = size.w * grow
+    const h = size.h * grow
     const base = (m.road ? this.groundY(m.lane, m.x, this.laneShift) : this.groundY(m.lane, m.x)) + (this.smooth ? m.dy : 0)
     // Bám lưới pixel của atlas → sprite không bị lệch nửa pixel, nét đều
     const snap = SCALE * SPRITE_SCALE
@@ -3093,6 +3124,18 @@ export class ChillScene {
       ctx.drawImage(this.atlasTinted, sx, sy, half, sh, x, y + (pitch < 0 ? 1 / snap : 0), half / snap, h)
       ctx.drawImage(this.atlasTinted, sx + half, sy, sw - half, sh, x + half / snap, y + (pitch > 0 ? 1 / snap : 0), (sw - half) / snap, h)
     } else ctx.drawImage(this.atlasTinted, sx, sy, sw, sh, x, y, w, h)
+    // Đèn cô gái cầm sáng về đêm (vẽ trong hệ toạ độ đã lật nên đi theo chiều cô đi)
+    if (night && m.sprite === 'lanterner') {
+      const cx = x + w * 0.9
+      const cy = y + h * (m.speed > 0 ? 0.47 : 0.2)
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 7)
+      glow.addColorStop(0, 'rgba(255,190,100,0.55)')
+      glow.addColorStop(1, 'rgba(255,140,60,0)')
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.fillStyle = glow
+      ctx.fillRect(cx - 7, cy - 7, 14, 14)
+      ctx.globalCompositeOperation = 'source-over'
+    }
     const wheels = this.smooth ? WHEELS[name] : undefined
     if (wheels) this.drawSpokes(wheels, m.step, x, y, snap)
     // Đêm: cửa kính ô tô / xe buýt sáng đèn bên trong (vẽ trong hệ toạ độ đã lật)

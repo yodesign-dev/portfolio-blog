@@ -219,6 +219,10 @@ export function ChillEmbed({tracks, destinations, seasons = []}: {tracks: Track[
     audioRef.current?.setAmbience(0.35, weather === 'rain' ? 'rain' : 'street')
   }, [weather])
 
+  useEffect(() => {
+    audioRef.current?.setOldtown(dest.scenery === 'oldtown')
+  }, [dest.scenery])
+
   const playAt = useCallback(
     (i: number, crossfade = false) => {
       const audio = audioRef.current

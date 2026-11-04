@@ -1484,6 +1484,7 @@ export function ChillRoom({
   // Phố đường tàu: tải sẵn file còi + tiếng tàu để chuyến đầu đã có tiếng thật
   useEffect(() => {
     if (dest.scenery === 'railway') audioRef.current?.preloadTrain()
+    audioRef.current?.setOldtown(dest.scenery === 'oldtown')
   }, [dest.scenery])
 
   useEffect(() => {

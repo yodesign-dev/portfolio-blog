@@ -29,7 +29,9 @@ export type Destination = {
   // gió, không có các cảnh nhỏ của phố (shipper, cặp đôi, bảng menu…)
   // "railway" = phố đường tàu: ray thay cho 2 làn xe, không xe cộ, chỉ người đi bộ +
   // đoàn tàu chạy qua vài phút một lần (TRAIN trong scene.ts)
-  scenery?: 'street' | 'countryside' | 'railway'
+  // "oldtown" = phố cổ ven sông (Hội An): cấm xe, chỉ người đi bộ, khách tham quan, người
+  // chụp ảnh; đò đi qua trên sông, đèn lồng sáng về đêm (river.ts)
+  scenery?: 'street' | 'countryside' | 'railway' | 'oldtown'
   // Điểm đến theo lịch (Xóm đạo mùa Noel): chỉ có trong khoảng này, máy khách tự so giờ
   showFrom?: string
   showUntil?: string

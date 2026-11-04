@@ -12,17 +12,23 @@ import type {SynthSpec, Track} from './tracks'
 import type {Mix} from './mix'
 
 export type Ambience = 'street' | 'rain' | 'quiet'
-export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder' | 'train-horn' | 'train'
+export type StreetSound = 'whoosh' | 'whoosh-big' | 'horn' | 'bark' | 'thunder' | 'train-horn' | 'train' | 'boat'
 
 // Tiếng tàu thu sẵn (CassetteAI qua Figma Weave, đã cắt + cân âm lượng, mono):
 // còi vọng xa và cả đoàn chạy qua (~30 giây: nhỏ lúc tới, to nhất khi đầu máy ngang
 // cửa sổ, nhỏ dần khi toa cuối đi khỏi). Chỉ tải khi ở phố đường tàu; chưa tải xong
 // thì phát tạm tiếng tổng hợp trong streetSound. `gain` cân với tiếng xe / còi xe máy
-const TRAIN_SFX = {
+// Phố cổ: mái chèo lặp theo đò đi qua khung. Chưa tải xong thì bỏ qua lần đó
+const SAMPLE_SFX = {
   'train-horn': {src: '/chill/sfx/train-horn.mp3', gain: 0.7},
   train: {src: '/chill/sfx/train-pass.mp3', gain: 0.9},
+  boat: {src: '/chill/sfx/boat-oar.mp3', gain: 0.9},
 } as const
-type TrainSfx = keyof typeof TRAIN_SFX
+type SampleSfx = keyof typeof SAMPLE_SFX
+
+// Tiếng nền phố cổ, thay tiếng ồn xe cộ (nước vỗ bờ, người xa, CassetteAI, chỗ nối mờ dần).
+// Chỉ tải khi ở phố cổ
+const OLDTOWN_BED = {src: '/chill/sfx/oldtown-river.mp3', gain: 1.1}
 
 // Tiếng quán lặp (CassetteAI qua Figma Weave: 2 bản 30 giây cân âm lượng rồi nối, chỗ nối
 // mờ dần nên lặp liền mạch, ~56 giây, mono). Chỉ tải khi thanh "Tiếng quán" > 0.
@@ -121,8 +127,11 @@ export class ChillAudio {
   private nearEndFired = false
   private sfxIn: AudioNode | null = null
   // File tiếng tàu: đã tải (chưa cần AudioContext) · đã giải mã (null = đang giải mã)
-  private sfxFiles = new Map<TrainSfx, Promise<ArrayBuffer | null>>()
-  private sfxBuffers = new Map<TrainSfx, AudioBuffer | null>()
+  private sfxFiles = new Map<SampleSfx, Promise<ArrayBuffer | null>>()
+  private sfxBuffers = new Map<SampleSfx, AudioBuffer | null>()
+  private bedGain!: GainNode
+  private oldtown = false
+  private bedLoading = false
 
   private track: Track | null = null
   private trackBus: GainNode | null = null
@@ -232,6 +241,10 @@ export class ChillAudio {
     street.connect(streetLp).connect(this.streetGain).connect(this.out)
     street.start()
 
+    this.bedGain = ctx.createGain()
+    this.bedGain.gain.value = 0
+    this.bedGain.connect(this.out)
+
     // Âm thanh ngoài phố (xe chạy qua, còi, chó sủa): lọc bớt treble như nghe
     // vọng qua cửa kính, âm lượng đi theo thanh Ambience
     const sfxLp = ctx.createBiquadFilter()
@@ -285,13 +298,41 @@ export class ChillAudio {
 
   // Tải trước file tiếng tàu (vd khi vào phố đường tàu) — chưa cần AudioContext
   preloadTrain() {
-    for (const kind of Object.keys(TRAIN_SFX) as TrainSfx[]) void this.fetchTrain(kind)
+    void this.fetchSample('train-horn')
+    void this.fetchSample('train')
   }
 
-  private fetchTrain(kind: TrainSfx) {
+  // Vào / rời phố cổ: đổi tiếng nền, tải sẵn tiếng đò
+  setOldtown(on: boolean) {
+    this.oldtown = on
+    if (on) {
+      void this.fetchSample('boat')
+    }
+    this.applyAmbience()
+  }
+
+  private startBed(ctx: AudioContext) {
+    if (this.bedLoading) return
+    this.bedLoading = true
+    void fetch(OLDTOWN_BED.src)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => ctx.decodeAudioData(data))
+      .then((buf) => {
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        src.loop = true
+        src.connect(this.bedGain)
+        src.start()
+      })
+      .catch(() => {
+        this.bedLoading = false
+      })
+  }
+
+  private fetchSample(kind: SampleSfx) {
     let file = this.sfxFiles.get(kind)
     if (!file) {
-      file = fetch(TRAIN_SFX[kind].src)
+      file = fetch(SAMPLE_SFX[kind].src)
         .then((r) => (r.ok ? r.arrayBuffer() : null))
         .catch(() => null)
       this.sfxFiles.set(kind, file)
@@ -301,30 +342,40 @@ export class ChillAudio {
 
   // Bản đã giải mã; chưa có thì bắt đầu giải mã cho lần sau và trả null (phát tiếng
   // tổng hợp lần này). Còi kêu trước tàu ~4 giây nên tiếng chạy qua thường kịp có
-  private trainBuffer(kind: TrainSfx) {
+  private sampleBuffer(kind: SampleSfx) {
     const ready = this.sfxBuffers.get(kind)
     if (ready || this.sfxBuffers.has(kind) || !this.ctx) return ready ?? null
     this.sfxBuffers.set(kind, null)
     const ctx = this.ctx
-    void this.fetchTrain(kind)
+    void this.fetchSample(kind)
       // decodeAudioData lấy luôn ArrayBuffer → giải mã bản sao để còn thử lại khi lỗi
       .then((data) => (data ? ctx.decodeAudioData(data.slice(0)) : null))
       .then((buf) => (buf ? this.sfxBuffers.set(kind, buf) : this.sfxBuffers.delete(kind)))
       .catch(() => this.sfxBuffers.delete(kind))
-    if (kind === 'train-horn') this.trainBuffer('train')
+    if (kind === 'train-horn') this.sampleBuffer('train')
     return null
   }
 
   // Còi: đứng yên ở phía tàu sắp tới. Tàu chạy qua: kéo giãn nhẹ cho khớp `len` (từ
   // lúc còi tới lúc toa cuối ra khỏi khung), quét từ loa phía tàu tới sang loa bên kia
-  private playTrainSample(kind: TrainSfx, buf: AudioBuffer, panner: StereoPannerNode, pan: number, dir: 1 | -1, len: number) {
+  private playSample(kind: SampleSfx, buf: AudioBuffer, panner: StereoPannerNode, pan: number, dir: 1 | -1, len: number) {
     const ctx = this.ctx!
     const now = ctx.currentTime
     const src = ctx.createBufferSource()
     src.buffer = buf
     const gain = ctx.createGain()
-    gain.gain.value = TRAIN_SFX[kind].gain
-    if (kind === 'train') {
+    gain.gain.value = SAMPLE_SFX[kind].gain
+    if (kind === 'boat') {
+      // Đò đi qua: lặp tiếng chèo, to dần rồi nhỏ dần, quét theo chiều đò
+      src.loop = true
+      const peak = SAMPLE_SFX.boat.gain
+      gain.gain.setValueAtTime(0, now)
+      gain.gain.linearRampToValueAtTime(peak, now + len * 0.4)
+      gain.gain.setValueAtTime(peak, now + len * 0.6)
+      gain.gain.linearRampToValueAtTime(0, now + len)
+      panner.pan.setValueAtTime(-0.7 * dir, now)
+      panner.pan.linearRampToValueAtTime(0.7 * dir, now + len)
+    } else if (kind === 'train') {
       src.playbackRate.value = Math.min(1.2, Math.max(0.8, buf.duration / len))
       panner.pan.setValueAtTime(-0.7 * dir, now)
       panner.pan.linearRampToValueAtTime(0.7 * dir, now + len)
@@ -333,6 +384,7 @@ export class ChillAudio {
     }
     src.connect(gain).connect(panner)
     src.start(now)
+    if (kind === 'boat') src.stop(now + len)
   }
 
   // ---------- Điều khiển ----------
@@ -495,12 +547,13 @@ export class ChillAudio {
     const panner = ctx.createStereoPanner()
     panner.connect(this.sfxIn)
 
-    if (kind === 'train' || kind === 'train-horn') {
-      const buf = this.trainBuffer(kind)
+    if (kind === 'train' || kind === 'train-horn' || kind === 'boat') {
+      const buf = this.sampleBuffer(kind)
       if (buf) {
-        this.playTrainSample(kind, buf, panner, pan, dir, len)
+        this.playSample(kind, buf, panner, pan, dir, len)
         return
       }
+      if (kind === 'boat') return
     }
 
     if (kind === 'whoosh' || kind === 'whoosh-big') {
@@ -794,12 +847,15 @@ export class ChillAudio {
 
   private applyAmbience() {
     if (!this.ctx) return
+    if (this.oldtown) this.sampleBuffer('boat')
     const now = this.ctx.currentTime
     const m = this.mix
     if (m) {
       // Bản trộn riêng: mỗi thanh 1 kênh; sự kiện ngoài phố (xe, còi, tàu) theo thanh Phố
       this.rainGain.gain.setTargetAtTime(m.rain * 0.5, now, 0.4)
-      this.streetGain.gain.setTargetAtTime(m.street * 0.6, now, 0.4)
+      this.streetGain.gain.setTargetAtTime(this.oldtown ? 0 : m.street * 0.6, now, 0.4)
+      this.bedGain.gain.setTargetAtTime(this.oldtown ? m.street * OLDTOWN_BED.gain : 0, now, 0.4)
+      if (this.oldtown && m.street > 0) this.startBed(this.ctx)
       this.sfxGain.gain.setTargetAtTime(m.street, now, 0.2)
       this.cafeGain.gain.setTargetAtTime(m.cafe * CAFE_SFX.gain, now, 0.4)
       this.purrGain.gain.setTargetAtTime(m.purr * 0.5, now, 0.4)
@@ -810,7 +866,9 @@ export class ChillAudio {
     const rain = this.ambience === 'rain' ? v * 0.5 : 0
     const street = this.ambience === 'street' ? v * 0.6 : this.ambience === 'rain' ? v * 0.15 : v * 0.25
     this.rainGain.gain.setTargetAtTime(rain, now, 0.4)
-    this.streetGain.gain.setTargetAtTime(street, now, 0.4)
+    this.streetGain.gain.setTargetAtTime(this.oldtown ? 0 : street, now, 0.4)
+    this.bedGain.gain.setTargetAtTime(this.oldtown ? street * OLDTOWN_BED.gain : 0, now, 0.4)
+    if (this.oldtown && street > 0) this.startBed(this.ctx)
     this.sfxGain.gain.setTargetAtTime(this.ambience === 'quiet' ? v * 0.4 : v, now, 0.2)
     this.cafeGain.gain.setTargetAtTime(0, now, 0.4)
     this.purrGain.gain.setTargetAtTime(0, now, 0.4)
