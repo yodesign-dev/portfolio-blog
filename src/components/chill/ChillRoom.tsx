@@ -27,6 +27,7 @@ import {MIX_CHANNELS, MIX_PRESETS, SILENT, parseMix, presetOf, sceneMix, type Mi
 import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} from './shelf'
 import {TREE_MAX, activeSeason, loadSeasonPref, loadTree, momentOn, readSeasonPreview, saveSeasonPref, saveTree, type Season, type SeasonPref} from './season'
 import {Focus} from './Focus'
+import {MIN_FULL_PHIN} from './BrewDesk'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {MiniVideo, canVideoPiP} from './MiniVideo'
 import {QuestCard} from './QuestCard'
@@ -37,7 +38,7 @@ import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
 import {HotBadge, NewBadge, PlayMeter, playStats} from './PlayMeter'
-import {addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
+import {addMinutes, addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -230,6 +231,7 @@ export function ChillRoom({
   facadeOn = false,
   highlandOn = false,
   sleepTimerOn = false,
+  brewDeskOn = false,
   seasons = [],
   lives = [],
 }: {
@@ -261,6 +263,7 @@ export function ChillRoom({
   // Hẹn giờ tắt nhạc 15/30/60/90 phút (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
   sleepTimerOn?: boolean
+  brewDeskOn?: boolean
   // Lịch mùa (Noel…) từ Studio, máy khách tự so giờ, xem season.ts
   seasons?: Season[]
   // Lịch live YouTube từ Studio, máy khách tự so giờ, xem live.ts
@@ -323,6 +326,8 @@ export function ChillRoom({
   const [regular, setRegular] = useState<Regular>({days: [], total: 0, phins: 0})
   const stamped = useRef(false)
   const [focusLabel, setFocusLabel] = useState<string | null>(null)
+  // Tải lại lúc đang pha: Focus báo trước khi có cảnh, nên giữ lại để cảnh nhận khi vừa tạo
+  const brewState = useRef<{level: number | null; paused: boolean}>({level: null, paused: false})
   const [focusOpen, setFocusOpen] = useState(false)
   const visitTracked = useRef(false)
   const [playing, setPlaying] = useState(false)
@@ -560,6 +565,7 @@ export function ChillRoom({
     const nowSeason = preview.season !== undefined ? preview.season : activeSeason(initialSeasons.current, preview.at ?? Date.now())
     const scene = new ChillScene(canvasRef.current!, {noelSeat: !!nowSeason?.layers.seat && loadSeasonPref(nowSeason.id) !== 'off'})
     sceneRef.current = scene
+    scene.setBrew(brewState.current.level, brewState.current.paused)
     // Tiếng xe chạy qua, còi, chó sủa ngoài phố → phát qua bộ âm thanh (theo thanh Ambience)
     scene.onSound = (kind, pan, dir, len) => audioRef.current?.streetSound(kind, pan, dir, len)
     // ?train=now: gọi tàu tới ngay khi đang ở phố đường tàu (quay clip khỏi phải chờ)
@@ -748,6 +754,20 @@ export function ChillRoom({
   useEffect(() => {
     sceneRef.current?.setNoelBrewing(focusLabel !== null && !focusLabel.startsWith('☕'))
   }, [focusLabel, seasonOn])
+
+  // Bàn pha phin: tấm đồng hồ thay thanh nhạc, phin trong cảnh đầy dần (?brew=1/0 ghi đè Studio)
+  const [brewFlag, setBrewFlag] = useState(false)
+  const [brewSlot, setBrewSlot] = useState<HTMLDivElement | null>(null)
+  const brewing = brewFlag && focusLabel !== null
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('brew')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setBrewFlag(param ? param === '1' : brewDeskOn)
+  }, [brewDeskOn])
+  const onBrew = useCallback((level: number | null, paused: boolean) => {
+    brewState.current = {level, paused}
+    sceneRef.current?.setBrew(level, paused)
+  }, [])
 
   const chooseSeasonPref = useCallback((pref: SeasonPref) => {
     if (!seasonId) return
@@ -1352,6 +1372,12 @@ export function ChillRoom({
     audioRef.current?.chime()
     sceneRef.current?.noticeCat()
     sayCat(t.room.catPhin)
+    // Phin ngắn (độ dài tuỳ chỉnh) chỉ cộng phút: không quà kệ, không thử thách, không treo cây
+    if (minutes < MIN_FULL_PHIN) {
+      setRegular((r) => addMinutes(r, minutes))
+      setGift(null)
+      return
+    }
     setRegular((r) => addPhin(r, minutes))
     setBookNudge(true)
     void onQuestDone()
@@ -2593,6 +2619,56 @@ export function ChillRoom({
     </button>
   )
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
+  // Đang pha phin: thanh trên lui xuống, rê chuột là rõ lại
+  const topFade = brewing && !hideUi && entered && !hovering && !focusOpen && !menuOpen ? 'opacity-25 transition-opacity duration-700 focus-within:opacity-100' : fade
+  // Hàng nhạc trong tấm đồng hồ: như thanh nhạc, gọn hơn
+  const brewMusic = (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span className="hidden sm:contents lg:hidden">
+        <RoundButton label={t.room.prev} onClick={prev}>
+          <PrevIcon />
+        </RoundButton>
+      </span>
+      <button
+        type="button"
+        onClick={togglePlay}
+        aria-label={playing ? t.room.pause : t.room.play}
+        title={`${playing ? t.room.pause : t.room.play} (Space)`}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e8b27d]/50 text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+      >
+        {playing ? <PauseIcon /> : <PlayIcon />}
+      </button>
+      <RoundButton label={t.room.next} onClick={next}>
+        <NextIcon />
+      </RoundButton>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
+          {stationLabel} · {playingPos + 1}/{playingList.length}
+        </p>
+        <p className="truncate text-sm font-semibold">{track.title}</p>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={volume}
+        onChange={(e) => setVolume(Number(e.target.value))}
+        aria-label={t.room.volume}
+        className="hidden w-24 accent-[#e8b27d] md:block lg:hidden"
+      />
+      <RoundButton
+        label={t.room.settings}
+        onClick={() => {
+          setWishOpen(false)
+          setChatOpen(false)
+          setPanelOpen((o) => !o)
+        }}
+      >
+        <SlidersIcon />
+      </RoundButton>
+    </div>
+  )
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
@@ -2782,6 +2858,17 @@ export function ChillRoom({
       )}
 
       {/* Mọi nút / bảng nằm trong lớp này — Zen thì giấu cả lớp, cảnh + nhạc vẫn chạy */}
+      {/* Tấm đồng hồ của Bàn pha phin (Focus.tsx đặt vào đây). Nằm ngoài lớp giao diện vì khác
+          với thanh nhạc, nó không ẩn hẳn khi khách không động chuột và vẫn hiện lúc Ngắm cảnh */}
+      {brewFlag && (
+        <div
+          ref={setBrewSlot}
+          {...hoverProps}
+          className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3 sm:px-5 ${
+            zen ? 'bottom-[calc(max(1rem,env(safe-area-inset-bottom))+84px)]' : 'bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-5'
+          } ${panelOpen && !zen ? 'sm:pr-[436px]' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''}`}
+        />
+      )}
       <div className={zen ? 'hidden' : 'contents'} inert={!entered}>
 
       {/* Màn dọc: gợi ý kéo ngang cảnh, ngay mép trên khung cảnh */}
@@ -3203,7 +3290,7 @@ export function ChillRoom({
       {/* Thanh trên: về trang chủ + điểm đến, giờ + nút cảnh */}
       <div
         {...hoverProps}
-        className={`absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/55 to-transparent p-3 pb-10 sm:p-5 sm:pb-14 ${fade}`}
+        className={`absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/55 to-transparent p-3 pb-10 sm:p-5 sm:pb-14 ${topFade}`}
       >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Link
@@ -3355,7 +3442,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} quest={quest ? <QuestCard state={quest} mine={questMine} myVote={questVote} voteError={questVoteErr} onVote={onQuestVote} /> : null} contrib={questJust ? (
             <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
               <p className="text-sm text-[#f3ece4]">{t.quest.added}</p>
               <NameField label={t.name.onBoard} className="mt-1" />
@@ -3440,7 +3527,7 @@ export function ChillRoom({
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
           panelOpen ? 'sm:pr-[436px]' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''
-        } ${fade}`}
+        } ${fade} ${brewing ? 'hidden' : ''}`}
       >
         <div
           {...hoverProps}
@@ -3683,7 +3770,7 @@ export function ChillRoom({
           Điện thoại / màn dọc: hàng ngang nút tròn gọn ngay trên thanh nhạc.
           Màn ngang ≥1024px: cột dọc sát mép phải, đáy ngang đáy thanh nhạc (khoảng trống
           bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi */}
-      <div className="absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end">
+      <div className={`absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end ${brewing ? 'max-lg:hidden' : ''}`}>
         <div ref={setDiarySlot} className="contents" />
         {/* Điện thoại: Góp ý + Mời bạn nằm trong Thực đơn; đang ngồi bàn nhóm thì nút bàn vẫn ở đây */}
         <div ref={setWishSlot} className="hidden sm:contents" />

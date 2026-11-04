@@ -537,6 +537,8 @@ export class ChillScene {
   private catTinted: HTMLCanvasElement
   private theme: Theme = themeById('cafe')
   private seat: Seat = 'boy'
+  private brewLevel: number | null = null
+  private brewPaused = false
   // Theme ảnh tĩnh: atlas các vùng biến thể của người ngồi (gõ phím, uống)
   private poseSheet: HTMLImageElement | null = null
   // Nhịp gõ phím: gõ liên tục vài giây rồi dừng đọc màn hình; tay nhún khi gõ
@@ -994,6 +996,7 @@ export class ChillScene {
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
     this.paintDrink(ctx)
+    this.paintBrew(ctx)
     // Theme ảnh tĩnh: khoét vùng người ngồi theo ô mặt nạ, tư thế vẽ vào lúc draw
     const frames = this.art.character
     if (frames.kind === 'frames' && ready(this.poseSheet)) {
@@ -1035,6 +1038,45 @@ export class ChillScene {
       // Chỗ cà phê loang vào sữa + vệt sáng thành ly
       fill('#a67c45', coffee.x, coffee.y - 2, coffee.w, 2)
       fill('#ecdba6', coffee.x + coffee.w - 3, coffee.y, 2, coffee.h + 2)
+    }
+  }
+
+  // Bàn pha phin: ly đầy dần theo thời gian của phin. Vẽ ngay trên tranh nội thất như món
+  // khách chọn nên sáng / chiều / tối đều khớp màu. Sữa đặc có sẵn dưới đáy thì cà phê chỉ
+  // dâng từ mặt sữa, như pha thật; ly đen và bạc xỉu dâng từ đáy.
+  private brewSurface(glass: NonNullable<Theme['drink']>) {
+    const top = glass.coffee.y - 6
+    const hasMilk = !this.drink || this.drink === 'sua'
+    const bottom = hasMilk ? glass.milk.y : glass.milk.y + glass.milk.h
+    return {top, bottom, y: bottom - Math.round((this.brewLevel ?? 1) * (bottom - top))}
+  }
+
+  private paintBrew(ctx: CanvasRenderingContext2D) {
+    const glass = this.theme.drink
+    if (!glass || this.brewLevel === null) return
+    const {top, bottom, y} = this.brewSurface(glass)
+    const x = glass.coffee.x + 1
+    const w = glass.coffee.w - 3
+    if (y > top) {
+      ctx.fillStyle = '#5e4436'
+      ctx.fillRect(x * RES, top * RES, w * RES, (y - top) * RES)
+    }
+    if (y > top && y < bottom) {
+      ctx.fillStyle = '#a06a3c'
+      ctx.fillRect(x * RES, y * RES, w * RES, RES)
+    }
+  }
+
+  // Giọt cà phê rơi từ phin xuống mặt ly. ctx đang ở px gốc 640×360
+  private drawBrewDrip(ctx: CanvasRenderingContext2D, t: number) {
+    const glass = this.theme.drink
+    if (!glass || this.brewLevel === null || this.brewPaused) return
+    const {top, y} = this.brewSurface(glass)
+    const x = glass.coffee.x + Math.floor(glass.coffee.w / 2) - 1
+    ctx.fillStyle = this.o('#2c1608')
+    for (let i = 0; i < 2; i++) {
+      const p = (t / 1.1 + i * 0.5) % 1
+      ctx.fillRect(x, Math.round(top + p * Math.max(2, y - top - 2)), 2, 2)
     }
   }
 
@@ -2096,6 +2138,15 @@ export class ChillScene {
     this.dirty = true
   }
 
+  // Bàn pha phin: level 0…1 = phin đang pha tới đâu, null = không pha (ly đầy như tranh gốc).
+  // Chỉ vẽ lại lớp nội thất khi mặt cà phê lên thêm 1 px
+  setBrew(level: number | null, paused: boolean) {
+    this.brewPaused = paused
+    const step = (v: number | null) => (v === null ? -1 : Math.round(v * 40))
+    if (step(level) !== step(this.brewLevel)) this.dirty = true
+    this.brewLevel = level
+  }
+
   // Phin + ly trên quầy → bấm để đổi món (phòng không có ly trong → null)
   get drinkHitBox() {
     return this.theme.drink?.hit ?? null
@@ -2822,6 +2873,7 @@ export class ChillScene {
     }
     if (ready(this.interior)) this.noel?.drawRoomBack(ctx, (c, w, h) => this.wash(c, w, h))
     if (ready(this.interior)) this.drawTip(ctx, t)
+    if (ready(this.interior)) this.drawBrewDrip(ctx, t)
     if (this.toyProp && !this.wand && ready(this.interior)) drawWandProp(ctx, this.theme.toy, t, this.time === 'night')
     this.cat.draw(ctx, this.catTinted)
     this.wand?.draw(ctx, t, this.time === 'night')

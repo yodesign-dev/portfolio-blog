@@ -34,6 +34,7 @@ type Value = {
   highlandOpen?: boolean
   miniPlayerOpen?: boolean
   sleepTimerOpen?: boolean
+  brewDeskOpen?: boolean
   seasonsOpen?: boolean
   liveOpen?: boolean
   questOpen?: boolean
@@ -57,7 +58,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
+type FeatureKey = 'brewDeskOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -71,6 +72,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'slipNewOpen', icon: '🩹', title: 'Mẩu ghi chú kiểu mới', short: 'Mẩu nhỏ dán băng keo, tự xoay vòng', desc: 'Mẩu giấy góc trái trên cảnh gọn lại (dán băng keo, bỏ đinh ghim) và tự xoay qua tối đa 5 mẩu: 3 mẩu khách mới nhất, câu mèo quán, câu hỏi của quán. Rê chuột thì dừng, đang chạy phin thì chỉ còn miếng băng keo. Cần bật Bảng nhật ký. Thử trước bằng ?slip=new.', delay: '30 giây'},
       {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', short: 'Anh / Chị ở màn chào', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', delay: '1 phút'},
       {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
+      {key: 'brewDeskOpen', icon: '☕', title: 'Bàn pha phin', short: 'Đồng hồ lớn thay thanh nhạc, phin nhỏ giọt trong cảnh', desc: 'Đang pha phin thì tấm đồng hồ pixel thay chỗ thanh nhạc, phin trên quầy nhỏ giọt và ly đầy dần. Có tạm dừng, thu gọn và độ dài tuỳ chỉnh 5 đến 120 phút. Tắt là về bảng đồng hồ cũ, phiên đang chạy không mất.', delay: '1 phút'},
       {key: 'sleepTimerOpen', icon: '🌙', title: 'Hẹn giờ tắt nhạc', short: 'Nút trăng: tắt nhạc sau 15/30/60/90 phút', desc: 'Nút trăng cạnh nút Cài đặt dưới thanh nhạc: chọn 15 / 30 / 60 / 90 phút, nút hiện số phút còn lại. 60 giây cuối nhạc và tiếng nền nhỏ dần rồi dừng hẳn, bấm phát là nghe lại. Lần đầu khách vào trạm Night & Sleep, bảng chọn tự mở để gợi ý. Thử trước bằng ?sleep=1.', delay: '1 phút'},
     ],
   },

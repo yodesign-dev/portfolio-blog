@@ -30,6 +30,7 @@ export default defineType({
     defineField({name: 'highlandOpen', title: 'Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ)', type: 'boolean', initialValue: false}),
     defineField({name: 'streetMotionOpen', title: 'Chuyển động phố mượt (người, xe, chó)', type: 'boolean', initialValue: false}),
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
+    defineField({name: 'brewDeskOpen', title: 'Bàn pha phin (đồng hồ mới, phin trong cảnh)', type: 'boolean', initialValue: false}),
     defineField({name: 'sleepTimerOpen', title: 'Hẹn giờ tắt nhạc', type: 'boolean', initialValue: false}),
     defineField({name: 'seasonsOpen', title: 'Theme theo mùa (lịch ở Chill · Mùa)', type: 'boolean', initialValue: false}),
     defineField({name: 'liveOpen', title: 'Huy hiệu LIVE (lịch ở Chill · Live)', type: 'boolean', initialValue: false}),

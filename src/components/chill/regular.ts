@@ -66,6 +66,14 @@ export function addPhin(r: Regular, minutes: number, now = new Date()): Regular 
   return regular
 }
 
+// Phin ngắn (Bàn pha phin, dưới 15 phút): chỉ cộng phút của hôm nay, không tính là 1 phin
+export function addMinutes(r: Regular, minutes: number, now = new Date()): Regular {
+  const before = todayOf(r, now)
+  const regular = {...r, today: {day: dayKey(now), phins: before.phins, minutes: before.minutes + minutes}}
+  save(regular)
+  return regular
+}
+
 // Số ngày ghé liên tiếp tính tới hôm nay (hôm nay chưa ghé thì tính tới hôm qua)
 export function streakOf(r: Regular, now = new Date()) {
   const have = new Set(r.days)

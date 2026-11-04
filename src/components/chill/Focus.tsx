@@ -14,8 +14,12 @@
 // - Giờ nghỉ kiểu Pomodoro: xong phin thì nghỉ 5 phút, cứ 4 phin liền mạch thì nghỉ dài 15 phút.
 //   Hết giờ nghỉ chuông khác kêu (ChillRoom: onBreakDone), bảng mở mời pha tiếp. Công tắc "tự
 //   chạy vòng" nối phin → nghỉ → phin không cần bấm. Giờ nghỉ không tính vào phin/phút/thử thách
+// - Bàn pha phin (công tắc brewDeskOpen, prop `brew`): đang pha thì tấm đồng hồ (BrewDesk.tsx) thay
+//   chỗ thanh nhạc, phin trong cảnh đầy dần (onBrew), có tạm dừng, thu gọn, độ dài tuỳ chỉnh.
+//   Bảng ở đây chỉ còn để chuẩn bị và tổng kết. Tắt công tắc là về bảng cũ, chung dữ liệu chill:focus
 
 import {useEffect, useEffectEvent, useRef, useState, type ReactNode} from 'react'
+import {createPortal} from 'react-dom'
 import {trackEvent} from '@/lib/analytics'
 import {useT} from './i18n'
 import {CARD_SLOTS, cardOf, levelOf, streakOf, todayOf, type Regular} from './regular'
@@ -24,6 +28,7 @@ import {ITEMS} from './shelf'
 import {addTodo, doneTodayOf, loadTodos, removeTodo, setTodoDone, type Todo} from './todo'
 import {TodoList} from './TodoList'
 import {NameField} from './NameField'
+import {BrewPlate, CUSTOM_MAX, CUSTOM_MIN, CUSTOM_STEP, MIN_FULL_PHIN} from './BrewDesk'
 
 const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
@@ -32,13 +37,15 @@ const TODO_SEEN_KEY = 'chill:todo-seen'
 const OPTIONS = [15, 25, 45]
 const AUTO_KEY = 'chill:focus-auto'
 const CHAIN_KEY = 'chill:focus-chain'
+const COMPACT_KEY = 'chill:brew-compact'
 const BREAK_MIN = 5
 const LONG_BREAK_MIN = 15
 const LONG_EVERY = 4
 // Phin mới bắt đầu trong vòng 30 phút sau phin trước (nghỉ dài 15 phút vẫn lọt) thì còn cùng 1 vòng
 const CHAIN_GAP = 30 * 60_000
 
-type Session = {endsAt: number; minutes: number; todo?: string; kind?: 'break'; long?: boolean}
+// pausedLeft: đang tạm dừng, còn lại bao nhiêu ms (lúc này endsAt không có nghĩa)
+type Session = {endsAt: number; minutes: number; todo?: string; kind?: 'break'; long?: boolean; pausedLeft?: number}
 // Vòng phin liền mạch: số phin đã xong + lúc phin gần nhất xong
 type Chain = {count: number; lastAt: number}
 
@@ -73,6 +80,12 @@ export function Focus({
   onStart,
   quest = null,
   contrib = null,
+  brew = false,
+  brewSlot = null,
+  brewMusic = null,
+  zen = false,
+  dimmed = false,
+  onBrew,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -100,6 +113,17 @@ export function Focus({
   quest?: ReactNode
   // Dòng "phin của bạn đã góp cho quán" + tên trên bảng, hiện trong tổng kết phin
   contrib?: ReactNode
+  // Bàn pha phin đang bật
+  brew?: boolean
+  // Chỗ đặt tấm đồng hồ (thay thanh nhạc); null = chưa vào quán
+  brewSlot?: HTMLElement | null
+  // Hàng nút nhạc trong tấm đồng hồ
+  brewMusic?: ReactNode
+  zen?: boolean
+  // Giao diện đang tự ẩn vì khách không động chuột: tấm đồng hồ chỉ mờ đi
+  dimmed?: boolean
+  // Phin trong cảnh: tiến độ 0…1, null = không pha
+  onBrew?: (level: number | null, paused: boolean) => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -122,6 +146,8 @@ export function Focus({
   const [chain, setChain] = useState<Chain | null>(null)
   // Vừa hết giờ nghỉ (không tự chạy) → bảng mời pha phin tiếp
   const [rested, setRested] = useState(false)
+  const [custom, setCustom] = useState(false)
+  const [compact, setCompact] = useState(false)
   // Phiên vừa kết thúc — chặn interval + visibilitychange cùng báo hết giờ 2 lần
   const endedRef = useRef(0)
   const ref = useRef<HTMLDivElement>(null)
@@ -137,10 +163,12 @@ export function Focus({
       const savedChain = JSON.parse(localStorage.getItem(CHAIN_KEY) ?? 'null') as Partial<Chain> | null
       if (Number(savedChain?.count) > 0 && Number(savedChain?.lastAt) > 0) setChain({count: Number(savedChain!.count), lastAt: Number(savedChain!.lastAt)})
       const saved = JSON.parse(localStorage.getItem(FOCUS_KEY) ?? 'null') as Partial<Session> | null
-      if (saved?.endsAt && saved.endsAt > Date.now() && saved.minutes) {
+      const pausedLeft = Number(saved?.pausedLeft) > 0 ? Number(saved?.pausedLeft) : undefined
+      if (saved?.endsAt && (saved.endsAt > Date.now() || pausedLeft) && saved.minutes) {
         setSession({
           endsAt: saved.endsAt,
           minutes: saved.minutes,
+          ...(pausedLeft ? {pausedLeft} : {}),
           ...(typeof saved.todo === 'string' ? {todo: saved.todo} : {}),
           ...(saved.kind === 'break' ? {kind: 'break' as const, ...(saved.long ? {long: true} : {})} : {}),
         })
@@ -167,8 +195,33 @@ export function Focus({
     }
   }, [open])
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => openSignal > 0 ? setOpen(true) : undefined, [openSignal])
+  // Bàn pha phin: độ dài tuỳ chỉnh, cách hiện đồng hồ, và việc của phin đang chạy (tấm đồng hồ
+  // hiện tên việc ngay cả khi chưa mở bảng lần nào từ lúc tải trang)
+  useEffect(() => {
+    if (!brew) return
+    try {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      const saved = Number(localStorage.getItem(MINUTES_KEY))
+      if (saved >= CUSTOM_MIN && saved <= CUSTOM_MAX) {
+        setMinutes(saved)
+        setCustom(!OPTIONS.includes(saved))
+      }
+      setCompact(localStorage.getItem(COMPACT_KEY) === '1')
+      setTodos(loadTodos())
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } catch {
+      // Chặn storage → dùng mặc định
+    }
+  }, [brew])
+
+  const onOpenSignal = useEffectEvent(() => {
+    if (brew && session) setCompact(false)
+    else setOpen(true)
+  })
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- nút "Thử ngay" gửi tín hiệu từ ngoài
+    if (openSignal > 0) onOpenSignal()
+  }, [openSignal])
 
   // Bắt đầu 1 phin hoặc 1 giờ nghỉ. Nghỉ dài khi vừa xong phin thứ 4, 8… của vòng
   const begin = (kind: 'phin' | 'break', at = Date.now(), round = chainCount(chain, at)) => {
@@ -188,8 +241,9 @@ export function Focus({
       next = {endsAt: at + minutes * 60_000, minutes, ...(todo ? {todo} : {})}
       setFinished(null)
       setPicked(null)
-      onStart?.()
-      trackEvent({name: 'Chill Focus', props: {action: 'start'}})
+      // Phin ngắn không góp vào thử thách chung
+      if (minutes >= MIN_FULL_PHIN) onStart?.()
+      trackEvent({name: 'Chill Focus', props: {action: 'start', ...(brew ? {minutes} : {})}})
     }
     onPrime()
     setNow(at)
@@ -213,7 +267,8 @@ export function Focus({
       setOpen(true)
       return
     }
-    const nextChain = {count: chainCount(chain, s.endsAt - s.minutes * 60_000) + 1, lastAt: at}
+    // Phin ngắn không tính vào vòng 4 phin
+    const nextChain = s.minutes >= MIN_FULL_PHIN ? {count: chainCount(chain, s.endsAt - s.minutes * 60_000) + 1, lastAt: at} : (chain ?? {count: 0, lastAt: at})
     setChain(nextChain)
     store(CHAIN_KEY, nextChain)
     setFinished({minutes: s.minutes, todo: s.todo})
@@ -229,7 +284,7 @@ export function Focus({
 
   // Đếm theo đồng hồ thật (timer bị bóp khi tab chạy nền vẫn không lệch giờ)
   useEffect(() => {
-    if (!session) return
+    if (!session || session.pausedLeft !== undefined) return
     const tick = () => {
       const at = Date.now()
       if (at < session.endsAt) return setNow(at)
@@ -244,8 +299,9 @@ export function Focus({
   }, [session])
 
   const onBreak = session?.kind === 'break'
-  const left = session ? Math.max(0, session.endsAt - now) : 0
-  const label = session ? `${onBreak ? '☕ ' : ''}${clock(left)}` : null
+  const left = session ? (session.pausedLeft ?? Math.max(0, session.endsAt - now)) : 0
+  const paused = session?.pausedLeft !== undefined
+  const label = session ? `${onBreak ? '☕ ' : paused ? '⏸ ' : ''}${clock(left)}` : null
   useEffect(() => onTick(label), [label, onTick])
   useEffect(() => () => onTick(null), [onTick])
 
@@ -284,6 +340,34 @@ export function Focus({
     begin('phin')
   }
 
+  const togglePause = () => {
+    if (!session) return
+    const at = Date.now()
+    let next: Session
+    if (session.pausedLeft !== undefined) {
+      const {pausedLeft, ...rest} = session
+      next = {...rest, endsAt: at + pausedLeft}
+    } else {
+      next = {...session, pausedLeft: Math.max(0, session.endsAt - at)}
+    }
+    trackEvent({name: 'Chill Focus', props: {action: session.pausedLeft !== undefined ? 'resume' : 'pause'}})
+    setNow(at)
+    setSession(next)
+    store(FOCUS_KEY, next)
+  }
+
+  const chooseCompact = (value: boolean) => {
+    setCompact(value)
+    store(COMPACT_KEY, value ? 1 : null)
+    if (value) trackEvent({name: 'Chill Focus', props: {action: 'compact'}})
+  }
+
+  // Bắt đầu từ bảng: bảng đóng lại nhường chỗ cho tấm đồng hồ và cảnh
+  const beginFromPanel = (kind: 'phin' | 'break') => {
+    begin(kind)
+    if (brew) close()
+  }
+
   const toggleAuto = () => {
     const value = !auto
     setAuto(value)
@@ -291,7 +375,11 @@ export function Focus({
     trackEvent({name: 'Chill Focus', props: {action: value ? 'auto-on' : 'auto-off'}})
   }
 
-  const progress = session ? 1 - left / (session.minutes * 60_000) : 0
+  const progress = session ? Math.min(1, Math.max(0, 1 - left / (session.minutes * 60_000))) : 0
+  const brewLevel = brew && session && !onBreak ? progress : null
+  useEffect(() => {
+    onBrew?.(brewLevel, paused)
+  }, [brewLevel, paused, onBrew])
   const {stamps, card} = cardOf(regular.total)
   const streak = streakOf(regular)
   const done = finished !== null && !session && !rested
@@ -324,6 +412,7 @@ export function Focus({
   const summary = finished && (
     <div role="status">
       <p className="mt-2 text-lg font-semibold tracking-tight text-[#f3ece4]">{t.focus.doneTitle(finished.minutes)}</p>
+      {finished.minutes < MIN_FULL_PHIN && <p className="mt-1 text-xs text-[#a79e94]">{t.focus.shortNote}</p>}
       {finishedTodo && (finishedTodo.doneDay || !askSkipped) && (
         <div className="mt-3 rounded-xl border border-[#e8b27d]/30 bg-[#e8b27d]/[0.07] px-3 py-2.5">
           <p className={`break-words text-sm leading-snug ${finishedTodo.doneDay ? 'text-[#a79e94] line-through' : 'text-[#f3ece4]'}`}>{finishedTodo.text}</p>
@@ -384,7 +473,7 @@ export function Focus({
       <div className="relative">
       <button
         type="button"
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => (open ? close() : brew && session ? chooseCompact(!compact) : setOpen(true))}
         aria-expanded={open}
         aria-controls="chill-focus"
         aria-label={session ? (onBreak ? t.focus.breakAria(clock(left)) : t.focus.runningAria(clock(left))) : t.focus.open}
@@ -420,7 +509,11 @@ export function Focus({
           id="chill-focus"
           role="dialog"
           aria-label={t.focus.title}
-          className="absolute right-3 top-full z-40 mt-2 max-h-[calc(100dvh-5rem)] w-[min(300px,calc(100vw-24px))] overflow-y-auto overscroll-contain sm:right-0 rounded-2xl border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl"
+          className={`z-40 overflow-y-auto overscroll-contain border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl ${
+            brew
+              ? 'fixed inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-5rem)] sm:w-[400px] sm:rounded-2xl sm:pb-4'
+              : 'absolute right-3 top-full mt-2 max-h-[calc(100dvh-5rem)] w-[min(300px,calc(100vw-24px))] rounded-2xl sm:right-0'
+          }`}
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.title}</p>
           {/* Đang chạy phin thì chỉ có đồng hồ, không tab */}
@@ -436,7 +529,19 @@ export function Focus({
             />
           )}
 
-          {session && onBreak ? (
+          {brew && session ? (
+            // Đang chạy thì giờ nằm ở tấm đồng hồ; bảng chỉ tự mở để tổng kết phin vừa xong
+            <>
+              {summary}
+              <button
+                type="button"
+                onClick={close}
+                className="mt-3 w-full rounded-full border border-white/15 py-2 text-sm text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                {t.focus.closeSummary}
+              </button>
+            </>
+          ) : session && onBreak ? (
             <>
               <p className="mt-2 text-sm font-medium text-[#bfe3c4]">{t.focus.breakTitle(Boolean(session.long))}</p>
               <p className="mt-0.5 font-mono text-4xl tabular-nums tracking-tight text-[#e3f2e5]" aria-live="off">
@@ -500,22 +605,66 @@ export function Focus({
                 <p className="mt-2 text-sm leading-relaxed text-[#ede6dd]">{t.focus.pitch}</p>
               )}
               <TodoList todos={todos} picked={picked} onPick={setPicked} onAdd={add} onCheck={check} onRemove={drop} />
-              <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl border border-white/10 p-1" role="radiogroup" aria-label={t.focus.length}>
+              <div className={`mt-3 grid gap-1 rounded-xl border border-white/10 p-1 ${brew ? 'grid-cols-4' : 'grid-cols-3'}`} role="radiogroup" aria-label={t.focus.length}>
                 {OPTIONS.map((m) => (
                   <button
                     key={m}
                     type="button"
                     role="radio"
-                    aria-checked={minutes === m}
-                    onClick={() => choose(m)}
+                    aria-checked={minutes === m && !custom}
+                    onClick={() => {
+                      setCustom(false)
+                      choose(m)
+                    }}
                     className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
-                      minutes === m ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
+                      minutes === m && !custom ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
                     }`}
                   >
                     {t.focus.minutes(m)}
                   </button>
                 ))}
+                {brew && (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={custom}
+                    onClick={() => setCustom(true)}
+                    className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                      custom ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
+                    }`}
+                  >
+                    {t.focus.custom}
+                  </button>
+                )}
               </div>
+              {brew && custom && (
+                <div className="mt-2 grid gap-1">
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      aria-label={t.focus.fewer}
+                      disabled={minutes <= CUSTOM_MIN}
+                      onClick={() => choose(Math.max(CUSTOM_MIN, minutes - CUSTOM_STEP))}
+                      className="size-10 rounded-lg border border-white/10 text-lg text-[#ede6dd] transition enabled:hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                    >
+                      −
+                    </button>
+                    <span className="min-w-20 text-center font-mono text-lg tabular-nums text-[#f3cfa8]" aria-live="polite">
+                      {t.focus.minutes(minutes)}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={t.focus.more}
+                      disabled={minutes >= CUSTOM_MAX}
+                      onClick={() => choose(Math.min(CUSTOM_MAX, minutes + CUSTOM_STEP))}
+                      className="size-10 rounded-lg border border-white/10 text-lg text-[#ede6dd] transition enabled:hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {minutes < MIN_FULL_PHIN && <p className="text-center text-[11px] leading-snug text-[#a79e94]">{t.focus.shortNote}</p>}
+                </div>
+              )}
               {round > 0 && (
                 <div className="mt-3 flex items-center gap-2 text-xs text-[#a79e94]">
                   <span className="flex gap-1" role="img" aria-label={t.focus.chainAria(roundDots, LONG_EVERY)}>
@@ -529,7 +678,7 @@ export function Focus({
               {done && (
                 <button
                   type="button"
-                  onClick={() => begin('break')}
+                  onClick={() => beginFromPanel('break')}
                   className="mt-3 w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
                 >
                   {t.focus.takeBreak(nextBreakLong ? LONG_BREAK_MIN : BREAK_MIN, nextBreakLong)}
@@ -537,7 +686,7 @@ export function Focus({
               )}
               <button
                 type="button"
-                onClick={() => begin('phin')}
+                onClick={() => beginFromPanel('phin')}
                 className={
                   done
                     ? 'mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
@@ -627,6 +776,32 @@ export function Focus({
           )}
         </div>
       )}
+      {brew && brewSlot && session &&
+        createPortal(
+          <BrewPlate
+            clock={clock(left)}
+            ariaLabel={onBreak ? t.focus.breakAria(clock(left)) : t.focus.runningAria(clock(left))}
+            progress={progress}
+            minutes={session.minutes}
+            paused={paused}
+            rest={Boolean(onBreak)}
+            long={Boolean(session.long)}
+            task={sessionTodo?.text}
+            roundNow={(round % LONG_EVERY) + 1}
+            roundDots={onBreak ? roundDots : round % LONG_EVERY}
+            roundOf={LONG_EVERY}
+            nextMinutes={minutes}
+            compact={compact}
+            zen={zen}
+            dimmed={dimmed}
+            music={brewMusic}
+            onPause={togglePause}
+            onDrop={stop}
+            onSkipBreak={skipBreak}
+            onCompact={chooseCompact}
+          />,
+          brewSlot
+        )}
     </div>
   )
 }
