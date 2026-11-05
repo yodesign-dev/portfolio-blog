@@ -805,6 +805,12 @@ export class ChillScene {
       this.movers = this.movers.filter((m) => !m.road && m.sprite === 'walker')
       if (weather !== 'rain') for (let i = 0; i < 10; i++) this.spawnWalker(16 + this.rng() * (SCENE_W - 32))
     }
+    // Rời phố cổ: khách tham quan ở lại phố cổ; người đi bộ về lại 3 hàng vỉa hè thường
+    // (vỉa hè phố cổ rộng tới 9 hàng, giữ nguyên thì sang cảnh khác họ đứng giữa sông, giữa ruộng)
+    if (wasOldtown && !this.oldtown) {
+      this.movers = this.movers.filter((m) => !isSightseer(m.sprite))
+      for (const m of this.movers) if (!m.road) m.dy = Math.max(m.dy, -2)
+    }
     // Sang phố đường tàu: hết xe trên ray; vừa tới nơi thì chuyến đầu đến sớm
     if (this.railway && !wasRailway) {
       this.movers = this.movers.filter((m) => !m.road)
