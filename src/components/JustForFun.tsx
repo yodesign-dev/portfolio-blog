@@ -5,15 +5,15 @@ import {useState} from 'react'
 import {TRUT_GIAN_URL} from '@/lib/site'
 
 // Section "Just for fun" trang chủ: game Trút Giận Online, tách khỏi Side projects vì giọng
-// điệu khác hẳn quán lofi. Xấp thẻ xoè theo mẫu Portrait Stack của Superdesign, mỗi thẻ là một
-// nỗi bực trong game, chữ lấy nguyên từ game. Cố ý bỏ thẻ sếp, vợ/chồng, người yêu vì trang
+// điệu khác hẳn quán lofi. Xấp thẻ xoè theo mẫu Portrait Stack của Superdesign, mỗi thẻ là ảnh
+// chụp một màn chơi thật, chữ lấy nguyên từ game. Cố ý bỏ thẻ sếp, vợ/chồng, người yêu vì trang
 // này hướng tới nhà tuyển dụng.
 const GRIPES = [
-  {emoji: '🔊', title: 'Neighbor', detail: 'Midnight karaoke, drilling at 7am', color: '#993556'},
-  {emoji: '🏓', title: 'Court hogs', detail: 'Took your court, “one more game” for 2h', color: '#0f6e56'},
-  {emoji: '🎮', title: 'Gaming teammate', detail: 'Feeding, flaming, AFK', color: '#534ab7'},
-  {emoji: '🧾', title: 'Client', detail: 'Endless revisions, haggling', color: '#993c1d'},
-  {emoji: '💸', title: 'Friend who owes you', detail: '“I’ll pay tomorrow” for 6 months', color: '#854f0b'},
+  {image: '/side/trut-gian-neighbor.jpg', title: 'Neighbor', detail: 'Midnight karaoke, drilling at 7am'},
+  {image: '/side/trut-gian-court.jpg', title: 'Court hogs', detail: 'Took your court, “one more game” for 2h'},
+  {image: '/side/trut-gian-teammate.jpg', title: 'Gaming teammate', detail: 'Feeding, flaming, AFK'},
+  {image: '/side/trut-gian-client.jpg', title: 'Client', detail: 'Endless revisions, haggling'},
+  {image: '/side/trut-gian-friend.jpg', title: 'Friend who owes you', detail: '“I’ll pay tomorrow” for 6 months'},
 ]
 
 const arrowClass =
@@ -28,7 +28,7 @@ export function JustForFun() {
     <section aria-labelledby="just-for-fun-title" className="overflow-hidden bg-white">
       <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 py-20 sm:px-8 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         {/* Chữ trên thẻ đã có ở dòng mô tả bên cạnh nên ẩn với trình đọc màn hình */}
-        <div aria-hidden="true" className="relative mx-auto h-64 w-48 sm:h-72 sm:w-56">
+        <div aria-hidden="true" className="relative mx-auto aspect-[3/4] w-52 sm:w-64">
           {GRIPES.map((card, index) => {
             // Khoảng cách tới thẻ đang mở tính vòng tròn, để xấp thẻ lặp chứ không hết
             let distance = (index - active + count) % count
@@ -38,14 +38,15 @@ export function JustForFun() {
               <div
                 key={card.title}
                 style={{
-                  backgroundColor: card.color,
                   transform: `translateX(${distance * 26}px) rotate(${distance * 6}deg) scale(${1 - away * 0.06})`,
                   zIndex: count - away,
                 }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-2xl border border-white/20 p-5 text-center text-white shadow-md transition-transform duration-300 ease-out motion-reduce:transition-none"
+                className="absolute inset-0 overflow-hidden rounded-2xl border border-black/10 bg-neutral-200 shadow-md transition-transform duration-300 ease-out motion-reduce:transition-none"
               >
-                <span className="text-5xl leading-none sm:text-6xl">{card.emoji}</span>
-                <span className="text-lg font-bold leading-snug">{card.title}</span>
+                <Image src={card.image} alt="" fill sizes="(min-width: 640px) 256px, 208px" className="object-cover" />
+                <span className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-center text-sm font-semibold text-white">
+                  {card.title}
+                </span>
               </div>
             )
           })}
