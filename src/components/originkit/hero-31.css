@@ -59,37 +59,26 @@
 }
 
 /*
- * Process canvas (process-canvas.tsx) — kịch bản thiết kế trên thang 18s, phát
- * trong --pc-loop giây (đặt ở process-canvas.tsx, mặc định 18s), bắt đầu sau 2.8s để người
- * xem đọc tiêu đề gõ xong. Kịch bản chi tiết (theo giây) và keyframes của con
- * trỏ + khung Hi-fi (pc-ai, pc-bin, pc-m-*, pc-prompt, pc-pill…) được sinh
- * trong process-canvas.tsx; ở đây chỉ còn Research, Wireframe, viền Hi-fi:
- *   0–4.5s    AI lướt qua các sticky note ở Research (note sáng lần lượt)
- *   4.5–7.6s  Bin phác Wireframe (khối wireframe hiện rõ dần)
- *   8.1–16.2s Hai con trỏ làm việc ở Hi-fi, frame Hi-fi sáng viền
- *  16.2–18s   Quay về vị trí đầu, lặp lại
- * Vị trí con trỏ là left/top theo % khung canvas.
+ * Process canvas (process-canvas.tsx) — 1 vòng --pc-loop giây (đặt ở
+ * process-canvas.tsx), bắt đầu sau --pc-delay (2.8s, hoặc 0s khi vừa xong mở
+ * màn bầy con trỏ). Kịch bản và mọi keyframes (pc-bin, pc-ai, pc-wire,
+ * pc-hifi, pc-v-*…) được sinh trong process-canvas.tsx; ở đây chỉ gắn chúng.
  */
 .pc-cursor-ai {
-  animation: pc-ai var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
+  animation: pc-ai var(--pc-loop, 15s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-cursor-bin {
-  animation: pc-bin var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
-}
-.pc-note {
-  /* Mỗi note sáng lên đúng lúc con trỏ AI đi qua (cách nhau 0.84/18 vòng) */
-  animation: pc-note var(--pc-loop, 18s) ease-in-out infinite both;
-  animation-delay: calc(var(--pc-delay, 2.8s) + var(--pc-i, 0) * var(--pc-loop, 18s) * 0.84 / 18);
+  animation: pc-bin var(--pc-loop, 15s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-wire {
-  animation: pc-wire var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
+  animation: pc-wire var(--pc-loop, 15s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-hifi {
-  animation: pc-hifi var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
+  animation: pc-hifi var(--pc-loop, 15s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-step {
   /* animation-name gán inline theo từng phần tử (xem process-canvas.tsx) */
-  animation-duration: var(--pc-loop, 18s);
+  animation-duration: var(--pc-loop, 15s);
   animation-timing-function: ease-out;
   animation-delay: var(--pc-delay, 2.8s);
   animation-iteration-count: infinite;
@@ -112,9 +101,10 @@
   opacity: 0;
   pointer-events: none;
 }
+/* !important: keyframes pc-ai có đổi opacity, phải thắng được animation */
 [data-intro="on"] .pc-cursor-bin,
 [data-intro="on"] .pc-cursor-ai {
-  opacity: 0;
+  opacity: 0 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -125,23 +115,7 @@
   .sw-part[data-hidden="true"],
   [data-intro="on"] .pc-cursor-bin,
   [data-intro="on"] .pc-cursor-ai {
-    opacity: 1;
+    opacity: 1 !important;
     pointer-events: auto;
   }
-}
-
-@keyframes pc-note {
-  0%, 0.78%, 7%, 100% { transform: scale(1);    background-color: #fef3c7; }
-  3.11%               { transform: scale(1.12); background-color: #fcd34d; }
-}
-
-@keyframes pc-wire {
-  0%, 26.44% { opacity: 0.35; }
-  42%, 90%   { opacity: 1; }
-  100%      { opacity: 0.35; }
-}
-
-@keyframes pc-hifi {
-  0%, 45.11%, 96%, 100% { outline-color: transparent; }
-  51.33%, 90%           { outline-color: rgb(255 255 255 / 0.85); }
 }

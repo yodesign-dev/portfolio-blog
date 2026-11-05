@@ -5,8 +5,9 @@ import { AI_TONE, BIN_TONE, Cursor, type CursorTone } from "@/components/origink
 
 // Mở màn bầy con trỏ cho canvas ở hero: canvas trống, ~9 con trỏ (Bin, AI và
 // 7 agent) bay lên thành bầy, kéo đường gióng, kéo khung có nhãn W × H để dựng
-// Research / Wireframe / Hi-fi, chạm thả từng sticky note, rồi cả bầy thu về
-// đúng chỗ đứng đầu vòng câu chuyện Bin × AI — vòng đó chạy tiếp ngay.
+// Research / Wireframe / Hi-fi (Bin dựng khung Hi-fi), chạm thả từng sticky
+// note, rồi cả bầy thu về đúng chỗ đứng đầu vòng câu chuyện Bin × AI — vòng
+// đó chạy tiếp ngay.
 //
 // Ý tưởng lấy cảm hứng từ Swarm của Joel Califa (califa.github.io/swarm-site);
 // code viết mới hoàn toàn, không chép từ Swarm hay swarm-cursors (cả hai đều
@@ -46,22 +47,24 @@ const AGENTS: { label: string; tone: CursorTone }[] = [
   { label: "Layout", tone: agentTone("#6ee7b7") },
 ];
 
-// Cuối màn, agent nhập vào con trỏ nào (gần chỗ chúng làm việc)
-const LEADER = [BIN, AI, AI, BIN, AI, AI, AI, BIN, BIN];
+// Cuối màn, agent nhập vào con trỏ nào (gần chỗ đứng đầu vòng: Bin cạnh
+// Research, AI dưới khung Hi-fi)
+const LEADER = [BIN, AI, BIN, AI, BIN, BIN, AI, BIN, AI];
 
 // ---------- Kịch bản (giây) ----------
 const FLOCK_END = 0.85; // bay bầy xong, toả ra làm việc
 const NOTE_START = 1.65;
 const NOTE_GAP = 0.12;
-const NOTE_AGENTS = [A11Y, COPY, QA, MOTION, RESEARCH, GRID];
+const NOTE_AGENTS = [A11Y, COPY, QA, MOTION, AI, GRID];
 const GATHER = 2.45; // thu bầy về Bin / AI
 const END = 3.15;
 const GUIDE_COLOR = "#ff8a8a";
 
+// Bin dựng khung chính (Hi-fi); agent lo khung phụ, AI chỉ thả note
 const DRAGS: { key: SwarmFrame; who: number; start: number; end: number }[] = [
   { key: "research", who: RESEARCH, start: 1.1, end: 1.55 },
-  { key: "hifi", who: AI, start: 1.3, end: 1.75 },
-  { key: "wire", who: BIN, start: 1.45, end: 1.9 },
+  { key: "hifi", who: BIN, start: 1.3, end: 1.75 },
+  { key: "wire", who: LAYOUT, start: 1.45, end: 1.9 },
 ];
 
 type Geometry = { frames: Record<SwarmFrame, Box>; notes: Pt[] };
@@ -226,6 +229,8 @@ export function SwarmIntro({
         if (!el) continue;
         const P = pos[i];
         let opacity = clamp01(t / 0.3);
+        // AI mờ dần về 0.5 — đúng độ mờ "đang chờ lệnh" ở đầu vòng câu chuyện
+        if (i === AI && t >= GATHER) opacity = Math.min(opacity, 1 - 0.5 * clamp01((t - GATHER) / 0.5));
         // Agent nhạt dần khi về tới con trỏ dẫn đầu
         if (i !== BIN && i !== AI && t >= GATHER) {
           const home = homeOf(i);
