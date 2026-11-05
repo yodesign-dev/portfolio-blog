@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AI_TONE, BIN_TONE, Cursor } from "@/components/originkit/ui/hero-31/cursor";
+import { SwarmIntro, type SwarmPart } from "@/components/originkit/ui/hero-31/swarm-intro";
 
 // Canvas "người × AI" ở hero: 3 frame Research → Wireframe → Hi-fi kiểu
 // Figma, 2 con trỏ "Bin" và "AI" cùng làm việc rồi gặp nhau ở Hi-fi, nơi
@@ -23,34 +25,6 @@ const NOTES = [
   { i: 4, visited: true },
   { i: 5, visited: false },
 ];
-
-function Cursor({
-  label,
-  tone,
-  className = "",
-  style,
-}: {
-  label: string;
-  tone: "bin" | "ai";
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const fill = tone === "bin" ? "#ffffff" : "#00ddff";
-  return (
-    <div className={`pointer-events-none absolute z-20 ${className}`} style={style}>
-      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-        <path d="M2 1.5 L15 8.2 L9 9.6 L6.4 15.5 Z" fill={fill} stroke="#0b1432" strokeWidth="1" strokeLinejoin="round" />
-      </svg>
-      <span
-        className={`ml-3 inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-semibold leading-none ${
-          tone === "bin" ? "bg-white text-brand" : "bg-accent text-ink"
-        }`}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
 
 function FrameLabel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <p className={`mb-1.5 text-xs font-semibold tracking-wide text-white/85 ${className}`}>{children}</p>;
@@ -75,6 +49,10 @@ const pct = (sec: number) => +((sec / LOOP_SECONDS) * 100).toFixed(2);
 const keyframes = (name: string, stops: [number, string][]) =>
   `@keyframes ${name}{${stops.map(([sec, css]) => `${pct(sec)}%{${css}}`).join("")}}`;
 const at = (left: number, top: number) => `left:${left}%;top:${top}%`;
+// Chỗ đứng đầu vòng của 2 con trỏ — đoạn mở màn bầy con trỏ thu về đúng đây
+const AI_HOME = { x: 40, y: 46 };
+const SWARM_SEEN_KEY = "hero-swarm-seen";
+const BIN_HOME = { x: 2, y: 90 };
 
 const SKELETON = "#e9ecf2";
 const AI_FLASH = "#a5f3fc";
@@ -88,7 +66,7 @@ const MOBILE_STEPS = [9.9, 10.3, 10.7, 11.1, 11.5];
 
 const STORY_KEYFRAMES = [
   keyframes("pc-ai", [
-    [0, at(40, 46)],
+    [0, at(AI_HOME.x, AI_HOME.y)],
     [0.84, at(9, 18)],
     [1.68, at(20, 18)],
     [2.52, at(31, 18)],
@@ -106,10 +84,10 @@ const STORY_KEYFRAMES = [
     [12.8, at(50, 26)],
     [13.4, at(55, 32)],
     [RESET, at(55, 32)],
-    [18, at(40, 46)],
+    [18, at(AI_HOME.x, AI_HOME.y)],
   ]),
   keyframes("pc-bin", [
-    [0, at(2, 90)],
+    [0, at(BIN_HOME.x, BIN_HOME.y)],
     [4.48, at(2, 90)],
     [5.6, at(12, 66)],
     [6.44, at(34, 72)],
@@ -124,7 +102,7 @@ const STORY_KEYFRAMES = [
     [14.3, at(80.5, 26.5)],
     [14.9, at(70, 42)],
     [RESET, at(70, 42)],
-    [18, at(2, 90)],
+    [18, at(BIN_HOME.x, BIN_HOME.y)],
   ]),
   ...MOBILE_STEPS.map((sec, i) =>
     keyframes(`pc-m-${i}`, [
@@ -338,10 +316,13 @@ function HiFiFrame({
   study,
   className = "",
   animated = false,
+  hidden = false,
 }: {
   study: HeroStudy | null;
   className?: string;
   animated?: boolean;
+  // Đang chờ bầy con trỏ dựng (swarm-intro.tsx)
+  hidden?: boolean;
 }) {
   const body = (
     <div
@@ -371,15 +352,16 @@ function HiFiFrame({
     <Link
       href={study.href}
       aria-label={`${study.title} — case study`}
-      className={`group flex flex-col focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white ${className}`}
+      data-hidden={hidden}
+      className={`sw-part group flex flex-col focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white ${className}`}
     >
       {label}
-      <div className="min-h-0 flex-1">{body}</div>
+      <div data-sw-box="hifi" className="min-h-0 flex-1">{body}</div>
     </Link>
   ) : (
-    <div className={`flex flex-col ${className}`}>
+    <div data-hidden={hidden} className={`sw-part flex flex-col ${className}`}>
       {label}
-      <div className="min-h-0 flex-1">{body}</div>
+      <div data-sw-box="hifi" className="min-h-0 flex-1">{body}</div>
     </div>
   );
 }
@@ -388,6 +370,37 @@ function HiFiFrame({
 export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
+  // Mở màn bầy con trỏ: "pending" lúc render server/hydrate (khung ẩn, vòng
+  // câu chuyện đứng ở 0), "running" khi bầy đang dựng, "done" khi vòng chạy.
+  const [intro, setIntro] = useState<"pending" | "running" | "done">("pending");
+  const [built, setBuilt] = useState<ReadonlySet<SwarmPart>>(() => new Set());
+  // Bầy đã chạy thì vòng câu chuyện vào luôn, không chờ 2.8s như cũ
+  const [handedOff, setHandedOff] = useState(false);
+
+  // Chạy 1 lần mỗi phiên (quay lại trang chủ không phải xem lại); ?swarm=1
+  // ép chạy lại. Bỏ qua khi giảm chuyển động hoặc canvas bị ẩn (màn nhỏ).
+  useEffect(() => {
+    const el = ref.current;
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem(SWARM_SEEN_KEY) === "1";
+    } catch {}
+    const force = new URLSearchParams(window.location.search).has("swarm");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setIntro(!el?.offsetWidth || reduce || (seen && !force) ? "done" : "running");
+  }, []);
+
+  const reveal = useCallback((part: SwarmPart) => {
+    setBuilt((prev) => new Set(prev).add(part));
+  }, []);
+  const finishIntro = useCallback(() => {
+    setIntro("done");
+    setHandedOff(true);
+    try {
+      sessionStorage.setItem(SWARM_SEEN_KEY, "1");
+    } catch {}
+  }, []);
+  const hide = (part: SwarmPart) => intro !== "done" && !built.has(part);
 
   // Dừng chuyển động khi hero cuộn khỏi màn hình — tiết kiệm pin/CPU
   useEffect(() => {
@@ -401,14 +414,16 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
   return (
     <div
       ref={ref}
-      data-paused={paused}
+      data-paused={paused || intro !== "done"}
+      data-intro={intro !== "done" ? "on" : undefined}
       className="relative aspect-[4/3] w-full"
-      style={{ "--pc-loop": `${PLAYBACK_SECONDS}s` } as React.CSSProperties}
+      style={{ "--pc-loop": `${PLAYBACK_SECONDS}s`, ...(handedOff && { "--pc-delay": "0s" }) } as React.CSSProperties}
     >
       {/* Đường nối Research → Wireframe → Hi-fi */}
       <svg
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full"
+        data-hidden={hide("wire")}
+        className="sw-part pointer-events-none absolute inset-0 h-full w-full"
         viewBox="0 0 400 300"
         preserveAspectRatio="none"
       >
@@ -417,13 +432,15 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
       </svg>
 
       {/* Research */}
-      <div aria-hidden="true" className="absolute left-[2%] top-[4%] flex h-[36%] w-[36%] flex-col">
+      <div aria-hidden="true" data-hidden={hide("research")} className="sw-part absolute left-[2%] top-[4%] flex h-[36%] w-[36%] flex-col">
         <FrameLabel>Research</FrameLabel>
-        <div className="grid flex-1 grid-cols-3 grid-rows-2 gap-1.5 rounded-md border border-dashed border-white/60 bg-white/10 p-2">
+        <div data-sw-box="research" className="grid flex-1 grid-cols-3 grid-rows-2 gap-1.5 rounded-md border border-dashed border-white/60 bg-white/10 p-2">
           {NOTES.map((note) => (
             <div
               key={note.i}
-              className={`rounded-sm bg-amber-100 ${note.visited ? "pc-anim pc-note" : ""}`}
+              data-sw-note
+              data-hidden={hide(`note-${note.i}`)}
+              className={`sw-part rounded-sm bg-amber-100 ${note.visited ? "pc-anim pc-note" : ""}`}
               style={note.visited ? ({ "--pc-i": note.i === 4 ? 3 : note.i } as React.CSSProperties) : undefined}
             />
           ))}
@@ -431,9 +448,9 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
       </div>
 
       {/* Wireframe */}
-      <div aria-hidden="true" className="absolute left-[6%] top-[54%] flex h-[38%] w-[36%] flex-col">
+      <div aria-hidden="true" data-hidden={hide("wire")} className="sw-part absolute left-[6%] top-[54%] flex h-[38%] w-[36%] flex-col">
         <FrameLabel>Wireframe</FrameLabel>
-        <div className="pc-anim pc-wire flex flex-1 flex-col gap-1.5 rounded-md bg-white p-2.5">
+        <div data-sw-box="wire" className="pc-anim pc-wire flex flex-1 flex-col gap-1.5 rounded-md bg-white p-2.5">
           <div className="h-2.5 w-1/2 rounded-sm border border-dashed border-neutral-400" />
           <div className="flex-1 rounded-sm border border-dashed border-neutral-400" />
           <div className="flex gap-1.5">
@@ -444,11 +461,13 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
       </div>
 
       {/* Hi-fi — link thật tới case study mới nhất */}
-      <HiFiFrame study={study} animated className="absolute left-[46%] top-[8%] h-[62%] w-[52%]" />
+      <HiFiFrame study={study} animated hidden={hide("hifi")} className="absolute left-[46%] top-[8%] h-[62%] w-[52%]" />
       <style>{STORY_KEYFRAMES}</style>
 
-      <Cursor label="Bin" tone="bin" className="pc-anim pc-cursor-bin" style={{ left: "70%", top: "42%" }} />
-      <Cursor label="AI" tone="ai" className="pc-anim pc-cursor-ai" style={{ left: "55%", top: "32%" }} />
+      <Cursor label="Bin" tone={BIN_TONE} className="pc-anim pc-cursor-bin" style={{ left: "70%", top: "42%" }} />
+      <Cursor label="AI" tone={AI_TONE} className="pc-anim pc-cursor-ai" style={{ left: "55%", top: "32%" }} />
+
+      {intro === "running" && <SwarmIntro bin={BIN_HOME} ai={AI_HOME} onReveal={reveal} onDone={finishIntro} />}
     </div>
   );
 }
@@ -458,7 +477,7 @@ export function ProcessCanvasCompact({ study }: { study: HeroStudy | null }) {
   return (
     <div className="relative">
       <HiFiFrame study={study} className="aspect-[16/10] w-full" />
-      <Cursor label="AI" tone="ai" style={{ right: "18%", bottom: "-6px" }} />
+      <Cursor label="AI" tone={AI_TONE} style={{ right: "18%", bottom: "-6px" }} />
     </div>
   );
 }

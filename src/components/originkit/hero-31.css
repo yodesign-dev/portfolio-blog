@@ -71,27 +71,27 @@
  * Vị trí con trỏ là left/top theo % khung canvas.
  */
 .pc-cursor-ai {
-  animation: pc-ai var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
+  animation: pc-ai var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-cursor-bin {
-  animation: pc-bin var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
+  animation: pc-bin var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-note {
   /* Mỗi note sáng lên đúng lúc con trỏ AI đi qua (cách nhau 0.84/18 vòng) */
   animation: pc-note var(--pc-loop, 18s) ease-in-out infinite both;
-  animation-delay: calc(2.8s + var(--pc-i, 0) * var(--pc-loop, 18s) * 0.84 / 18);
+  animation-delay: calc(var(--pc-delay, 2.8s) + var(--pc-i, 0) * var(--pc-loop, 18s) * 0.84 / 18);
 }
 .pc-wire {
-  animation: pc-wire var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
+  animation: pc-wire var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-hifi {
-  animation: pc-hifi var(--pc-loop, 18s) ease-in-out 2.8s infinite both;
+  animation: pc-hifi var(--pc-loop, 18s) ease-in-out var(--pc-delay, 2.8s) infinite both;
 }
 .pc-step {
   /* animation-name gán inline theo từng phần tử (xem process-canvas.tsx) */
   animation-duration: var(--pc-loop, 18s);
   animation-timing-function: ease-out;
-  animation-delay: 2.8s;
+  animation-delay: var(--pc-delay, 2.8s);
   animation-iteration-count: infinite;
   animation-fill-mode: both;
 }
@@ -100,9 +100,33 @@
   animation-play-state: paused;
 }
 
+/*
+ * Mở màn bầy con trỏ (swarm-intro.tsx): khung/note ẩn tới khi bầy dựng xong
+ * phần đó. Vòng câu chuyện đứng yên ở 0 suốt mở màn (data-paused), khi bàn giao
+ * thì --pc-delay = 0s để vòng chạy luôn thay vì chờ 2.8s.
+ */
+.sw-part {
+  transition: opacity 0.3s ease-out;
+}
+.sw-part[data-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+[data-intro="on"] .pc-cursor-bin,
+[data-intro="on"] .pc-cursor-ai {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pc-anim {
     animation: none !important;
+  }
+  /* Không chạy mở màn — kể cả trước khi JS kịp quyết định */
+  .sw-part[data-hidden="true"],
+  [data-intro="on"] .pc-cursor-bin,
+  [data-intro="on"] .pc-cursor-ai {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
