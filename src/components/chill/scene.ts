@@ -2205,7 +2205,11 @@ export class ChillScene {
     const dir: 1 | -1 = r() < 0.5 ? 1 : -1
     const roll = r()
     // Phố cổ: chỉ người đi bộ, khách tham quan, người chụp ảnh
-    const sprite: Walk = this.oldtown ? (roll < 0.16 ? 'walker' : SIGHTSEERS[Math.floor(r() * SIGHTSEERS.length)]) : roll < (this.countryside ? 0.5 : 0.35) ? 'dog' : roll < (this.countryside ? 0.75 : 0.65) ? 'vendor' : 'walker'
+    let sprite: Walk = this.oldtown ? (roll < 0.16 ? 'walker' : SIGHTSEERS[Math.floor(r() * SIGHTSEERS.length)]) : roll < (this.countryside ? 0.5 : 0.35) ? 'dog' : roll < (this.countryside ? 0.75 : 0.65) ? 'vendor' : 'walker'
+    // Cảnh khác: một phần người đi bộ là khách du lịch (chó, gánh hàng giữ nguyên tỉ lệ).
+    // Phố đường tàu đông khách nhất (~21% người trên vỉa hè), phố ~12%, đồng quê ~6%.
+    // Cỡ người và 3 hàng vỉa hè theo cảnh như người đi bộ thường, không phóng to như phố cổ
+    if (sprite === 'walker' && !this.oldtown && r() < (this.railway ? 0.6 : this.countryside ? 0.25 : 0.35)) sprite = SIGHTSEERS[Math.floor(r() * SIGHTSEERS.length)]
     const cruise = sprite === 'dog' ? 20 + r() * 8 : sprite === 'vendor' ? 5 + r() * 2 : sprite === 'elders' ? 4.5 + r() * 1.5 : isSightseer(sprite) ? 6 + r() * 2 : 8 + r() * 3
     this.movers.push({
       ...this.baseMover(),
