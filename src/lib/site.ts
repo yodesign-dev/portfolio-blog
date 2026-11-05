@@ -65,10 +65,12 @@ export const NAV_LINKS = [
 export const NOTION_TEMPLATE_URL = 'https://grand-dust-291.notion.site/Hanoi-Caf-Workspace-3f9a4ffd358081cb9b9cdc607f19c49d'
 export const YOUTUBE_URL = 'https://www.youtube.com/@lofipixel.cafevn'
 export const CHILL_EXTENSION_URL = 'https://chromewebstore.google.com/detail/gidomdfggefliiidbfijmknejmjafafi'
+export const TRUT_GIAN_URL = 'https://www.trut-gian-online.app/'
 export const SIDE_PROJECT_LINKS: {label: string; href: string; external?: boolean}[] = [
   {label: 'Lofi Pixel Café', href: '/chill'},
   {label: 'Notion template', href: NOTION_TEMPLATE_URL, external: true},
   {label: 'YouTube', href: YOUTUBE_URL, external: true},
+  {label: 'Trút Giận Online', href: TRUT_GIAN_URL, external: true},
 ]
 
 export const CONTACT_EMAIL = 'nguyenbinhdesign@gmail.com'

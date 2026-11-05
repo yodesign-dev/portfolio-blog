@@ -3,6 +3,7 @@ import { client } from '@/sanity/lib/client'
 import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
 import { Background } from '@/components/Background'
 import { SideProjects } from '@/components/SideProjects'
+import { JustForFun } from '@/components/JustForFun'
 import { HowIWork } from '@/components/HowIWork'
 import { Testimonials } from '@/components/Testimonials'
 import { BehanceCard } from '@/components/BehanceArchive'
@@ -129,7 +130,7 @@ export default async function HomePage() {
 
       <Background />
 
-      {/* Thứ tự: hero → lý lịch → việc đã làm → lời giới thiệu → cách làm → side projects → bài viết */}
+      {/* Thứ tự: hero → lý lịch → việc đã làm → lời giới thiệu → cách làm → side projects → just for fun → bài viết */}
       {(featuredStudies.length > 0 || featuredBehance.length > 0) && (
         <section id="work" className="mx-auto max-w-6xl scroll-mt-24 px-6 pt-20 sm:px-8">
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
@@ -170,6 +171,7 @@ export default async function HomePage() {
 
       <div className="mt-24">
         <SideProjects />
+        <JustForFun />
       </div>
 
       {writing.length > 0 && (
