@@ -281,6 +281,8 @@ export function ChillRoom({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const initialSeasons = useRef(seasons)
+  // Công tắc chọn người ngồi lúc mở trang (cảnh chỉ tạo một lần)
+  const initialSeatPick = useRef(seatPickOn)
   // Điểm đến theo lịch (Xóm đạo): máy khách so giờ mỗi phút, ?at= để xem trước. Danh sách chỉ đổi
   // khi có cảnh mở hoặc đóng, nên các effect theo danh sách không chạy lại mỗi phút
   const [placeClock, setPlaceClock] = useState(0)
@@ -368,6 +370,8 @@ export function ChillRoom({
   // chị vẫn bấm Chị được, cảnh tạm là anh kèm 1 dòng giải thích; về phòng có chị thì chị ngồi
   const girlHere = hasGirl(theme)
   const shownSeat: Seat = seatPickOn && seat === 'girl' && girlHere ? 'girl' : 'boy'
+  // Người ngồi đang tải (chưa sẵn lúc bấm) → vòng xoay trên nút chọn
+  const [seatLoading, setSeatLoading] = useState<Seat | null>(null)
   // Chế độ Zen: giấu hết nút, chỉ còn cảnh động + nhạc. Bật / tắt bằng công tắc trên
   // thanh trên (hoặc phím H); trong Zen công tắc chỉ hiện lại khi nhích chuột / chạm
   const [zen, setZen] = useState(false)
@@ -598,11 +602,23 @@ export function ChillRoom({
     // Đang trong mùa: tải thẳng sheet người quàng khăn
     const preview = readSeasonPreview(window.location.search)
     const nowSeason = preview.season !== undefined ? preview.season : activeSeason(initialSeasons.current, preview.at ?? Date.now())
-    const scene = new ChillScene(canvasRef.current!, {noelSeat: !!nowSeason?.layers.seat && loadSeasonPref(nowSeason.id) !== 'off'})
+    // Khách đã chọn chị lần trước (và phòng đã lưu có bản nữ): tải thẳng ảnh của chị, không
+    // vẽ anh trong lúc chờ khôi phục lựa chọn
+    const prefs = readPrefs()
+    const seat: Seat = initialSeatPick.current && prefs.seat === 'girl' && hasGirl(prefs.theme ?? 'cafe') ? 'girl' : 'boy'
+    const scene = new ChillScene(canvasRef.current!, {noelSeat: !!nowSeason?.layers.seat && loadSeasonPref(nowSeason.id) !== 'off', seat})
     sceneRef.current = scene
     scene.setBrew(brewState.current.level, brewState.current.paused)
     // Tiếng xe chạy qua, còi, chó sủa ngoài phố → phát qua bộ âm thanh (theo thanh Ambience)
     scene.onSound = (kind, pan, dir, len) => audioRef.current?.streetSound(kind, pan, dir, len)
+    // Đổi xong người ngồi: cảnh đang dừng (giảm chuyển động) thì vẽ lại một lần, không mờ dần
+    scene.onSeatLoading = (s) => {
+      setSeatLoading(s)
+      if (s === null && scenePausedRef.current) {
+        scene.endSeatFade()
+        scene.frame(performance.now())
+      }
+    }
     // ?train=now: gọi tàu tới ngay khi đang ở phố đường tàu (quay clip khỏi phải chờ)
     if (new URLSearchParams(window.location.search).get('train') === 'now') scene.callTrain()
     if (new URLSearchParams(window.location.search).get('santa') === 'now') scene.callSanta()
@@ -700,13 +716,33 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [theme])
 
-  // Người ngồi nam / nữ (phòng chưa có bản nữ thì cảnh tự giữ bản nam)
+  // Người ngồi nam / nữ (phòng chưa có bản nữ thì cảnh tự giữ bản nam). Chờ khôi phục lựa
+  // chọn lần trước: cảnh đã tạo đúng người, lượt render đầu (seat còn mặc định) không được đè
   useEffect(() => {
     const scene = sceneRef.current
-    if (!scene) return
+    if (!scene || !loaded) return
     scene.setSeat(shownSeat)
     scene.frame(performance.now())
-  }, [shownSeat])
+  }, [shownSeat, loaded])
+
+  // Tải sẵn người ngồi còn lại khi trình duyệt rảnh (vài giây sau khi quán mở) → bấm đổi là
+  // đổi ngay. Chỉ khi công tắc chọn người bật và phòng có bản nữ
+  useEffect(() => {
+    if (!loaded || !seatPickOn || !hasGirl(theme)) return
+    const other: Seat = shownSeat === 'girl' ? 'boy' : 'girl'
+    const warm = () => sceneRef.current?.preloadSeat(other)
+    let idle = 0
+    const timer = window.setTimeout(() => {
+      // Safari chưa có requestIdleCallback → chạy luôn sau quãng chờ
+      if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(warm, {timeout: 4000})
+      else warm()
+    }, 3000)
+    return () => {
+      clearTimeout(timer)
+      if (idle) window.cancelIdleCallback(idle)
+    }
+  }, [loaded, seatPickOn, theme, shownSeat])
+  const warmSeat = useCallback((s: Seat) => sceneRef.current?.preloadSeat(s), [])
 
   useEffect(() => {
     const motion = new URLSearchParams(window.location.search).get('motion')
@@ -4405,7 +4441,7 @@ export function ChillRoom({
                 {seatPickOn && (
                   <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span className="text-sm text-[#a79e94]">{t.room.seatTitle}</span>
-                    <SeatPicker seat={seat} onPick={setSeat} label={t.room.seatTitle} names={t.room.seats} />
+                    <SeatPicker seat={seat} onPick={setSeat} onWarm={warmSeat} loading={seatLoading} label={t.room.seatTitle} names={t.room.seats} />
                     {seat === 'girl' && !girlHere && <p className="w-full text-xs text-[#a79e94]">{t.room.seatNoGirl}</p>}
                   </div>
                 )}
@@ -4689,7 +4725,7 @@ export function ChillRoom({
               // phòng chưa có bản nữ thì cảnh tạm là anh, có 1 dòng giải thích, không đổi phòng
               <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mb-1 flex flex-col items-center gap-1.5">
                 <p className="text-xs text-white/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.welcome.seat}</p>
-                <SeatPicker seat={seat} onPick={setSeat} label={t.welcome.seat} names={t.room.seats} />
+                <SeatPicker seat={seat} onPick={setSeat} onWarm={warmSeat} loading={seatLoading} label={t.welcome.seat} names={t.room.seats} />
                 {seat === 'girl' && !girlHere && (
                   <p className="max-w-xs text-center text-xs text-white/75 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.room.seatNoGirl}</p>
                 )}
@@ -4813,7 +4849,23 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
 // (vùng đầu người ngồi, px 1280: x 980–1140, y 270–430)
 const SEAT_FACES: Record<Seat, string> = {boy: '/chill/scenes/interior.webp', girl: '/chill/scenes/interior-girl.webp'}
 
-function SeatPicker({seat, onPick, label, names}: {seat: Seat; onPick: (s: Seat) => void; label: string; names: Record<Seat, string>}) {
+// Rê chuột / chạm / focus vào nút → tải sẵn người đó. `loading` = người đang tải → vòng xoay
+// thay ảnh mặt trên nút đó cho tới khi người mới hiện trong cảnh
+function SeatPicker({
+  seat,
+  onPick,
+  onWarm,
+  loading,
+  label,
+  names,
+}: {
+  seat: Seat
+  onPick: (s: Seat) => void
+  onWarm: (s: Seat) => void
+  loading: Seat | null
+  label: string
+  names: Record<Seat, string>
+}) {
   return (
     <div className="flex gap-1 rounded-full bg-black/45 p-1 backdrop-blur" role="radiogroup" aria-label={label}>
       {SEATS.map((s) => {
@@ -4824,16 +4876,24 @@ function SeatPicker({seat, onPick, label, names}: {seat: Seat; onPick: (s: Seat)
             type="button"
             role="radio"
             aria-checked={active}
+            aria-busy={loading === s}
+            onPointerEnter={() => onWarm(s)}
+            onPointerDown={() => onWarm(s)}
+            onFocus={() => onWarm(s)}
             onClick={() => onPick(s)}
             className={`flex min-h-9 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
               active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/80 hover:bg-white/10 hover:text-white'
             }`}
           >
-            <span
-              aria-hidden
-              className="block size-7 shrink-0 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated]"
-              style={{backgroundImage: `url(${SEAT_FACES[s]})`, backgroundSize: '224px 126px', backgroundPosition: '-171px -47px'}}
-            />
+            <span aria-hidden className="relative block size-7 shrink-0">
+              <span
+                className="block size-7 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated]"
+                style={{backgroundImage: `url(${SEAT_FACES[s]})`, backgroundSize: '224px 126px', backgroundPosition: '-171px -47px'}}
+              />
+              {loading === s && (
+                <span className="absolute inset-0 animate-spin rounded-full border-2 border-[#2a1a10]/25 border-t-[#2a1a10] motion-reduce:animate-none" />
+              )}
+            </span>
             {names[s]}
           </button>
         )

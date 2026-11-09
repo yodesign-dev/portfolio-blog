@@ -64,6 +64,8 @@ const FADE_SECONDS = 1.2
 // suốt). Toạ độ px gốc 640×360 đo trên ảnh: tâm 4 ghế, mép xa mặt bàn, ô kính, bóng đèn.
 const GROUP_BG_SRC = '/chill/scenes/group/group-bg.webp'
 const GROUP_SEATS = [135, 264, 392, 522]
+// Giây người ngồi cũ mờ dần sau khi đổi nam / nữ
+const SEAT_FADE = 0.3
 // Nhân vật nhìn chính diện (AI, đã cắt nền xanh + mặt bàn): 6 cột (thứ tự như
 // CHARACTERS trong table-view.ts) × 3 hàng khung — 0 bình thường, 1 nhắm mắt (chớp /
 // ngủ gật), 2 nâng ly uống. Ô 187×185 px canvas đệm; neo: tâm người cách mép trái ô
@@ -325,6 +327,9 @@ function loadImage(src: string, onLoad: () => void) {
   return img
 }
 
+// Ảnh đã tải có đúng đường dẫn `src` (img.src là URL tuyệt đối)
+const sameSrc = (img: HTMLImageElement, src: string) => img.src === new URL(src, window.location.href).href
+
 const ready = (img: HTMLImageElement | null): img is HTMLImageElement => !!img && img.complete && img.naturalWidth > 0
 
 // ---------- Nhân vật chuyển động ----------
@@ -539,7 +544,18 @@ export class ChillScene {
   private catSheet: HTMLImageElement
   private catTinted: HTMLCanvasElement
   private theme: Theme = themeById('cafe')
+  // seat = người khách chọn; shownSeat = người đang vẽ. Đổi người thì tải xong ảnh + sheet
+  // của người mới rồi mới đổi một lần (không có quãng trống / người đứng im)
   private seat: Seat = 'boy'
+  private shownSeat: Seat = 'boy'
+  private seatLoad = 0
+  // Ảnh nội thất + sheet người ngồi đã tải và giải nén sẵn, theo URL tuyệt đối → đổi nam / nữ
+  // không phải chờ mạng lẫn giải nén (preloadSeat tải trước người còn lại khi rảnh)
+  private seatImgs = new Map<string, Promise<HTMLImageElement>>()
+  // Người cũ mờ dần trên người mới sau khi đổi (vùng người ngồi, px gốc 640×360)
+  private seatFade: {canvas: HTMLCanvasElement; x: number; y: number; w: number; h: number; t: number} | null = null
+  // Báo khung ngoài: đang tải người mới (`seat`) hoặc đã xong / huỷ (`null`) → vòng xoay trên nút
+  onSeatLoading?: (seat: Seat | null) => void
   private brewLevel: number | null = null
   private brewPaused = false
   // Theme ảnh tĩnh: atlas các vùng biến thể của người ngồi (gõ phím, uống)
@@ -672,8 +688,11 @@ export class ChillScene {
   private clock = 0
 
   // noelSeat: đang trong mùa thì tải thẳng sheet quàng khăn, khỏi tải bản thường rồi đổi
-  constructor(canvas: HTMLCanvasElement, {noelSeat = false}: {noelSeat?: boolean} = {}) {
+  // seat: người ngồi khách đã chọn lần trước — tải thẳng ảnh của người đó, không vẽ bản nam trước
+  constructor(canvas: HTMLCanvasElement, {noelSeat = false, seat = 'boy'}: {noelSeat?: boolean; seat?: Seat} = {}) {
     this.noelSeatOn = noelSeat
+    this.seat = seat
+    this.shownSeat = seat
     this.display = canvas
     this.displayCtx = canvas.getContext('2d')!
     this.buffer = this.makeLayer()
@@ -705,14 +724,16 @@ export class ChillScene {
     this.spawnWalker(140)
   }
 
-  // Người ngồi của theme hiện tại: sheet video (bản ×2 cho màn rộng) hoặc atlas tư thế
-  private loadCharacter() {
+  // Người ngồi của theme hiện tại: sheet video (bản ×2 cho màn rộng) hoặc atlas tư thế.
+  // `loaded` = sheet đã tải sẵn (setSeat), dùng lại nếu đúng bản cần
+  private loadCharacter(loaded?: HTMLImageElement) {
     const c = this.art.character
     this.charFrameKey = ''
     if (c.kind === 'video') {
       this.charCfg = c
-      this.charSpec = window.matchMedia('(min-width: 1024px)').matches ? c.hi : c.lo
-      this.charSheet = loadImage(this.seatSrc(c, this.charSpec), () => (this.dirty = true))
+      this.charSpec = this.pickSpec(c)
+      const src = this.seatSrc(c, this.charSpec)
+      this.charSheet = loaded && sameSrc(loaded, src) ? loaded : loadImage(src, () => (this.dirty = true))
       this.noelGlow = this.noelSeatOn && c.noel ? loadImage(c.noel.glow.src, () => {}) : null
       this.charFrame.width = c.at.w * this.charSpec.scale
       this.charFrame.height = c.at.h * this.charSpec.scale
@@ -722,8 +743,12 @@ export class ChillScene {
     } else {
       this.charCfg = null
       this.charSpec = null
-      this.poseSheet = loadImage(c.src, () => (this.dirty = true))
+      this.poseSheet = loaded && sameSrc(loaded, c.src) ? loaded : loadImage(c.src, () => (this.dirty = true))
     }
+  }
+
+  private pickSpec(c: CharacterVideo) {
+    return window.matchMedia('(min-width: 1024px)').matches ? c.hi : c.lo
   }
 
   // Sheet người ngồi đúng theo mùa: bản quàng khăn cùng cấu trúc với bản thường
@@ -762,6 +787,11 @@ export class ChillScene {
   setTheme(id: ThemeId) {
     if (id === this.theme.id) return
     this.theme = themeById(id)
+    // Đổi phòng tải lại tất cả theo người khách chọn → bỏ lượt tải người ngồi đang dở
+    this.seatLoad++
+    this.seatFade = null
+    this.onSeatLoading?.(null)
+    this.shownSeat = this.seat
     this.interior = loadImage(this.art.interior, () => (this.dirty = true))
     this.loadCharacter()
     this.sipT = -1
@@ -774,20 +804,123 @@ export class ChillScene {
 
   // Ảnh nội thất + người ngồi theo phòng và lựa chọn nam / nữ
   private get art() {
-    return seatArt(this.theme, this.seat)
+    return seatArt(this.theme, this.shownSeat)
   }
 
   // Người ngồi nam / nữ (lựa chọn của khách khi công tắc Studio seatPickOpen bật). Phòng chưa
-  // có bản nữ thì giữ nguyên bản nam, không tải lại gì
+  // có bản nữ thì giữ nguyên bản nam, không tải lại gì. Có bản nữ: người cũ vẫn ngồi đó cho
+  // tới khi ảnh nội thất + sheet của người mới tải và giải nén xong (lỗi tải cũng đổi, để không
+  // kẹt), rồi người cũ mờ dần trên người mới. Đã tải sẵn (preloadSeat) thì đổi gần như ngay
   setSeat(seat: Seat) {
     if (seat === this.seat) return
-    const before = this.art.interior
     this.seat = seat
-    if (this.art.interior === before) return
-    this.interior = loadImage(this.art.interior, () => (this.dirty = true))
-    this.loadCharacter()
-    this.sipT = -1
-    this.dirty = true
+    const token = ++this.seatLoad
+    const next = seatArt(this.theme, seat)
+    if (next.interior === this.art.interior) {
+      this.shownSeat = seat
+      this.onSeatLoading?.(null)
+      return
+    }
+    this.keepSeatImages()
+    let waiting = true
+    Promise.all(this.seatSources(seat).map((src) => this.seatImage(src))).then(([interior, sheet]) => {
+      waiting = false
+      if (token !== this.seatLoad) return
+      this.snapshotSeat()
+      this.shownSeat = seat
+      this.interior = interior
+      this.loadCharacter(sheet)
+      this.sipT = -1
+      this.dirty = true
+      this.onSeatLoading?.(null)
+    })
+    // Chưa sẵn sau một nhịp ngắn thì mới báo đang tải (đã tải sẵn thì không loé vòng xoay)
+    setTimeout(() => {
+      if (waiting && token === this.seatLoad) this.onSeatLoading?.(seat)
+    }, 120)
+  }
+
+  // Tải + giải nén trước ảnh của người ngồi `seat` trong phòng hiện tại (khi rảnh, hoặc khi
+  // khách rê chuột / chạm vào nút chọn). Phòng chưa có bản nữ thì không tải gì
+  preloadSeat(seat: Seat) {
+    const next = seatArt(this.theme, seat)
+    if (next.interior === this.art.interior) return
+    for (const src of this.seatSources(seat)) this.seatImage(src)
+  }
+
+  // Ảnh nội thất + sheet người ngồi (đúng bản màn rộng / hẹp và bản theo mùa) của `seat`
+  private seatSources(seat: Seat) {
+    const next = seatArt(this.theme, seat)
+    const c = next.character
+    return [next.interior, c.kind === 'video' ? this.seatSrc(c, this.pickSpec(c)) : c.src]
+  }
+
+  private seatImage(src: string) {
+    const key = new URL(src, window.location.href).href
+    let p = this.seatImgs.get(key)
+    if (!p) {
+      p = new Promise<HTMLImageElement>((resolve) => {
+        const img = loadImage(src, () => {
+          img.decode().catch(() => {}).then(() => resolve(img))
+        })
+        img.onerror ??= () => {
+          this.seatImgs.delete(key)
+          resolve(img)
+        }
+      })
+      this.seatImgs.set(key, p)
+    }
+    return p
+  }
+
+  // Giữ ảnh của người đang ngồi → đổi qua rồi đổi lại thì khỏi tải / giải nén lại
+  private keepSeatImages() {
+    const sheet = this.art.character.kind === 'video' ? this.charSheet : this.poseSheet
+    for (const img of [this.interior, sheet]) {
+      if (ready(img) && !this.seatImgs.has(img.src)) this.seatImgs.set(img.src, Promise.resolve(img))
+    }
+  }
+
+  // Chụp vùng người ngồi đang hiện (laptop + nội thất + người) để mờ dần sau khi đổi người
+  private snapshotSeat() {
+    const c = this.art.character
+    this.seatFade = null
+    if (c.kind !== 'video' || !this.charSpec || !ready(this.interior) || !ready(this.charSheet)) return
+    const {at} = c
+    const w = at.w
+    const h = SCENE_H * SCALE - at.y
+    const k = this.interiorLayer.width / (SCENE_W * SCALE)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(w * k)
+    canvas.height = Math.round(h * k)
+    const ctx = canvas.getContext('2d')!
+    ctx.imageSmoothingEnabled = false
+    ctx.setTransform(k, 0, 0, k, -at.x * k, -at.y * k)
+    const {screen, screenBehind} = this.theme
+    const night = this.time === 'night'
+    if (screen && screenBehind) drawScreen(ctx, screen, this.clock, night)
+    ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W * SCALE, SCENE_H * SCALE)
+    if (screen && !screenBehind) drawScreen(ctx, screen, this.clock, night)
+    ctx.drawImage(this.charFrameCanvas(), at.x, at.y, at.w, at.h)
+    this.seatFade = {canvas, x: at.x, y: at.y, w, h, t: this.clock}
+  }
+
+  // Cảnh đang dừng (giảm chuyển động) thì đổi thẳng, không để người cũ đứng mờ
+  endSeatFade() {
+    this.seatFade = null
+  }
+
+  private drawSeatFade(ctx: CanvasRenderingContext2D) {
+    const f = this.seatFade
+    if (!f) return
+    const alpha = 1 - (this.clock - f.t) / SEAT_FADE
+    if (alpha <= 0) {
+      this.seatFade = null
+      return
+    }
+    ctx.globalAlpha = alpha
+    ctx.drawImage(f.canvas, f.x, f.y, f.w, f.h)
+    ctx.globalAlpha = 1
   }
 
   setAtmosphere(time: TimeOfDay, weather: Weather, destination = this.destination) {
@@ -2946,6 +3079,7 @@ export class ChillScene {
     } else if (ready(this.poseSheet) && ready(this.interior)) {
       this.drawPose(character)
     }
+    this.drawSeatFade(ctx)
     if (ready(this.interior)) this.noel?.drawRoomBack(ctx, (c, w, h) => this.wash(c, w, h))
     if (ready(this.interior)) this.drawTip(ctx, t)
     if (ready(this.interior)) this.drawBrewDrip(ctx, t)

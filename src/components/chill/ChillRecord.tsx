@@ -139,7 +139,8 @@ export function ChillRecord({
 
     void import('./scene').then(({ChillScene}) => {
       if (cancelled) return
-      scene = new ChillScene(canvas, {noelSeat: !!readSeasonPreview(window.location.search).season?.layers.seat})
+      // Người ngồi truyền ngay lúc tạo: khỏi vẽ bản nam trong lúc chờ ảnh bản nữ
+      scene = new ChillScene(canvas, {noelSeat: !!readSeasonPreview(window.location.search).season?.layers.seat, seat: setup.seat})
       sceneRef.current = scene
       if (new URLSearchParams(window.location.search).get('train') === 'now') scene.callTrain()
       if (new URLSearchParams(window.location.search).get('santa') === 'now') scene.callSanta()
