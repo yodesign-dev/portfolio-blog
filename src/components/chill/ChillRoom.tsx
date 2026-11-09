@@ -365,6 +365,21 @@ export function ChillRoom({
   // Người ngồi khách chọn; Studio tắt thì cảnh luôn là nam (lựa chọn cũ vẫn giữ trong prefs)
   const [seat, setSeat] = useState<Seat>('boy')
   const shownSeat: Seat = seatPickOn ? seat : 'boy'
+  // Vừa chọn Chị ở phòng chưa có bản nữ → đã đưa sang Cửa sổ quán, hiện 1 dòng giải thích
+  const [seatMoved, setSeatMoved] = useState(false)
+  // Chị hiện chỉ ngồi ở phòng có bản nữ: chọn Chị ở phòng khác thì sang Cửa sổ quán,
+  // chọn phòng chỉ có anh khi đang là Chị thì đổi về Anh — không bao giờ "chọn Chị mà ra anh"
+  const pickSeat = (s: Seat) => {
+    setSeat(s)
+    const move = s === 'girl' && !hasGirl(theme)
+    if (move) setTheme('cafe')
+    setSeatMoved(move)
+  }
+  const pickTheme = (id: ThemeId) => {
+    setTheme(id)
+    setSeatMoved(false)
+    if (seatPickOn && seat === 'girl' && !hasGirl(id)) setSeat('boy')
+  }
   // Chế độ Zen: giấu hết nút, chỉ còn cảnh động + nhạc. Bật / tắt bằng công tắc trên
   // thanh trên (hoặc phím H); trong Zen công tắc chỉ hiện lại khi nhích chuột / chạm
   const [zen, setZen] = useState(false)
@@ -511,8 +526,10 @@ export function ChillRoom({
     }
     savedPlace.current = prefs.destination ?? null
     if (TRAVEL_OPTIONS.some((o) => o.value === prefs.travel)) setTravel(prefs.travel!)
-    if (THEMES.some((t) => t.id === prefs.theme)) setTheme(prefs.theme!)
-    if (SEATS.includes(prefs.seat!)) setSeat(prefs.seat!)
+    const savedTheme = THEMES.some((t) => t.id === prefs.theme) ? prefs.theme! : null
+    if (savedTheme) setTheme(savedTheme)
+    // Bản cũ lưu được Chị + phòng chưa có chị (cảnh vẫn ra anh): giữ phòng, về Anh cho khớp cảnh
+    if (SEATS.includes(prefs.seat!)) setSeat(prefs.seat === 'girl' && !hasGirl(savedTheme ?? 'cafe') ? 'boy' : prefs.seat!)
     if (PANEL_TABS.some((t) => t.id === prefs.panelTab)) setPanelTab(prefs.panelTab!)
     if (prefs.zen === true) setZen(true)
     if (prefs.groupWall === 'glass') setGroupWall('glass')
@@ -1966,7 +1983,7 @@ export function ChillRoom({
     trackEvent({name: 'Chill Update Try', props: {action}})
     const [kind, id] = action.split(':')
     if (kind === 'room' && THEMES.some((t) => t.id === id)) {
-      setTheme(id as ThemeId)
+      pickTheme(id as ThemeId)
       setPanelTab('scene')
     } else if (kind === 'station' && STATIONS.some((st) => st.id === id)) {
       changeStation(id as StationId)
@@ -4373,13 +4390,15 @@ export function ChillRoom({
                 <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t.room.roomTitle}>
                   {THEMES.map((th) => {
                     const active = th.id === theme
+                    // Đang là Chị: phòng chưa có bản nữ ghi rõ "chỉ có anh" (bấm vào là đổi về Anh)
+                    const heOnly = seatPickOn && seat === 'girl' && !th.girl
                     return (
                       <button
                         key={th.id}
                         type="button"
                         role="radio"
                         aria-checked={active}
-                        onClick={() => setTheme(th.id)}
+                        onClick={() => pickTheme(th.id)}
                         className={`group overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
                           active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
                         }`}
@@ -4392,6 +4411,7 @@ export function ChillRoom({
                           className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
                         />
                         <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.room.themes[th.id]}</span>
+                        {heOnly && <span className="-mt-1 block truncate px-2 pb-1.5 text-[10px] text-[#a79e94]">{t.room.heOnly}</span>}
                       </button>
                     )
                   })}
@@ -4399,8 +4419,8 @@ export function ChillRoom({
                 {seatPickOn && (
                   <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span className="text-sm text-[#a79e94]">{t.room.seatTitle}</span>
-                    <SeatPicker seat={seat} onPick={setSeat} label={t.room.seatTitle} names={t.room.seats} />
-                    {seat === 'girl' && !hasGirl(theme) && <p className="w-full text-xs text-[#a79e94]">{t.room.seatNoGirl}</p>}
+                    <SeatPicker seat={seat} onPick={pickSeat} label={t.room.seatTitle} names={t.room.seats} />
+                    {seatMoved && <p className="w-full text-xs text-[#a79e94]">{t.room.seatMoved}</p>}
                   </div>
                 )}
               </section>
@@ -4678,11 +4698,13 @@ export function ChillRoom({
                 {t.welcome.visit(visitDayOf(regular), t.regular.levels[levelOf(visitDayOf(regular))])}
               </p>
             )}
-            {seatPickOn && hasGirl(theme) && (
-              // Chọn người ngồi — không tính là "vào quán" (cả màn chào bắt click)
+            {seatPickOn && (
+              // Chọn người ngồi — không tính là "vào quán" (cả màn chào bắt click). Hiện ở mọi phòng:
+              // chọn Chị ở phòng chưa có bản nữ thì cảnh sang Cửa sổ quán
               <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mb-1 flex flex-col items-center gap-1.5">
                 <p className="text-xs text-white/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.welcome.seat}</p>
-                <SeatPicker seat={seat} onPick={setSeat} label={t.welcome.seat} names={t.room.seats} />
+                <SeatPicker seat={seat} onPick={pickSeat} label={t.welcome.seat} names={t.room.seats} />
+                {seatMoved && <p className="text-xs text-white/75 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.room.seatMoved}</p>}
               </div>
             )}
             <button
