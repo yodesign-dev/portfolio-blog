@@ -76,6 +76,7 @@ export function Focus({
   onOpenChange,
   hint,
   openSignal = 0,
+  startSignal = 0,
   gift = null,
   tripSlot = null,
   shelfCount = null,
@@ -110,6 +111,8 @@ export function Focus({
   hint?: string | null
   // Tăng 1 = mở bảng (nút "Thử ngay" trong Có gì mới, hành động `phin`)
   openSignal?: number
+  // Tăng 1 = bắt đầu ngay 1 phin với số phút đã lưu (thẻ ChromoTime ở màn chào); đang có phiên thì để yên
+  startSignal?: number
   // Món mèo vừa mang ra cho kệ sau phin này (shelf.ts) — hiện trong tổng kết
   gift?: string | null
   // Lời mời tiễn mèo đi chơi xa sau phin này (TripPostcard.tsx: TripOffer)
@@ -282,6 +285,13 @@ export function Focus({
     setSession(next)
     store(FOCUS_KEY, next)
   }
+  const onStartSignal = useEffectEvent(() => {
+    if (!session) begin('phin')
+  })
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- thẻ ChromoTime ở màn chào gửi tín hiệu từ ngoài
+    if (startSignal > 0) onStartSignal()
+  }, [startSignal])
 
   // late = phin hết giờ lúc đóng trang, vừa mở lại: tính phin nhưng không tự chạy tiếp
   const onEnd = useEffectEvent((s: Session, late = false) => {

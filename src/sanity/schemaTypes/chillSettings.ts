@@ -31,6 +31,7 @@ export default defineType({
     defineField({name: 'streetMotionOpen', title: 'Chuyển động phố mượt (người, xe, chó)', type: 'boolean', initialValue: false}),
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
     defineField({name: 'brewDeskOpen', title: 'Bàn pha phin (đồng hồ mới, phin trong cảnh)', type: 'boolean', initialValue: false}),
+    defineField({name: 'welcomeObOpen', title: 'Màn chào kiểu onboarding (Nghe nhạc / ChromoTime)', type: 'boolean', initialValue: false}),
     defineField({name: 'sleepTimerOpen', title: 'Hẹn giờ tắt nhạc', type: 'boolean', initialValue: false}),
     defineField({name: 'tripOpen', title: 'Mèo đi chơi xa (bưu thiếp)', type: 'boolean', initialValue: false}),
     defineField({name: 'tripPhins', title: 'Số phin trong ngày để mèo muốn đi', type: 'number', initialValue: 3, validation: (rule) => rule.integer().min(1).max(8)}),

@@ -28,6 +28,7 @@ import {addItem, loadShelf, markSeen, pickGift, toggleShown, type ShelfState} fr
 import {TREE_MAX, activeSeason, loadSeasonPref, loadTree, momentOn, readSeasonPreview, saveSeasonPref, saveTree, type Season, type SeasonPref} from './season'
 import {Focus} from './Focus'
 import {MIN_FULL_PHIN, type BrewControls, type BrewInfo} from './BrewDesk'
+import {Welcome} from './Welcome'
 import {AddTrackButton, MusicChooser, MusicPicker, notifyBrew, useBrewMusic} from './BrewMusic'
 import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, suggestQueue, totalSeconds, type MusicQueue} from './playlist'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
@@ -236,6 +237,7 @@ export function ChillRoom({
   highlandOn = false,
   sleepTimerOn = false,
   brewDeskOn = false,
+  welcomeObOn = false,
   tripOn = false,
   tripPhins = TRIP_PHINS_DEFAULT,
   seasons = [],
@@ -270,6 +272,9 @@ export function ChillRoom({
   // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
   sleepTimerOn?: boolean
   brewDeskOn?: boolean
+  // Màn chào kiểu onboarding: khách mới 2 bước, khách quay lại 1 chạm (Studio "Chill · Cài đặt"),
+  // mặc định tắt. ?ob=1 / ?ob=0 trên URL ghi đè. Xem Welcome.tsx
+  welcomeObOn?: boolean
   // Mèo đi chơi xa (Studio "Chill · Cài đặt", cần bật Kệ sưu tầm), mặc định tắt. ?trip=1 / ?trip=0
   // ghi đè, ?trip=back cho mèo về ngay để thử. tripPhins = số phin trong ngày để mèo muốn đi
   tripOn?: boolean
@@ -379,6 +384,14 @@ export function ChillRoom({
   const [tableSignal, setTableSignal] = useState(0)
   // Tăng 1 = mở bảng đồng hồ phin (nút "Thử ngay" trong Có gì mới)
   const [focusSignal, setFocusSignal] = useState(0)
+  // Thẻ ChromoTime ở màn chào: tăng 1 = bắt đầu ngay 1 phin
+  const [focusStart, setFocusStart] = useState(0)
+  const [obFlag, setObFlag] = useState(welcomeObOn)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('ob')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setObFlag(param ? param === '1' : welcomeObOn)
+  }, [welcomeObOn])
   // Kệ sưu tầm (shelf.ts): món đã có + đang bày, món mèo vừa mang ra cho phin vừa xong,
   // sổ sưu tầm đang mở + món đang chọn trong sổ, vùng bấm từng món trên kệ
   const [shelf, setShelf] = useState<ShelfState>({owned: [], shown: []})
@@ -3785,7 +3798,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} startSignal={focusStart} gift={gift} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
             onBrewBegin(manual, minutes)
             // Trình duyệt chỉ cho mở cửa sổ nổi ngay trong cú bấm của khách
             if (manual && brewMusicApi.prefs.miniOnStart && miniFlag && canMini && !miniOpen) openMini('brew')
@@ -4686,7 +4699,51 @@ export function ChillRoom({
       {/* Màn chào: cảnh + 1 lời mời + 1 nút lớn. Bấm bất kỳ đâu là vào quán và nhạc chạy
           (trình duyệt chỉ cho phát tiếng sau 1 cú bấm). Mọi nút khác chờ sau bước này.
           Màn dọc: chữ nằm trên cảnh, nút nằm dưới cảnh — không che người ngồi */}
-      {!welcomeGone && (
+      {!welcomeGone && obFlag && (
+        <Welcome
+          entered={entered}
+          onGone={() => setWelcomeGone(true)}
+          returning={returning}
+          visitDay={visitDayOf(regular)}
+          level={t.regular.levels[levelOf(visitDayOf(regular))]}
+          canPickSeat={seatPickOn && hasGirl(theme)}
+          seat={seat}
+          onSeat={setSeat}
+          room={t.room.themes[theme]}
+          place={dest.name}
+          station={stationLabel}
+          loaded={loaded}
+          onGoal={(goal) => {
+            enter(goal !== 'look')
+            if (goal === 'focus') setFocusStart((n) => n + 1)
+          }}
+          top={
+            <>
+              <Link
+                href="/"
+                aria-label={t.welcome.home}
+                className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                <ArrowIcon dir="left" />
+                Bin Nguyen
+              </Link>
+              <LangSwitch />
+            </>
+          }
+          legal={
+            <>
+              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline">
+                {t.room.terms}
+              </Link>
+              {' · '}
+              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-white hover:underline">
+                {t.room.privacy}
+              </Link>
+            </>
+          }
+        />
+      )}
+      {!welcomeGone && !obFlag && (
         <div
           inert={entered}
           onClick={() => enter(true)}
