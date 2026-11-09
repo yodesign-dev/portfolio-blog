@@ -476,6 +476,8 @@ const LEAF = {
   q: 1,
 } as const
 const DOG_POSES: SpriteName[] = ['dog-stand', 'dog-wag', 'dog-sniff', 'dog-sit']
+// Khung thứ mấy trong chu kỳ n khung — luôn 0…n-1, kể cả khi quãng đường âm
+const cycle = (v: number, n: number) => ((Math.floor(v) % n) + n) % n
 const LIGHTS_OFF = new Set<string>(['cyclist', 'cyclo'])
 // Chuyển động mượt (công tắc Studio streetMotionOpen, setStreetMotion):
 //   SEAMS: mối nối mặt đường (lưới 320) — bánh trước rồi bánh sau lăn qua thì xe nảy 1 px
@@ -955,8 +957,11 @@ export class ChillScene {
 
   // Gọi mỗi frame từ requestAnimationFrame
   frame(now: number) {
-    const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0
-    this.last = now
+    // Mốc giờ có thể lùi: ChillRoom gọi cả frame(performance.now()) lẫn frame(mốc rAF),
+    // mà mốc rAF là lúc khung bắt đầu → có khi sớm hơn lần gọi trước cả chục ms.
+    // dt âm làm cả cảnh chạy lùi (bước chân âm → tên khung "walker--1") nên bỏ qua.
+    const dt = this.last ? Math.max(0, Math.min(0.1, (now - this.last) / 1000)) : 0
+    this.last = Math.max(this.last, now)
     this.clock += dt
     if (this.dirty) this.rebuild()
     this.update(dt)
@@ -3084,14 +3089,14 @@ export class ChillScene {
   // khung "chân chụm"; chó chạy → 4 khung chạy, dừng → tư thế (vẫy đuôi đổi khung)
   private frameOf(m: Mover, t: number): SpriteName {
     if (m.sprite === 'vendor' || m.sprite === 'walker') {
-      const i = m.speed > 0 ? Math.floor(m.step / (m.sprite === 'vendor' ? 2.6 : 3.2)) % 4 : 1
+      const i = m.speed > 0 ? cycle(m.step / (m.sprite === 'vendor' ? 2.6 : 3.2), 4) : 1
       return `${m.sprite}-${i}` as SpriteName
     }
-    if (isSightseer(m.sprite)) return `${m.sprite}-${m.speed > 0 ? Math.floor(m.step / 3.2) % 4 : 'stop'}` as SpriteName
+    if (isSightseer(m.sprite)) return `${m.sprite}-${m.speed > 0 ? cycle(m.step / 3.2, 4) : 'stop'}` as SpriteName
     if (m.sprite === 'dog') {
       // Mượt: lon ton (chậm) chỉ dùng 2 khung chân thu / chân duỗi, nhịp nhanh hơn
-      if (m.speed > 0 && this.smooth && m.speed < 14) return (Math.floor(m.step / 1.6) % 2 ? 'dog-3' : 'dog-0') as SpriteName
-      if (m.speed > 0) return `dog-${Math.floor(m.step / 2.2) % 4}` as SpriteName
+      if (m.speed > 0 && this.smooth && m.speed < 14) return (cycle(m.step / 1.6, 2) ? 'dog-3' : 'dog-0') as SpriteName
+      if (m.speed > 0) return `dog-${cycle(m.step / 2.2, 4)}` as SpriteName
       const pose = m.pose ?? 'dog-stand'
       // Mượt: đuôi vẫy từng đợt không đều thay vì lật đều 6 lần/giây
       if (pose === 'dog-wag' && this.smooth) return [0, 1, 1, 0, 1, 0][Math.floor(t * 7 + m.phase * 6) % 6] ? 'dog-wag' : 'dog-stand'
@@ -3136,6 +3141,8 @@ export class ChillScene {
     if (!this.atlasTinted.width) return
     const ctx = this.ctx
     const name = this.frameOf(m, t)
+    // Khung không có trong atlas thì bỏ qua mover này, đừng làm đứng cả vòng vẽ
+    if (!SPRITES[name]) return
     const [sx, sy, sw, sh] = SPRITES[name]
     const size = spriteSize(name)
     // Phố cổ: người to hơn cho hợp cảnh; đứng xa (dy âm) nhỏ hơn một chút
