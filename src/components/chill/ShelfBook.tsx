@@ -66,6 +66,7 @@ export function Shelf({
   phins,
   season,
   onBrew,
+  extra = null,
 }: {
   open: boolean
   onClose: () => void
@@ -83,6 +84,8 @@ export function Shelf({
   season: string | null
   // Nút "Pha một phin": đóng kệ, mở đồng hồ phin
   onBrew: () => void
+  // Phần thêm cuối sổ (Sổ bưu thiếp của Mèo đi chơi xa)
+  extra?: ReactNode
 }) {
   const t = useT()
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -301,6 +304,7 @@ export function Shelf({
           })}
         </ul>
         {state.shown.length > slots && <p className="mt-3 text-xs text-[#e6cfae]">{t.shelf.slots(slots)}</p>}
+        {extra}
       </div>
     </section>
   )

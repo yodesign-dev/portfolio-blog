@@ -77,6 +77,7 @@ export function Focus({
   hint,
   openSignal = 0,
   gift = null,
+  tripSlot = null,
   shelfCount = null,
   onOpenShelf,
   onStart,
@@ -111,6 +112,8 @@ export function Focus({
   openSignal?: number
   // Món mèo vừa mang ra cho kệ sau phin này (shelf.ts) — hiện trong tổng kết
   gift?: string | null
+  // Lời mời tiễn mèo đi chơi xa sau phin này (TripPostcard.tsx: TripOffer)
+  tripSlot?: ReactNode
   // Số món đã có trên kệ; null = kệ đang tắt ở Studio
   shelfCount?: number | null
   onOpenShelf?: () => void
@@ -539,6 +542,7 @@ export function Focus({
           }}
         />
       )}
+      {tripSlot}
       {doneToday > 0 && <p className="mt-2 text-xs text-[#a79e94]">{t.todo.doneToday(doneToday)}</p>}
       {!onBreak && <p className="mt-3 text-sm leading-relaxed text-[#ede6dd]">{t.focus.doneBody}</p>}
     </div>

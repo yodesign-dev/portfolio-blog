@@ -35,6 +35,8 @@ type Value = {
   miniPlayerOpen?: boolean
   sleepTimerOpen?: boolean
   brewDeskOpen?: boolean
+  tripOpen?: boolean
+  tripPhins?: number
   seasonsOpen?: boolean
   liveOpen?: boolean
   questOpen?: boolean
@@ -58,7 +60,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'brewDeskOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
+type FeatureKey = 'brewDeskOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -88,6 +90,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
     title: 'Đồ chơi & sưu tầm',
     items: [
       {key: 'shelfOpen', icon: '🏺', title: 'Kệ sưu tầm', short: 'Xong phin, mèo mang ra một món', desc: 'Xong phin, mèo mang ra một món cho kệ. 20 món, chỉ lưu trên máy khách.', delay: '1 phút'},
+      {key: 'tripOpen', icon: '🎒', title: 'Mèo đi chơi xa', short: 'Đủ phin trong ngày, tiễn mèo đi, mai mèo về với bưu thiếp', desc: 'Pha đủ số phin bên dưới trong một ngày thì tổng kết phin mời khách tiễn mèo đi một điểm đến (ưu tiên nơi khách chưa ghé). Bậu cửa còn cái gối và mẩu giấy, cần câu cất đi, phin không có món kệ. Từ 5:00 sáng hôm sau (đi ít nhất 8 tiếng) mèo về cạnh ba lô và bưu thiếp: ảnh cảnh, lời mèo kể, nút ghé nơi đó, món kệ của nơi đó nếu chưa có. Sổ bưu thiếp nằm cuối Kệ sưu tầm. Cần bật Kệ sưu tầm. Thử trước bằng ?trip=1, cho mèo về ngay bằng ?trip=back.', delay: '1 phút'},
       {key: 'catToyOpen', icon: '🪶', title: 'Trêu mèo', short: 'Cần câu lông vũ cạnh mèo', desc: 'Cần câu lông vũ dựng cạnh mèo. Khách cầm lên đung đưa, mèo rình, lắc mông, vồ, khều. Chơi chừng 7 lần vồ là mèo đi ngủ.', delay: '1 phút'},
       {key: 'playCountsOpen', icon: '🎧', title: 'Lượt nghe', short: 'Từ 50 lượt mới hiện số', desc: 'Đếm lượt nghe từng bài (nghe đủ 30 giây, 1 máy 1 lượt mỗi ngày). Bài từ 50 lượt mới hiện số trong danh sách.', delay: '5 phút'},
     ],
@@ -160,7 +163,7 @@ export function ChillSettingsInput(props: ObjectInputProps) {
   const diaryCustom = DIARY_FIELDS.some((f) => value[f])
 
   const tabStatus: Record<TabId, {text: string; tone: 'positive' | 'default' | 'caution'; pending: boolean}> = {
-    features: {text: `${onCount} / ${FEATURES.length} đang bật`, tone: onCount ? 'positive' : 'default', pending: anyPending([...FEATURES.map((f) => f.key), 'groupMaxMembers'])},
+    features: {text: `${onCount} / ${FEATURES.length} đang bật`, tone: onCount ? 'positive' : 'default', pending: anyPending([...FEATURES.map((f) => f.key), 'groupMaxMembers', 'tripPhins'])},
     events: eventsTabStatus(events, anyPending(['seasonsOpen', 'liveOpen'])),
     quest: {text: `${value.questTitle || 'Mùa 1'} · ${questOn ? 'bật' : 'tắt'}`, tone: questOn ? 'positive' : 'default', pending: anyPending(QUEST_FIELDS)},
     diary: {text: diaryCustom ? 'Câu riêng' : 'Tự động', tone: diaryCustom ? 'caution' : 'default', pending: anyPending(DIARY_FIELDS)},
@@ -206,6 +209,24 @@ export function ChillSettingsInput(props: ObjectInputProps) {
               <Card radius={3} border overflow="hidden">
                 {g.items.map((f, i) => (
                   <FeatureRow key={f.key} f={f} first={i === 0} on={isOn(value, f.key)} pending={pending(f.key)} readOnly={readOnly} onToggle={() => put(f.key, !isOn(value, f.key))}>
+                    {f.key === 'tripOpen' && (
+                      <Flex align="center" gap={3}>
+                        <Stack gap={2} flex={1}>
+                          <Flex align="center" gap={2}>
+                            <Text size={1} weight="medium">
+                              Số phin trong ngày để mèo muốn đi
+                            </Text>
+                            {pending('tripPhins') && <PendingBadge />}
+                          </Flex>
+                          <Text size={0} muted>
+                            Mặc định 3. Ít khách đạt thì hạ xuống 2. Từ 1 đến 8.
+                          </Text>
+                        </Stack>
+                        <Box style={{width: 72}}>
+                          <NumberInput value={value.tripPhins ?? 3} min={1} max={8} readOnly={readOnly} onChange={(n) => put('tripPhins', n)} />
+                        </Box>
+                      </Flex>
+                    )}
                     {f.key === 'groupTableOpen' && (
                       <Flex align="center" gap={3}>
                         <Stack gap={2} flex={1}>

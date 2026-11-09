@@ -40,7 +40,9 @@ import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
 import {HotBadge, NewBadge, PlayMeter, playStats} from './PlayMeter'
-import {addMinutes, addPhin, levelOf, loadRegular, stampToday, streakOf, visitDayOf, type Regular} from './regular'
+import {addMinutes, addPhin, levelOf, loadRegular, stampToday, streakOf, todayOf, visitDayOf, type Regular} from './regular'
+import {PostcardAlbum, PostcardDialog, TripOffer} from './TripPostcard'
+import {TRIP_PHINS_DEFAULT, canOffer, collectTrip, declineTrip, forceBack, loadSeen, loadTrip, markPlaceSeen, pickPlace, sendTrip, souvenirFor, tripMode, tripModeNow, type Postcard, type TripState} from './trip'
 
 const PREFS_KEY = 'chill:prefs'
 // Đã từng bấm vào mèo → thôi hiện bong bóng gợi ý
@@ -234,6 +236,8 @@ export function ChillRoom({
   highlandOn = false,
   sleepTimerOn = false,
   brewDeskOn = false,
+  tripOn = false,
+  tripPhins = TRIP_PHINS_DEFAULT,
   seasons = [],
   lives = [],
 }: {
@@ -266,6 +270,10 @@ export function ChillRoom({
   // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
   sleepTimerOn?: boolean
   brewDeskOn?: boolean
+  // Mèo đi chơi xa (Studio "Chill · Cài đặt", cần bật Kệ sưu tầm), mặc định tắt. ?trip=1 / ?trip=0
+  // ghi đè, ?trip=back cho mèo về ngay để thử. tripPhins = số phin trong ngày để mèo muốn đi
+  tripOn?: boolean
+  tripPhins?: number
   // Lịch mùa (Noel…) từ Studio, máy khách tự so giờ, xem season.ts
   seasons?: Season[]
   // Lịch live YouTube từ Studio, máy khách tự so giờ, xem live.ts
@@ -368,6 +376,19 @@ export function ChillRoom({
   // sổ sưu tầm đang mở + món đang chọn trong sổ, vùng bấm từng món trên kệ
   const [shelf, setShelf] = useState<ShelfState>({owned: [], shown: []})
   const [gift, setGift] = useState<string | null>(null)
+  // Mèo đi chơi xa (trip.ts): tripNow = 0 lúc chưa hydrate → coi như mèo ở nhà
+  const [tripFlag, setTripFlag] = useState(false)
+  const [trip, setTrip] = useState<TripState>({cards: []})
+  const [tripNow, setTripNow] = useState(0)
+  const [tripOffer, setTripOffer] = useState<string | null>(null)
+  const [postcard, setPostcard] = useState<{card: Postcard; fresh: boolean} | null>(null)
+  const [tripBox, setTripBox] = useState<Box | null>(null)
+  const tripActive = tripFlag && shelfOn
+  // Sự kiện Chill Visit gắn trạng thái mèo (đã tiễn / đã về) khi Studio bật Mèo đi chơi xa
+  const tripVisit = useRef(tripOn && shelfOn)
+  const catTrip = tripActive && tripNow ? tripMode(trip, tripNow) : 'home'
+  const placeOf = useCallback((id: string) => allDestinations.find((d) => d.id === id)?.name ?? id, [allDestinations])
+  const tripImg = useCallback((id: string, at: TimeOfDay) => allDestinations.find((d) => d.id === id)?.streets[at] ?? null, [allDestinations])
   const [shelfOpen, setShelfOpen] = useState(false)
   const [shelfPick, setShelfPick] = useState<string | null>(null)
   const [shelfBoxes, setShelfBoxes] = useState<{id: string; box: Box}[]>([])
@@ -525,7 +546,7 @@ export function ChillRoom({
       } catch {
         // Chặn storage → chỉ biết khách mới / cũ theo prefs
       }
-      trackEvent({name: 'Chill Visit', props: {visitor, ref: visitRef()}})
+      trackEvent({name: 'Chill Visit', props: {visitor, ref: visitRef(), ...(tripVisit.current ? {trip: tripModeNow()} : {})}})
     }
   }, [tracks, allDestinations])
 
@@ -634,6 +655,8 @@ export function ChillRoom({
         return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
       }
       setCatBox(toBox(scene.catHitBox))
+      const tripHit = scene.tripHitBox
+      setTripBox(tripHit ? toBox(tripHit) : null)
       setToyBox(toBox(scene.toyPropBox))
       toSceneRef.current = (x, y) => {
         const r = wrap.getBoundingClientRect()
@@ -1121,7 +1144,7 @@ export function ChillRoom({
   const purrTimers = useRef<{wait?: number; loop?: number}>({})
   const purrHeld = useRef(false)
   const startPurrHold = (e: React.PointerEvent) => {
-    if (e.button > 0) return
+    if (e.button > 0 || catTrip === 'away') return
     purrHeld.current = false
     window.clearTimeout(purrTimers.current.wait)
     purrTimers.current.wait = window.setTimeout(() => {
@@ -1142,6 +1165,13 @@ export function ChillRoom({
   useEffect(() => stopPurrHold, [stopPurrHold])
   const onCatClick = () => {
     if (purrHeld.current) return
+    // Mèo đi vắng: bấm vào mẩu giấy trên gối → đọc lời nhắn
+    if (catTrip === 'away' && trip.trip) {
+      const left = trip.trip.backAt - tripNow
+      const at = new Date(trip.trip.backAt).toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US', {hour: '2-digit', minute: '2-digit'})
+      sayCat(t.trip.away(placeOf(trip.trip.place), left < 3_600_000 ? null : at))
+      return
+    }
     petCat()
   }
 
@@ -1149,7 +1179,7 @@ export function ChillRoom({
 
   // Bày cần câu khi đang ở quầy, cảnh không tạm dừng — kể cả lúc chạy phin (khách vào quán
   // chủ yếu để làm việc, ẩn lúc Focus thì gần như không ai thấy)
-  const toyAvailable = catToyOn && !groupView && !scenePaused
+  const toyAvailable = catToyOn && !groupView && !scenePaused && catTrip === 'home'
   const toyOut = toyAvailable && toyIn === theme
   useEffect(() => {
     sceneRef.current?.setToyProp(toyAvailable)
@@ -1313,6 +1343,92 @@ export function ChillRoom({
     scene.frame(performance.now())
   }, [shelf, shelfOn, theme])
 
+  // ---------- Mèo đi chơi xa (trip.ts) ----------
+
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('trip')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setTripFlag(param ? param !== '0' : tripOn)
+  }, [tripOn])
+
+  // Nạp chuyến đi, đếm giờ mèo về (30 giây một lần), nghe tab khác tiễn / nhận
+  useEffect(() => {
+    if (!tripActive) return
+    let s = loadTrip()
+    if (new URLSearchParams(window.location.search).get('trip') === 'back') s = forceBack(s, 'hue', 'afternoon')
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setTrip(s)
+    setTripNow(Date.now())
+    /* eslint-enable react-hooks/set-state-in-effect */
+    const tick = window.setInterval(() => setTripNow(Date.now()), 30_000)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'chill:trip') return
+      setTrip(loadTrip())
+      setTripNow(Date.now())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.clearInterval(tick)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [tripActive])
+
+  // Cảnh vẽ gối + mẩu giấy (vắng) hoặc ba lô + bưu thiếp (về), tính lại vùng bấm
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.setTrip(catTrip)
+    fitRef.current()
+    scene.frame(performance.now())
+  }, [catTrip, theme])
+
+  // Nơi khách đã ngồi → mèo ưu tiên rủ đi nơi khác
+  useEffect(() => {
+    if (tripActive && entered && dest?.id) markPlaceSeen(dest.id)
+  }, [tripActive, entered, dest?.id])
+
+  // Mèo về: chào khách một lần trong lần ghé này
+  const tripGreeted = useRef(false)
+  const tripBackPlace = catTrip === 'back' ? trip.trip?.place : undefined
+  useEffect(() => {
+    if (!tripBackPlace || !entered || tripGreeted.current) return
+    const id = window.setTimeout(() => {
+      tripGreeted.current = true
+      sceneRef.current?.noticeCat()
+      sayCat(t.trip.backHello(placeOf(tripBackPlace)))
+    }, CAT_GREET_DELAY_MS * 2)
+    return () => window.clearTimeout(id)
+  }, [tripBackPlace, entered, sayCat, t, placeOf])
+
+  const sendCat = useCallback(() => {
+    if (!tripOffer) return
+    setTrip((s) => sendTrip(s, tripOffer, time, todayOf(regular).phins))
+    setTripNow(Date.now())
+    trackEvent({name: 'Chill Trip', props: {action: 'send', place: tripOffer}})
+  }, [tripOffer, time, regular])
+
+  const declineCat = useCallback(() => {
+    if (tripOffer) trackEvent({name: 'Chill Trip', props: {action: 'later', place: tripOffer}})
+    setTrip((s) => declineTrip(s))
+    setTripOffer(null)
+  }, [tripOffer])
+
+  // Bấm bưu thiếp trên bậu: nhận bưu thiếp (+ món kệ của nơi đó nếu chưa có), mở ra xem
+  const openTripCard = () => {
+    const tr = trip.trip
+    if (!tr) return
+    const item = shelfOn ? souvenirFor(tr.place, shelf) : null
+    if (item) setShelf(addItem(shelf, item.id, new Date(), {place: tr.place, time: tr.time}))
+    const hours = Math.max(0, Math.round((Date.now() - tr.backAt) / 3_600_000))
+    const next = collectTrip(trip, item?.id ?? null)
+    setTrip(next)
+    setPostcard({card: next.cards[next.cards.length - 1], fresh: true})
+    trackEvent({name: 'Chill Trip', props: {action: 'collect', place: tr.place, hours}})
+  }
+
+  const closePostcard = useCallback(() => setPostcard(null), [])
+
+
   // Lời mời làm quen (guide.ts): những món khách đã thử — khai báo sớm vì mở kệ cũng tính
   const [guideTried, setGuideTried] = useState<GuideStep[]>([])
   const markTried = useCallback((step: GuideStep) => {
@@ -1419,8 +1535,12 @@ export function ChillRoom({
   const destId = dest?.id
   const onFocusDone = useCallback((minutes: number) => {
     audioRef.current?.chime()
-    sceneRef.current?.noticeCat()
-    sayCat(t.room.catPhin)
+    const away = catTrip === 'away'
+    setTripOffer(null)
+    if (!away) {
+      sceneRef.current?.noticeCat()
+      sayCat(t.room.catPhin)
+    }
     // Phin ngắn (độ dài tuỳ chỉnh) chỉ cộng phút: không quà kệ, không thử thách, không treo cây
     if (brewNotifyOn.current) notifyBrew(t.brew.notifyDone(minutes), t.brew.notifyDoneBody)
     if (minutes < MIN_FULL_PHIN) {
@@ -1442,7 +1562,16 @@ export function ChillRoom({
         trackEvent({name: 'Chill Season', props: {season: seasonId, action: 'tree'}})
       }
     }
-    if (!shelfOn) return
+    // Đủ phin trong ngày → mời tiễn mèo đi chơi xa (hiện trong tổng kết phin)
+    if (tripActive && canOffer(trip, todayOf(regular).phins + 1, tripPhins)) {
+      const place = pickPlace(trip, destinations.map((d) => d.id), destId, loadSeen())
+      if (place) {
+        setTripOffer(place)
+        trackEvent({name: 'Chill Trip', props: {action: 'offer', place}})
+      }
+    }
+    // Mèo đi vắng thì không có món kệ — về sẽ mang quà bù
+    if (!shelfOn || away) return
     // Mèo mang ra 1 món cho kệ (nếu tới lượt) — hiện trong bảng tổng kết phin
     const item = pickGift(shelf, {phins: regular.phins + 1, place: destId, weather, time, season: seasonOn && season?.layers.shelf ? season.pack : undefined})
     if (!item) return
@@ -1450,7 +1579,7 @@ export function ChillRoom({
     setShelf(addItem(shelf, item.id, new Date(), {place: destId, weather, time, phin: regular.phins + 1}))
     setGift(item.id)
     trackEvent({name: 'Chill Shelf', props: {action: 'gift'}})
-  }, [sayCat, t, shelfOn, shelf, regular.phins, destId, weather, time, onQuestDone, seasonOn, seasonId, season, treeCount])
+  }, [sayCat, t, shelfOn, shelf, regular, destId, weather, time, onQuestDone, seasonOn, seasonId, season, treeCount, catTrip, tripActive, trip, tripPhins, destinations])
 
   // Hết giờ nghỉ giữa 2 phin: chuông khác + mèo gọi pha tiếp (không tính gì thêm)
   const onBreakDone = useCallback(() => {
@@ -1503,6 +1632,18 @@ export function ChillRoom({
     travelRef.current = 0
     setTravelElapsed(0)
   }, [destinations.length])
+
+  // Nút "Ghé … ngay" trên bưu thiếp (Mèo đi chơi xa)
+  const visitTripPlace = (place: string) => {
+    const i = destinations.findIndex((d) => d.id === place)
+    setPostcard(null)
+    if (i < 0) return
+    setShelfOpen(false)
+    if (destinations[i].id !== dest?.id) {
+      trackEvent({name: 'Chill Trip', props: {action: 'visit-place', place}})
+      goTo(i)
+    }
+  }
 
   // Tự chuyển ga: đếm từng giây, đủ N phút thì sang điểm đến tiếp theo
   useEffect(() => {
@@ -3206,7 +3347,7 @@ export function ChillRoom({
       {catBox && !groupView && !toyOut && (
         <button
           type="button"
-          aria-label={t.room.petCat}
+          aria-label={catTrip === 'away' && trip.trip ? t.trip.noteAria(placeOf(trip.trip.place)) : t.room.petCat}
           onClick={onCatClick}
           onPointerEnter={() => sceneRef.current?.noticeCat()}
           onPointerDown={startPurrHold}
@@ -3264,6 +3405,26 @@ export function ChillRoom({
             style={{transform: 'translate(-50%, 0)'}}
           >
             {toyOut ? t.room.toyHint : toyRest ? t.room.toyRest : t.room.toyPick}
+          </span>
+        </button>
+      )}
+
+      {/* Mèo đi chơi về: bưu thiếp dựng cạnh ba lô, bấm để nhận và lật xem */}
+      {tripBox && catTrip === 'back' && !groupView && trip.trip && (
+        <button
+          type="button"
+          aria-label={t.trip.postcardTap(placeOf(trip.trip.place))}
+          onClick={openTripCard}
+          className="group absolute z-10 cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          style={tripBox}
+        >
+          {!hideUi && <BookSparkles />}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-full left-1/2 mb-1 whitespace-nowrap rounded-md border border-[#86b7d6]/50 bg-black/60 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-[#cfe4f2] opacity-0 backdrop-blur transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 sm:text-[11px]"
+            style={{transform: 'translate(-50%, 0)'}}
+          >
+            {t.trip.postcardTap(placeOf(trip.trip.place))}
           </span>
         </button>
       )}
@@ -3585,7 +3746,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} gift={gift} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
             onBrewBegin(manual, minutes)
             // Trình duyệt chỉ cho mở cửa sổ nổi ngay trong cú bấm của khách
             if (manual && brewMusicApi.prefs.miniOnStart && miniFlag && canMini && !miniOpen) openMini('brew')
@@ -4003,6 +4164,8 @@ export function ChillRoom({
         onOnline={setOnline}
       />
 
+      {/* Bưu thiếp mèo mang về (Mèo đi chơi xa) */}
+      <PostcardDialog card={postcard?.card ?? null} fresh={postcard?.fresh ?? false} placeName={placeOf} img={tripImg} onVisit={visitTripPlace} onClose={closePostcard} />
       {shelfOn && (
         <Shelf
           open={shelfOpen}
@@ -4022,6 +4185,7 @@ export function ChillRoom({
           onToggle={(id) => setShelf((s) => toggleShown(s, id))}
           slots={themeById(theme).shelf.length}
           placeName={(id) => allDestinations.find((d) => d.id === id)?.name ?? ''}
+          extra={tripActive ? <PostcardAlbum places={destinations.map((d) => d.id)} cards={trip.cards} placeName={placeOf} img={tripImg} onOpen={(card) => setPostcard({card, fresh: false})} /> : null}
         />
       )}
 

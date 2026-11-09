@@ -32,6 +32,8 @@ export default defineType({
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
     defineField({name: 'brewDeskOpen', title: 'Bàn pha phin (đồng hồ mới, phin trong cảnh)', type: 'boolean', initialValue: false}),
     defineField({name: 'sleepTimerOpen', title: 'Hẹn giờ tắt nhạc', type: 'boolean', initialValue: false}),
+    defineField({name: 'tripOpen', title: 'Mèo đi chơi xa (bưu thiếp)', type: 'boolean', initialValue: false}),
+    defineField({name: 'tripPhins', title: 'Số phin trong ngày để mèo muốn đi', type: 'number', initialValue: 3, validation: (rule) => rule.integer().min(1).max(8)}),
     defineField({name: 'seasonsOpen', title: 'Theme theo mùa (lịch ở Chill · Mùa)', type: 'boolean', initialValue: false}),
     defineField({name: 'liveOpen', title: 'Huy hiệu LIVE (lịch ở Chill · Live)', type: 'boolean', initialValue: false}),
     // Thử thách chung "Cả quán cùng pha phin" (xem src/app/api/chill-quest/route.ts)

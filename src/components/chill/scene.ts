@@ -35,7 +35,8 @@ import {drawScreen} from './screen'
 import {seatArt, themeById, type CharacterVideo, type Seat, type SheetSpec, type Theme, type ThemeId} from './themes'
 import {SPRITES, SPRITE_SCALE, SPRITE_SRC, type SpriteName} from './sprites'
 import {drawCoinDrop, drawIcedCoffee, drawTipJar, jarHitBox} from './tipjar'
-import {drawItem, itemById, itemHitBox} from './shelf'
+import {drawItem, itemById, itemHitBox, spriteSize as itemSize} from './shelf'
+import {BACKPACK, CUSHION, NOTE, POSTCARD, TRIP_ART, type TripMode} from './trip'
 import type {Drink} from './drink'
 import {CHARACTERS, type SeatedFriend} from './table-view'
 import type {StreetSound} from './audio'
@@ -562,6 +563,8 @@ export class ChillScene {
   private tip = {cups: 0, cup: false}
   // Món sưu tầm đang bày, trái → phải theo ô của phòng (shelf.ts)
   private shelf: string[] = []
+  // Mèo đi chơi xa (trip.ts): away = bậu còn gối + mẩu giấy, back = mèo về + ba lô + bưu thiếp
+  private trip: TripMode = 'home'
   private propsLayer: HTMLCanvasElement
   private propsKey = ''
   private coinAt = -1
@@ -1935,6 +1938,7 @@ export class ChillScene {
   private updateCat(dt: number) {
     const rain = this.weather === 'rain'
     this.wand?.update(dt)
+    if (this.trip === 'away') return
     this.cat.update(dt, {night: this.time === 'night', rain, music: this.musicOn})
     if (this.cat.action !== 'paw' || !rain) {
       this.pawTarget = null
@@ -1972,6 +1976,62 @@ export class ChillScene {
   }
 
   // Cần câu lông vũ (wand.ts, công tắc Studio catToyOpen): dựng chờ cạnh mèo
+  // Mèo đi chơi xa: vắng thì không vẽ / không cập nhật mèo; về thì ba lô + bưu thiếp đứng ở
+  // chỗ cần câu (ChillRoom cất cần câu khi mèo không ở nhà)
+  setTrip(mode: TripMode) {
+    this.trip = mode
+    if (mode === 'away') this.cat.setPurring(false)
+  }
+
+  // Chỗ bấm của mẩu giấy (lúc vắng) hoặc bưu thiếp (lúc về), px gốc 640×360
+  get tripHitBox() {
+    if (this.trip === 'away') {
+      const {x, y} = this.notePos
+      return {x: x - 13, y: y - 22, w: 26, h: 24}
+    }
+    if (this.trip === 'back') {
+      const {x, y} = this.postcardPos
+      return {x: x - 16, y: y - 20, w: 32, h: 22}
+    }
+    return null
+  }
+
+  private get cushionPos() {
+    const c = this.theme.cat
+    return {x: c.x + 42, y: c.y}
+  }
+  private get notePos() {
+    const p = this.cushionPos
+    return {x: p.x + 20, y: p.y - 9}
+  }
+  private get packPos() {
+    return this.theme.toy.base
+  }
+  private get postcardPos() {
+    const p = this.packPos
+    return {x: p.x + 12, y: p.y + 1}
+  }
+
+  // Lấp lánh quanh bưu thiếp chờ nhận
+  private drawTripSparkle(ctx: CanvasRenderingContext2D, t: number) {
+    if (this.trip !== 'back') return
+    const {x, y} = this.postcardPos
+    const h = itemSize(POSTCARD).h * TRIP_ART
+    ctx.fillStyle = '#fff3c4'
+    for (let i = 0; i < 3; i++) {
+      const phase = (t * 1.1 + i / 3) % 1
+      if (phase > 0.55) continue
+      const k = phase < 0.27
+      const sx = Math.round(x - 14 + ((i * 13) % 28))
+      const sy = Math.round(y - h - 3 - ((i * 5) % 7))
+      ctx.fillRect(sx, sy, 1, 1)
+      if (k) {
+        ctx.fillRect(sx - 1, sy, 3, 1)
+        ctx.fillRect(sx, sy - 1, 1, 3)
+      }
+    }
+  }
+
   setToyProp(on: boolean) {
     this.toyProp = on
     if (!on) this.stopToy()
@@ -2890,7 +2950,8 @@ export class ChillScene {
     if (ready(this.interior)) this.drawTip(ctx, t)
     if (ready(this.interior)) this.drawBrewDrip(ctx, t)
     if (this.toyProp && !this.wand && ready(this.interior)) drawWandProp(ctx, this.theme.toy, t, this.time === 'night')
-    this.cat.draw(ctx, this.catTinted)
+    if (this.trip !== 'away') this.cat.draw(ctx, this.catTinted)
+    this.drawTripSparkle(ctx, t)
     this.wand?.draw(ctx, t, this.time === 'night')
     if (ready(this.interior)) this.noel?.drawRoomFront(ctx)
     if (this.friendLights !== null && this.theme.id === 'cafe') this.drawFriendLights(ctx, t)
@@ -2942,7 +3003,7 @@ export class ChillScene {
   // Lọ tip + ly cà phê (lớp tô sẵn màu) + đồng xu đang rơi. ctx đang ở px gốc 640×360
   private drawTip(ctx: CanvasRenderingContext2D, t: number) {
     const jar = this.theme.tipJar
-    const key = `${this.theme.id}:${this.tip.cups}:${this.tip.cup}:${this.shelf.join(',')}`
+    const key = `${this.theme.id}:${this.tip.cups}:${this.tip.cup}:${this.shelf.join(',')}:${this.trip}`
     if (key !== this.propsKey) {
       this.propsKey = key
       const layer = this.propsLayer
@@ -2953,6 +3014,13 @@ export class ChillScene {
       drawTipJar(c, jar.x, jar.y, this.tip.cups)
       if (this.tip.cup) drawIcedCoffee(c, jar.x + jar.cupDx, jar.y)
       this.shelfSlots().forEach(({item, x, y}) => drawItem(c, item, x, y))
+      if (this.trip === 'away') {
+        drawItem(c, CUSHION, this.cushionPos.x, this.cushionPos.y, TRIP_ART)
+        drawItem(c, NOTE, this.notePos.x, this.notePos.y, TRIP_ART)
+      } else if (this.trip === 'back') {
+        drawItem(c, BACKPACK, this.packPos.x, this.packPos.y, TRIP_ART)
+        drawItem(c, POSTCARD, this.postcardPos.x, this.postcardPos.y, TRIP_ART)
+      }
       c.setTransform(1, 0, 0, 1, 0, 0)
       this.wash(c, layer.width, layer.height)
     }

@@ -15,7 +15,7 @@ export type AnalyticsEvent =
   // `visitor`: new = lần đầu · same-day / within-week / later = khoảng cách từ lần ghé trước
   // · returning = khách cũ từ trước khi có mốc này
   // `ref` = khách tới từ đâu: ?ref= trên link (vd yt, ext), không có thì utm_source, không có nữa thì "none"
-  | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'; ref: string}}
+  | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'; ref: string; trip?: 'home' | 'away' | 'back'}}
   | {name: 'Chill Start'; props: {from: 'welcome' | 'player'}}
   | {name: 'Chill Listen'; props: {minutes: number}}
   | {name: 'Chill Look Around'; props?: undefined}
@@ -24,6 +24,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Focus'; props: {action: 'start' | 'done' | 'stop' | 'break-start' | 'break-done' | 'break-skip' | 'auto-on' | 'auto-off' | 'pause' | 'resume' | 'compact' | 'music-start' | 'music-reroll' | 'music-save'; break?: 'short' | 'long'; minutes?: number; music?: 'suggest' | 'list' | 'current'; mood?: string}}
   | {name: 'Chill Todo'; props: {action: 'add' | 'done' | 'book'}}
   | {name: 'Chill Shelf'; props: {action: 'gift' | 'open'}}
+  // Mèo đi chơi xa: mời / tiễn / để mai / nhận bưu thiếp (hours = số giờ từ lúc mèo về tới lúc nhận) / ghé nơi đó
+  | {name: 'Chill Trip'; props: {action: 'offer' | 'send' | 'later' | 'collect' | 'visit-place'; place: string; hours?: number}}
   | {name: 'Chill Install'; props: {action: 'open' | 'accepted' | 'dismissed' | 'installed' | 'help'}}
   | {name: 'Chill App Open'; props?: undefined}
   | {name: 'Chill Mix'; props: {preset: 'scene' | 'busy' | 'rainyNight' | 'quiet' | 'mute' | 'custom'}}
