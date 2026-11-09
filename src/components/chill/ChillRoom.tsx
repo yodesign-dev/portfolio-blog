@@ -365,7 +365,7 @@ export function ChillRoom({
   // Người ngồi khách chọn (lưu trong prefs); Studio tắt thì cảnh luôn là nam
   const [seat, setSeat] = useState<Seat>('boy')
   // Chị hiện chỉ có ở phòng có bản nữ. Chọn người ngồi KHÔNG BAO GIỜ đổi phòng: ở phòng chưa có
-  // chị, nút Chị khoá ("Sắp có") và cảnh là anh; về phòng có chị thì lựa chọn Chị hiện lại
+  // chị vẫn bấm Chị được, cảnh tạm là anh kèm 1 dòng giải thích; về phòng có chị thì chị ngồi
   const girlHere = hasGirl(theme)
   const shownSeat: Seat = seatPickOn && seat === 'girl' && girlHere ? 'girl' : 'boy'
   // Chế độ Zen: giấu hết nút, chỉ còn cảnh động + nhạc. Bật / tắt bằng công tắc trên
@@ -4405,8 +4405,8 @@ export function ChillRoom({
                 {seatPickOn && (
                   <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span className="text-sm text-[#a79e94]">{t.room.seatTitle}</span>
-                    <SeatPicker seat={shownSeat} girlHere={girlHere} onPick={setSeat} label={t.room.seatTitle} names={t.room.seats} soon={t.room.seatSoon} />
-                    {!girlHere && <p className="w-full text-xs text-[#a79e94]">{t.room.seatNoGirl}</p>}
+                    <SeatPicker seat={seat} onPick={setSeat} label={t.room.seatTitle} names={t.room.seats} />
+                    {seat === 'girl' && !girlHere && <p className="w-full text-xs text-[#a79e94]">{t.room.seatNoGirl}</p>}
                   </div>
                 )}
               </section>
@@ -4686,10 +4686,13 @@ export function ChillRoom({
             )}
             {seatPickOn && (
               // Chọn người ngồi — không tính là "vào quán" (cả màn chào bắt click). Hiện ở mọi phòng;
-              // phòng chưa có bản nữ thì nút Chị khoá, không đổi phòng
+              // phòng chưa có bản nữ thì cảnh tạm là anh, có 1 dòng giải thích, không đổi phòng
               <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mb-1 flex flex-col items-center gap-1.5">
                 <p className="text-xs text-white/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.welcome.seat}</p>
-                <SeatPicker seat={shownSeat} girlHere={girlHere} onPick={setSeat} label={t.welcome.seat} names={t.room.seats} soon={t.room.seatSoon} />
+                <SeatPicker seat={seat} onPick={setSeat} label={t.welcome.seat} names={t.room.seats} />
+                {seat === 'girl' && !girlHere && (
+                  <p className="max-w-xs text-center text-xs text-white/75 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.room.seatNoGirl}</p>
+                )}
               </div>
             )}
             <button
@@ -4810,50 +4813,28 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
 // (vùng đầu người ngồi, px 1280: x 980–1140, y 270–430)
 const SEAT_FACES: Record<Seat, string> = {boy: '/chill/scenes/interior.webp', girl: '/chill/scenes/interior-girl.webp'}
 
-// Phòng chưa có chị (girlHere = false): nút Chị khoá kèm nhãn "Sắp có" — chọn người ngồi không đổi phòng
-function SeatPicker({
-  seat,
-  girlHere,
-  onPick,
-  label,
-  names,
-  soon,
-}: {
-  seat: Seat
-  girlHere: boolean
-  onPick: (s: Seat) => void
-  label: string
-  names: Record<Seat, string>
-  soon: string
-}) {
+function SeatPicker({seat, onPick, label, names}: {seat: Seat; onPick: (s: Seat) => void; label: string; names: Record<Seat, string>}) {
   return (
     <div className="flex gap-1 rounded-full bg-black/45 p-1 backdrop-blur" role="radiogroup" aria-label={label}>
       {SEATS.map((s) => {
         const active = s === seat
-        const locked = s === 'girl' && !girlHere
         return (
           <button
             key={s}
             type="button"
             role="radio"
             aria-checked={active}
-            disabled={locked}
             onClick={() => onPick(s)}
             className={`flex min-h-9 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-              active
-                ? 'bg-[#e8b27d] text-[#2a1a10]'
-                : locked
-                  ? 'cursor-not-allowed text-white/45'
-                  : 'text-white/80 hover:bg-white/10 hover:text-white'
+              active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/80 hover:bg-white/10 hover:text-white'
             }`}
           >
             <span
               aria-hidden
-              className={`block size-7 shrink-0 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated] ${locked ? 'opacity-50 grayscale' : ''}`}
+              className="block size-7 shrink-0 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated]"
               style={{backgroundImage: `url(${SEAT_FACES[s]})`, backgroundSize: '224px 126px', backgroundPosition: '-171px -47px'}}
             />
             {names[s]}
-            {locked && <span className="rounded-full border border-white/20 px-1.5 py-px text-[10px] font-medium leading-tight text-white/60">{soon}</span>}
           </button>
         )
       })}
