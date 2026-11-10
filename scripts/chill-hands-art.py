@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
-# Vẽ lại bàn tay gõ phím của người ngồi phòng Café window (/chill), cả anh lẫn chị.
+# Vẽ lại bàn tay gõ phím của người ngồi ở Café window và Night desk (/chill), cả anh lẫn chị:
+# một bàn tay cho cả hai phòng, tay anh to hơn tay chị.
 #
-# Video Kling vẽ bàn tay trên bàn phím thành một cục nhoè, không thấy ngón. Script này, trên
-# từng khung của 8 sheet (anh / chị × thường / Noel × hi ×2 / lo ×1):
+# Video Kling vẽ bàn tay trên bàn phím không ra hình: ở quán là một cục nhoè không thấy ngón, ở
+# Bàn đêm tay chị to thô, tay anh thành cục ngón đan vào nhau. Script này, trên từng khung của 16
+# sheet (quán / Bàn đêm × anh / chị × thường / Noel × hi ×2 / lo ×1):
 #   1. tìm cục da tay trên bàn phím (khung đang ghép đúng như scene.ts vẽ: nội thất đã khoét
 #      mặt nạ + khung người), xoá nó cùng viền nâu, vá lại bằng bàn phím sạch;
-#   2. đặt bàn tay mới bám theo cổ tay của khung đó; tay áo trong khung vẫn đè lên cổ tay.
-#      --hand desk (mặc định): bàn tay của khung cùng thời điểm trong video Bàn đêm của chị, nên
-#      hai phòng gõ phím bằng cùng một bàn tay, cùng nhịp (xem desk_hands). Anh mượn tay chị (thu
-#      0,8, màu da anh) và Bàn đêm của anh cũng được thay theo (process_desk_sheet, --room).
-#      --hand nano: bàn tay Nano Banana 2 vẽ (scripts/chill-hand-girl.png),
-#      đốt tay nhấp nhô theo nhịp gõ tính bằng giây.
-# Khung chị đưa tay lên cầm ly thì để nguyên tay, chỉ dọn viền nâu "bóng ma" còn trên bàn phím.
+#   2. đặt bàn tay Nano Banana 2 vẽ (scripts/chill-hand-girl.png) bám theo cổ tay của khung đó;
+#      tay áo trong khung vẫn đè lên cổ tay. Chị dùng cỡ gốc, anh phóng 1,15 và chỉnh sang màu da
+#      anh (SCALE, PAL);
+#   3. đốt tay nhấp nhô theo nhịp gõ tính bằng giây, nên sheet 8 fps và 12 fps gõ giống nhau.
+# Khung chị đưa tay lên cầm ly ở quán thì để nguyên tay, chỉ dọn viền nâu "bóng ma" trên bàn phím.
 #
-# Bàn phím sạch lấy từ các khung chị cầm ly (tay rời bàn phím); anh và chị cùng một laptop, bản
-# anh chỉ bù lệch màu. Phần bàn phím bị che ở mọi khung: mỗi hàng phím lấy màu giữa của đoạn còn
-# thấy ngay sau mép bạc.
+# Đã thử và bỏ (2026-11-10): ghép bàn tay của video Bàn đêm sang quán theo từng khung. Tay chị
+# trông to thô như tay con trai, tay anh (mượn tay chị thu 0,8) nhỏ như tay con gái.
 #
-#   python3 scripts/chill-hands-art.py [--rev 5dcf719] [--only girl] [--hand desk|nano]
-#                                      [--sheet <tên sheet>] [--out <thư mục xem thử>]
+# Bàn phím sạch ở quán lấy từ các khung chị cầm ly (tay rời bàn phím); anh và chị cùng một laptop,
+# bản anh chỉ bù lệch màu. Phần bàn phím bị che ở mọi khung: mỗi hàng phím lấy màu giữa của đoạn
+# còn thấy ngay sau mép bạc. Bàn đêm có bàn phím sạch riêng, xem phần "Bàn đêm" bên dưới.
 #
-# Luôn đọc sheet gốc từ git (--rev, mặc định 5dcf719 = trước khi vẽ lại tay) nên chạy lại không
-# vẽ chồng. Ghi đè public/chill/scenes/*.webp (hoặc --out). Cần numpy, Pillow.
+#   python3 scripts/chill-hands-art.py [--rev 5dcf719] [--only boy|girl] [--room cafe|desk]
+#                                      [--sheet <tên sheet>] [--boy-scale 1.15] [--out <thư mục>]
+#
+# Luôn đọc sheet gốc từ git (quán: --rev, mặc định 5dcf719; Bàn đêm: DESK_REV — đều là trước khi
+# vẽ lại tay) nên chạy lại không vẽ chồng. Ghi đè public/chill/scenes/*.webp (hoặc --out).
+# Cần numpy, Pillow.
 
 import argparse
 import io
@@ -69,7 +73,10 @@ PAL = {
     'boy': dict(ol=(62, 26, 14), sh=(196, 104, 64), base=(226, 128, 82), li=(244, 160, 108), hi=(250, 196, 146)),
     'girl': dict(ol=(88, 48, 34), sh=(206, 132, 90), base=(236, 168, 116), li=(249, 186, 134), hi=(252, 212, 170)),
 }
-SCALE = {'boy': 0.8, 'girl': 1.0}
+# Cỡ bàn tay so với ảnh gốc: tay anh to hơn tay chị (bàn tay đàn ông), cùng một hình vẽ
+SCALE = {'boy': 1.15, 'girl': 1.0}
+# Lề quanh ô bàn tay để bản phóng to không bị cắt
+PAD = 24
 # Nhịp gõ: [trỏ, giữa, áp út, út] — 1 = ngón đang nhấc. Đổi tư thế mỗi BEAT giây
 SEQ = [
     [0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 0],
@@ -80,7 +87,7 @@ BEAT = 0.17
 
 # Bàn tay do Nano Banana 2 vẽ lại từ ảnh cận cảnh bàn phím khung 0 của chị (lưng bàn tay có khối, 4
 # đốt tay, ngón cái chìa sang trái), cắt sẵn thành scripts/chill-hand-girl.png: 72×50 px ô ×2, cổ tay
-# (điểm neo) ở (-OX, -OY). Anh dùng cùng bàn tay, thu còn 0,8 và chỉnh sang màu da của anh.
+# (điểm neo) ở (-OX, -OY). Anh dùng cùng bàn tay, phóng theo SCALE và chỉnh sang màu da của anh.
 OX, OY, SW, SH = -58, -34, 72, 50
 HAND = os.path.join(ROOT, 'scripts', 'chill-hand-girl.png')
 _sprites = {}
@@ -91,19 +98,20 @@ def base_hand(n):
     if n in _base:
         return _base[n]
     im = Image.open(HAND).convert('RGBA')
-    if n == 'boy':
-        s = SCALE['boy']
+    s = SCALE[n]
+    a = np.zeros((SH + 2 * PAD, SW + 2 * PAD, 4))
+    if s == 1.0:
+        a[PAD:PAD + SH, PAD:PAD + SW] = np.asarray(im).astype(float)
+    else:
         w, h = round(SW * s), round(SH * s)
-        small = np.asarray(im.resize((w, h), Image.LANCZOS)).astype(float)
-        small[..., 3] = np.where(small[..., 3] > 127, 255, 0)
-        a = np.zeros((SH, SW, 4))
+        img = np.asarray(im.resize((w, h), Image.LANCZOS)).astype(float)
+        img[..., 3] = np.where(img[..., 3] > 127, 255, 0)
         # giữ điểm neo (cổ tay) ở nguyên chỗ
-        x0, y0 = round(-OX - (-OX) * s), round(-OY - (-OY) * s)
-        a[y0:y0 + h, x0:x0 + w] = small
+        x0, y0 = round(PAD - OX - (-OX) * s), round(PAD - OY - (-OY) * s)
+        a[y0:y0 + h, x0:x0 + w] = img
+    if n == 'boy':
         ratio = np.array(PAL['boy']['base'], float) / np.array(PAL['girl']['base'], float)
         a[..., :3] = np.clip(a[..., :3] * ratio, 0, 255)
-    else:
-        a = np.asarray(im).astype(float)
     a[a[..., 3] == 0] = 0
     # 4 đốt tay: chia đều bề ngang của dải trên cùng bàn tay
     ys, xs = np.nonzero(a[..., 3])
@@ -329,123 +337,7 @@ def build_plates(rev):
 # ---------------------------------------------------------------- xử lý 1 sheet
 
 
-# ---------------------------------------------------------------- bàn tay của Bàn đêm
-# Bàn đêm (room-desk*) dùng cùng laptop, cùng chỗ (lòng màn 436, 219 px gốc) và video Kling có
-# bàn tay gõ phím tự nhiên suốt cả vòng. Chế độ --hand desk lấy bàn tay của khung cùng thời điểm ở
-# Bàn đêm (sheet cùng cỡ: hi 81 khung 8 fps, lo 121 khung 12 fps) đặt vào cổ tay của quán, nên
-# hai phòng gõ phím bằng cùng một bàn tay, cùng nhịp.
-CAFE_AT = (429, 116)
-DESK = {
-    'girl': dict(interior='room-desk-girl.webp', at=(429, 131, 211, 207),
-                 sheets={2: ('room-desk-girl-loop@2x.webp', 10, 81), 1: ('room-desk-girl-loop.webp', 12, 121)}),
-    'boy': dict(interior='room-desk.webp', at=(437, 136, 203, 202),
-                sheets={2: ('room-desk-loop@2x.webp', 10, 81), 1: ('room-desk-loop.webp', 12, 121)}),
-}
-
-
-def fill_small_holes(m, size):
-    ys, xs = np.nonzero(m)
-    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    sub = m[y0:y1, x0:x1]
-    out = m.copy()
-    for comp in components(~sub):
-        cy, cx = map(list, zip(*comp))
-        edge = min(cy) == 0 or min(cx) == 0 or max(cy) == sub.shape[0] - 1 or max(cx) == sub.shape[1] - 1
-        if not edge and len(comp) < size:
-            out[[y + y0 for y in cy], [x + x0 for x in cx]] = True
-    return out
-
-
-# Bàn tay lấy từ video Bàn đêm của ai, thu nhỏ bao nhiêu, chỉnh màu da ra sao. Video Bàn đêm của
-# anh vẽ bàn tay thành cục ngón đan vào nhau, nên anh mượn bàn tay của chị: thu 0,8 (tay cũ của anh
-# lộ ra cỡ đó dưới tay áo) và nhân màu theo da tay cũ của anh / của chị (224,134,93 / 240,171,118)
-HAND_SRC = {
-    'girl': ('girl', 1.0, None),
-    'boy': ('girl', 0.8, (224 / 240, 134 / 171, 93 / 118)),
-}
-
-
-def resize_hand(c, hand, br, s, k):
-    # Thu bàn tay quanh góc dưới-phải; k = 2 khi ô là bản lo đã nhân đôi (thu ở độ phân giải gốc
-    # rồi nhân đôi lại để giữ khối 2×2)
-    ys, xs = np.nonzero(hand)
-    y0, x0 = ys.min() // k * k, xs.min() // k * k
-    y1, x1 = (ys.max() // k + 1) * k, (xs.max() // k + 1) * k
-    sub = c[y0:y1:k, x0:x1:k]
-    msk = hand[y0:y1:k, x0:x1:k].astype(float)
-    H, W = msk.shape
-    h2, w2 = max(1, round(H * s)), max(1, round(W * s))
-    rgb = np.stack([np.asarray(Image.fromarray(sub[..., j].astype(np.float32)).resize((w2, h2), Image.LANCZOS))
-                    for j in range(3)], -1)
-    m2 = np.asarray(Image.fromarray(msk.astype(np.float32)).resize((w2, h2), Image.BILINEAR)) > 0.5
-    rgb, m2 = rgb.repeat(k, 0).repeat(k, 1), m2.repeat(k, 0).repeat(k, 1)
-    oc = np.zeros_like(c)
-    om = np.zeros_like(hand)
-    ny0, nx0 = y1 - h2 * k, x1 - w2 * k
-    oc[ny0:y1, nx0:x1] = rgb
-    om[ny0:y1, nx0:x1] = m2
-    bx, by = br
-    return oc, om, (x1 - 1 - round((x1 - 1 - bx) * s), y1 - 1 - round((y1 - 1 - by) * s))
-
-
-def desk_hands(n, scale):
-    # Mỗi khung Bàn đêm: (ảnh ghép ×2, mặt nạ bàn tay, góc dưới-phải cục da) theo toạ độ ô Bàn đêm
-    src, s, tint = HAND_SRC[n]
-    cfg = DESK[src]
-    n = src
-    name, cols, frames = cfg['sheets'][scale]
-    ax, ay, aw, ah = cfg['at']
-    w, h = aw * 2, ah * 2
-    dx, dy = (ax - CAFE_AT[0]) * 2, (ay - CAFE_AT[1]) * 2
-    a = np.asarray(git_image('HEAD', name)).astype(float)
-    cw, ch = w * scale // 2, h * scale // 2
-
-    def cell(i):
-        c = a[(i // cols) * ch:(i // cols) * ch + ch, (i % cols) * cw:(i % cols) * cw + cw]
-        return c if scale == 2 else c.repeat(2, 0).repeat(2, 1)
-    interior = np.asarray(git_image('HEAD', cfg['interior'])).astype(float)
-    if interior.shape[1] == 640:
-        interior = interior.repeat(2, 0).repeat(2, 1)
-    reg = interior[ay * 2:ay * 2 + h, ax * 2:ax * 2 + w].copy()
-    reg[..., 3] *= 1 - cell(frames)[..., 3] / 255
-    x0, y0, x1, y1 = max(0, Z[0] - dx), max(0, Z[1] - dy), Z[2] - dx, Z[3] - dy
-    out = []
-    for i in range(frames):
-        c = compose(cell(i), reg)
-        m = np.zeros(c.shape[:2], bool)
-        m[y0:y1, x0:x1] = skinmask(c[y0:y1, x0:x1])
-        skin = biggest(m)
-        if skin.sum() < 250:
-            out.append(None)
-            continue
-        # viền nâu + bóng giữa các ngón dính vào da; tay áo để quán tự đè
-        hand = skin | (dil(skin, 3) & brownish(c) & ~sleevemask(c, n))
-        hand = fill_small_holes(hand, 30)
-        ys, xs = np.nonzero(skin)
-        br = (xs.max(), ys.max())
-        if s != 1.0:
-            c, hand, br = resize_hand(c, hand, br, s, 1 if scale == 2 else 2)
-        if tint:
-            c = np.clip(c * np.array(tint), 0, 255)
-        out.append((c, hand, br))
-    # khung không tìm thấy tay (hiếm): mượn khung gần nhất
-    for i in range(frames):
-        if out[i] is None:
-            for k in range(1, frames):
-                for j in (i - k, i + k):
-                    if 0 <= j < frames and out[j] is not None and out[i] is None:
-                        out[i] = out[j]
-    return out
-
-
-HAND_MODE = 'desk'
-# Người ngồi dùng bàn tay Bàn đêm (anh mượn tay chị, HAND_SRC; Bàn đêm của anh sửa theo, xem
-# process_desk_sheet). Bỏ khỏi đây thì người đó quay về tay Nano Banana
-DESK_SEATS = {'girl', 'boy'}
-
-
 def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=None):
-    desk = desk_hands(n, scale) if HAND_MODE == 'desk' and n in DESK_SEATS else None
     sheet = git_image(rev, name)
     interior = np.asarray(git_image(rev, SHEETS[n]['interior'])).astype(float)
     arr, cell, cw, ch = cells(sheet, scale, cols, frames)
@@ -485,7 +377,14 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=N
         sl = sleevemask(c, n)
         sleeve = big_sleeve(c, n, (Z[0] - 10, Z[1] - 30, Z[2], Z[3] + 30))
         arm = dil(sleeve, 2)
-        cuff = dil(sleeve, 1) | sl  # tay áo (cả viền tối) đè lên tay mới
+        # tay áo (cả viền tối) đè lên tay mới. Chỉ lấy điểm màu áo sát mảng tay áo lớn: khe phím tối
+        # ngả xanh cũng khớp màu áo anh, tính cả thì bàn tay bị thủng lỗ chấm đen
+        cuff = dil(sleeve, 1) | (sl & dil(sleeve, 4))
+        if n == 'boy':
+            # điểm sáng của đốt tay cũ dính sát mép áo anh: không phải áo (áo anh tối), không giữ lại
+            lit = c.min(-1) > 150
+            cuff &= ~lit
+            arm = arm & ~lit
         # dọn viền nâu / cục da sót trên mặt phím. Khung cầm ly: tay đang giơ giữ nguyên, chỉ dọn
         # viền nâu không dính vào da
         if anchors[i] is not None:
@@ -512,24 +411,11 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=N
         changed |= ghost
         transparent = np.zeros_like(changed)
         transparent[sy0:sy1, sx0:sx1] = ghost[sy0:sy1, sx0:sx1]
-        if anchors[i] is not None and desk is not None:
-            # góc dưới-phải cục da Bàn đêm trùng góc dưới-phải cục da cũ của quán (đã làm mượt);
-            # ô lo dời chẵn để khối 2×2 của Bàn đêm giữ nguyên khi gộp lại
-            dc, hm, (bx, by) = desk[i]
-            ox = anchors[i][0] + 6 * SCALE[n] - bx
-            oy = anchors[i][1] + 8 * SCALE[n] - by
-            ox, oy = (int(round(ox / 2)) * 2, int(round(oy / 2)) * 2) if scale == 1 else (int(round(ox)), int(round(oy)))
-            for yy, xx in zip(*np.nonzero(hm)):
-                Y, X = yy + oy, xx + ox
-                if 0 <= Y < CH2 and 0 <= X < CW2 and not cuff[Y, X]:
-                    new[Y, X] = dc[yy, xx]
-                    changed[Y, X] = True
-                    transparent[Y, X] = False
-        elif anchors[i] is not None:
+        if anchors[i] is not None:
             sp = sprite(n, pose_at(i / fps))
             ax, ay = int(round(anchors[i][0])), int(round(anchors[i][1]))
             for yy, xx in zip(*np.nonzero(sp[..., 3])):
-                Y, X = ay + OY + yy, ax + OX + xx
+                Y, X = ay + OY - PAD + yy, ax + OX - PAD + xx
                 if 0 <= Y < CH2 and 0 <= X < CW2 and not cuff[Y, X]:
                     new[Y, X] = sp[yy, xx, :3]
                     changed[Y, X] = True
@@ -574,33 +460,35 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=N
     print(path, os.path.getsize(path), 'hands', sum(a is not None for a in anchors), '/', frames)
 
 
-# ---------------------------------------------------------------- Bàn đêm của anh
-# Video Bàn đêm của anh vẽ bàn tay thành cục ngón đan vào nhau, nên Bàn đêm của anh cũng thay bằng
-# bàn tay của chị ở Bàn đêm (cùng phòng, cùng laptop) như ở quán: thu 0,8, màu da anh, khung cùng
-# thời điểm. Laptop ở Bàn đêm vẽ khác quán (lệch ~10 px, màn to hơn) nên có bàn phím sạch riêng:
-# mỗi điểm lấy trung vị các khung tay cũ không che điểm đó, điểm luôn bị che lấy màu giữa của hàng.
-# Ô Bàn đêm chỉ đục ở phần chuyển động (tay, đầu); lòng màn vẽ dưới ảnh tĩnh nên trong khung là
-# trong suốt. Đọc sheet gốc ở DESK_REV (trước khi sửa tay Bàn đêm) nên chạy lại không vẽ chồng.
+# ---------------------------------------------------------------- Bàn đêm
+# Bàn đêm (room-desk*) cũng gõ phím trên laptop, nên thay cùng bàn tay với quán cho cả anh lẫn chị:
+# hai phòng một bàn tay. Video Bàn đêm vẽ tay chị to thô, tay anh thành cục ngón đan vào nhau.
+# Laptop ở Bàn đêm vẽ khác quán (lệch ~10 px, màn to hơn) nên có bàn phím sạch riêng cho từng
+# người: mỗi điểm lấy trung vị các khung tay cũ không che điểm đó, điểm luôn bị che lấy màu giữa
+# của hàng. Ô Bàn đêm chỉ đục ở phần chuyển động (tay, đầu); lòng màn vẽ dưới ảnh tĩnh nên trong
+# khung là trong suốt. Đọc sheet gốc ở DESK_REV (trước khi sửa tay Bàn đêm) nên chạy lại không vẽ
+# chồng. `zd` = vùng bàn tay, `screen` = lòng màn (436, 219, 99×51 px gốc), đều theo ô ×2.
 DESK_REV = '38003aa'
-DESK_BOY = dict(at=(437, 136, 203, 202), interior='room-desk.webp', sheets=[
-    ('room-desk-loop@2x.webp', 2, 10, 81, 8),
-    ('room-desk-loop.webp', 1, 12, 121, 12),
-    ('room-desk-loop-noel@2x.webp', 2, 10, 81, 8),
-    ('room-desk-loop-noel.webp', 1, 12, 121, 12),
-])
-# Vùng bàn tay (ô ×2 của Bàn đêm anh) và lòng màn (436, 219, 99×51 px gốc → trong ô)
-ZD = (0, 236, 190, 330)
-SCREEN_D = (0, 166, 196, 268)
+DESK_ROOMS = {
+    'boy': dict(at=(437, 136, 203, 202), interior='room-desk.webp', zd=(0, 236, 190, 330), screen=(0, 166, 196, 268),
+                sheets=[('room-desk-loop@2x.webp', 2, 10, 81, 8), ('room-desk-loop.webp', 1, 12, 121, 12),
+                        ('room-desk-loop-noel@2x.webp', 2, 10, 81, 8), ('room-desk-loop-noel.webp', 1, 12, 121, 12)]),
+    'girl': dict(at=(429, 131, 211, 207), interior='room-desk-girl.webp', zd=(10, 246, 206, 340), screen=(14, 176, 212, 278),
+                 sheets=[('room-desk-girl-loop@2x.webp', 2, 10, 81, 8), ('room-desk-girl-loop.webp', 1, 12, 121, 12),
+                         ('room-desk-girl-loop-noel@2x.webp', 2, 10, 81, 8),
+                         ('room-desk-girl-loop-noel.webp', 1, 12, 121, 12)]),
+}
 
 
 class DeskRoom:
-    def __init__(self, name, scale, cols, frames):
-        ax, ay, aw, ah = DESK_BOY['at']
+    def __init__(self, n, name, scale, cols, frames):
+        cfg = DESK_ROOMS[n]
+        ax, ay, aw, ah = cfg['at']
         self.w, self.h = aw * 2, ah * 2
         self.scale, self.cols, self.frames = scale, cols, frames
         self.cw, self.ch = self.w * scale // 2, self.h * scale // 2
         self.arr = np.asarray(git_image(DESK_REV, name)).astype(float)
-        interior = np.asarray(git_image(DESK_REV, DESK_BOY['interior'])).astype(float)
+        interior = np.asarray(git_image(DESK_REV, cfg['interior'])).astype(float)
         if interior.shape[1] == 640:
             interior = interior.repeat(2, 0).repeat(2, 1)
         self.reg = interior[ay * 2:ay * 2 + self.h, ax * 2:ax * 2 + self.w].copy()
@@ -617,23 +505,24 @@ class DeskRoom:
         return f[..., :3] * a + (self.reg[..., :3] * ra + BG * (1 - ra)) * (1 - a)
 
 
-def desk_blob(c):
-    x0, y0, x1, y1 = ZD
+def desk_blob(c, zd):
+    x0, y0, x1, y1 = zd
     m = np.zeros(c.shape[:2], bool)
     m[y0:y1, x0:x1] = skinmask(c[y0:y1, x0:x1])
     b = biggest(m)
     return b if b.sum() >= 250 else None
 
 
-def desk_plate():
+def desk_plate(n):
     # Bàn phím sạch của Bàn đêm từ sheet hi thường
-    room = DeskRoom(DESK_BOY['sheets'][0][0], 2, 10, 81)
-    x0, y0, x1, y1 = ZD
+    zd = DESK_ROOMS[n]['zd']
+    room = DeskRoom(n, DESK_ROOMS[n]['sheets'][0][0], 2, 10, 81)
+    x0, y0, x1, y1 = zd
     obs, ok = [], []
     for i in range(room.frames):
         c = room.comp(i)
-        b = desk_blob(c)
-        cover = dil(sleevemask(c, 'boy'), 3) | dil(skinmask(c), 3) | brownish(c)
+        b = desk_blob(c, zd)
+        cover = dil(sleevemask(c, n), 3) | dil(skinmask(c), 3) | brownish(c)
         if b is not None:
             cover |= dil(b, 5)
         obs.append(c[y0:y1, x0:x1])
@@ -657,14 +546,14 @@ def desk_plate():
     return full
 
 
-def process_desk_sheet(name, scale, cols, frames, fps, plate, out_dir=None):
-    room = DeskRoom(name, scale, cols, frames)
-    hands = desk_hands('boy', scale)
+def process_desk_sheet(n, name, scale, cols, frames, fps, plate, out_dir=None):
+    ZD, SCREEN_D = DESK_ROOMS[n]['zd'], DESK_ROOMS[n]['screen']
+    room = DeskRoom(n, name, scale, cols, frames)
     comps, blobs = [], []
     for i in range(frames):
         c = room.comp(i)
         comps.append(c)
-        blobs.append(desk_blob(c))
+        blobs.append(desk_blob(c, ZD))
     raw = [None if b is None else (np.nonzero(b)[1].max(), np.nonzero(b)[0].max()) for b in blobs]
     anchors = []
     for i, a in enumerate(raw):
@@ -678,10 +567,15 @@ def process_desk_sheet(name, scale, cols, frames, fps, plate, out_dir=None):
     for i in range(frames):
         c = comps[i]
         new = c.copy()
-        sl = sleevemask(c, 'boy')
-        sleeve = big_sleeve(c, 'boy', (ZD[0], ZD[1] - 30, ZD[2], ZD[3]))
+        sl = sleevemask(c, n)
+        sleeve = big_sleeve(c, n, (ZD[0], ZD[1] - 30, ZD[2], ZD[3]))
         arm = dil(sleeve, 2)
-        cuff = dil(sleeve, 1) | sl
+        cuff = dil(sleeve, 1) | (sl & dil(sleeve, 4))
+        if n == 'boy':
+            # chấm sáng của video gốc sát mép áo anh: không phải áo (áo anh tối), để tay mới vẽ đè
+            lit = c.min(-1) > 150
+            cuff &= ~lit
+            arm = arm & ~lit
         ghost = np.zeros((H, W), bool)
         if blobs[i] is not None:
             # cục tay cũ + viền nâu + điểm sáng hồng trên mu tay quanh nó
@@ -698,13 +592,14 @@ def process_desk_sheet(name, scale, cols, frames, fps, plate, out_dir=None):
         transparent = np.zeros_like(changed)
         transparent[sy0:sy1, sx0:sx1] = ghost[sy0:sy1, sx0:sx1]
         if anchors[i] is not None:
-            dc, hm, (bx, by) = hands[i]
-            ox, oy = anchors[i][0] - bx, anchors[i][1] - by
-            ox, oy = (int(round(ox / 2)) * 2, int(round(oy / 2)) * 2) if scale == 1 else (int(round(ox)), int(round(oy)))
-            for yy, xx in zip(*np.nonzero(hm)):
-                Y, X = yy + oy, xx + ox
+            # bàn tay Nano Banana, neo như ở quán (cổ tay = góc dưới-phải cục da cũ lùi vào)
+            sp = sprite(n, pose_at(i / fps))
+            ax_ = int(round(anchors[i][0] - 6 * SCALE[n]))
+            ay_ = int(round(anchors[i][1] - 8 * SCALE[n]))
+            for yy, xx in zip(*np.nonzero(sp[..., 3])):
+                Y, X = ay_ + OY - PAD + yy, ax_ + OX - PAD + xx
                 if 0 <= Y < H and 0 <= X < W and not cuff[Y, X]:
-                    new[Y, X] = dc[yy, xx]
+                    new[Y, X] = sp[yy, xx, :3]
                     changed[Y, X] = True
                     transparent[Y, X] = False
         orig = room.cell(i)
@@ -743,13 +638,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--rev', default='5dcf719')
     ap.add_argument('--only', choices=['boy', 'girl'])
-    ap.add_argument('--hand', choices=['desk', 'nano'], default='desk')
+    ap.add_argument('--boy-scale', type=float, help='thử cỡ tay anh (mặc định SCALE)')
     ap.add_argument('--sheet', help='chỉ làm 1 sheet (tên file)')
-    ap.add_argument('--room', choices=['cafe', 'desk', 'all'], default='all', help='desk = Bàn đêm của anh')
+    ap.add_argument('--room', choices=['cafe', 'desk', 'all'], default='all', help='chỉ làm quán hoặc Bàn đêm')
     ap.add_argument('--out', help='ghi sheet vào thư mục này thay vì public/chill/scenes')
     args = ap.parse_args()
-    global HAND_MODE
-    HAND_MODE = args.hand
+    if args.boy_scale:
+        SCALE['boy'] = args.boy_scale
     plates = build_plates(args.rev)
     keys = key_area()
     if args.room in ('cafe', 'all'):
@@ -760,12 +655,14 @@ def main():
                 if args.sheet and name != args.sheet:
                     continue
                 process_sheet(n, name, scale, cols, frames, fps, args.rev, plates[n], keys, args.out)
-    if args.room in ('desk', 'all') and args.only != 'girl' and args.hand == 'desk' and 'boy' in DESK_SEATS:
-        dplate = desk_plate()
-        for name, scale, cols, frames, fps in DESK_BOY['sheets']:
-            if args.sheet and name != args.sheet:
+    if args.room in ('desk', 'all'):
+        for n, cfg in DESK_ROOMS.items():
+            if args.only and n != args.only:
                 continue
-            process_desk_sheet(name, scale, cols, frames, fps, dplate, args.out)
+            names = [x for x in cfg['sheets'] if not args.sheet or x[0] == args.sheet]
+            dplate = desk_plate(n) if names else None
+            for name, scale, cols, frames, fps in names:
+                process_desk_sheet(n, name, scale, cols, frames, fps, dplate, args.out)
 
 
 if __name__ == '__main__':
