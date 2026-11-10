@@ -217,12 +217,14 @@ export const THEMES: Theme[] = [
     cat: {x: 60, y: 197},
     // Đầu lan can, tới trước bụi hoa giấy
     catRoom: [44, 186],
-    toy: {base: {x: 152, y: 196}, tip: {x: 160, y: 172}, hideY: 199},
+    // Cụm đồ trên lan can, sau đầu mèo (mèo 60–136): lọ tip, ly của người mời, cần câu
+    toy: {base: {x: 190, y: 196}, tip: {x: 198, y: 172}, hideY: 199},
     notebook: null,
-    // Trên bàn nhỏ, giữa ly cà phê đá và quyển sách; ly của người mời đứng mép trái bàn
-    tipJar: {x: 440, y: 293, cupDx: -46},
-    // Thanh trên lan can, chừa mèo nằm đầu lan can và 2 bụi hoa giấy
-    shelf: [292, 322, 352, 170].map((x) => ({x, y: 196})),
+    // Trên lan can, sát đầu mèo; ly của người mời đứng ngay bên phải lọ. Trước đây lọ đứng trên
+    // bàn nhỏ, đúng chỗ tay người ngồi đưa lên cầm ly nên đè lên bàn tay
+    tipJar: {x: 151, y: 196, cupDx: 21},
+    // Thanh trên lan can, chừa mèo nằm đầu lan can, cụm lọ tip + cần câu và 2 bụi hoa giấy
+    shelf: [292, 322, 352, 214].map((x) => ({x, y: 196})),
     steam: null,
     drink: null,
     lamp: {x: 44, y: 28},
