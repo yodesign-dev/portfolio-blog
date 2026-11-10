@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-# Art người ngồi nữ (G2) cho phòng Bàn đêm của /chill: từ ảnh Nano Banana 2 + video loop Kling
-# (đã tạo trên Weave, ô kính và lòng màn laptop là nền xanh) ra 3 file cùng định dạng với bản nam:
+# Art người ngồi nữ (G2) cho phòng Bàn đêm và Ban công của /chill: từ ảnh Nano Banana 2 + video loop
+# Kling (đã tạo trên Weave, chỗ nhìn ra phố và lòng màn laptop là nền xanh) ra 3 file cùng định dạng
+# với bản nam, ví dụ phòng Bàn đêm:
 #   public/chill/scenes/room-desk-girl.webp         ảnh tĩnh 1280×720, ô kính + lòng màn trong suốt
-#   public/chill/scenes/room-desk-girl-loop.webp    121 khung 12fps, ô 211×207, 12 cột, ô cuối = mặt nạ
-#   public/chill/scenes/room-desk-girl-loop@2x.webp 81 khung 8fps, ô 422×414, 10 cột, ô cuối = mặt nạ
+#   public/chill/scenes/room-desk-girl-loop.webp    121 khung 12fps, 12 cột, ô cuối = mặt nạ
+#   public/chill/scenes/room-desk-girl-loop@2x.webp 81 khung 8fps, 10 cột, ô cuối = mặt nạ
 #
-#   python3 scripts/chill-girl-desk-art.py --nano <ảnh nano.png> --video <kling.mp4> [--install]
+#   python3 scripts/chill-girl-room-art.py --room desk|balcony --nano <ảnh nano.png> --video <kling.mp4> [--install]
 #
 # Khác quán: Bàn đêm vẽ màn laptop DƯỚI ảnh nội thất (themes.ts: screenBehind), nên lòng màn trong
 # ảnh tĩnh và trong từng khung phải trong suốt; video giữ lòng màn xanh nên khử xanh là đủ.
-#   - Cảnh (khung cửa, bàn, laptop, ghế, ly) lấy pixel ảnh gốc room-desk.webp, giống hệt bản nam.
+#   - Cảnh (khung cửa, bàn, laptop, ghế, ly, lan can, cây) lấy pixel ảnh gốc, giống hệt bản nam.
 #   - Người lấy từ video Kling; pixel đứng yên mà là cảnh thì lấy ảnh tĩnh cho nét, không rung.
 # Cần ffmpeg, Pillow, numpy.
 
@@ -18,7 +19,7 @@ import importlib.util
 import os
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCENES = os.path.join(ROOT, 'public', 'chill', 'scenes')
@@ -28,15 +29,68 @@ _spec.loader.exec_module(cafe)
 grow, shrink, big, enclosed, spread, lavender, rgba, video_frames = (
     cafe.grow, cafe.shrink, cafe.big, cafe.enclosed, cafe.spread, cafe.lavender, cafe.rgba, cafe.video_frames)
 
-# Vùng người ngồi nữ (themes.ts desk `girl.character.at` × 2), px 1280: cao hơn ô của nam 10 px
-# cho đỉnh tóc, rộng hơn 16 px bên trái cho bàn tay
-X0, Y0, W, H = 858, 262, 422, 414
-# Vùng quanh người được phép lấy ảnh Nano (ngoài vùng này luôn là ảnh gốc)
-ZONE = (850, 250, 1280, 720)
-# Ly cà phê đá trên bàn: giữ nguyên bản nam
-GLASS = (1196, 496, 1272, 588)
+# Mỗi phòng: `box` = vùng người ngồi nữ (themes.ts `girl.character.at` × 2, px 1280); `zone` = vùng
+# quanh người được phép lấy ảnh Nano (ngoài vùng này luôn là ảnh gốc); `glass` = ly cà phê đá, giữ
+# nguyên bản nam; `near` = chỉ tìm người nam trong
+# khoảng này quanh người (0 = cả vùng); `scene` = pixel cảnh khác ảnh tĩnh từ mức này mới
+# coi là có chuyển động; `q` = chất lượng webp của sheet
+ROOMS = {
+    # Ô cao hơn ô của nam 10 px cho đỉnh tóc, rộng hơn 16 px bên trái cho bàn tay
+    'desk': {'box': (858, 262, 422, 414), 'zone': (850, 250, 1280, 720), 'glass': (1196, 496, 1272, 588), 'near': 0, 'scene': 34, 'q': 88},
+    # Cùng ô với nam (đã gồm bàn nhỏ và ly ở bên trái)
+    'balcony': {'box': (742, 236, 538, 478), 'zone': (742, 236, 1280, 720), 'glass': (792, 498, 860, 588), 'near': 101, 'scene': 60, 'q': 82},
+}
 N = 242  # khung video 24fps × ~10 giây
-NAMES = ('room-desk-girl.webp', 'room-desk-girl-loop.webp', 'room-desk-girl-loop@2x.webp')
+
+
+def use_room(room):
+    global X0, Y0, W, H, ZONE, GLASS, NAMES, ORIG, ROOM
+    ROOM = room
+    X0, Y0, W, H = ROOMS[room]['box']
+    ZONE, GLASS = ROOMS[room]['zone'], ROOMS[room]['glass']
+    ORIG = f'room-{room}.webp'
+    NAMES = (f'room-{room}-girl.webp', f'room-{room}-girl-loop.webp', f'room-{room}-girl-loop@2x.webp')
+
+
+use_room('desk')
+
+
+def is_green(a):
+    return (a[..., 1] > a[..., 0] + 45) & (a[..., 1] > a[..., 2] + 35)
+
+
+def dark(a):
+    return a[..., :3].max(-1) < 80
+
+
+def skin(a):
+    return (a[..., 0] > 170) & (a[..., 0] > a[..., 1] + 25) & (a[..., 1] > a[..., 2] + 10)
+
+
+# Mỗi phòng: `box` = vùng người ngồi nữ (themes.ts `girl.character.at` × 2, px 1280); `zone` = vùng
+# quanh người được phép lấy ảnh Nano (ngoài vùng này luôn là ảnh gốc); `glass` = ly cà phê đá, giữ
+# nguyên bản nam; `near` = chỉ tìm người nam trong
+# khoảng này quanh người (0 = cả vùng); `scene` = pixel cảnh khác ảnh tĩnh từ mức này mới
+# coi là có chuyển động; `q` = chất lượng webp của sheet
+ROOMS = {
+    # Ô cao hơn ô của nam 10 px cho đỉnh tóc, rộng hơn 16 px bên trái cho bàn tay
+    'desk': {'box': (858, 262, 422, 414), 'zone': (850, 250, 1280, 720), 'glass': (1196, 496, 1272, 588), 'near': 0, 'scene': 34, 'q': 88},
+    # Cùng ô với nam (đã gồm bàn nhỏ và ly ở bên trái)
+    'balcony': {'box': (742, 236, 538, 478), 'zone': (742, 236, 1280, 720), 'glass': (792, 498, 860, 588), 'near': 101, 'scene': 60, 'q': 82},
+}
+N = 242  # khung video 24fps × ~10 giây
+
+
+def use_room(room):
+    global X0, Y0, W, H, ZONE, GLASS, NAMES, ORIG, ROOM
+    ROOM = room
+    X0, Y0, W, H = ROOMS[room]['box']
+    ZONE, GLASS = ROOMS[room]['zone'], ROOMS[room]['glass']
+    ORIG = f'room-{room}.webp'
+    NAMES = (f'room-{room}-girl.webp', f'room-{room}-girl-loop.webp', f'room-{room}-girl-loop@2x.webp')
+
+
+use_room('desk')
 
 
 def is_green(a):
@@ -53,32 +107,38 @@ def skin(a):
 
 def fill_holes(m):
     # Lấp các lỗ nằm lọt trong m (không thông ra mép ảnh)
-    im = Image.fromarray(np.pad(m, 1).astype(np.uint8) * 255)
+    im = Image.fromarray(np.pad(m, 1).astype(np.uint8) * 255).copy()
     ImageDraw.floodfill(im, (0, 0), 128)
-    return np.asarray(im)[1:-1, 1:-1] != 128
+    return np.array(im)[1:-1, 1:-1] != 128
 
 
 def build_static(nano, orig, video):
     girl = np.asarray(Image.open(nano).convert('RGB').resize((1280, 720), Image.LANCZOS)).astype(int)
     out = orig.copy()
     opaque = orig[..., 3] > 0
+    # Nền xanh, kể cả đốm xanh ngọc Nano để lại giữa nền (chỉ xét trong vùng quanh người)
     gg = is_green(girl)
+    cyan = (girl[..., 1] > girl[..., 0] + 60) & (girl[..., 2] > girl[..., 0] + 40)
+    gg |= grow(cyan, 3) & grow(gg, 9)
     diff = np.abs(girl - orig[..., :3]).max(-1)
     zone = np.zeros((720, 1280), bool)
     zone[ZONE[1]:ZONE[3], ZONE[0]:ZONE[2]] = True
     zone[GLASS[1]:GLASS[3], GLASS[0]:GLASS[2]] = False
     # Chỗ ảnh Nano khác ảnh gốc: người mới, và nền lộ ra sau khi bỏ người cũ
     differs = (opaque & ~gg & (diff > 45)) | (opaque & gg) | (~opaque & ~gg)
-    # Bỏ nét mảnh (vân gỗ Nano vẽ lệch 1–2 px) rồi mới nới ra, để vùng người không loang theo vân gỗ
-    solid = grow(shrink(differs & zone, 3), 3)
-    z = big(grow(solid, 7) & zone, 2000)
-    # Tóc đen của nữ trùng màu tóc / áo của nam nên không "khác": lấp các lỗ lọt giữa người
-    z = fill_holes(z) & zone
-    # Tóc / áo xanh than của nam (tối, ngả xanh; nét viền gỗ thì ngả đỏ) và da: luôn phải thay, kể cả
-    # chỗ tóc đen của nữ đè lên áo nam nên hai ảnh "gần giống nhau"
+    # Cả vùng quanh người lấy ảnh Nano, rồi trả lại ảnh gốc ở những pixel là cảnh: hai ảnh gần giống
+    # nhau và không phải người nam. Người nam = tóc / áo xanh than (tối, ngả xanh; nét viền gỗ thì
+    # ngả đỏ) và da — luôn phải thay, kể cả chỗ tóc đen của nữ đè lên nên hai ảnh "gần giống nhau"
+    z = zone.copy()
     cool = (orig[..., :3].max(-1) < 120) & (orig[..., 2] >= orig[..., 0])
     boyish = grow((cool | skin(orig)) & opaque, 5)
-    # Trong vùng đó, pixel cảnh (hai ảnh gần giống nhau, không phải người nam) vẫn lấy ảnh gốc
+    near = ROOMS[ROOM]['near']
+    if near:
+        # Cảnh có nhiều thứ tối ngả xanh (lan can sắt, lá cây): chỉ coi là người nam ở gần mảng khác
+        # biệt lớn (chính là người), còn lại vẫn trả về ảnh gốc
+        k = 9
+        body = big(grow(shrink(differs & zone, k), k), 2000)
+        boyish &= grow(body, near)
     same = z & opaque & ~gg & (diff < 60) & ~boyish
     z &= ~shrink(same, 3)
     out[z, :3] = girl[z]
@@ -131,8 +191,11 @@ def build_sheets(static, from_orig, fr, work):
     # Xanh lẫn nhẹ (viền) chỉ coi là nền ở chỗ ảnh tĩnh trong suốt
     green = ((g > r + 45) & (g > b + 35)) | ((st_a == 0)[None] & (g > r + 15) & (g > b + 5))
 
-    # Mặt nạ: chỗ video khác ảnh tĩnh + cả người nữ trong ảnh tĩnh
-    moving = (np.abs(fr - st_rgb).max(-1) > 34) | (green & (st_a > 0))
+    # Mặt nạ: chỗ video khác ảnh tĩnh + cả người nữ trong ảnh tĩnh. Chỗ ảnh tĩnh trong suốt (trời, ô
+    # kính) chỉ tính khi video không phải nền xanh, tức là có người đi ngang. Pixel cảnh thì phải khác
+    # rõ mới tính (cây, lan can trong video rung nhẹ so với ảnh tĩnh)
+    diff = np.abs(fr - st_rgb).max(-1)
+    moving = np.where((st_a > 0)[None], (diff > np.where(scene_px, ROOMS[ROOM]['scene'], 34)) | green, ~green)
     mask = big(shrink(grow(moving.any(0), 5), 3), 300) | (~scene_px & (st_a > 0))
     mask[H - 2:] = False  # webp lem màu ở mép ô → 2 hàng đáy để ảnh tĩnh lo
 
@@ -152,8 +215,9 @@ def build_sheets(static, from_orig, fr, work):
 
     def frame(i):
         f, gi = fr[i].copy(), green[i]
-        # Ly thuỷ tinh cầm trước áo: xanh lọt qua ly → vá màu láng giềng thay vì đục lỗ
-        hole = gi & (st_a > 0) & mask & ~scene_px
+        # Ly thuỷ tinh cầm trước áo: đốm xanh nhỏ lọt giữa ly / tay → vá màu láng giềng thay vì đục lỗ.
+        # Mảng xanh lớn (nền lộ ra khi người / quyển sách dời khỏi chỗ trong ảnh tĩnh) thì vẫn là nền
+        hole = enclosed(gi & mask & (st_a > 0) & ~scene_px, ~gi, 300)
         if hole.any():
             f = inpaint(f, hole)
             gi = gi & ~hole
@@ -213,7 +277,7 @@ def build_sheets(static, from_orig, fr, work):
             if scale == 1:
                 im = im.resize((cw, ch), Image.NEAREST)
             sheet.paste(im, ((k % cols) * cw, (k // cols) * ch))
-        sheet.save(os.path.join(work, name), quality=88, method=6)
+        sheet.save(os.path.join(work, name), quality=ROOMS[ROOM]['q'], method=6)
         print(name, sheet.size, len(idx), 'khung')
     # Đoạn uống: vùng ly đá đổi so với khung đầu. Lúc không uống, scene.ts nhảy từ đầu đoạn tới cuối
     # đoạn, nên chọn cặp khung (trước khi với tay, sau khi đặt ly) giống nhau nhất
@@ -227,15 +291,18 @@ def build_sheets(static, from_orig, fr, work):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--nano', required=True, help='ảnh Nano Banana 2 (người nữ ở Bàn đêm, 16:9, nền xanh)')
+    p.add_argument('--room', required=True, choices=sorted(ROOMS))
+    p.add_argument('--nano', required=True, help='ảnh Nano Banana 2 (người nữ trong phòng, 16:9, nền xanh)')
     p.add_argument('--video', required=True, help='video Kling 10 giây (khung đầu = khung cuối = ảnh nền xanh)')
-    p.add_argument('--work', default=os.path.join(ROOT, '.chill-video', 'girl-desk'))
+    p.add_argument('--work', help='thư mục làm việc (mặc định .chill-video/girl-<phòng>)')
     p.add_argument('--install', action='store_true', help='chép 3 file kết quả vào public/chill/scenes')
     args = p.parse_args()
+    use_room(args.room)
+    args.work = args.work or os.path.join(ROOT, '.chill-video', f'girl-{args.room}')
     os.makedirs(args.work, exist_ok=True)
-    orig = rgba(os.path.join(SCENES, 'room-desk.webp'))
+    orig = rgba(os.path.join(SCENES, ORIG))
     static, from_orig = build_static(args.nano, orig, args.video)
-    Image.fromarray(static.astype(np.uint8)).save(os.path.join(args.work, 'room-desk-girl.png'))
+    Image.fromarray(static.astype(np.uint8)).save(os.path.join(args.work, NAMES[0].replace('.webp', '.png')))
     Image.fromarray(static.astype(np.uint8)).save(os.path.join(args.work, NAMES[0]), quality=90, method=6, exact=True)
     fr = video_frames(args.video, (X0, Y0, W, H))[:N]
     build_sheets(static, from_orig, fr, args.work)

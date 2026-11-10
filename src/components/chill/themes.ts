@@ -10,7 +10,7 @@
 //
 // Người ngồi nam (art gốc) hoặc nữ (`girl`, công tắc Studio seatPickOpen): bản nữ là ảnh
 // nội thất + video riêng, cùng toạ độ với bản nam (scripts/chill-girl-cafe-art.py).
-// Phòng chưa có bản nữ thì luôn là nam.
+// Cả 3 phòng đều có bản nữ; phòng nào thiếu `girl` thì luôn là nam.
 
 import type {ToySpot} from './wand'
 
@@ -190,6 +190,19 @@ export const THEMES: Theme[] = [
         glow: {src: '/chill/scenes/room-balcony-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
       },
     },
+    // Bản nữ (scripts/chill-girl-room-art.py), cùng ô với nam. Đoạn uống gồm cả lật trang (2,1 giây)
+    // nên lúc ngồi đọc không lật trang liên tục. Chưa có sheet quàng khăn Noel
+    girl: {
+      interior: '/chill/scenes/room-balcony-girl.webp',
+      character: {
+        kind: 'video',
+        at: {x: 371, y: 118, w: 269, h: 239},
+        hi: {src: '/chill/scenes/room-balcony-girl-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+        lo: {src: '/chill/scenes/room-balcony-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+        duration: 121 / 12,
+        sip: [2.0, 9.0],
+      },
+    },
     screen: null,
     screenBehind: false,
     cat: {x: 60, y: 197},
@@ -235,7 +248,7 @@ export const THEMES: Theme[] = [
         glow: {src: '/chill/scenes/room-desk-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
       },
     },
-    // Bản nữ (scripts/chill-girl-desk-art.py): ô cao hơn ô nam 10 px gốc cho đỉnh tóc, rộng hơn
+    // Bản nữ (scripts/chill-girl-room-art.py): ô cao hơn ô nam 10 px gốc cho đỉnh tóc, rộng hơn
     // 8 px bên trái cho bàn tay; lòng màn trong ảnh tĩnh và trong từng khung đều trong suốt.
     // Chưa có sheet quàng khăn Noel
     girl: {
