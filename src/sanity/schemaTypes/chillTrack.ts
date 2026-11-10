@@ -45,6 +45,14 @@ export default defineType({
       validation: (Rule) => Rule.required(),
     }),
     defineField({
+      name: 'offSeasonStation',
+      title: 'Sau mùa chuyển sang trạm',
+      type: 'string',
+      options: {list: STATION_OPTIONS.filter((s) => s.value !== 'noel')},
+      description: 'Hết mùa Noel, bài này nối vào cuối trạm đã chọn và về lại tab Noel vào mùa sau. Để trống = nghỉ tới mùa sau (bài carol).',
+      hidden: ({document}) => document?.station !== 'noel',
+    }),
+    defineField({
       name: 'mood',
       title: 'Mô tả ngắn',
       type: 'string',

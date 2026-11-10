@@ -1,5 +1,5 @@
 import {DESTINATIONS, type Destination} from '@/components/chill/destinations'
-import {NEW_TRACK_DAYS, STATIONS, TRACKS, type StationId, type Track} from '@/components/chill/tracks'
+import {NEW_TRACK_DAYS, STATIONS, TRACKS, stationOf, type StationId, type Track} from '@/components/chill/tracks'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import type {ChillUpdate} from '@/components/chill/Changelog'
 import type {NeonSign} from '@/components/chill/facade'
@@ -21,6 +21,7 @@ const CHILL_QUERY = `{
     title,
     mood,
     station,
+    offSeasonStation,
     duration,
     _createdAt,
     "src": coalesce(audio.asset->url, localFile)
@@ -94,7 +95,7 @@ const CHILL_QUERY = `{
 }`
 
 type ChillContent = {
-  tracks: {id: string; title: string; mood?: string; station?: string; duration?: number; _createdAt?: string; src: string}[]
+  tracks: {id: string; title: string; mood?: string; station?: string; offSeasonStation?: string; duration?: number; _createdAt?: string; src: string}[]
   destinations: {
     id: string
     name: string
@@ -171,12 +172,15 @@ export async function getChillContent(revalidate: number) {
         ? (content.seasons ?? []).filter((s) => s.pack === 'noel').map((s) => ({id: s.id, pack: 'noel', start: s.start, end: s.end, layers: {...ALL_LAYERS, ...s.layers}, moments: s.moments ?? []}))
         : []
   // Trạm Noel chỉ có bài trong mùa, nên ngoài mùa không hiện tab (kể cả extension). Bài upload từ
-  // trước nên nhãn "Mới" tính từ ngày vào mùa. Máy dev: CHILL_DEV_HIDDEN=1 thấy luôn để thử
+  // trước nên nhãn "Mới" tính từ ngày vào mùa. Máy dev: CHILL_DEV_HIDDEN=1 thấy luôn để thử.
+  // Hết mùa, bài có "Sau mùa chuyển sang trạm" nối vào cuối trạm đó; carol nghỉ tới mùa sau.
+  // Trước mùa đầu tiên thì chưa bài nào đi đâu cả
   const now = Date.now()
   const season = activeSeason(seasons, now)
   const noelNew = season ? now - Date.parse(season.start) < NEW_TRACK_DAYS * 86_400_000 : false
+  const seasonOver = !season && seasons.some((s) => Date.parse(s.end) <= now)
 
-  const fromStudio: Track[] = content.tracks.filter((t) => t.station !== 'noel' || season || showHidden).map((t) => ({
+  const toTrack = (t: ChillContent['tracks'][number]): Track => ({
     id: t.id,
     title: t.title,
     mood: t.mood ?? '',
@@ -184,7 +188,15 @@ export async function getChillContent(revalidate: number) {
     src: t.src,
     station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,
     isNew: t.station === 'noel' ? noelNew : t._createdAt ? now - Date.parse(t._createdAt) < NEW_TRACK_DAYS * 86_400_000 : undefined,
-  }))
+  })
+  const regular = content.tracks.filter((t) => t.station !== 'noel' || season || (showHidden && !seasonOver)).map(toTrack)
+  // Trạm đích chưa có bài nào (vd mọi bài đang ẩn) thì thôi, không dựng tab chỉ vì vài bài này
+  const moved = seasonOver
+    ? content.tracks
+        .filter((t) => t.station === 'noel' && regular.some((r) => stationOf(r) === t.offSeasonStation))
+        .map((t) => ({...toTrack(t), station: t.offSeasonStation as StationId, isNew: false}))
+    : []
+  const fromStudio: Track[] = [...regular, ...moved]
   // Sanity lỗi / chưa có bài nào → bộ dự phòng trong code
   const tracks: Track[] = fromStudio.length ? fromStudio : TRACKS
 
