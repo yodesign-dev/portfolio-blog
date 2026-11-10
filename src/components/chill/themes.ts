@@ -235,6 +235,20 @@ export const THEMES: Theme[] = [
         glow: {src: '/chill/scenes/room-desk-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
       },
     },
+    // Bản nữ (scripts/chill-girl-desk-art.py): ô cao hơn ô nam 10 px gốc cho đỉnh tóc, rộng hơn
+    // 8 px bên trái cho bàn tay; lòng màn trong ảnh tĩnh và trong từng khung đều trong suốt.
+    // Chưa có sheet quàng khăn Noel
+    girl: {
+      interior: '/chill/scenes/room-desk-girl.webp',
+      character: {
+        kind: 'video',
+        at: {x: 429, y: 131, w: 211, h: 207},
+        hi: {src: '/chill/scenes/room-desk-girl-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+        lo: {src: '/chill/scenes/room-desk-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+        duration: 121 / 12,
+        sip: [1.67, 8.5],
+      },
+    },
     // Lòng màn hình (đã khoét khỏi ảnh tĩnh, dải màn xám cũ trong video đã xoá). Vai người
     // vẽ sẵn trong ảnh tĩnh nên màn vẽ dưới ảnh, viền laptop che phần thừa
     screen: {x: 436, y: 219, w: 99, h: 51},
