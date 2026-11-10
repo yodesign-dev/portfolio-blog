@@ -371,6 +371,16 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys):
         if anchors[i] is not None:
             ghost = keys & ~arm & (tinted(c) | skinmask(c))
             ghost |= dil(blobs[i], 4) & ~arm
+            # vệt sáng gần trắng của tay cũ (đầu ngón cái) trên mặt phím: không phải da, không có
+            # sắc màu nên 2 dòng trên bỏ sót; phím thật thì gần màu bàn phím sạch
+            # (cả viền tối quanh vệt, cách bàn phím sạch > 40)
+            bright = c.min(-1) > 175
+            ghost |= keys & ~arm & dil(c.min(-1) > 130, 1) & (np.abs(c - plate).max(-1) > 40)
+            # đốt tay cũ thò lên lòng màn sát mép vai (dính vào tay áo nên lớp `arm` giữ lại): bỏ
+            # điểm màu da / nâu / sáng gần cục tay cũ, trừ chính màu tay áo
+            scr_old = np.zeros_like(ghost)
+            scr_old[sy0:sy1, sx0:sx1] = True
+            ghost |= scr_old & dil(blobs[i], 8) & (skinmask(c) | brownish(c) | bright) & ~sl
         else:
             # khung cầm ly: tay rời phím — cả mặt phím (trừ tay áo, tay đang giơ) lấy bàn phím sạch,
             # vốn là trung vị của chính các khung này nên chỉ khác ở viền tay cũ
@@ -391,15 +401,34 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys):
                     new[Y, X] = sp[yy, xx, :3]
                     changed[Y, X] = True
                     transparent[Y, X] = False
-        # ghi lại vào ô sheet (ô lo: gộp 2×2)
+        orig = cell(i)
+        # Mẩu lẻ còn đục trong lòng màn sát chỗ vừa khoét (điểm sáng / xám của tay cũ không bị coi
+        # là da hay viền nâu): làm trong suốt luôn, kẻo thành chấm lấm tấm trên màn code vẽ
+        opaque = ((orig[..., 3] > 0) & ~changed) | (changed & ~transparent)
+        scr = np.zeros_like(opaque)
+        scr[sy0:sy1, sx0:sx1] = opaque[sy0:sy1, sx0:sx1]
+        near = dil(changed, 2)
+        for comp in components(scr):
+            ys, xs = map(list, zip(*comp))
+            if len(comp) < 60 and near[ys, xs].any():
+                changed[ys, xs] = True
+                transparent[ys, xs] = True
+        # ghi lại vào ô sheet (ô lo: gộp 2×2). Điểm không đổi giữ nguyên màu + alpha gốc (lòng màn
+        # vốn trong suốt), không phải đục 255
         r0, c0 = (i // cols) * ch, (i % cols) * cw
         rgba = np.concatenate([new, np.full(new.shape[:2] + (1,), 255.0)], -1)
+        rgba[~changed] = orig[~changed]
         rgba[transparent] = 0
         if scale == 1:
             ch_ = changed.reshape(ch, 2, cw, 2).any((1, 3))
-            tr = transparent.reshape(ch, 2, cw, 2).all((1, 3))
-            small = rgba.reshape(ch, 2, cw, 2, 4).mean((1, 3))
-            small[tr] = 0
+            # gộp 2×2 chỉ lấy màu các điểm đục (điểm trong suốt không kéo màu về đen); ô đục khi
+            # ít nhất 2/4 điểm đục, như sheet gốc chỉ có alpha 0 / 255
+            blk = rgba.reshape(ch, 2, cw, 2, 4)
+            op = blk[..., 3] > 0
+            cnt = op.sum((1, 3))
+            rgb = (blk[..., :3] * op[..., None]).sum((1, 3)) / np.maximum(cnt, 1)[..., None]
+            small = np.concatenate([rgb, np.full(cnt.shape + (1,), 255.0)], -1)
+            small[cnt < 2] = 0
             tile = out[r0:r0 + ch, c0:c0 + cw]
             tile[ch_] = small[ch_]
         else:
