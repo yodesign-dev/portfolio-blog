@@ -4438,15 +4438,23 @@ export function ChillRoom({
                           active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
                         }`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
-                        <img
-                          src={th.thumb}
-                          alt=""
-                          loading="lazy"
-                          className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
-                        />
+                        <span className="relative block">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
+                          <img
+                            src={th.thumb}
+                            alt=""
+                            loading="lazy"
+                            className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
+                          />
+                          {/* Nhãn nằm đè lên ảnh: hiện / ẩn không đổi chiều cao thẻ, nên hàng thẻ và
+                              nút chọn người ngồi bên dưới không nhảy khi đổi Anh ↔ Chị */}
+                          {heOnly && (
+                            <span className="absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-[#14110f]/80 px-1.5 py-0.5 text-[10px] leading-tight text-[#ede6dd]">
+                              {t.room.heOnly}
+                            </span>
+                          )}
+                        </span>
                         <span className="block truncate px-2 py-1.5 text-xs font-semibold text-[#ede6dd]">{t.room.themes[th.id]}</span>
-                        {heOnly && <span className="-mt-1 block truncate px-2 pb-1.5 text-[10px] text-[#a79e94]">{t.room.heOnly}</span>}
                       </button>
                     )
                   })}
