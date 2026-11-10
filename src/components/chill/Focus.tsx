@@ -34,7 +34,8 @@ const FOCUS_KEY = 'chill:focus'
 const MINUTES_KEY = 'chill:focus-min'
 // Đã mở bảng phin từ khi có việc cần làm → thôi chấm "mới" trên nút
 const TODO_SEEN_KEY = 'chill:todo-seen'
-const OPTIONS = [15, 25, 45]
+// Welcome.tsx dùng chung để ghi đúng số phút lên nút Tập trung
+export const OPTIONS = [15, 25, 45]
 const AUTO_KEY = 'chill:focus-auto'
 const CHAIN_KEY = 'chill:focus-chain'
 const COMPACT_KEY = 'chill:brew-compact'

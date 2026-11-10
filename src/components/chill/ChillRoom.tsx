@@ -4725,9 +4725,11 @@ export function ChillRoom({
           canPickSeat={seatPickOn && hasGirl(theme)}
           seat={seat}
           onSeat={setSeat}
-          room={t.room.themes[theme]}
-          place={dest.name}
+          onWarmSeat={warmSeat}
+          seatLoading={seatLoading}
           station={stationLabel}
+          track={track.title}
+          customMinutes={brewFlag}
           loaded={loaded}
           onGoal={(goal) => {
             enter(goal !== 'look')
