@@ -7,7 +7,7 @@
 # sheet (quán / Bàn đêm × anh / chị × thường / Noel × hi ×2 / lo ×1):
 #   1. tìm cục da tay trên bàn phím (khung đang ghép đúng như scene.ts vẽ: nội thất đã khoét
 #      mặt nạ + khung người), xoá nó cùng viền nâu, vá lại bằng bàn phím sạch;
-#   2. đặt bàn tay Nano Banana 2 vẽ (scripts/chill-hand-girl.png) bám theo cổ tay của khung đó;
+#   2. đặt bàn tay Nano Banana 2 vẽ (scripts/chill-hand-master.png) bám theo cổ tay của khung đó;
 #      tay áo trong khung vẫn đè lên cổ tay. Chị dùng cỡ gốc, anh phóng 1,15 và chỉnh sang màu da
 #      anh (SCALE, PAL);
 #   3. đốt tay nhấp nhô theo nhịp gõ tính bằng giây, nên sheet 8 fps và 12 fps gõ giống nhau.
@@ -77,7 +77,7 @@ PAL = {
 SCALE = {'boy': 1.15, 'girl': 1.0}
 # Lề quanh ô bàn tay để bản phóng to không bị cắt
 PAD = 24
-# Nhịp gõ: [trỏ, giữa, áp út, út] — 1 = ngón đang nhấc. Đổi tư thế mỗi BEAT giây
+# Nhịp gõ: [trỏ, giữa, áp út, út] — 1 = ngón nhấc lên ở nhịp đó. Mỗi nhịp dài BEAT giây
 SEQ = [
     [0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 0],
     [0, 1, 0, 0], [0, 0, 0, 1], [1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0],
@@ -86,10 +86,17 @@ BEAT = 0.17
 
 
 # Bàn tay do Nano Banana 2 vẽ lại từ ảnh cận cảnh bàn phím khung 0 của chị (lưng bàn tay có khối, 4
-# đốt tay, ngón cái chìa sang trái), cắt sẵn thành scripts/chill-hand-girl.png: 72×50 px ô ×2, cổ tay
-# (điểm neo) ở (-OX, -OY). Anh dùng cùng bàn tay, phóng theo SCALE và chỉnh sang màu da của anh.
+# đốt tay, ngón cái chìa sang trái). scripts/chill-hand-master.png là bàn tay cắt khỏi ảnh gốc
+# 1264×848 đó (đã lấp lỗ giữa ngón cái và ngón trỏ), còn nguyên độ phân giải: 1 px của ô ×2 ở cỡ
+# tay chị ≈ 6,2 px ảnh gốc. Mỗi người thu thẳng từ ảnh gốc về đúng cỡ của mình (không phóng to một
+# hình nhỏ) nên viền nâu liền nét ở mọi cỡ. Anh chỉnh thêm sang màu da của anh.
+HAND = os.path.join(ROOT, 'scripts', 'chill-hand-master.png')
+F0 = 57 / 352          # ảnh gốc → px ô ×2, cỡ tay chị
+ANCHOR_M = (302, 185)  # cổ tay (điểm neo) trong ảnh gốc
+# Đỉnh 4 đốt tay trong ảnh gốc: trỏ, giữa, áp út, út
+KNUCKLES_M = [(117, 46), (179, 19), (265, 19), (340, 105)]
+# Ô bàn tay: cổ tay ở (-OX, -OY), thêm lề PAD mỗi phía
 OX, OY, SW, SH = -58, -34, 72, 50
-HAND = os.path.join(ROOT, 'scripts', 'chill-hand-girl.png')
 _sprites = {}
 _base = {}
 
@@ -97,53 +104,60 @@ _base = {}
 def base_hand(n):
     if n in _base:
         return _base[n]
-    im = Image.open(HAND).convert('RGBA')
-    s = SCALE[n]
+    m = np.asarray(Image.open(HAND).convert('RGBA')).astype(float)
+    f = F0 * SCALE[n]
+    w, h = round(m.shape[1] * f), round(m.shape[0] * f)
+    # thu theo màu đã nhân alpha để mép không ngả đen
+    al = m[..., 3:4] / 255
+    pm = np.dstack([m[..., :3] * al, al])
+    ch = [np.asarray(Image.fromarray(pm[..., j].astype(np.float32)).resize((w, h), Image.LANCZOS)) for j in range(4)]
+    cov = np.clip(ch[3], 0, 1)
+    img = np.dstack([np.clip(ch[j] / np.maximum(cov, 1e-3), 0, 255) for j in range(3)] + [(cov > 0.5) * 255.0])
     a = np.zeros((SH + 2 * PAD, SW + 2 * PAD, 4))
-    if s == 1.0:
-        a[PAD:PAD + SH, PAD:PAD + SW] = np.asarray(im).astype(float)
-    else:
-        w, h = round(SW * s), round(SH * s)
-        img = np.asarray(im.resize((w, h), Image.LANCZOS)).astype(float)
-        img[..., 3] = np.where(img[..., 3] > 127, 255, 0)
-        # giữ điểm neo (cổ tay) ở nguyên chỗ
-        x0, y0 = round(PAD - OX - (-OX) * s), round(PAD - OY - (-OY) * s)
-        a[y0:y0 + h, x0:x0 + w] = img
+    x0, y0 = round(PAD - OX - ANCHOR_M[0] * f), round(PAD - OY - ANCHOR_M[1] * f)
+    a[y0:y0 + h, x0:x0 + w] = img
     if n == 'boy':
         ratio = np.array(PAL['boy']['base'], float) / np.array(PAL['girl']['base'], float)
         a[..., :3] = np.clip(a[..., :3] * ratio, 0, 255)
     a[a[..., 3] == 0] = 0
-    # 4 đốt tay: chia đều bề ngang của dải trên cùng bàn tay
-    ys, xs = np.nonzero(a[..., 3])
-    top = xs[ys < ys.min() + 9]
-    edges = np.linspace(top.min(), top.max() + 1, 5).round().astype(int)
-    _base[n] = (a, edges)
+    _base[n] = (a, [(x0 + kx * f, y0 + ky * f) for kx, ky in KNUCKLES_M])
     return _base[n]
 
 
-def sprite(n, pose):
-    # Ngón đang nhấc: đốt tay của ngón đó nhô lên 2 px (12 hàng trên cùng của cột dời lên, phần dưới
-    # giữ nguyên) — lưng bàn tay đứng yên, chỉ các đốt nhấp nhô theo nhịp gõ
-    key = (n, tuple(pose))
+def sprite(n, amps):
+    # Ngón nhấc: đốt tay của ngón đó nhô lên `amps[k]` px (cỡ tay chị). Kéo giãn mềm thay vì dời
+    # nguyên khối cột: độ dời giảm dần theo hình chuông sang hai bên đốt tay và giảm về 0 xuống
+    # lưng bàn tay, nên mép đốt không bị xé thành gai, lưng bàn tay đứng yên
+    key = (n, tuple(amps))
     if key in _sprites:
         return _sprites[key]
-    a, edges = base_hand(n)
-    out = a.copy()
-    for k in range(4):
-        if not pose[k]:
+    a, knuckles = base_hand(n)
+    s = SCALE[n]
+    H, W = a.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W]
+    d = np.zeros((H, W))
+    for (cx, cy), amp in zip(knuckles, amps):
+        if amp <= 0:
             continue
-        for x in range(edges[k], edges[k + 1]):
-            col = np.nonzero(a[:, x, 3])[0]
-            if not len(col) or col[0] < 2:
-                continue
-            t = col[0]
-            out[t - 2:t + 10, x] = a[t:t + 12, x]
+        wx = 0.5 * (1 + np.cos(np.pi * np.clip((xx - cx) / (9 * s), -1, 1)))
+        wy = np.clip(1 - (yy - (cy + 5 * s)) / (12 * s), 0, 1)
+        d = np.maximum(d, amp * s * wx * wy)
+    out = a[np.clip(yy + np.round(d).astype(int), 0, H - 1), xx]
     _sprites[key] = out
     return out
 
 
-def pose_at(t):
-    return SEQ[int(t / BEAT) % len(SEQ)]
+def amps_at(t):
+    # Độ nhô của 4 đốt tay ở giây t: mỗi lần nhấc lên rồi hạ xuống theo hình tam giác quanh giữa
+    # nhịp (0 → 2 px → 0), nên giữa hai khung có bước 1 px thay vì bật thẳng 2 px
+    b = t / BEAT
+    amps = [0.0] * 4
+    for j in (int(b) - 1, int(b), int(b) + 1):
+        w = max(0.0, 1 - abs(b - (j + 0.5)))
+        for k, on in enumerate(SEQ[j % len(SEQ)]):
+            if on:
+                amps[k] = max(amps[k], 2 * w)
+    return tuple(round(v * 4) / 4 for v in amps)
 
 # ---------------------------------------------------------------- phân loại pixel
 
@@ -171,6 +185,50 @@ def big_sleeve(c, n, z):
         if len(comp) >= 150:
             ys, xs = zip(*comp)
             out[list(ys), list(xs)] = True
+    return out
+
+
+def sleeve_masks(c, n, zone, blob=None):
+    # (màu áo, mảng tay áo, vùng tay áo được giữ nguyên, vùng tay áo đè lên tay mới) quanh bàn tay
+    sl = sleevemask(c, n)
+    sleeve = big_sleeve(c, n, zone)
+    if blob is not None:
+        # Tay áo nằm bên phải và phía dưới bàn tay. Phía trên bàn tay, bên trái cổ tay là viền màn
+        # laptop: ở Bàn đêm gờ viền xám xanh trùng màu áo anh và dính liền vai áo, tính là tay áo
+        # thì bàn tay mới bị nó đè, cụt phần trên
+        ys, xs = np.nonzero(blob)
+        yy, xx = np.mgrid[0:c.shape[0], 0:c.shape[1]]
+        above = (yy < ys.min() + 6) & (xx < xs.max() - 2)
+        sleeve = sleeve & ~above
+        sl = sl & ~above
+    # tay áo (cả viền tối) đè lên tay mới. Chỉ lấy điểm màu áo sát mảng tay áo lớn: khe phím tối
+    # ngả xanh cũng khớp màu áo anh, tính cả thì bàn tay bị thủng lỗ chấm đen
+    cuff = dil(sleeve, 1) | (sl & dil(sleeve, 4))
+    arm = dil(sleeve, 2)
+    # da và điểm sáng của tay cũ dính sát mép áo không phải là áo: không giữ, để tay mới vẽ đè
+    # (áo anh tối nên mọi điểm sáng đều không phải áo; áo chị sáng nên chỉ loại màu da)
+    notsleeve = skinmask(c) | (c.min(-1) > 150 if n == 'boy' else False)
+    return sl, sleeve, arm & ~notsleeve, cuff & ~notsleeve
+
+
+def sleeve_specks(c, n, sl, sleeve, zone):
+    # Chấm đen lẻ (≤ 4 px) của video gốc nằm lọt giữa tay áo, trong vùng `zone`: trả về danh sách
+    # (các điểm, màu áo quanh đó) để tô lại. Nếp gấp và viền áo là nét dài nên không bị đụng tới
+    x0, y0, x1, y1 = zone
+    box = np.zeros(c.shape[:2], bool)
+    box[max(0, y0):y1, max(0, x0):x1] = True
+    dark = (c.max(-1) < (90 if n == 'girl' else 45)) & ~sl & dil(sleeve, 2) & box
+    cloth = sl | sleeve
+    out = []
+    for comp in components(dark):
+        if len(comp) > 4:
+            continue
+        pts = set(comp)
+        ring = {(y + dy, x + dx) for y, x in comp for dy in (-1, 0, 1) for dx in (-1, 0, 1)} - pts
+        ring = [(y, x) for y, x in ring if 0 <= y < c.shape[0] and 0 <= x < c.shape[1]]
+        if ring and all(cloth[y, x] for y, x in ring):
+            col = np.median([c[y, x] for y, x in ring], 0)
+            out.append((comp, col))
     return out
 
 
@@ -374,17 +432,8 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=N
         c = comps[i]
         new = c.copy()
         changed = np.zeros(c.shape[:2], bool)
-        sl = sleevemask(c, n)
-        sleeve = big_sleeve(c, n, (Z[0] - 10, Z[1] - 30, Z[2], Z[3] + 30))
-        arm = dil(sleeve, 2)
-        # tay áo (cả viền tối) đè lên tay mới. Chỉ lấy điểm màu áo sát mảng tay áo lớn: khe phím tối
-        # ngả xanh cũng khớp màu áo anh, tính cả thì bàn tay bị thủng lỗ chấm đen
-        cuff = dil(sleeve, 1) | (sl & dil(sleeve, 4))
-        if n == 'boy':
-            # điểm sáng của đốt tay cũ dính sát mép áo anh: không phải áo (áo anh tối), không giữ lại
-            lit = c.min(-1) > 150
-            cuff &= ~lit
-            arm = arm & ~lit
+        szone = (Z[0] - 10, Z[1] - 30, Z[2], Z[3] + 30)
+        sl, sleeve, arm, cuff = sleeve_masks(c, n, szone, blobs[i])
         # dọn viền nâu / cục da sót trên mặt phím. Khung cầm ly: tay đang giơ giữ nguyên, chỉ dọn
         # viền nâu không dính vào da
         if anchors[i] is not None:
@@ -411,25 +460,33 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=N
         changed |= ghost
         transparent = np.zeros_like(changed)
         transparent[sy0:sy1, sx0:sx1] = ghost[sy0:sy1, sx0:sx1]
+        drawn = np.zeros_like(changed)
         if anchors[i] is not None:
-            sp = sprite(n, pose_at(i / fps))
+            sp = sprite(n, amps_at(i / fps))
             ax, ay = int(round(anchors[i][0])), int(round(anchors[i][1]))
             for yy, xx in zip(*np.nonzero(sp[..., 3])):
                 Y, X = ay + OY - PAD + yy, ax + OX - PAD + xx
                 if 0 <= Y < CH2 and 0 <= X < CW2 and not cuff[Y, X]:
                     new[Y, X] = sp[yy, xx, :3]
-                    changed[Y, X] = True
-                    transparent[Y, X] = False
+                    drawn[Y, X] = True
+        changed |= drawn
+        transparent &= ~drawn
+        for comp, col in sleeve_specks(c, n, sl, sleeve, szone):
+            ys, xs = map(list, zip(*comp))
+            if not changed[ys, xs].any():
+                new[ys, xs] = col
+                changed[ys, xs] = True
         orig = cell(i)
         # Mẩu lẻ còn đục trong lòng màn sát chỗ vừa khoét (điểm sáng / xám của tay cũ không bị coi
-        # là da hay viền nâu): làm trong suốt luôn, kẻo thành chấm lấm tấm trên màn code vẽ
+        # là da hay viền nâu): làm trong suốt luôn, kẻo thành chấm lấm tấm trên màn code vẽ. Phần
+        # đốt tay mới nhô lên lòng màn thì giữ (từng bị coi là mẩu lẻ nên bàn tay bị cắt phẳng)
         opaque = ((orig[..., 3] > 0) & ~changed) | (changed & ~transparent)
         scr = np.zeros_like(opaque)
         scr[sy0:sy1, sx0:sx1] = opaque[sy0:sy1, sx0:sx1]
         near = dil(changed, 2)
         for comp in components(scr):
             ys, xs = map(list, zip(*comp))
-            if len(comp) < 60 and near[ys, xs].any():
+            if len(comp) < 60 and near[ys, xs].any() and not drawn[ys, xs].any():
                 changed[ys, xs] = True
                 transparent[ys, xs] = True
         # ghi lại vào ô sheet (ô lo: gộp 2×2). Điểm không đổi giữ nguyên màu + alpha gốc (lòng màn
@@ -567,15 +624,8 @@ def process_desk_sheet(n, name, scale, cols, frames, fps, plate, out_dir=None):
     for i in range(frames):
         c = comps[i]
         new = c.copy()
-        sl = sleevemask(c, n)
-        sleeve = big_sleeve(c, n, (ZD[0], ZD[1] - 30, ZD[2], ZD[3]))
-        arm = dil(sleeve, 2)
-        cuff = dil(sleeve, 1) | (sl & dil(sleeve, 4))
-        if n == 'boy':
-            # chấm sáng của video gốc sát mép áo anh: không phải áo (áo anh tối), để tay mới vẽ đè
-            lit = c.min(-1) > 150
-            cuff &= ~lit
-            arm = arm & ~lit
+        szone = (ZD[0], ZD[1] - 30, ZD[2], ZD[3])
+        sl, sleeve, arm, cuff = sleeve_masks(c, n, szone, blobs[i])
         ghost = np.zeros((H, W), bool)
         if blobs[i] is not None:
             # cục tay cũ + viền nâu + điểm sáng hồng trên mu tay quanh nó
@@ -591,17 +641,24 @@ def process_desk_sheet(n, name, scale, cols, frames, fps, plate, out_dir=None):
         changed = ghost.copy()
         transparent = np.zeros_like(changed)
         transparent[sy0:sy1, sx0:sx1] = ghost[sy0:sy1, sx0:sx1]
+        drawn = np.zeros_like(changed)
         if anchors[i] is not None:
             # bàn tay Nano Banana, neo như ở quán (cổ tay = góc dưới-phải cục da cũ lùi vào)
-            sp = sprite(n, pose_at(i / fps))
+            sp = sprite(n, amps_at(i / fps))
             ax_ = int(round(anchors[i][0] - 6 * SCALE[n]))
             ay_ = int(round(anchors[i][1] - 8 * SCALE[n]))
             for yy, xx in zip(*np.nonzero(sp[..., 3])):
                 Y, X = ay_ + OY - PAD + yy, ax_ + OX - PAD + xx
                 if 0 <= Y < H and 0 <= X < W and not cuff[Y, X]:
                     new[Y, X] = sp[yy, xx, :3]
-                    changed[Y, X] = True
-                    transparent[Y, X] = False
+                    drawn[Y, X] = True
+        changed |= drawn
+        transparent &= ~drawn
+        for comp, col in sleeve_specks(c, n, sl, sleeve, szone):
+            ys, xs = map(list, zip(*comp))
+            if not changed[ys, xs].any():
+                new[ys, xs] = col
+                changed[ys, xs] = True
         orig = room.cell(i)
         opaque = ((orig[..., 3] > 0) & ~changed) | (changed & ~transparent)
         scr = np.zeros_like(opaque)
@@ -609,7 +666,7 @@ def process_desk_sheet(n, name, scale, cols, frames, fps, plate, out_dir=None):
         near = dil(changed, 2)
         for comp in components(scr):
             ys, xs = map(list, zip(*comp))
-            if len(comp) < 60 and near[ys, xs].any():
+            if len(comp) < 60 and near[ys, xs].any() and not drawn[ys, xs].any():
                 changed[ys, xs] = True
                 transparent[ys, xs] = True
         rgba = np.concatenate([new, np.full(new.shape[:2] + (1,), 255.0)], -1)
