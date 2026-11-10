@@ -533,17 +533,59 @@ def process_sheet(n, name, scale, cols, frames, fps, rev, plate, keys, out_dir=N
 # người: mỗi điểm lấy trung vị các khung tay cũ không che điểm đó, điểm luôn bị che lấy màu giữa
 # của hàng. Ô Bàn đêm chỉ đục ở phần chuyển động (tay, đầu); lòng màn vẽ dưới ảnh tĩnh nên trong
 # khung là trong suốt. Đọc sheet gốc ở DESK_REV (trước khi sửa tay Bàn đêm) nên chạy lại không vẽ
-# chồng. `zd` = vùng bàn tay, `screen` = lòng màn (436, 219, 99×51 px gốc), đều theo ô ×2.
+# chồng. `zd` = vùng bàn tay, `screen` = lòng màn (436, 219, 99×51 px gốc), `chair` = góc trái trên
+# của tay vịn ghế (đỉnh ghế màu cam giống da, không được dọn), đều theo ô ×2. `cap` (chị): ô quanh
+# đỉnh ghế có một khối xám sót từ lúc ghép ảnh bản nữ, có cả trong ảnh nền lẫn mọi khung; vá bằng
+# màu thân ghế ngay bên dưới cùng cột (chair_cap_fill)
 DESK_REV = '38003aa'
 DESK_ROOMS = {
     'boy': dict(at=(437, 136, 203, 202), interior='room-desk.webp', zd=(0, 236, 190, 330), screen=(0, 166, 196, 268),
+                chair=(158, 292),
                 sheets=[('room-desk-loop@2x.webp', 2, 10, 81, 8), ('room-desk-loop.webp', 1, 12, 121, 12),
                         ('room-desk-loop-noel@2x.webp', 2, 10, 81, 8), ('room-desk-loop-noel.webp', 1, 12, 121, 12)]),
     'girl': dict(at=(429, 131, 211, 207), interior='room-desk-girl.webp', zd=(10, 246, 206, 340), screen=(14, 176, 212, 278),
+                 chair=(176, 306), cap=(185, 318, 201, 333),
                  sheets=[('room-desk-girl-loop@2x.webp', 2, 10, 81, 8), ('room-desk-girl-loop.webp', 1, 12, 121, 12),
                          ('room-desk-girl-loop-noel@2x.webp', 2, 10, 81, 8),
                          ('room-desk-girl-loop-noel.webp', 1, 12, 121, 12)]),
 }
+
+
+def chair_cap_fill(c, box):
+    # Khối xám chữ nhật ở đỉnh ghế (`box`, đo trên ảnh, gồm cả viền mờ của khối) → mỗi điểm không
+    # phải viền đen của ghế (max > 90)
+    # lấy màu gỗ của cùng cột, ở điểm gỗ đầu tiên từ dưới khối 2 hàng (gỗ: R > G > B, R - B > 40).
+    # Thân ghế là dải dọc nên đỉnh ghế liền màu với thân. Trả về mặt nạ các điểm đã vá
+    x0, y0, x1, y1 = box
+    out = np.zeros(c.shape[:2], bool)
+    for x in range(x0, x1):
+        src = None
+        for y in range(y1 + 1, min(c.shape[0], y1 + 14)):
+            R, G, B = c[y, x]
+            if R > G > B and R - B > 40:
+                src = c[y, x].copy()
+                break
+        if src is None:
+            continue
+        for y in range(y0, y1):
+            if c[y, x].max() > 90:
+                c[y, x] = src
+                out[y, x] = True
+    return out
+
+
+def fix_desk_girl_interior(out_dir=None):
+    # Ảnh nền Bàn đêm của chị (1280×720) cũng có khối xám ở đỉnh ghế: vá cùng cách, từ bản DESK_REV
+    cfg = DESK_ROOMS['girl']
+    im = np.asarray(git_image(DESK_REV, cfg['interior'])).astype(float)
+    ax, ay = cfg['at'][0] * 2, cfg['at'][1] * 2
+    x0, y0, x1, y1 = cfg['cap']
+    rgb = im[..., :3].copy()
+    fixed = chair_cap_fill(rgb, (x0 + ax, y0 + ay, x1 + ax, y1 + ay))
+    im[..., :3] = rgb
+    path = os.path.join(out_dir or os.path.join(ROOT, SCENES), cfg['interior'])
+    Image.fromarray(im.round().astype(np.uint8)).save(path, 'WEBP', quality=90, alpha_quality=100, method=6, exact=True)
+    print(path, os.path.getsize(path), 'chair cap px', int(fixed.sum()))
 
 
 class DeskRoom:
@@ -630,6 +672,9 @@ def process_desk_sheet(n, name, scale, cols, frames, fps, plate, out_dir=None):
     H, W = room.h, room.w
     zone = np.zeros((H, W), bool)
     zone[ZD[1]:ZD[3], ZD[0]:ZD[2]] = True
+    cx, cy = DESK_ROOMS[n]['chair']
+    zone[cy:, cx:] = False
+    cap = DESK_ROOMS[n].get('cap')
     for i in range(frames):
         c = comps[i]
         new = c.copy()
@@ -648,6 +693,10 @@ def process_desk_sheet(n, name, scale, cols, frames, fps, plate, out_dir=None):
         ghost &= zone
         new[ghost] = plate[ghost]
         changed = ghost.copy()
+        if cap:
+            # đỉnh ghế: chỉ vá chỗ khung đang đục (chỗ trong suốt thì ảnh nền đã vá lo)
+            capfix = chair_cap_fill(new, cap) & (room.cell(i)[..., 3] > 0)
+            changed |= capfix
         transparent = np.zeros_like(changed)
         transparent[sy0:sy1, sx0:sx1] = ghost[sy0:sy1, sx0:sx1]
         drawn = np.zeros_like(changed)
@@ -727,6 +776,8 @@ def main():
                 continue
             names = [x for x in cfg['sheets'] if not args.sheet or x[0] == args.sheet]
             dplate = desk_plate(n) if names else None
+            if n == 'girl' and not args.sheet:
+                fix_desk_girl_interior(args.out)
             for name, scale, cols, frames, fps in names:
                 process_desk_sheet(n, name, scale, cols, frames, fps, dplate, args.out)
 
