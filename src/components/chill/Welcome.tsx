@@ -80,7 +80,7 @@ function PrimaryButton({item, busy, onChoose, className = ''}: {item: Goal; busy
 }
 
 // Nút phụ. `tall` (thanh màn ngang): cao bằng nút chính, có dòng phụ. Màn dọc: 1 dòng
-function SecondaryButton({item, quiet = false, tall = false, busy, onChoose}: {item: Goal; quiet?: boolean; tall?: boolean; busy: boolean; onChoose: (goal: WelcomeGoal) => void}) {
+function SecondaryButton({item, quiet = false, tall = false, busy, onChoose, className = ''}: {item: Goal; quiet?: boolean; tall?: boolean; busy: boolean; onChoose: (goal: WelcomeGoal) => void; className?: string}) {
   return (
     <button
       type="button"
@@ -88,7 +88,7 @@ function SecondaryButton({item, quiet = false, tall = false, busy, onChoose}: {i
       aria-busy={busy}
       className={`flex min-w-0 items-center gap-2.5 border-[1.5px] bg-black/60 text-left font-bold backdrop-blur transition ${ring} ${
         tall ? 'h-16 rounded-[18px] px-[18px] [@media(max-height:500px)]:h-[52px]' : 'h-[52px] justify-center rounded-[14px] px-2'
-      } ${quiet ? 'border-white/20 hover:border-white/45' : 'border-[#e8b27d]/55 hover:border-[#e8b27d]'} ${busy ? 'cursor-progress opacity-60' : ''}`}
+      } ${quiet ? 'border-white/20 hover:border-white/45' : 'border-[#e8b27d]/55 hover:border-[#e8b27d]'} ${busy ? 'cursor-progress opacity-60' : ''} ${className}`}
     >
       {item.icon(`size-5 shrink-0 ${quiet ? 'text-[#c9bfb4]' : 'text-[#e8b27d]'}`)}
       <span className="flex min-w-0 flex-col">
@@ -289,22 +289,27 @@ export function Welcome({
           <div className="absolute inset-x-0 bottom-[11rem] top-[6.5rem] hidden grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] portrait:grid max-sm:top-[5.25rem]">
             <div className="flex min-h-0 flex-col items-center justify-end gap-2 px-5 pb-4 text-center">
               {eyebrow && <p className={`font-mono text-[11px] uppercase tracking-[0.2em] text-[#e8b27d] ${returning ? '' : '[@media(max-height:700px)]:hidden'}`}>{eyebrow}</p>}
-              <h2 className="text-balance text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl">{title}</h2>
-              {!returning && <p className="text-pretty text-sm text-[#ded5cb] sm:text-base">{w.sub}</p>}
+              {/* Màn rất thấp (điện thoại 320×568): chữ nhỏ lại và bỏ dòng mô tả, để không chạm thanh trên */}
+              <h2 className="text-balance text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl [@media(max-height:600px)]:text-xl">{title}</h2>
+              {!returning && <p className="text-pretty text-sm text-[#ded5cb] sm:text-base [@media(max-height:600px)]:hidden">{w.sub}</p>}
             </div>
             <div aria-hidden className="aspect-video w-full" />
             <div className="flex min-h-0 flex-col items-center px-4 pt-[clamp(0.75rem,5dvh,3.5rem)]">
-              <div className="flex w-full max-w-md flex-col gap-3">
-                <PrimaryButton item={primary} busy={busy} onChoose={choose} className="w-full justify-center" />
-                <div className="grid grid-cols-2 gap-2.5">
-                  <SecondaryButton item={second} busy={busy} onChoose={choose} />
-                  <SecondaryButton item={look} quiet busy={busy} onChoose={choose} />
+              {/* Màn dọc mà rộng (tablet, cửa sổ hẹp trên máy tính): 3 nút nằm 1 hàng cho đỡ cao.
+                  Dòng điều khoản đi liền dưới cùng trong luồng, để không bao giờ bị nút đè lên */}
+              <div className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl [@media(max-height:600px)]:gap-2">
+                <div className="flex flex-col gap-3 sm:flex-row [@media(max-height:600px)]:gap-2">
+                  <PrimaryButton item={primary} busy={busy} onChoose={choose} className="w-full justify-center sm:w-auto sm:flex-1" />
+                  <div className="grid grid-cols-2 gap-2.5 sm:flex sm:gap-3">
+                    <SecondaryButton item={second} busy={busy} onChoose={choose} className="sm:h-16 sm:rounded-[18px] sm:px-[18px]" />
+                    <SecondaryButton item={look} quiet busy={busy} onChoose={choose} className="sm:h-16 sm:rounded-[18px] sm:px-[18px]" />
+                  </div>
                 </div>
                 {canPickSeat && <div className="flex justify-center">{seatToggle(true)}</div>}
+                <div className="text-center text-[11px] text-white/60">{legal}</div>
               </div>
             </div>
           </div>
-          <div className="absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] hidden text-center text-[11px] text-white/60 portrait:block">{legal}</div>
         </>
       )}
     </div>
