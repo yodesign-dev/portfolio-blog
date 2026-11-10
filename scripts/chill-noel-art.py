@@ -165,6 +165,25 @@ SEATS = {
         'front': {'frames': ((22, 30), (42, 50)), 'x': (120, 170), 'y': (150, 215)},
         'glow': {'box': (95, 0, 300, 280), 'skip': (0, 140, 190, 290)},
     },
+    # Bản nữ của Ban công và Bàn đêm (scripts/chill-girl-room-art.py): cùng kiểu khăn với nữ ở quán
+    'balcony-girl': {
+        'sheet': 'room-balcony-girl-loop', 'interior': 'room-balcony-girl.webp', 'cell': (538, 478), 'at_px': (742, 236),
+        'hi': (10, 81), 'lo': (12, 121),
+        'at': (250, 188),
+        'tail': [(12, 16), (23, 16), (20, 39), (9, 39)],
+        'front': {'frames': ((36, 60),), 'x': (230, 275), 'y': (150, 260)},
+        'hair': (330, 150, 420, 380),
+        'glow': {'box': (225, 40, 420, 215), 'skip': (0, 0, 0, 0)},
+    },
+    'desk-girl': {
+        'sheet': 'room-desk-girl-loop', 'interior': 'room-desk-girl.webp', 'cell': (422, 414), 'at_px': (858, 262),
+        'hi': (10, 81), 'lo': (12, 121),
+        'at': (133, 177),
+        'tail': [(12, 16), (23, 16), (20, 39), (9, 39)],
+        'front': {'frames': ((22, 52),), 'x': (90, 178), 'y': (150, 230)},
+        'hair': (215, 90, 300, 315),
+        'glow': {'box': (111, 10, 316, 290), 'skip': (0, 150, 206, 300)},
+    },
 }
 
 

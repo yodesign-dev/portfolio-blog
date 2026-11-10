@@ -191,7 +191,7 @@ export const THEMES: Theme[] = [
       },
     },
     // Bản nữ (scripts/chill-girl-room-art.py), cùng ô với nam. Đoạn uống gồm cả lật trang (2,1 giây)
-    // nên lúc ngồi đọc không lật trang liên tục. Chưa có sheet quàng khăn Noel
+    // nên lúc ngồi đọc không lật trang liên tục.
     girl: {
       interior: '/chill/scenes/room-balcony-girl.webp',
       character: {
@@ -201,6 +201,11 @@ export const THEMES: Theme[] = [
         lo: {src: '/chill/scenes/room-balcony-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
         duration: 121 / 12,
         sip: [2.0, 9.0],
+        noel: {
+          hi: '/chill/scenes/room-balcony-girl-loop-noel@2x.webp',
+          lo: '/chill/scenes/room-balcony-girl-loop-noel.webp',
+          glow: {src: '/chill/scenes/room-balcony-girl-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
+        },
       },
     },
     screen: null,
@@ -249,8 +254,7 @@ export const THEMES: Theme[] = [
       },
     },
     // Bản nữ (scripts/chill-girl-room-art.py): ô cao hơn ô nam 10 px gốc cho đỉnh tóc, rộng hơn
-    // 8 px bên trái cho bàn tay; lòng màn trong ảnh tĩnh và trong từng khung đều trong suốt.
-    // Chưa có sheet quàng khăn Noel
+    // 8 px bên trái cho bàn tay; lòng màn trong ảnh tĩnh và trong từng khung đều trong suốt
     girl: {
       interior: '/chill/scenes/room-desk-girl.webp',
       character: {
@@ -260,6 +264,11 @@ export const THEMES: Theme[] = [
         lo: {src: '/chill/scenes/room-desk-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
         duration: 121 / 12,
         sip: [1.67, 8.5],
+        noel: {
+          hi: '/chill/scenes/room-desk-girl-loop-noel@2x.webp',
+          lo: '/chill/scenes/room-desk-girl-loop-noel.webp',
+          glow: {src: '/chill/scenes/room-desk-girl-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
+        },
       },
     },
     // Lòng màn hình (đã khoét khỏi ảnh tĩnh, dải màn xám cũ trong video đã xoá). Vai người
