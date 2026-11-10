@@ -73,7 +73,7 @@ export type Theme = {
   // Café: người ngồi là sprite sheet từ video + màn hình laptop vẽ bằng code
   character: CharacterVideo | CharacterFrames
   // Bản người ngồi nữ: ảnh nội thất + video riêng, cùng vị trí với bản nam
-  girl?: {interior: string; character: CharacterVideo}
+  girl?: {interior: string; thumb: string; character: CharacterVideo}
   // Màn laptop vẽ app thiết kế bằng code (screen.ts), px gốc — nằm dưới lớp người ngồi,
   // đầu / vai che phía trước. null = không có màn hình
   screen: Rect | null
@@ -134,6 +134,8 @@ export const THEMES: Theme[] = [
     // Nữ G2 (tóc dài buộc thấp, kính, cardigan tím): Nano Banana 2 + Kling O1 Pro, cùng động tác
     girl: {
       interior: '/chill/scenes/interior-girl.webp',
+      // Ảnh thẻ chọn phòng khi khách chọn Chị (ảnh thẻ của anh, thay vùng người ngồi)
+      thumb: '/chill/scenes/room-cafe-girl-thumb.webp',
       character: {
         kind: 'video',
         at: {x: 429, y: 116, w: 211, h: 220},
@@ -194,6 +196,8 @@ export const THEMES: Theme[] = [
     // nên lúc ngồi đọc không lật trang liên tục.
     girl: {
       interior: '/chill/scenes/room-balcony-girl.webp',
+      // Ảnh thẻ chọn phòng khi khách chọn Chị (ảnh thẻ của anh, thay vùng người ngồi)
+      thumb: '/chill/scenes/room-balcony-girl-thumb.webp',
       character: {
         kind: 'video',
         at: {x: 371, y: 118, w: 269, h: 239},
@@ -257,6 +261,8 @@ export const THEMES: Theme[] = [
     // 8 px bên trái cho bàn tay; lòng màn trong ảnh tĩnh và trong từng khung đều trong suốt
     girl: {
       interior: '/chill/scenes/room-desk-girl.webp',
+      // Ảnh thẻ chọn phòng khi khách chọn Chị (ảnh thẻ của anh, thay vùng người ngồi)
+      thumb: '/chill/scenes/room-desk-girl-thumb.webp',
       character: {
         kind: 'video',
         at: {x: 429, y: 131, w: 211, h: 207},

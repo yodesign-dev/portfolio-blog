@@ -4427,6 +4427,10 @@ export function ChillRoom({
                     const active = th.id === theme
                     // Đang ngồi là Chị: phòng chưa có bản nữ ghi rõ "chỉ có anh" (vào đó cảnh là anh)
                     const heOnly = shownSeat === 'girl' && !th.girl
+                    // Ảnh thẻ theo người khách chọn: chọn Chị thì cả 3 thẻ đều thấy Chị ngồi, để hình dung
+                    // trước khi vào phòng. Hai ảnh chồng nhau, đổi bằng mờ dần (không chớp trắng lúc tải)
+                    const girlThumb = seatPickOn && th.girl ? th.girl.thumb : null
+                    const showGirl = !!girlThumb && seat === 'girl'
                     return (
                       <button
                         key={th.id}
@@ -4438,14 +4442,18 @@ export function ChillRoom({
                           active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
                         }`}
                       >
-                        <span className="relative block">
+                        <span className={`relative block transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}>
                           {/* eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn */}
-                          <img
-                            src={th.thumb}
-                            alt=""
-                            loading="lazy"
-                            className={`aspect-video w-full object-cover [image-rendering:pixelated] transition duration-300 ${active ? '' : 'opacity-70 group-hover:opacity-100'}`}
-                          />
+                          <img src={th.thumb} alt="" loading="lazy" className="aspect-video w-full object-cover [image-rendering:pixelated]" />
+                          {girlThumb && (
+                            // eslint-disable-next-line @next/next/no-img-element -- ảnh nội thất nhỏ, đã có sẵn
+                            <img
+                              src={girlThumb}
+                              alt=""
+                              loading="lazy"
+                              className={`absolute inset-0 h-full w-full object-cover [image-rendering:pixelated] transition-opacity duration-300 ${showGirl ? 'opacity-100' : 'opacity-0'}`}
+                            />
+                          )}
                           {/* Nhãn nằm đè lên ảnh: hiện / ẩn không đổi chiều cao thẻ, nên hàng thẻ và
                               nút chọn người ngồi bên dưới không nhảy khi đổi Anh ↔ Chị */}
                           {heOnly && (
