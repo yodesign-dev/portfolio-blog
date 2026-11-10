@@ -5,9 +5,9 @@
 # từng khung của 8 sheet (anh / chị × thường / Noel × hi ×2 / lo ×1):
 #   1. tìm cục da tay trên bàn phím (khung đang ghép đúng như scene.ts vẽ: nội thất đã khoét
 #      mặt nạ + khung người), xoá nó cùng viền nâu, vá lại bằng bàn phím sạch;
-#   2. vẽ bàn tay pixel mới (4 ngón khép, co xuống phím, đốt tay, ngón cái dưới) bám theo cổ tay
+#   2. đặt bàn tay mới (Nano Banana 2 vẽ, scripts/chill-hand-girl.png) bám theo cổ tay
 #      của khung đó; tay áo trong khung vẫn đè lên cổ tay;
-#   3. ngón tay nhấc / đặt theo nhịp gõ tính bằng giây, nên sheet 8 fps và 12 fps gõ giống nhau.
+#   3. đốt tay nhấp nhô theo nhịp gõ tính bằng giây, nên sheet 8 fps và 12 fps gõ giống nhau.
 # Khung chị đưa tay lên cầm ly thì để nguyên tay, chỉ dọn viền nâu "bóng ma" còn trên bàn phím.
 #
 # Bàn phím sạch lấy từ các khung chị cầm ly (tay rời bàn phím); anh và chị cùng một laptop, bản
@@ -74,95 +74,58 @@ SEQ = [
 BEAT = 0.17
 
 
-def hand_parts(n, pose):
-    # Bàn tay trái đặt trên phím, nhìn từ sau vai — theo tỉ lệ tay trong video gốc: gờ 4 đốt tay
-    # dọc mép trên, 4 ngón khép chạy chéo xuống trái, đầu ngón chạm phím ngang tầm cổ tay; mu tay
-    # ở bên phải, khuất dần vào tay áo. Gốc (0, 0) = cổ tay ở mép áo, px ô ×2 (cỡ tay chị).
-    s = SCALE[n]
-    parts = [('poly', [(-45, -15), (-40, -22), (-28, -23.5), (-18, -22), (-8, -17), (0, -10), (6, 0),
-                       (7, 9), (-8, 11), (-22, 9), (-33, 3)], None, 'palm'),
-             # ngón cái nằm dọc phím cách, dưới các ngón
-             ('cap', [(-10, 6), (-22, 7.5), (-27, 6)], 3.2, 'thumb')]
-    # đốt tay từ trái sang phải
-    fingers = [((-43, -18.5), 3.6), ((-36, -20.5), 3.8), ((-29, -20.5), 3.6), ((-22.5, -18.5), 3.3)]
-    for k, (K, r) in enumerate(fingers):
-        lift = pose[k]
-        ln = 1.0 - 0.1 * k
-        # đốt gần chĩa xuống trái, đốt xa gập xuống phím; ngón nhấc co lên về phía đốt
-        J = (K[0] - 4 * ln + 1.0 * lift, K[1] + 9 * ln - 2.0 * lift)
-        T = (J[0] - 3 * ln + 1.5 * lift, J[1] + 8 * ln - 3.5 * lift)
-        parts.append(('cap', [K, J, T], r, 'f%d' % k))
-    return [(t, [(x * s, y * s) for x, y in pts], (r * s if r else None), nm) for t, pts, r, nm in parts]
-
-
-def inside(part, X, Y):
-    t, pts, r, _ = part
-    if t == 'cap':
-        m = np.zeros_like(X, bool)
-        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
-            dx, dy = x1 - x0, y1 - y0
-            tt = np.clip(((X - x0) * dx + (Y - y0) * dy) / (dx * dx + dy * dy + 1e-9), 0, 1)
-            m |= (X - x0 - tt * dx) ** 2 + (Y - y0 - tt * dy) ** 2 <= r * r
-        return m
-    c = np.zeros_like(X, bool)
-    for i in range(len(pts)):
-        xa, ya = pts[i]
-        xb, yb = pts[(i + 1) % len(pts)]
-        c ^= ((ya > Y) != (yb > Y)) & (X < (xb - xa) * (Y - ya) / (yb - ya + 1e-9) + xa)
-    return c
-
-
-OX, OY, SW, SH = -58, -32, 66, 44
+# Bàn tay do Nano Banana 2 vẽ lại từ ảnh cận cảnh bàn phím khung 0 của chị (lưng bàn tay có khối, 4
+# đốt tay, ngón cái chìa sang trái), cắt sẵn thành scripts/chill-hand-girl.png: 72×50 px ô ×2, cổ tay
+# (điểm neo) ở (-OX, -OY). Anh dùng cùng bàn tay, thu còn 0,8 và chỉnh sang màu da của anh.
+OX, OY, SW, SH = -58, -34, 72, 50
+HAND = os.path.join(ROOT, 'scripts', 'chill-hand-girl.png')
 _sprites = {}
+_base = {}
+
+
+def base_hand(n):
+    if n in _base:
+        return _base[n]
+    im = Image.open(HAND).convert('RGBA')
+    if n == 'boy':
+        s = SCALE['boy']
+        w, h = round(SW * s), round(SH * s)
+        small = np.asarray(im.resize((w, h), Image.LANCZOS)).astype(float)
+        small[..., 3] = np.where(small[..., 3] > 127, 255, 0)
+        a = np.zeros((SH, SW, 4))
+        # giữ điểm neo (cổ tay) ở nguyên chỗ
+        x0, y0 = round(-OX - (-OX) * s), round(-OY - (-OY) * s)
+        a[y0:y0 + h, x0:x0 + w] = small
+        ratio = np.array(PAL['boy']['base'], float) / np.array(PAL['girl']['base'], float)
+        a[..., :3] = np.clip(a[..., :3] * ratio, 0, 255)
+    else:
+        a = np.asarray(im).astype(float)
+    a[a[..., 3] == 0] = 0
+    # 4 đốt tay: chia đều bề ngang của dải trên cùng bàn tay
+    ys, xs = np.nonzero(a[..., 3])
+    top = xs[ys < ys.min() + 9]
+    edges = np.linspace(top.min(), top.max() + 1, 5).round().astype(int)
+    _base[n] = (a, edges)
+    return _base[n]
 
 
 def sprite(n, pose):
+    # Ngón đang nhấc: đốt tay của ngón đó nhô lên 2 px (12 hàng trên cùng của cột dời lên, phần dưới
+    # giữ nguyên) — lưng bàn tay đứng yên, chỉ các đốt nhấp nhô theo nhịp gõ
     key = (n, tuple(pose))
     if key in _sprites:
         return _sprites[key]
-    parts = hand_parts(n, pose)
-    ys, xs = np.mgrid[0:SH, 0:SW]
-    X, Y = xs + OX + 0.5, ys + OY + 0.5
-    # ngón cái dưới cùng, rồi các ngón (xa → gần), mu tay đè lên gốc ngón
-    order = [p for p in parts if p[3] == 'palm'] + [p for p in parts if p[3] == 'thumb'] + \
-        [p for p in parts if p[3].startswith('f')]
-    names = [p[3] for p in order]
-    lab = np.full((SH, SW), -1)
-    for k, p in enumerate(order):
-        lab[inside(p, X, Y)] = k
-    pad = np.pad(lab, 2, constant_values=-1)
-
-    def nb(dx, dy):
-        return pad[2 + dy:2 + dy + SH, 2 + dx:2 + dx + SW]
-
-    up, dn, lf, rt, ul, dr = nb(0, -1), nb(0, 1), nb(-1, 0), nb(1, 0), nb(-1, -1), nb(1, 1)
-    pal = PAL[n]
-    s = SCALE[n]
-    out = np.zeros((SH, SW, 4))
-    for y in range(SH):
-        for x in range(SW):
-            L = lab[y, x]
-            if L < 0:
+    a, edges = base_hand(n)
+    out = a.copy()
+    for k in range(4):
+        if not pose[k]:
+            continue
+        for x in range(edges[k], edges[k + 1]):
+            col = np.nonzero(a[:, x, 3])[0]
+            if not len(col) or col[0] < 2:
                 continue
-            nm = names[L]
-            around = (up[y, x], dn[y, x], lf[y, x], rt[y, x])
-            if min(around) < 0:
-                col = pal['ol']  # viền ngoài
-            elif nm.startswith('f') and any(0 <= v < L and names[v].startswith('f') for v in around) \
-                    and Y[y, x] > -17 * s:
-                col = pal['ol']  # khe giữa 2 ngón (dưới gờ đốt)
-            elif ul[y, x] != L:
-                col = pal['li']
-            elif dr[y, x] != L or dn[y, x] != L:
-                col = pal['sh']
-            elif nm.startswith('f') and up[y, x] >= 0 and nb(0, -2)[y, x] < 0:
-                col = pal['hi']  # đỉnh đốt tay bắt sáng cửa sổ
-            elif nm == 'palm' and (X[y, x] > 0 or Y[y, x] > 3 * s):
-                col = pal['sh']  # phía cổ tay / mép dưới khuất bóng
-            else:
-                col = pal['base']
-            out[y, x, :3] = col
-            out[y, x, 3] = 255
+            t = col[0]
+            out[t - 2:t + 10, x] = a[t:t + 12, x]
     _sprites[key] = out
     return out
 
