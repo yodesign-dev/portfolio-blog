@@ -64,6 +64,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Season'; props: {season: string; action: 'view' | 'on' | 'quiet' | 'off' | 'tree'}}
   // Huy hiệu LIVE: view = lần đầu thấy trong lần mở trang · click = bấm sang YouTube
   | {name: 'Chill Live'; props: {id: string; state: 'on' | 'soon'; action: 'view' | 'click'}}
+  // Lời mời mở bằng trình duyệt ngoài khi khách vào từ trình duyệt trong app (Facebook, Zalo…)
+  | {name: 'Chill InApp'; props: {action: 'view' | 'open' | 'copy' | 'dismiss'; app: string}}
 
 export function trackEvent({name, props}: AnalyticsEvent) {
   try {

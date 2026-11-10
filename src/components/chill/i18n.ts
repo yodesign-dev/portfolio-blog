@@ -71,6 +71,16 @@ const en = {
     copied: 'Copied',
     language: 'Language',
   },
+  inApp: {
+    title: (app: string) => `You’re in ${app}’s browser`,
+    body: 'The music stops as soon as you switch apps. Open it in your browser to keep listening while you work.',
+    openSafari: 'Open in Safari',
+    openChrome: 'Open in Chrome',
+    copy: 'Copy link',
+    copied: 'Copied — paste it in your browser',
+    manual: 'Didn’t work? Tap ⋯ in the corner and choose “Open in browser”.',
+    close: 'Close',
+  },
   welcome: {
     title: 'A window seat in a little Vietnamese café',
     titleBack: 'Welcome back. Your seat is still free',
@@ -808,6 +818,16 @@ const vi: typeof en = {
     copy: 'Copy',
     copied: 'Đã copy',
     language: 'Ngôn ngữ',
+  },
+  inApp: {
+    title: (app) => `Đang mở trong ${app}`,
+    body: 'Nhạc sẽ tắt khi bạn chuyển sang app khác. Mở bằng trình duyệt để nghe nền trong lúc làm việc.',
+    openSafari: 'Mở bằng Safari',
+    openChrome: 'Mở bằng Chrome',
+    copy: 'Copy link',
+    copied: 'Đã copy, dán vào trình duyệt nhé',
+    manual: 'Không mở được? Bấm ⋯ ở góc màn hình rồi chọn “Mở trong trình duyệt”.',
+    close: 'Đóng',
   },
   welcome: {
     title: 'Một chỗ ngồi bên cửa sổ quán cà phê',

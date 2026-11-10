@@ -35,6 +35,7 @@ import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
+import {InAppHint} from './InAppHint'
 import {LiveBadge} from './LiveBadge'
 import type {ChillLive} from './live'
 import {loadMe, onMeChange} from './identity'
@@ -4851,6 +4852,7 @@ export function ChillRoom({
           </div>
         </div>
       )}
+      <InAppHint />
     </div>
   )
 }
