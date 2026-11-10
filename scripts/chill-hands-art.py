@@ -43,6 +43,8 @@ AT = (858, 232, 422, 440)
 # Vùng bàn tay trong ô ×2 (x0, y0, x1, y1) và lòng màn laptop (code vẽ màn — để trong suốt)
 Z = (20, 280, 200, 360)
 SCREEN = (14, 206, 190, 304)
+# Góc trái trên của tay vịn ghế trong ô ×2 (gỗ bắt đầu ở x 184, y 340, chừa viền tối)
+CHAIR = (178, 334)
 
 SHEETS = {
     'boy': {
@@ -302,6 +304,9 @@ def key_area():
         zy = y - y0
         edge = 20 if zy < 45 else int(round(2 + (zy - 45) * 1.2)) + 3
         m[y, x0 + edge:x1] = y >= SCREEN[3]  # phía trên là lòng màn (code vẽ đè)
+    # Đỉnh tay vịn ghế gỗ lọt vào góc phải dưới của vùng Z: gỗ nâu từng bị coi là viền tay cũ và bị
+    # vá màu bàn phím thành một khối xám ở mọi khung
+    m[CHAIR[1]:, CHAIR[0]:] = False
     return m
 
 # ---------------------------------------------------------------- ghép như scene.ts
@@ -340,10 +345,12 @@ def compose(f, reg):
 
 
 def keyboard_plate(g):
-    # g: vùng Z lúc chị cầm ly. Mỗi hàng: đoạn sạch ngay sau mép bạc; phần bị che lấy màu giữa
-    # của đoạn đó (hàng phím là dải ngang)
+    # g: vùng Z lúc chị cầm ly (trung vị các khung đó, tức bàn phím thật). Giữ nguyên chi tiết
+    # từng phím ở chỗ nhìn thấy; chỉ chỗ bị che (tay áo, tay, viền nâu của tay cũ) mới lấy màu giữa
+    # của đoạn sạch ngay sau mép bạc cùng hàng (hàng phím là dải ngang). Trước đây cả hàng bị tô
+    # một màu nên lúc chị cầm ly mặt phím mất hết chi tiết
     H, W = g.shape[:2]
-    bad = brownish(g) | dil(sleevemask(g, 'girl'), 2)
+    bad = brownish(g) | dil(sleevemask(g, 'girl'), 2) | dil(skinmask(g), 3)
     p = g.copy()
     for y in range(H):
         a = 20 if y < 45 else int(round(2 + (y - 45) * 1.2)) + 3
@@ -361,7 +368,9 @@ def keyboard_plate(g):
             continue
         vals = g[y, seg[0]:seg[-1] + 1]
         col = np.median(vals[2:] if len(vals) > 6 else vals, 0)
-        p[y, seg[-1] + 1:] = col
+        fill = bad[y].copy()
+        fill[:a] = False
+        p[y, fill] = col
         p[y, a:seg[0]] = col
     full = np.zeros((CH2, CW2, 3))
     full[Z[1]:Z[3], Z[0]:Z[2]] = p
