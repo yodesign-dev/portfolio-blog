@@ -16,7 +16,9 @@ export type AnalyticsEvent =
   // · returning = khách cũ từ trước khi có mốc này
   // `ref` = khách tới từ đâu: ?ref= trên link (vd yt, ext), không có thì utm_source, không có nữa thì "none"
   | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'; ref: string; trip?: 'home' | 'away' | 'back'}}
-  | {name: 'Chill Start'; props: {from: 'welcome' | 'player'}}
+  // from: welcome = nút ở màn chào · resume = nút "Bật nhạc" khách cũ thấy khi vào thẳng quán
+  // · player = nút phát / phím Space
+  | {name: 'Chill Start'; props: {from: 'welcome' | 'player' | 'resume'}}
   | {name: 'Chill Listen'; props: {minutes: number}}
   | {name: 'Chill Look Around'; props?: undefined}
   // Màn chào kiểu onboarding (welcomeObOpen): khách chọn gì để vào quán

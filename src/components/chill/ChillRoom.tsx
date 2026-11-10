@@ -289,6 +289,11 @@ export function ChillRoom({
   const initialSeasons = useRef(seasons)
   // Công tắc chọn người ngồi lúc mở trang (cảnh chỉ tạo một lần)
   const initialSeatPick = useRef(seatPickOn)
+  const initialWelcomeOb = useRef(welcomeObOn)
+  const obAtMount = () => {
+    const param = new URLSearchParams(window.location.search).get('ob')
+    return param ? param === '1' : initialWelcomeOb.current
+  }
   // Điểm đến theo lịch (Xóm đạo): máy khách so giờ mỗi phút, ?at= để xem trước. Danh sách chỉ đổi
   // khi có cảnh mở hoặc đóng, nên các effect theo danh sách không chạy lại mỗi phút
   const [placeClock, setPlaceClock] = useState(0)
@@ -335,7 +340,10 @@ export function ChillRoom({
   // Màn chào: chưa "bước vào quán" thì chỉ có cảnh + 1 nút lớn, mọi nút khác ẩn
   const [entered, setEntered] = useState(false)
   const [welcomeGone, setWelcomeGone] = useState(false)
-  const startFrom = useRef<'welcome' | 'player'>('player')
+  const startFrom = useRef<'welcome' | 'player' | 'resume'>('player')
+  // Khách cũ vào thẳng quán, bỏ qua màn chào → mời bấm 1 lần để bật nhạc (trình duyệt
+  // chỉ cho phát tiếng sau 1 cú bấm, nên không tự phát được)
+  const [resumeOffer, setResumeOffer] = useState(false)
   const startTracked = useRef(false)
   const [canPan, setCanPan] = useState(false)
   const [panSeen, setPanSeen] = useState(true)
@@ -544,7 +552,8 @@ export function ChillRoom({
       setCatPetted(false)
     }
     setReturning(hadPrefs)
-    setRegular(loadRegular())
+    const savedRegular = loadRegular()
+    setRegular(savedRegular)
     try {
       setPanSeen(localStorage.getItem(PAN_SEEN_KEY) === '1')
     } catch {
@@ -552,6 +561,14 @@ export function ChillRoom({
     }
     // Link mời vào bàn nhóm → vào thẳng màn chọn nhân vật, khỏi qua màn chào
     if (new URLSearchParams(window.location.search).has('table')) setEntered(true)
+    // Khách đã từng bước vào quán (có dấu trên thẻ khách quen) đã biết quán → vào thẳng, khỏi qua
+    // màn chào. Không dùng prefs để đoán: prefs lưu ngay khi trang tải xong, nên người chỉ mở trang
+    // rồi đi cũng có prefs, lần sau vẫn cần màn chào.
+    // Màn chào mới (welcomeObOpen): khách cũ thấy màn 1 chạm, trừ khi đang có phin chạy dở
+    else if (savedRegular.total > 0 && (!obAtMount() || focusRunningAtMount())) {
+      setEntered(true)
+      setResumeOffer(true)
+    }
     setLoaded(true)
     /* eslint-enable react-hooks/set-state-in-effect */
     if (!visitTracked.current) {
@@ -3892,8 +3909,21 @@ export function ChillRoom({
       >
         <div
           {...hoverProps}
-          className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
+          className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
         >
+          {resumeOffer && !started && (
+            <button
+              type="button"
+              onClick={() => {
+                startFrom.current = 'resume'
+                playAt(index)
+              }}
+              className="absolute bottom-full left-1/2 mb-3 flex min-h-12 -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full bg-[#e8b27d] py-2 pl-4 pr-6 text-sm font-semibold text-[#2a1a10] shadow-[0_16px_40px_-12px_rgba(232,178,125,0.7)] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d]"
+            >
+              <PlayIcon small />
+              {t.room.resume}
+            </button>
+          )}
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               <span className={sleepFlag && sleepOnPhone ? 'hidden sm:contents' : 'contents'}>
@@ -4924,6 +4954,16 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
 
 // Chọn người ngồi nam / nữ: 2 nút có mặt nhân vật, cắt từ ảnh nội thất phòng Cửa sổ quán
 // (vùng đầu người ngồi, px 1280: x 980–1140, y 270–430)
+// Phin đang chạy dở từ lần trước (Focus.tsx lưu ở chill:focus)
+function focusRunningAtMount() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('chill:focus') ?? 'null') as {endsAt?: number; pausedLeft?: number} | null
+    return Boolean(saved && (Number(saved.pausedLeft) > 0 || Number(saved.endsAt) > Date.now()))
+  } catch {
+    return false
+  }
+}
+
 const SEAT_FACES: Record<Seat, string> = {boy: '/chill/scenes/interior.webp', girl: '/chill/scenes/interior-girl.webp'}
 
 // Rê chuột / chạm / focus vào nút → tải sẵn người đó. `loading` = người đang tải → vòng xoay
