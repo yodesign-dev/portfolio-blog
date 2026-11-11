@@ -12,6 +12,10 @@
 // nội thất + video riêng, cùng toạ độ với bản nam (scripts/chill-girl-cafe-art.py).
 // Cả 3 phòng đều có bản nữ; phòng nào thiếu `girl` thì luôn là nam.
 
+// Tranh sửa lại mà giữ tên file thì tăng `?v=` của đường dẫn đó: service worker của /chill
+// (public/chill-sw.js) trả bản đã lưu trước rồi mới tải bản mới, nên không đổi URL thì khách cũ
+// vẫn thấy tranh cũ ở lần mở đầu.
+
 import type {Bulb} from './string-lights'
 import type {ToySpot} from './wand'
 
@@ -143,13 +147,13 @@ export const THEMES: Theme[] = [
       character: {
         kind: 'video',
         at: {x: 429, y: 116, w: 211, h: 220},
-        hi: {src: '/chill/scenes/interior-girl-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
-        lo: {src: '/chill/scenes/interior-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+        hi: {src: '/chill/scenes/interior-girl-loop@2x.webp?v=2', scale: 2, cols: 10, frames: 81, fps: 8},
+        lo: {src: '/chill/scenes/interior-girl-loop.webp?v=2', scale: 1, cols: 12, frames: 121, fps: 12},
         duration: 121 / 12,
         sip: [2.4, 7.7],
         noel: {
-          hi: '/chill/scenes/interior-girl-loop-noel@2x.webp',
-          lo: '/chill/scenes/interior-girl-loop-noel.webp',
+          hi: '/chill/scenes/interior-girl-loop-noel@2x.webp?v=2',
+          lo: '/chill/scenes/interior-girl-loop-noel.webp?v=2',
           glow: {src: '/chill/scenes/interior-girl-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
         },
       },
@@ -266,19 +270,19 @@ export const THEMES: Theme[] = [
     // Bản nữ (scripts/chill-girl-room-art.py): ô cao hơn ô nam 10 px gốc cho đỉnh tóc, rộng hơn
     // 8 px bên trái cho bàn tay; lòng màn trong ảnh tĩnh và trong từng khung đều trong suốt
     girl: {
-      interior: '/chill/scenes/room-desk-girl.webp',
+      interior: '/chill/scenes/room-desk-girl.webp?v=2',
       // Ảnh thẻ chọn phòng khi khách chọn Chị (ảnh thẻ của anh, thay vùng người ngồi)
       thumb: '/chill/scenes/room-desk-girl-thumb.webp',
       character: {
         kind: 'video',
         at: {x: 429, y: 131, w: 211, h: 207},
-        hi: {src: '/chill/scenes/room-desk-girl-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
-        lo: {src: '/chill/scenes/room-desk-girl-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+        hi: {src: '/chill/scenes/room-desk-girl-loop@2x.webp?v=2', scale: 2, cols: 10, frames: 81, fps: 8},
+        lo: {src: '/chill/scenes/room-desk-girl-loop.webp?v=2', scale: 1, cols: 12, frames: 121, fps: 12},
         duration: 121 / 12,
         sip: [1.67, 8.5],
         noel: {
-          hi: '/chill/scenes/room-desk-girl-loop-noel@2x.webp',
-          lo: '/chill/scenes/room-desk-girl-loop-noel.webp',
+          hi: '/chill/scenes/room-desk-girl-loop-noel@2x.webp?v=2',
+          lo: '/chill/scenes/room-desk-girl-loop-noel.webp?v=2',
           glow: {src: '/chill/scenes/room-desk-girl-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
         },
       },
