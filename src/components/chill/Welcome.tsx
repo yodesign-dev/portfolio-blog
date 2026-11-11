@@ -259,59 +259,57 @@ export function Welcome({
     >
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-3 sm:p-5">{top}</div>
 
-      {returning !== null && (
-        <>
-          {/* ——— Màn ngang: 1 thanh trên dải quầy. Hẹp hơn 1280px thì dòng chữ lên trên hàng nút;
-              màn thấp (điện thoại xoay ngang) thì bỏ các dòng phụ cho thanh mỏng lại ——— */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 px-4 pb-3 portrait:hidden">
-            <div className="flex w-fit max-w-full flex-col items-center gap-3 rounded-[26px] border border-white/10 bg-[#18120e]/90 p-3 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md xl:flex-row xl:pl-6">
-              <div className="flex flex-col gap-1 px-2 pt-1 text-center xl:mr-2 xl:p-0 xl:text-left">
-                <h2 className="text-balance text-[17px] font-extrabold leading-tight text-white xl:whitespace-nowrap">{title}</h2>
-                {returning ? (
-                  eyebrow && <p className={`font-mono text-[11px] uppercase tracking-[0.16em] text-[#e8b27d] xl:whitespace-nowrap ${short}`}>{eyebrow}</p>
-                ) : (
-                  <p className={`text-[13px] text-[#cfc5ba] xl:whitespace-nowrap ${short}`}>{w.sub}</p>
-                )}
-              </div>
-              <div className="flex max-w-full flex-wrap items-center justify-center gap-3 xl:flex-nowrap">
-                <PrimaryButton item={primary} busy={busy} onChoose={choose} className="max-w-[20rem]" />
-                <SecondaryButton item={second} tall busy={busy} onChoose={choose} />
-                <SecondaryButton item={look} quiet tall busy={busy} onChoose={choose} />
-                {canPickSeat && <span aria-hidden className="mx-1 hidden h-10 w-px bg-white/15 xl:block" />}
-                {seatToggle(false)}
-              </div>
-            </div>
-            <div className="text-[11px] text-white/60">{legal}</div>
+      {/* Chưa đọc xong máy khách (returning === null, gồm cả HTML từ máy chủ) thì vẽ như khách mới,
+          để trang vừa mở đã có tiêu đề và nút thay vì nền trống. Nút mờ tới khi trang tải xong */}
+      {/* ——— Màn ngang: 1 thanh trên dải quầy. Hẹp hơn 1280px thì dòng chữ lên trên hàng nút;
+          màn thấp (điện thoại xoay ngang) thì bỏ các dòng phụ cho thanh mỏng lại ——— */}
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 px-4 pb-3 portrait:hidden">
+        <div className="flex w-fit max-w-full flex-col items-center gap-3 rounded-[26px] border border-white/10 bg-[#18120e]/90 p-3 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md xl:flex-row xl:pl-6">
+          <div className="flex flex-col gap-1 px-2 pt-1 text-center xl:mr-2 xl:p-0 xl:text-left">
+            <h2 className="text-balance text-[17px] font-extrabold leading-tight text-white xl:whitespace-nowrap">{title}</h2>
+            {returning ? (
+              eyebrow && <p className={`font-mono text-[11px] uppercase tracking-[0.16em] text-[#e8b27d] xl:whitespace-nowrap ${short}`}>{eyebrow}</p>
+            ) : (
+              <p className={`text-[13px] text-[#cfc5ba] xl:whitespace-nowrap ${short}`}>{w.sub}</p>
+            )}
           </div>
+          <div className="flex max-w-full flex-wrap items-center justify-center gap-3 xl:flex-nowrap">
+            <PrimaryButton item={primary} busy={busy} onChoose={choose} className="max-w-[20rem]" />
+            <SecondaryButton item={second} tall busy={busy} onChoose={choose} />
+            <SecondaryButton item={look} quiet tall busy={busy} onChoose={choose} />
+            {canPickSeat && <span aria-hidden className="mx-1 hidden h-10 w-px bg-white/15 xl:block" />}
+            {seatToggle(false)}
+          </div>
+        </div>
+        <div className="text-[11px] text-white/60">{legal}</div>
+      </div>
 
-          {/* ——— Màn dọc: khung này trùng đúng khung cảnh (xem ChillRoom: cảnh 16:9 nằm giữa khoảng
-              top-[6.5rem]…bottom-[11rem]). Hàng giữa để trống cho cảnh, chữ ở trên, nút ở dưới ——— */}
-          <div className="absolute inset-x-0 bottom-[11rem] top-[6.5rem] hidden grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] portrait:grid max-sm:top-[5.25rem]">
-            <div className="flex min-h-0 flex-col items-center justify-end gap-2 px-5 pb-4 text-center">
-              {eyebrow && <p className={`font-mono text-[11px] uppercase tracking-[0.2em] text-[#e8b27d] ${returning ? '' : '[@media(max-height:700px)]:hidden'}`}>{eyebrow}</p>}
-              {/* Màn rất thấp (điện thoại 320×568): chữ nhỏ lại và bỏ dòng mô tả, để không chạm thanh trên */}
-              <h2 className="text-balance text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl [@media(max-height:600px)]:text-xl">{title}</h2>
-              {!returning && <p className="text-pretty text-sm text-[#ded5cb] sm:text-base [@media(max-height:600px)]:hidden">{w.sub}</p>}
-            </div>
-            <div aria-hidden className="aspect-video w-full" />
-            <div className="flex min-h-0 flex-col items-center px-4 pt-[clamp(0.75rem,5dvh,3.5rem)]">
-              {/* Màn dọc mà rộng (tablet, cửa sổ hẹp trên máy tính): 3 nút nằm 1 hàng cho đỡ cao.
-                  Dòng điều khoản đi liền dưới cùng trong luồng, để không bao giờ bị nút đè lên */}
-              <div className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl [@media(max-height:600px)]:gap-2">
-                <div className="flex flex-col gap-3 sm:flex-row [@media(max-height:600px)]:gap-2">
-                  <PrimaryButton item={primary} busy={busy} onChoose={choose} className="w-full justify-center sm:w-auto sm:flex-1" />
-                  <div className="grid grid-cols-2 gap-2.5 sm:flex sm:gap-3">
-                    <SecondaryButton item={second} busy={busy} onChoose={choose} className="sm:h-16 sm:rounded-[18px] sm:px-[18px]" />
-                    <SecondaryButton item={look} quiet busy={busy} onChoose={choose} className="sm:h-16 sm:rounded-[18px] sm:px-[18px]" />
-                  </div>
-                </div>
-                {canPickSeat && <div className="flex justify-center">{seatToggle(true)}</div>}
-                <div className="text-center text-[11px] text-white/60">{legal}</div>
+      {/* ——— Màn dọc: khung này trùng đúng khung cảnh (xem ChillRoom: cảnh 16:9 nằm giữa khoảng
+          top-[6.5rem]…bottom-[11rem]). Hàng giữa để trống cho cảnh, chữ ở trên, nút ở dưới ——— */}
+      <div className="absolute inset-x-0 bottom-[11rem] top-[6.5rem] hidden grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] portrait:grid max-sm:top-[5.25rem]">
+        <div className="flex min-h-0 flex-col items-center justify-end gap-2 px-5 pb-4 text-center">
+          {eyebrow && <p className={`font-mono text-[11px] uppercase tracking-[0.2em] text-[#e8b27d] ${returning ? '' : '[@media(max-height:700px)]:hidden'}`}>{eyebrow}</p>}
+          {/* Màn rất thấp (điện thoại 320×568): chữ nhỏ lại và bỏ dòng mô tả, để không chạm thanh trên */}
+          <h2 className="text-balance text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl [@media(max-height:600px)]:text-xl">{title}</h2>
+          {!returning && <p className="text-pretty text-sm text-[#ded5cb] sm:text-base [@media(max-height:600px)]:hidden">{w.sub}</p>}
+        </div>
+        <div aria-hidden className="aspect-video w-full" />
+        <div className="flex min-h-0 flex-col items-center px-4 pt-[clamp(0.75rem,5dvh,3.5rem)]">
+          {/* Màn dọc mà rộng (tablet, cửa sổ hẹp trên máy tính): 3 nút nằm 1 hàng cho đỡ cao.
+              Dòng điều khoản đi liền dưới cùng trong luồng, để không bao giờ bị nút đè lên */}
+          <div className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl [@media(max-height:600px)]:gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row [@media(max-height:600px)]:gap-2">
+              <PrimaryButton item={primary} busy={busy} onChoose={choose} className="w-full justify-center sm:w-auto sm:flex-1" />
+              <div className="grid grid-cols-2 gap-2.5 sm:flex sm:gap-3">
+                <SecondaryButton item={second} busy={busy} onChoose={choose} className="sm:h-16 sm:rounded-[18px] sm:px-[18px]" />
+                <SecondaryButton item={look} quiet busy={busy} onChoose={choose} className="sm:h-16 sm:rounded-[18px] sm:px-[18px]" />
               </div>
             </div>
+            {canPickSeat && <div className="flex justify-center">{seatToggle(true)}</div>}
+            <div className="text-center text-[11px] text-white/60">{legal}</div>
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   )
 }
