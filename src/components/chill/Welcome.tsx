@@ -55,7 +55,7 @@ const EyeIcon = ({className = ''}: {className?: string}) => (
 )
 
 const ring = 'focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d]'
-// Màn thấp (điện thoại xoay ngang): ẩn các dòng phụ
+// Màn thấp (điện thoại xoay ngang, cửa sổ máy tính thấp): ẩn các dòng phụ
 const short = '[@media(max-height:500px)]:hidden'
 
 type Goal = {goal: WelcomeGoal; icon: (className: string) => ReactNode; title: string; sub: string}
@@ -86,7 +86,7 @@ function SecondaryButton({item, quiet = false, tall = false, busy, onChoose, cla
       type="button"
       onClick={() => onChoose(item.goal)}
       aria-busy={busy}
-      className={`flex min-w-0 items-center gap-2.5 border-[1.5px] bg-black/60 text-left font-bold backdrop-blur transition ${ring} ${
+      className={`flex min-w-0 shrink-0 items-center gap-2.5 border-[1.5px] bg-black/60 text-left font-bold backdrop-blur transition ${ring} ${
         tall ? 'h-16 rounded-[18px] px-[18px] [@media(max-height:500px)]:h-[52px]' : 'h-[52px] justify-center rounded-[14px] px-2'
       } ${quiet ? 'border-white/20 hover:border-white/45' : 'border-[#e8b27d]/55 hover:border-[#e8b27d]'} ${busy ? 'cursor-progress opacity-60' : ''} ${className}`}
     >
@@ -134,7 +134,9 @@ function SeatToggle({
             onPointerDown={() => onWarm(s)}
             onFocus={() => onWarm(s)}
             onClick={() => onSeat(s)}
-            className={`flex items-center gap-2 rounded-full pl-1 pr-3.5 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${touch ? 'h-11' : 'h-10'} ${
+            // Màn thấp chỉ còn mặt: rê chuột vẫn thấy tên
+            title={names[s]}
+            className={`flex items-center gap-2 rounded-full pl-1 pr-3.5 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${touch ? 'h-11' : 'h-10 [@media(max-height:500px)]:size-11 [@media(max-height:500px)]:justify-center [@media(max-height:500px)]:p-0'} ${
               active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/85 hover:bg-white/10 hover:text-white'
             }`}
           >
@@ -142,7 +144,7 @@ function SeatToggle({
               <Face seat={s} size={32} />
               {loading === s && <span aria-hidden className="absolute inset-0 animate-spin rounded-full border-2 border-[#2a1a10]/25 border-t-[#2a1a10] motion-reduce:animate-none" />}
             </span>
-            {names[s]}
+            <span className={touch ? '' : '[@media(max-height:500px)]:sr-only'}>{names[s]}</span>
           </button>
         )
       })}
@@ -261,20 +263,24 @@ export function Welcome({
 
       {/* Chưa đọc xong máy khách (returning === null, gồm cả HTML từ máy chủ) thì vẽ như khách mới,
           để trang vừa mở đã có tiêu đề và nút thay vì nền trống. Nút mờ tới khi trang tải xong */}
-      {/* ——— Màn ngang: 1 thanh trên dải quầy. Hẹp hơn 1280px thì dòng chữ lên trên hàng nút;
-          màn thấp (điện thoại xoay ngang) thì bỏ các dòng phụ cho thanh mỏng lại ——— */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 px-4 pb-3 portrait:hidden">
-        <div className="flex w-fit max-w-full flex-col items-center gap-3 rounded-[26px] border border-white/10 bg-[#18120e]/90 p-3 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md xl:flex-row xl:pl-6">
-          <div className="flex flex-col gap-1 px-2 pt-1 text-center xl:mr-2 xl:p-0 xl:text-left">
+      {/* ——— Màn ngang: 1 thanh trên dải quầy. Hẹp hơn 1280px thì dòng chữ lên trên hàng nút.
+          Màn thấp (điện thoại xoay ngang, cao ≤ 500px): tiêu đề lên giữa thanh trên cùng, thanh chỉ còn
+          1 hàng nút cao 44–52px, Anh/Chị chỉ còn mặt, để cảnh quán không bị che quá 1/4 màn ——— */}
+      <h2 className="pointer-events-none absolute inset-x-0 top-0 hidden justify-center px-32 pt-[max(1.125rem,env(safe-area-inset-top))] text-center text-[15px] font-extrabold leading-tight text-white [text-shadow:0_1px_10px_rgba(0,0,0,0.9)] landscape:[@media(max-height:500px)]:flex">
+        <span className="truncate">{title}</span>
+      </h2>
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 px-4 pb-3 portrait:hidden [@media(max-height:500px)]:gap-1 [@media(max-height:500px)]:px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] [@media(max-height:500px)]:pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+        <div className="flex w-fit max-w-full flex-col items-center gap-3 rounded-[26px] border border-white/10 bg-[#18120e]/90 p-3 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.85)] backdrop-blur-md xl:flex-row xl:pl-6 [@media(max-height:500px)]:rounded-[22px] [@media(max-height:500px)]:p-2">
+          <div className="flex flex-col gap-1 px-2 pt-1 text-center xl:mr-2 xl:p-0 xl:text-left [@media(max-height:500px)]:hidden">
             <h2 className="text-balance text-[17px] font-extrabold leading-tight text-white xl:whitespace-nowrap">{title}</h2>
             {returning ? (
-              eyebrow && <p className={`font-mono text-[11px] uppercase tracking-[0.16em] text-[#e8b27d] xl:whitespace-nowrap ${short}`}>{eyebrow}</p>
+              eyebrow && <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#e8b27d] xl:whitespace-nowrap">{eyebrow}</p>
             ) : (
-              <p className={`text-[13px] text-[#cfc5ba] xl:whitespace-nowrap ${short}`}>{w.sub}</p>
+              <p className="text-[13px] text-[#cfc5ba] xl:whitespace-nowrap">{w.sub}</p>
             )}
           </div>
-          <div className="flex max-w-full flex-wrap items-center justify-center gap-3 xl:flex-nowrap">
-            <PrimaryButton item={primary} busy={busy} onChoose={choose} className="max-w-[20rem]" />
+          <div className="flex max-w-full flex-wrap items-center justify-center gap-3 xl:flex-nowrap [@media(max-height:500px)]:w-full [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:gap-2">
+            <PrimaryButton item={primary} busy={busy} onChoose={choose} className="max-w-[20rem] [@media(max-height:500px)]:h-[52px] [@media(max-height:500px)]:pl-4 [@media(max-height:500px)]:pr-5" />
             <SecondaryButton item={second} tall busy={busy} onChoose={choose} />
             <SecondaryButton item={look} quiet tall busy={busy} onChoose={choose} />
             {canPickSeat && <span aria-hidden className="mx-1 hidden h-10 w-px bg-white/15 xl:block" />}
