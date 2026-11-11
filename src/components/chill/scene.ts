@@ -40,6 +40,7 @@ import {BACKPACK, CUSHION, NOTE, POSTCARD, TRIP_ART, type TripMode} from './trip
 import type {Drink} from './drink'
 import {CHARACTERS, type SeatedFriend} from './table-view'
 import type {StreetSound} from './audio'
+import {StringLights} from './string-lights'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
 export type Weather = 'clear' | 'rain' | 'mist'
@@ -514,6 +515,9 @@ export class ChillScene {
   private tilt = 0
   private laneShift = 0
   private smooth = false
+  // Đèn dây vẽ sẵn trong ảnh phòng thở / chớp / đổi màu nhẹ (công tắc Studio stringLightsOpen)
+  private lightsOn = false
+  private stringLights = new StringLights()
   private musicOn = false
   private tint: string | null = null
 
@@ -1056,6 +1060,12 @@ export class ChillScene {
   // theo bước, dừng / đi có hãm, đứng so le trên vỉa hè. Tắt = như cũ
   setStreetMotion(on: boolean) {
     this.smooth = on
+  }
+
+  // Đèn dây vẽ sẵn trong phòng (Bàn đêm) thở chậm, thỉnh thoảng chớp, màu trôi nhẹ dọc dây
+  // (công tắc Studio stringLightsOpen). Tắt = bóng đứng yên như ảnh
+  setStringLights(on: boolean) {
+    this.lightsOn = on
   }
 
   // Tạm dừng cảnh (nút pause / giảm chuyển động)
@@ -3064,6 +3074,14 @@ export class ChillScene {
       ctx.restore()
     }
     ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W, SCENE_H)
+    const bulbs = this.lightsOn ? this.theme.stringLights : undefined
+    // Noel có lớp riêng cho bóng vẽ sẵn: lớp đèn dây bật thì Noel nhường, đèn chuyển màu Noel
+    if (this.noel) this.noel.bakedByScene = !!bulbs
+    if (bulbs && ready(this.interior)) {
+      this.stringLights.setSource(this.interior, bulbs)
+      const glow = this.time === 'night' ? 1 : this.time === 'afternoon' || this.weather === 'rain' ? 0.6 : 0.35
+      this.stringLights.draw(ctx, {t: this.noel?.quiet ? 0 : t, glow, noel: !!this.noel?.roomLights})
+    }
     ctx.save()
     // Lớp vẽ theo px gốc 640×360
     ctx.setTransform(RES, 0, 0, RES, 0, 0)

@@ -69,16 +69,19 @@ function readSetup(destinations: Destination[]): Setup {
 }
 
 // streetMotionOn: công tắc Studio "Phố chuyển động mượt"; ?motion=1 / ?motion=0 ghi đè
+// stringLightsOn: công tắc Studio "Đèn dây trong phòng"; ?lights=1 / ?lights=0 ghi đè
 // facadeOn: công tắc Studio "Mặt phố sống động"; ?facade=1 / ?facade=0 ghi đè
 // highlandOn: công tắc Studio "Đà Lạt sương mù"; ?highland=1 / ?highland=0 ghi đè
 export function ChillRecord({
   destinations,
   streetMotionOn = false,
+  stringLightsOn = false,
   facadeOn = false,
   highlandOn = false,
 }: {
   destinations: Destination[]
   streetMotionOn?: boolean
+  stringLightsOn?: boolean
   facadeOn?: boolean
   highlandOn?: boolean
 }) {
@@ -150,6 +153,8 @@ export function ChillRecord({
       scene.setBusy(setup.busy)
       const motion = new URLSearchParams(window.location.search).get('motion')
       scene.setStreetMotion(motion ? motion === '1' : streetMotionOn)
+      const lights = new URLSearchParams(window.location.search).get('lights')
+      scene.setStringLights(lights ? lights === '1' : stringLightsOn)
       const facade = new URLSearchParams(window.location.search).get('facade')
       scene.setFacade(facade ? facade === '1' : facadeOn)
       const highland = new URLSearchParams(window.location.search).get('highland')
@@ -173,7 +178,7 @@ export function ChillRecord({
       ro.disconnect()
       sceneRef.current = null
     }
-  }, [setup, streetMotionOn, facadeOn, highlandOn])
+  }, [setup, streetMotionOn, stringLightsOn, facadeOn, highlandOn])
 
   useEffect(() => {
     if (setup) sceneRef.current?.setAtmosphere(time, setup.weather, setup.dest)

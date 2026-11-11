@@ -233,6 +233,7 @@ export function ChillRoom({
   catToyOn = false,
   seatPickOn = false,
   streetMotionOn = false,
+  stringLightsOn = false,
   miniPlayerOn = false,
   facadeOn = false,
   highlandOn = false,
@@ -260,6 +261,9 @@ export function ChillRoom({
   // Người, xe, chó ngoài phố chuyển động mượt (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?motion=1 / ?motion=0 trên URL ghi đè để so trước / sau
   streetMotionOn?: boolean
+  // Đèn dây vẽ sẵn trong phòng thở, chớp, đổi màu nhẹ (Studio "Chill · Cài đặt"), mặc định tắt.
+  // ?lights=1 / ?lights=0 trên URL ghi đè
+  stringLightsOn?: boolean
   // Thu nhỏ quán thành cửa sổ nổi (Document PiP) + tên trạm / ảnh / tua trên màn hình khoá
   // (Studio "Chill · Cài đặt"), mặc định tắt. ?mini=1 / ?mini=0 trên URL ghi đè
   miniPlayerOn?: boolean
@@ -779,6 +783,11 @@ export function ChillRoom({
     const motion = new URLSearchParams(window.location.search).get('motion')
     sceneRef.current?.setStreetMotion(motion ? motion === '1' : streetMotionOn)
   }, [streetMotionOn])
+
+  useEffect(() => {
+    const lights = new URLSearchParams(window.location.search).get('lights')
+    sceneRef.current?.setStringLights(lights ? lights === '1' : stringLightsOn)
+  }, [stringLightsOn])
 
   useEffect(() => {
     const facade = new URLSearchParams(window.location.search).get('facade')

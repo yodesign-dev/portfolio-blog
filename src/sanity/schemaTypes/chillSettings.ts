@@ -29,6 +29,7 @@ export default defineType({
     defineField({name: 'facadeOpen', title: 'Mặt phố sống động (ảnh nét, đèn đêm, neon, bóng mây)', type: 'boolean', initialValue: false}),
     defineField({name: 'highlandOpen', title: 'Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ)', type: 'boolean', initialValue: false}),
     defineField({name: 'streetMotionOpen', title: 'Chuyển động phố mượt (người, xe, chó)', type: 'boolean', initialValue: false}),
+    defineField({name: 'stringLightsOpen', title: 'Đèn dây trong phòng thở, chớp, đổi màu nhẹ', type: 'boolean', initialValue: false}),
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
     defineField({name: 'brewDeskOpen', title: 'Bàn pha phin (đồng hồ mới, phin trong cảnh)', type: 'boolean', initialValue: false}),
     defineField({name: 'welcomeObOpen', title: 'Màn chào kiểu onboarding (Nghe nhạc / ChromoTime)', type: 'boolean', initialValue: false}),

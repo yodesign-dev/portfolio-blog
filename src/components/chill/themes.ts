@@ -12,6 +12,7 @@
 // nội thất + video riêng, cùng toạ độ với bản nam (scripts/chill-girl-cafe-art.py).
 // Cả 3 phòng đều có bản nữ; phòng nào thiếu `girl` thì luôn là nam.
 
+import type {Bulb} from './string-lights'
 import type {ToySpot} from './wand'
 
 export type ThemeId = 'cafe' | 'balcony' | 'desk'
@@ -101,6 +102,9 @@ export type Theme = {
   // Quầng sáng màn laptop (null = không có laptop)
   laptop: Pt | null
   headphones: Pt
+  // Bóng đèn dây vẽ sẵn trong ảnh (tâm lõi sáng, px ảnh 1280×720): thở, chớp, đổi màu nhẹ
+  // (string-lights.ts, công tắc Studio stringLightsOpen). Ảnh anh và chị chung toạ độ
+  stringLights?: Bulb[]
 }
 
 export const THEMES: Theme[] = [
@@ -298,6 +302,8 @@ export const THEMES: Theme[] = [
     lampAlways: true,
     laptop: {x: 233, y: 117},
     headphones: {x: 265, y: 89},
+    // Dây trên kệ sách (trái → phải) rồi dây buông dọc mép kệ xuống góc trái
+    stringLights: [[240, 107], [287, 103], [335, 91], [374, 72], [408, 44], [229, 150], [232, 206], [226, 261], [196, 312], [158, 332], [112, 350], [65, 360], [22, 360]],
   },
 ]
 

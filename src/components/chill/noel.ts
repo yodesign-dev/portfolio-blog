@@ -395,6 +395,8 @@ export type NoelFrame = {time: TimeOfDay; weather: Weather; theme: ThemeId; stre
 
 export class Noel {
   private cfg: NoelConfig
+  // Cảnh tự vẽ đèn dây có sẵn trong ảnh phòng (string-lights.ts): bỏ quầng bóng vẽ sẵn ở đây
+  bakedByScene = false
   private clock = 0
   private f: NoelFrame | null = null
   private brewing = false
@@ -427,6 +429,16 @@ export class Noel {
     }
     // Trộn thứ tự để lúc tuyết thưa vẫn đủ cả ba lớp
     this.flakes.sort((a, b) => a.p - b.p)
+  }
+
+  // Đang treo đèn trong phòng (lớp roomLights của mùa)
+  get roomLights() {
+    return !!this.cfg.layers.roomLights
+  }
+
+  // Khách chọn Noel "Yên tĩnh": trang trí đứng yên
+  get quiet() {
+    return !!this.cfg.quiet
   }
 
   configure(cfg: NoelConfig) {
@@ -898,7 +910,7 @@ export class Noel {
       const lv = this.level()
       const t = this.clock
       const still = this.still
-      if (lv > 0.05) {
+      if (lv > 0.05 && !this.bakedByScene) {
         ctx.globalCompositeOperation = 'lighter'
         R.baked.forEach(([x, y], i) => {
           ctx.globalAlpha = (still ? 0.9 : 0.8 + 0.2 * Math.sin(t * 0.8 + i * 1.3)) * 0.62 * lv

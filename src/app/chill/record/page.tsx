@@ -11,6 +11,6 @@ export const metadata: Metadata = {
 }
 
 export default async function ChillRecordPage() {
-  const {destinations, streetMotionOn, facadeOn, highlandOn} = await getChillContent(revalidate)
-  return <ChillRecord destinations={destinations} streetMotionOn={streetMotionOn} facadeOn={facadeOn} highlandOn={highlandOn} />
+  const {destinations, streetMotionOn, stringLightsOn, facadeOn, highlandOn} = await getChillContent(revalidate)
+  return <ChillRecord destinations={destinations} streetMotionOn={streetMotionOn} stringLightsOn={stringLightsOn} facadeOn={facadeOn} highlandOn={highlandOn} />
 }
