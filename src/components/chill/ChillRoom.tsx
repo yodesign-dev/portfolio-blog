@@ -33,6 +33,7 @@ import {Welcome} from './Welcome'
 import {AddTrackButton, MusicChooser, MusicPicker, notifyBrew, useBrewMusic} from './BrewMusic'
 import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, suggestQueue, totalSeconds, type MusicQueue} from './playlist'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
+import {favList, loadFavs, markPlayed, saveFavs, toggleFav, type Favs} from './favs'
 import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
@@ -156,6 +157,8 @@ type Prefs = {
   time: TimeOfDay
   weather: Weather
   shuffle: boolean
+  // Phát lặp 1 bài (chỉ dùng khi bật Bài của tôi — favOpen)
+  repeat?: boolean
   station: StationId
   destination: string
   travel: number
@@ -241,6 +244,7 @@ export function ChillRoom({
   highlandOn = false,
   marketOn = false,
   sleepTimerOn = false,
+  favOn = false,
   brewDeskOn = false,
   welcomeObOn = false,
   tripOn = false,
@@ -284,6 +288,9 @@ export function ChillRoom({
   // Hẹn giờ tắt nhạc 15/30/60/90 phút (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
   sleepTimerOn?: boolean
+  // Bài của tôi: thả tim bài, tab "Của tôi", phát lặp 1 bài (Studio "Chill · Cài đặt"), mặc
+  // định tắt. ?fav=1 / ?fav=0 trên URL ghi đè. Xem favs.ts
+  favOn?: boolean
   brewDeskOn?: boolean
   // Màn chào kiểu onboarding: khách mới 2 bước, khách quay lại 1 chạm (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?ob=1 / ?ob=0 trên URL ghi đè. Xem Welcome.tsx
@@ -511,15 +518,42 @@ export function ChillRoom({
   const catSayTimers = useRef<number[]>([])
 
   const track = tracks[index]
+  // Bài của tôi (favOpen): bài đã thả tim, tab "Của tôi" đang mở, phát lặp 1 bài.
+  // favsLoaded: đã đọc tim trên máy — trước đó không được dọn hàng đợi "fav" (tim còn rỗng)
+  const [favFlag, setFavFlag] = useState(false)
+  const [favs, setFavs] = useState<Favs>({})
+  const [favsLoaded, setFavsLoaded] = useState(false)
+  const [mineTab, setMineTab] = useState(false)
+  const [repeatOne, setRepeatOne] = useState(false)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('fav')
+    const on = param ? param === '1' : favOn
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL + bộ nhớ máy sau khi hydrate
+    setFavFlag(on)
+    if (!on) return
+    setFavs(loadFavs())
+    setFavsLoaded(true)
+    // Lần trước đang nghe bộ "Của tôi" thì mở sẵn tab đó
+    if (loadQueue()?.key === 'fav') setMineTab(true)
+  }, [favOn])
+  const favIds = useMemo(() => (favFlag ? favList(favs, tracks.map((tr) => tr.id)) : []), [favFlag, favs, tracks])
+  const favRows = useMemo(
+    () => favIds.map((id) => ({tr: tracks.find((tr) => tr.id === id)!, i: tracks.findIndex((tr) => tr.id === id)})),
+    [favIds, tracks]
+  )
+  const showMine = favFlag && mineTab && favIds.length > 0
+  const isFav = (id: string) => favFlag && Object.hasOwn(favs, id)
   // Hàng đợi của Bàn pha phin (Quán chọn giúp / danh sách tự chọn). Bài đang phát nằm trong
   // hàng đợi thì bài tiếp, bài trước, Media Session, cửa sổ nổi đều đi theo nó; không thì theo trạm
   const [queue, setQueue] = useState<MusicQueue | null>(null)
   const queueIdx = useMemo(() => (queue ? queue.ids.map((id) => tracks.findIndex((tr) => tr.id === id)).filter((i) => i >= 0) : []), [queue, tracks])
   const queueOn = queueIdx.includes(index)
-  const queueLabel = queueOn ? queue!.label : null
+  const queueLabel = queueOn ? (queue!.key === 'fav' ? t.room.favLabel : queue!.label) : null
   // Playlist của trạm đang chọn (index vẫn là vị trí trong toàn bộ `tracks`)
   // `station` chỉ là tab đang xem — bài đang phát giữ nguyên trạm của nó cho tới khi chọn bài khác
   const stationList = tracks.map((tr, i) => ({tr, i})).filter(({tr}) => stationOf(tr) === station)
+  // Danh sách đang xem: tab "Của tôi" hoặc trạm đang chọn
+  const shownList = showMine ? favRows : stationList
   const playingStation = stationOf(track)
   const playingList = queueOn ? queueIdx.map((i) => tracks[i]) : tracks.filter((tr) => stationOf(tr) === playingStation)
   const playingPos = playingList.indexOf(track)
@@ -547,6 +581,7 @@ export function ChillRoom({
     if (prefs.time && ['morning', 'afternoon', 'night'].includes(prefs.time)) setTime(prefs.time)
     if (prefs.weather && ['clear', 'rain', 'mist'].includes(prefs.weather)) setWeather(prefs.weather)
     if (typeof prefs.shuffle === 'boolean') setShuffle(prefs.shuffle)
+    if (typeof prefs.repeat === 'boolean') setRepeatOne(prefs.repeat)
     // Trạm đã lưu mà giờ không còn bài (mọi bài bị ẩn trong Studio) → như chưa chọn
     const savedStation = STATIONS.find((st) => st.id === prefs.station && tracks.some((t) => stationOf(t) === st.id))?.id
     // Không có lựa chọn cũ thì mở trạm có bài đầu tiên (ưu tiên Café Acoustic)
@@ -633,6 +668,7 @@ export function ChillRoom({
       time,
       weather,
       shuffle,
+      repeat: repeatOne,
       station,
       destination: dest.id,
       travel,
@@ -647,7 +683,7 @@ export function ChillRoom({
     } catch {
       // Chế độ ẩn danh / chặn storage — bỏ qua, trang vẫn chạy bình thường
     }
-  }, [loaded, track.id, volume, ambience, mix, time, weather, shuffle, station, dest.id, travel, theme, seat, panelTab, zen, groupWall])
+  }, [loaded, track.id, volume, ambience, mix, time, weather, shuffle, repeatOne, station, dest.id, travel, theme, seat, panelTab, zen, groupWall])
 
   // Vòng lặp vẽ cảnh, giới hạn ~30fps cho nhẹ máy
   useEffect(() => {
@@ -918,10 +954,12 @@ export function ChillRoom({
   }, [brewPhase, mix, ambience, weather, brewMusicApi.prefs.mix, brewMusicApi.prefs.breakMode])
   const effectiveVolume = brewPhase === 'break' ? (brewMusicApi.prefs.breakMode === 'duck' ? volume * 0.6 : brewMusicApi.prefs.breakMode === 'ambient' ? 0 : volume) : volume
   useEffect(() => {
-    if (!brewFlag) return
+    if (!brewFlag && !favFlag) return
+    const saved = loadQueue()
+    // Tắt Bàn pha phin thì chỉ nhận lại hàng đợi "Của tôi", bỏ qua bộ nhạc của phin
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc hàng đợi đã lưu sau khi hydrate
-    setQueue(loadQueue())
-  }, [brewFlag])
+    setQueue(brewFlag || saved?.key === 'fav' ? saved : null)
+  }, [brewFlag, favFlag])
   const applyQueue = useCallback((next: MusicQueue | null) => {
     setQueue(next)
     saveQueue(next)
@@ -1955,7 +1993,8 @@ export function ChillRoom({
     setPlaying(true)
     setPosition(0)
     setDuration(next.duration)
-    trackEvent({name: 'Chill Play', props: {track: next.id}})
+    const again = markPlayed(next.id)
+    trackEvent({name: 'Chill Play', props: again === null ? {track: next.id} : {track: next.id, again}})
     if (!startTracked.current) {
       startTracked.current = true
       trackEvent({name: 'Chill Start', props: {from: startFrom.current}})
@@ -1977,7 +2016,9 @@ export function ChillRoom({
   )
 
   // Bài tự hết thì sang bài tiếp, không tính là bỏ qua
-  const nextAuto = useCallback(() => playAt(nextIndex(index)), [index, nextIndex, playAt])
+  // Lặp 1 bài: hết bài thì phát lại chính nó (bấm "bài tiếp" vẫn sang bài khác)
+  const loopOne = favFlag && repeatOne
+  const nextAuto = useCallback(() => playAt(loopOne ? index : nextIndex(index)), [index, nextIndex, playAt, loopOne])
   const next = useCallback(() => {
     // Khách bỏ qua sớm 1 bài quán chọn → lần sau ít gợi ý bài đó hơn
     const audio = audioRef.current
@@ -1992,6 +2033,38 @@ export function ChillRoom({
     },
     [queue, queueIdx, applyQueue, playAt]
   )
+  // Bài của tôi: bấm một bài trong tab "Của tôi" → nghe cả bộ theo thứ tự trong tab (hàng đợi "fav").
+  // Bấm bài ở tab trạm → thôi bộ "Của tôi", về nghe theo trạm như thường
+  const pickRow = (i: number) => {
+    if (showMine) {
+      const fresh = queue?.key !== 'fav' || !queueOn
+      applyQueue({key: 'fav', label: t.room.favLabel, ids: favIds})
+      playAt(i)
+      if (fresh) trackEvent({name: 'Chill Fav', props: {action: 'play', count: favIds.length}})
+      return
+    }
+    if (queue?.key === 'fav') applyQueue(null)
+    playAt(i)
+  }
+  const toggleFavId = (id: string, from: 'list' | 'bar') => {
+    const adding = !Object.hasOwn(favs, id)
+    const next = toggleFav(favs, id)
+    setFavs(next)
+    saveFavs(next)
+    // Đang nghe bộ "Của tôi": bài mới thả tim vào đầu bộ (giống thứ tự trong tab)
+    if (adding && queue?.key === 'fav') applyQueue({...queue, ids: [id, ...queue.ids.filter((x) => x !== id)]})
+    // Bỏ tim bài cuối cùng → tab "Của tôi" biến mất, về tab trạm
+    if (!adding && Object.keys(next).length === 0) setMineTab(false)
+    trackEvent({name: 'Chill Fav', props: {action: adding ? 'add' : 'remove', from, count: Object.keys(next).length}})
+  }
+  // Bỏ tim lúc đang nghe bộ "Của tôi": bài khác rời bộ ngay, bài đang phát thì phát hết rồi mới rời
+  useEffect(() => {
+    if (!favFlag || !favsLoaded || queue?.key !== 'fav') return
+    const keep = queue.ids.filter((id) => Object.hasOwn(favs, id) || id === track.id)
+    if (keep.length === queue.ids.length) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- giữ hàng đợi khớp bài đã thả tim
+    applyQueue(keep.length ? {...queue, ids: keep} : null)
+  }, [favFlag, favsLoaded, favs, queue, track.id, applyQueue])
   useEffect(() => {
     if (brewFlag && started) pushRecent(track.id)
   }, [brewFlag, started, track.id])
@@ -2027,7 +2100,7 @@ export function ChillRoom({
     applyQueue({...queue, ids: [track.id, ...more.filter((id) => id !== track.id)]})
     trackEvent({name: 'Chill Focus', props: {action: 'music-reroll'}})
   }, [queue, queueOn, brewMusicApi, tracks, time, weather, track.id, applyQueue])
-  const nextSmooth = useCallback(() => playAt(nextIndex(index), true), [index, nextIndex, playAt])
+  const nextSmooth = useCallback(() => playAt(loopOne ? index : nextIndex(index), true), [index, nextIndex, playAt, loopOne])
 
   const prev = useCallback(() => {
     const audio = audioRef.current
@@ -2043,6 +2116,11 @@ export function ChillRoom({
 
   // Đổi tab trạm chỉ đổi danh sách đang xem; bài đang phát / tạm dừng vẫn giữ nguyên. Chưa
   // phát bài nào thì bài đầu của trạm thành bài chờ, bấm Play là nghe trạm đó
+  // Bấm tab trạm: rời tab "Của tôi" (nếu đang mở) rồi đổi trạm như thường
+  const pickStation = (id: StationId) => {
+    setMineTab(false)
+    changeStation(id)
+  }
   const changeStation = (id: StationId) => {
     if (id === station) return
     setStation(id)
@@ -2970,6 +3048,30 @@ export function ChillRoom({
       {updatesSeen.dot && <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d] sm:hidden" />}
     </button>
   )
+  // Tab "Của tôi" đứng đầu dãy trạm, chỉ hiện khi đã thả tim ít nhất 1 bài còn trong kho
+  const mineTabButton =
+    favIds.length > 0 ? (
+      <button
+        type="button"
+        role="radio"
+        aria-checked={showMine}
+        onClick={() => setMineTab(true)}
+        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition ${
+          showMine ? 'border-rose-300/50 bg-rose-300/10 text-rose-100' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
+        }`}
+      >
+        <span className="text-rose-300">
+          <HeartIcon filled size={12} />
+        </span>
+        {t.room.favTab}
+        <span className="font-mono text-[11px] tabular-nums opacity-70">{favIds.length}</span>
+      </button>
+    ) : null
+  const toggleRepeat = () => {
+    const on = !repeatOne
+    setRepeatOne(on)
+    trackEvent({name: 'Chill Fav', props: {action: on ? 'repeat-on' : 'repeat-off'}})
+  }
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   // Đang pha phin: thanh trên lui xuống, rê chuột là rõ lại
   const topFade = brewing && !hideUi && entered && !hovering && !focusOpen && !menuOpen ? 'opacity-25 transition-opacity duration-700 focus-within:opacity-100' : fade
@@ -3128,9 +3230,10 @@ export function ChillRoom({
           {zenList && (
             <div className="mb-2 max-h-[min(55dvh,420px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md">
               <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.room.stationAria}>
+                {mineTabButton}
                 {STATIONS.map((st) => {
                   const count = tracks.filter((t) => stationOf(t) === st.id).length
-                  const on = st.id === station
+                  const on = !showMine && st.id === station
                   if (count === 0) return null
                   return (
                     <button
@@ -3138,7 +3241,7 @@ export function ChillRoom({
                       type="button"
                       role="radio"
                       aria-checked={on}
-                      onClick={() => changeStation(st.id)}
+                      onClick={() => pickStation(st.id)}
                       className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
                         st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
@@ -3161,15 +3264,15 @@ export function ChillRoom({
                 })}
               </div>
               <ol className="mt-2 divide-y divide-white/[0.06]">
-                {stationList.map(({tr, i}, pos) => {
+                {shownList.map(({tr, i}, pos) => {
                   const active = i === index
                   return (
-                    <li key={tr.id}>
+                    <li key={tr.id} className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => (active && started ? togglePlay() : pickTrack(i))}
+                        onClick={() => (active && started ? togglePlay() : pickRow(i))}
                         aria-current={active ? 'true' : undefined}
-                        className={`grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition ${
+                        className={`grid min-h-11 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition ${
                           active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
                         }`}
                       >
@@ -3186,6 +3289,7 @@ export function ChillRoom({
                           <PlayMeter stat={plays?.get(tr.id)} />
                         </span>
                       </button>
+                      {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
                     </li>
                   )
                 })}
@@ -3211,6 +3315,7 @@ export function ChillRoom({
               <span className="block truncate font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{stationLabel}</span>
               <span className="block truncate text-sm text-[#ede6dd]">{track.title}</span>
             </span>
+            {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             <button
               type="button"
               onClick={() => setZenList((o) => !o)}
@@ -3958,7 +4063,8 @@ export function ChillRoom({
           )}
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              <span className={sleepFlag && sleepOnPhone ? 'hidden sm:contents' : 'contents'}>
+              {/* Điện thoại: nút bài trước nhường chỗ cho tên bài khi có nút trăng hoặc nút tim (Bài của tôi) */}
+              <span className={(sleepFlag && sleepOnPhone) || favFlag ? 'hidden sm:contents' : 'contents'}>
                 <RoundButton label={t.room.prev} onClick={prev}>
                   <PrevIcon />
                 </RoundButton>
@@ -3982,6 +4088,7 @@ export function ChillRoom({
               </p>
               <p className="truncate font-semibold">{track.title}</p>
             </div>
+            {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             <Visualizer audioRef={audioRef} playing={playing} />
             <input
               type="range"
@@ -4395,9 +4502,10 @@ export function ChillRoom({
             <>
               {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
               <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.room.stationAria}>
+                {mineTabButton}
                 {STATIONS.map((st) => {
                   const count = tracks.filter((t) => stationOf(t) === st.id).length
-                  const on = st.id === station
+                  const on = !showMine && st.id === station
                   if (count === 0) return null
                   return (
                     <button
@@ -4405,7 +4513,7 @@ export function ChillRoom({
                       type="button"
                       role="radio"
                       aria-checked={on}
-                      onClick={() => changeStation(st.id)}
+                      onClick={() => pickStation(st.id)}
                       className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
                         st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
@@ -4429,7 +4537,20 @@ export function ChillRoom({
               </div>
 
               {/* Volume nằm trên thanh phát nhạc (desktop: thanh trượt, điện thoại: nút loa) */}
-              <div className="mt-4 flex items-center justify-end">
+              <div className="mt-4 flex items-center justify-end gap-2">
+                {favFlag && (
+                  <button
+                    type="button"
+                    onClick={toggleRepeat}
+                    aria-pressed={repeatOne}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
+                      repeatOne ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
+                    }`}
+                  >
+                    <RepeatOneIcon />
+                    {t.room.repeatOne}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShuffle((s) => !s)}
@@ -4444,13 +4565,13 @@ export function ChillRoom({
               </div>
 
               <ol className="mt-3 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-                {stationList.map(({tr, i}, pos) => {
+                {shownList.map(({tr, i}, pos) => {
                   const active = i === index
                   return (
                     <li key={tr.id} className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => (active && started ? togglePlay() : pickTrack(i))}
+                        onClick={() => (active && started ? togglePlay() : pickRow(i))}
                         aria-current={active ? 'true' : undefined}
                         className={`grid min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition ${
                           active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
@@ -4472,6 +4593,7 @@ export function ChillRoom({
                           <PlayMeter stat={plays?.get(tr.id)} />
                         </span>
                       </button>
+                      {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
                       {brewFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
                     </li>
                   )
@@ -5315,6 +5437,42 @@ function ArrowIcon({dir}: {dir: 'left' | 'right'}) {
   return (
     <svg {...iconProps}>
       <path d={dir === 'left' ? 'M19 12H5M11 6l-6 6 6 6' : 'M5 12h14M13 6l6 6-6 6'} />
+    </svg>
+  )
+}
+
+// Nút tim của Bài của tôi: trong dòng bài (size md, 40px) và cạnh tên bài đang phát
+function FavButton({on, title, onToggle, round = false}: {on: boolean; title: string; onToggle: () => void; round?: boolean}) {
+  const t = useT()
+  const label = on ? t.room.favRemove(title) : t.room.favAdd(title)
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      aria-label={label}
+      title={label}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${round ? 'rounded-full' : 'rounded-lg'} ${
+        on ? 'text-rose-300 hover:bg-white/[0.06]' : 'text-[#a79e94] hover:bg-white/[0.06] hover:text-rose-200'
+      }`}
+    >
+      <HeartIcon filled={on} />
+    </button>
+  )
+}
+
+function HeartIcon({filled, size = 16}: {filled: boolean; size?: number}) {
+  return (
+    <svg {...iconProps} width={size} height={size} fill={filled ? 'currentColor' : 'none'}>
+      <path d="M12 20.5s-7.5-4.6-9.4-9.3C1.3 7.9 3.4 4.5 6.8 4.5c2.1 0 3.6 1.2 5.2 3 1.6-1.8 3.1-3 5.2-3 3.4 0 5.5 3.4 4.2 6.7-1.9 4.7-9.4 9.3-9.4 9.3Z" />
+    </svg>
+  )
+}
+
+function RepeatOneIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3M11 10.5l1.5-1v5" />
     </svg>
   )
 }

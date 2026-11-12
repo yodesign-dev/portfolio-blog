@@ -35,7 +35,11 @@ export type AnalyticsEvent =
   | {name: 'Chill App Open'; props?: undefined}
   | {name: 'Chill Mix'; props: {preset: 'scene' | 'busy' | 'rainyNight' | 'quiet' | 'mute' | 'custom'}}
   | {name: 'Chill Quest'; props: {action: 'vote'; option: string}}
-  | {name: 'Chill Play'; props: {track: string}}
+  // again = máy này từng nghe bài này trước đây (favs.ts); không có khi chặn storage
+  | {name: 'Chill Play'; props: {track: string; again?: boolean}}
+  // Bài của tôi (favOpen): thả / bỏ tim (from: list = dòng trong danh sách · bar = bài đang phát),
+  // play = bắt đầu nghe từ tab Của tôi, repeat = bật / tắt phát lặp 1 bài
+  | {name: 'Chill Fav'; props: {action: 'add' | 'remove' | 'play' | 'repeat-on' | 'repeat-off'; from?: 'list' | 'bar'; count?: number}}
   | {name: 'Chill Pet Cat'; props?: undefined}
   | {name: 'Chill Cat Toy'; props?: undefined}
   | {name: 'Chill Donate Open'; props?: {from: string}}

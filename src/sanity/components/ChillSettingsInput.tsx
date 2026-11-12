@@ -37,6 +37,7 @@ type Value = {
   marketOpen?: boolean
   miniPlayerOpen?: boolean
   sleepTimerOpen?: boolean
+  favOpen?: boolean
   brewDeskOpen?: boolean
   welcomeObOpen?: boolean
   tripOpen?: boolean
@@ -64,7 +65,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
+type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'favOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -81,6 +82,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
       {key: 'brewDeskOpen', icon: '☕', title: 'Bàn pha phin', short: 'Đồng hồ lớn thay thanh nhạc, phin nhỏ giọt trong cảnh', desc: 'Đang pha phin thì tấm đồng hồ pixel thay chỗ thanh nhạc, phin trên quầy nhỏ giọt và ly đầy dần. Có tạm dừng, thu gọn và độ dài tuỳ chỉnh 5 đến 120 phút. Tắt là về bảng đồng hồ cũ, phiên đang chạy không mất.', delay: '1 phút'},
       {key: 'sleepTimerOpen', icon: '🌙', title: 'Hẹn giờ tắt nhạc', short: 'Nút trăng: tắt nhạc sau 15/30/60/90 phút', desc: 'Nút trăng cạnh nút Cài đặt dưới thanh nhạc: chọn 15 / 30 / 60 / 90 phút, nút hiện số phút còn lại. 60 giây cuối nhạc và tiếng nền nhỏ dần rồi dừng hẳn, bấm phát là nghe lại. Lần đầu khách vào trạm Night & Sleep, bảng chọn tự mở để gợi ý. Thử trước bằng ?sleep=1.', delay: '1 phút'},
+      {key: 'favOpen', icon: '💛', title: 'Bài của tôi', short: 'Thả tim bài, nghe lại cả bộ, phát lặp 1 bài', desc: 'Nút tim ở mỗi bài trong danh sách nhạc và cạnh tên bài đang phát. Bài đã thả tim gom vào tab Của tôi đứng đầu dãy trạm (mới thả đứng trên), bấm một bài là nghe cả bộ theo thứ tự đó, tải lại trang hay bấm Nghe tiếp ở màn chào vẫn đi tiếp đúng bộ. Thêm nút Lặp 1 bài cạnh nút Ngẫu nhiên. Chỉ lưu trên máy khách, không tài khoản. Thử trước bằng ?fav=1.', delay: '1 phút'},
     ],
   },
   {

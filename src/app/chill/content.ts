@@ -75,6 +75,7 @@ const CHILL_QUERY = `{
   "highlandOpen": *[_id == "chillSettings"][0].highlandOpen,
   "marketOpen": *[_id == "chillSettings"][0].marketOpen,
   "sleepTimerOpen": *[_id == "chillSettings"][0].sleepTimerOpen,
+  "favOpen": *[_id == "chillSettings"][0].favOpen,
   "brewDeskOpen": *[_id == "chillSettings"][0].brewDeskOpen,
   "welcomeObOpen": *[_id == "chillSettings"][0].welcomeObOpen,
   "tripOpen": *[_id == "chillSettings"][0].tripOpen,
@@ -129,6 +130,7 @@ type ChillContent = {
   highlandOpen?: boolean | null
   marketOpen?: boolean | null
   sleepTimerOpen?: boolean | null
+  favOpen?: boolean | null
   brewDeskOpen?: boolean | null
   welcomeObOpen?: boolean | null
   tripOpen?: boolean | null
@@ -281,6 +283,8 @@ export async function getChillContent(revalidate: number) {
   const marketOn = content.marketOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MARKET === '1')
   // Hẹn giờ tắt nhạc 15/30/60/90 phút. Máy dev: CHILL_DEV_SLEEP=1
   const sleepTimerOn = content.sleepTimerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SLEEP === '1')
+  // Bài của tôi: thả tim bài, tab "Của tôi", phát lặp 1 bài. Máy dev: CHILL_DEV_FAV=1
+  const favOn = content.favOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_FAV === '1')
   // Bàn pha phin: tấm đồng hồ thay thanh nhạc, phin trong cảnh. Máy dev: CHILL_DEV_BREW=1
   const brewDeskOn = content.brewDeskOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_BREW === '1')
   // Màn chào kiểu onboarding (khách mới 2 bước, khách quay lại 1 chạm). Máy dev: CHILL_DEV_OB=1
@@ -290,5 +294,5 @@ export async function getChillContent(revalidate: number) {
   const tripPhins = Math.min(8, Math.max(1, Math.round(content.tripPhins ?? 3)))
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
-  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
 }

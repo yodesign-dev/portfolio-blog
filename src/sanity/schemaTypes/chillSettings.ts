@@ -36,6 +36,7 @@ export default defineType({
     defineField({name: 'brewDeskOpen', title: 'Bàn pha phin (đồng hồ mới, phin trong cảnh)', type: 'boolean', initialValue: false}),
     defineField({name: 'welcomeObOpen', title: 'Màn chào kiểu onboarding (Nghe nhạc / ChromoTime)', type: 'boolean', initialValue: false}),
     defineField({name: 'sleepTimerOpen', title: 'Hẹn giờ tắt nhạc', type: 'boolean', initialValue: false}),
+    defineField({name: 'favOpen', title: 'Bài của tôi (thả tim bài, phát lặp 1 bài)', type: 'boolean', initialValue: false}),
     defineField({name: 'tripOpen', title: 'Mèo đi chơi xa (bưu thiếp)', type: 'boolean', initialValue: false}),
     defineField({name: 'tripPhins', title: 'Số phin trong ngày để mèo muốn đi', type: 'number', initialValue: 3, validation: (rule) => rule.integer().min(1).max(8)}),
     defineField({name: 'seasonsOpen', title: 'Theme theo mùa (lịch ở Chill · Mùa)', type: 'boolean', initialValue: false}),
