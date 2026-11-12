@@ -69,6 +69,7 @@ const CHILL_QUERY = `{
   "seatPickOpen": *[_id == "chillSettings"][0].seatPickOpen,
   "streetMotionOpen": *[_id == "chillSettings"][0].streetMotionOpen,
   "stringLightsOpen": *[_id == "chillSettings"][0].stringLightsOpen,
+  "sketchOpen": *[_id == "chillSettings"][0].sketchOpen,
   "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen,
   "facadeOpen": *[_id == "chillSettings"][0].facadeOpen,
   "highlandOpen": *[_id == "chillSettings"][0].highlandOpen,
@@ -121,6 +122,7 @@ type ChillContent = {
   seatPickOpen?: boolean | null
   streetMotionOpen?: boolean | null
   stringLightsOpen?: boolean | null
+  sketchOpen?: boolean | null
   miniPlayerOpen?: boolean | null
   facadeOpen?: boolean | null
   highlandOpen?: boolean | null
@@ -265,6 +267,8 @@ export async function getChillContent(revalidate: number) {
   const streetMotionOn = content.streetMotionOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MOTION === '1')
   // Đèn dây trong phòng thở, chớp, đổi màu nhẹ. Máy dev: CHILL_DEV_LIGHTS=1
   const stringLightsOn = content.stringLightsOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_LIGHTS === '1')
+  // Chị ký hoạ ở giá vẽ thay vì gõ laptop (Cửa sổ quán). Máy dev: CHILL_DEV_SKETCH=1
+  const sketchOn = content.sketchOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SKETCH === '1')
   // Thu nhỏ quán thành cửa sổ nổi (Document PiP) + Media Session. Máy dev: CHILL_DEV_MINI=1
   const miniPlayerOn = content.miniPlayerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MINI === '1')
   // Mặt phố sống động (ảnh nét, đèn đêm, neon, bóng mây). Máy dev: CHILL_DEV_FACADE=1
@@ -282,5 +286,5 @@ export async function getChillContent(revalidate: number) {
   const tripPhins = Math.min(8, Math.max(1, Math.round(content.tripPhins ?? 3)))
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
-  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
 }

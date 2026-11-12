@@ -16,6 +16,7 @@
 // (public/chill-sw.js) trả bản đã lưu trước rồi mới tải bản mới, nên không đổi URL thì khách cũ
 // vẫn thấy tranh cũ ở lần mở đầu.
 
+import type {PageQuad} from './sketch'
 import type {Bulb} from './string-lights'
 import type {ToySpot} from './wand'
 
@@ -48,6 +49,8 @@ export type CharacterVideo = {
   noel?: {hi: string; lo: string; glow: SheetSpec}
 }
 
+export type SketchArt = {interior: string; character: CharacterVideo; page: PageQuad}
+
 export type CharacterFrames = {
   kind: 'frames'
   src: string
@@ -79,6 +82,10 @@ export type Theme = {
   character: CharacterVideo | CharacterFrames
   // Bản người ngồi nữ: ảnh nội thất + video riêng, cùng vị trí với bản nam
   girl?: {interior: string; thumb: string; character: CharacterVideo}
+  // Bản chị ký hoạ (công tắc Studio sketchOpen, ?sketch=1): giá vẽ + sketchbook thay laptop, trang
+  // giấy (px đệm 1280×720) do code vẽ dưới ảnh nội thất (sketch.ts). Có bản này thì không vẽ màn
+  // laptop / quầng sáng laptop
+  girlSketch?: SketchArt
   // Màn laptop vẽ app thiết kế bằng code (screen.ts), px gốc — nằm dưới lớp người ngồi,
   // đầu / vai che phía trước. null = không có màn hình
   screen: Rect | null
@@ -157,6 +164,23 @@ export const THEMES: Theme[] = [
           glow: {src: '/chill/scenes/interior-girl-loop-glow.webp', scale: 1, cols: 10, frames: 81, fps: 8},
         },
       },
+    },
+    // Chị ký hoạ ở giá vẽ (scripts/chill-girl-sketch-art.py), cùng ô với bản gõ laptop. Chưa có
+    // sheet khăn Noel: mùa Noel không quàng khăn
+    girlSketch: {
+      interior: '/chill/scenes/interior-girl-sketch.webp',
+      character: {
+        kind: 'video',
+        at: {x: 429, y: 116, w: 211, h: 220},
+        hi: {src: '/chill/scenes/interior-girl-sketch-loop@2x.webp', scale: 2, cols: 10, frames: 81, fps: 8},
+        lo: {src: '/chill/scenes/interior-girl-sketch-loop.webp', scale: 1, cols: 12, frames: 121, fps: 12},
+        duration: 121 / 12,
+        // Video: vẽ (mặt nghiêng, không kính) → cầm ly cà phê đá trên quầy uống → vẽ tiếp → đặt ly lại.
+        // 3,5 s nối êm với 9,67 s: vòng vẽ ~3,9 s, đoạn uống phát thỉnh thoảng
+        sip: [3.5, 9.67],
+      },
+      // Lòng trang giấy trên giá vẽ (hình bình hành, giá ngả ra sau)
+      page: {tl: {x: 853, y: 373}, tr: {x: 957, y: 370}, bl: {x: 883, y: 530}},
     },
     screen: {x: 436, y: 219, w: 88, h: 49},
     screenBehind: false,
@@ -314,7 +338,8 @@ export const THEMES: Theme[] = [
 export const themeById = (id: string | undefined) => THEMES.find((t) => t.id === id) ?? THEMES[0]
 
 // Ảnh nội thất + người ngồi của phòng theo lựa chọn nam / nữ
-export const seatArt = (theme: Theme, seat: Seat) =>
-  (seat === 'girl' && theme.girl) || {interior: theme.interior, character: theme.character}
+// sketch: công tắc chị ký hoạ (phòng có bản ký hoạ thì dùng, không thì bản gõ laptop)
+export const seatArt = (theme: Theme, seat: Seat, sketch = false): {interior: string; character: Theme['character']; page?: PageQuad} =>
+  (seat === 'girl' && sketch && theme.girlSketch) || (seat === 'girl' && theme.girl) || {interior: theme.interior, character: theme.character}
 
 export const hasGirl = (id: ThemeId) => !!themeById(id).girl

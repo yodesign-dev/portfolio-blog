@@ -69,6 +69,7 @@ function readSetup(destinations: Destination[]): Setup {
 }
 
 // streetMotionOn: công tắc Studio "Phố chuyển động mượt"; ?motion=1 / ?motion=0 ghi đè
+// sketchOn: công tắc Studio "Chị ký hoạ ở giá vẽ"; ?sketch=1 / ?sketch=0 ghi đè
 // stringLightsOn: công tắc Studio "Đèn dây trong phòng"; ?lights=1 / ?lights=0 ghi đè
 // facadeOn: công tắc Studio "Mặt phố sống động"; ?facade=1 / ?facade=0 ghi đè
 // highlandOn: công tắc Studio "Đà Lạt sương mù"; ?highland=1 / ?highland=0 ghi đè
@@ -76,12 +77,14 @@ export function ChillRecord({
   destinations,
   streetMotionOn = false,
   stringLightsOn = false,
+  sketchOn = false,
   facadeOn = false,
   highlandOn = false,
 }: {
   destinations: Destination[]
   streetMotionOn?: boolean
   stringLightsOn?: boolean
+  sketchOn?: boolean
   facadeOn?: boolean
   highlandOn?: boolean
 }) {
@@ -148,6 +151,10 @@ export function ChillRecord({
       if (new URLSearchParams(window.location.search).get('train') === 'now') scene.callTrain()
       if (new URLSearchParams(window.location.search).get('santa') === 'now') scene.callSanta()
       scene.setTheme(setup.theme)
+      // Trước setSeat: người ngồi tải đúng bản (ký hoạ / laptop) ngay từ đầu
+      const sketch = new URLSearchParams(window.location.search).get('sketch')
+      const page = Number(new URLSearchParams(window.location.search).get('page'))
+      scene.setSketch(sketch ? sketch === '1' : sketchOn, page > 0 && page <= 1 ? page : null)
       scene.setSeat(setup.seat)
       scene.setMusic(true)
       scene.setBusy(setup.busy)
@@ -178,7 +185,7 @@ export function ChillRecord({
       ro.disconnect()
       sceneRef.current = null
     }
-  }, [setup, streetMotionOn, stringLightsOn, facadeOn, highlandOn])
+  }, [setup, streetMotionOn, stringLightsOn, sketchOn, facadeOn, highlandOn])
 
   useEffect(() => {
     if (setup) sceneRef.current?.setAtmosphere(time, setup.weather, setup.dest)

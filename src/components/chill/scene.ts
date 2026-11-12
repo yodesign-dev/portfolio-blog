@@ -41,6 +41,7 @@ import type {Drink} from './drink'
 import {CHARACTERS, type SeatedFriend} from './table-view'
 import type {StreetSound} from './audio'
 import {StringLights} from './string-lights'
+import {SketchPage, idleProgress, type PageQuad} from './sketch'
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night'
 export type Weather = 'clear' | 'rain' | 'mist'
@@ -517,6 +518,11 @@ export class ChillScene {
   private smooth = false
   // Đèn dây vẽ sẵn trong ảnh phòng thở / chớp / đổi màu nhẹ (công tắc Studio stringLightsOpen)
   private lightsOn = false
+  // Chị ký hoạ ở giá vẽ thay vì gõ laptop (công tắc Studio sketchOpen)
+  private sketchOn = false
+  private sketchPage: SketchPage | null = null
+  // Xem trước một mức vẽ cố định (?page=0.8), null = theo phin / đồng hồ
+  private sketchFixed: number | null = null
   private stringLights = new StringLights()
   private musicOn = false
   private tint: string | null = null
@@ -808,7 +814,7 @@ export class ChillScene {
 
   // Ảnh nội thất + người ngồi theo phòng và lựa chọn nam / nữ
   private get art() {
-    return seatArt(this.theme, this.shownSeat)
+    return seatArt(this.theme, this.shownSeat, this.sketchOn)
   }
 
   // Người ngồi nam / nữ (lựa chọn của khách khi công tắc Studio seatPickOpen bật). Phòng chưa
@@ -819,7 +825,7 @@ export class ChillScene {
     if (seat === this.seat) return
     this.seat = seat
     const token = ++this.seatLoad
-    const next = seatArt(this.theme, seat)
+    const next = seatArt(this.theme, seat, this.sketchOn)
     if (next.interior === this.art.interior) {
       this.shownSeat = seat
       this.onSeatLoading?.(null)
@@ -847,14 +853,14 @@ export class ChillScene {
   // Tải + giải nén trước ảnh của người ngồi `seat` trong phòng hiện tại (khi rảnh, hoặc khi
   // khách rê chuột / chạm vào nút chọn). Phòng chưa có bản nữ thì không tải gì
   preloadSeat(seat: Seat) {
-    const next = seatArt(this.theme, seat)
+    const next = seatArt(this.theme, seat, this.sketchOn)
     if (next.interior === this.art.interior) return
     for (const src of this.seatSources(seat)) this.seatImage(src)
   }
 
   // Ảnh nội thất + sheet người ngồi (đúng bản màn rộng / hẹp và bản theo mùa) của `seat`
   private seatSources(seat: Seat) {
-    const next = seatArt(this.theme, seat)
+    const next = seatArt(this.theme, seat, this.sketchOn)
     const c = next.character
     return [next.interior, c.kind === 'video' ? this.seatSrc(c, this.pickSpec(c)) : c.src]
   }
@@ -900,7 +906,8 @@ export class ChillScene {
     const ctx = canvas.getContext('2d')!
     ctx.imageSmoothingEnabled = false
     ctx.setTransform(k, 0, 0, k, -at.x * k, -at.y * k)
-    const {screen, screenBehind} = this.theme
+    const {screenBehind} = this.theme
+    const screen = this.art.page ? null : this.theme.screen
     const night = this.time === 'night'
     if (screen && screenBehind) drawScreen(ctx, screen, this.clock, night)
     ctx.drawImage(this.interiorLayer, 0, 0, SCENE_W * SCALE, SCENE_H * SCALE)
@@ -1066,6 +1073,24 @@ export class ChillScene {
   // (công tắc Studio stringLightsOpen). Tắt = bóng đứng yên như ảnh
   setStringLights(on: boolean) {
     this.lightsOn = on
+  }
+
+  // Chị ký hoạ ở giá vẽ (công tắc Studio sketchOpen): phòng có bản ký hoạ thì tải ảnh + sheet mới
+  setSketch(on: boolean, fixed: number | null = null) {
+    this.sketchFixed = fixed
+    if (on === this.sketchOn) return
+    const before = this.art.interior
+    this.sketchOn = on
+    if (this.art.interior === before && this.shownSeat === this.seat) return
+    // Như đổi phòng: bỏ lượt tải người ngồi đang dở (nó tải theo bản cũ), tải lại theo người khách chọn
+    this.seatLoad++
+    this.seatFade = null
+    this.onSeatLoading?.(null)
+    this.shownSeat = this.seat
+    this.interior = loadImage(this.art.interior, () => (this.dirty = true))
+    this.loadCharacter()
+    this.sipT = -1
+    this.dirty = true
   }
 
   // Tạm dừng cảnh (nút pause / giảm chuyển động)
@@ -3066,7 +3091,11 @@ export class ChillScene {
     this.noel?.drawGlass(ctx)
     ctx.restore()
 
-    const {screen, screenBehind} = this.theme
+    const {screenBehind} = this.theme
+    // Bản ký hoạ: trang sketchbook thay màn laptop, vẽ dưới ảnh nội thất như màn của Bàn đêm
+    const page = this.art.page
+    const screen = page ? null : this.theme.screen
+    if (page && ready(this.interior)) this.drawSketchPage(ctx, page)
     if (screen && screenBehind && ready(this.interior)) {
       ctx.save()
       ctx.setTransform(RES, 0, 0, RES, 0, 0)
@@ -3560,6 +3589,15 @@ export class ChillScene {
   }
 
   // Ánh sáng cộng thêm (đèn thả, màn hình, nắng xuyên cửa) + viền tối
+  // Trang sketchbook: ký hoạ con phố đang ở ngoài cửa sổ. Pha phin thì nét hiện theo phin (phin xong
+  // = bức xong); không pha thì theo đồng hồ thật, một bức mỗi 25 phút, tải lại trang vẫn vẽ tiếp
+  private drawSketchPage(ctx: CanvasRenderingContext2D, page: PageQuad) {
+    if (!this.sketchPage || this.sketchPage.quad !== page) this.sketchPage = new SketchPage(page)
+    if (ready(this.street)) this.sketchPage.setSource(this.street, this.destination.id)
+    const progress = this.sketchFixed ?? this.brewLevel ?? idleProgress(Date.now() / 1000)
+    this.sketchPage.draw(ctx, progress, (c, w, h) => this.wash(c, w, h), `${this.time}|${this.weather}`)
+  }
+
   private drawLights() {
     const ctx = this.ctx
     ctx.save()
@@ -3591,7 +3629,7 @@ export class ChillScene {
       // Bóng đèn thả của quán
       if (this.theme.id === 'cafe') this.rect(lamp.x - 3, lamp.y - 1, 7, 2, 'rgba(255,231,168,0.9)')
     }
-    if (laptop) {
+    if (laptop && !this.art.page) {
       const screen = this.time === 'night' ? 0.28 : 0.1
       const g = ctx.createRadialGradient(laptop.x, laptop.y, 1, laptop.x, laptop.y, 40)
       g.addColorStop(0, `rgba(130,175,255,${screen})`)
