@@ -4210,7 +4210,7 @@ export function ChillRoom({
             <WhatsNewButton
               dot={updatesSeen.dot}
               toast={updatesSeen.toast}
-              latest={updates[0]}
+              latest={updatesSeen.headline}
               open={updatesOpen}
               onOpen={openUpdates}
               onCloseToast={updatesSeen.closeToast}

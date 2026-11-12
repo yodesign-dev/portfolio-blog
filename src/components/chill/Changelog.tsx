@@ -2,8 +2,8 @@
 
 // Nhật ký thay đổi trang /chill (Studio: "Chill · Nhật ký thay đổi").
 //
-// - Nút "Có gì mới" trên thanh trên cùng; chấm cam khi bản mới nhất có "Báo cho
-//   người xem" mà máy này chưa xem
+// - Nút "Có gì mới" trên thanh trên cùng; chấm cam khi bản "Báo cho người xem" mới nhất
+//   (headline) máy này chưa xem. Bản không báo đăng sau nó không che mất chấm cam
 // - Lần đầu quay lại sau bản đó: thông báo nhỏ ngay dưới nút, tự ẩn — không tự bật
 //   popup (người xem đang tập trung)
 // - Popup giữa màn (desktop) / sheet từ dưới lên (điện thoại), cùng kiểu bảng cảm ơn.
@@ -72,7 +72,10 @@ function write(key: string, value: string) {
 // Trạng thái đã xem. `returning` = máy này từng vào /chill trước khi có nhật ký
 // (đã có prefs) → vẫn báo bản mới; người mới vào lần đầu thì không báo gì.
 export function useUpdatesSeen(updates: ChillUpdate[], returning: boolean | null) {
+  // `latest` đánh dấu đã xem tới đâu; `headline` = bản có báo mới nhất, quyết định chấm cam
+  // và thông báo nhỏ — bản không báo (sửa lỗi nhỏ) đăng sau nó không được che mất nó
   const latest = updates[0]
+  const headline = updates.find((u) => u.announce !== false)
   const [seen, setSeen] = useState<string | null | undefined>(undefined)
   const [toast, setToast] = useState(false)
   // Đã mở popup trong phiên này → tắt chấm cam; nhãn "Chưa xem" giữ tới lần sau
@@ -89,15 +92,18 @@ export function useUpdatesSeen(updates: ChillUpdate[], returning: boolean | null
     }
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setSeen(saved)
-    const fresh = latest.announce !== false && saved !== latest.id
-    if (!fresh || read(TOAST_KEY) === latest.id) return
+    if (!headline) return
+    // Bản đã xem nằm sau headline (cũ hơn) hoặc không còn trong danh sách → headline là mới
+    const seenAt = updates.findIndex((u) => u.id === saved)
+    const fresh = seenAt === -1 || seenAt > updates.indexOf(headline)
+    if (!fresh || read(TOAST_KEY) === headline.id) return
     // Đợi cảnh hiện lên rồi mới báo
     const t = window.setTimeout(() => {
-      write(TOAST_KEY, latest.id)
+      write(TOAST_KEY, headline.id)
       setToast(true)
     }, TOAST_DELAY)
     return () => window.clearTimeout(t)
-  }, [latest, returning])
+  }, [updates, latest, headline, returning])
 
   // Tự ẩn, trừ lúc người xem đang rê chuột / focus vào thông báo
   useEffect(() => {
@@ -110,7 +116,7 @@ export function useUpdatesSeen(updates: ChillUpdate[], returning: boolean | null
   // xong storage hoặc bản `seen` đã bị xoá → không đánh dấu gì
   const seenIndex = seen === undefined ? 0 : seen === null ? updates.length : Math.max(0, updates.findIndex((u) => u.id === seen))
   const unseen = new Set(updates.slice(0, seenIndex).map((u) => u.id))
-  const dot = Boolean(!opened && latest && latest.announce !== false && unseen.has(latest.id))
+  const dot = Boolean(!opened && headline && unseen.has(headline.id))
 
   const markSeen = () => {
     if (!latest) return
@@ -119,7 +125,7 @@ export function useUpdatesSeen(updates: ChillUpdate[], returning: boolean | null
     setToast(false)
   }
 
-  return {unseen, dot, toast, closeToast: () => setToast(false), holdToast: setHoldToast, markSeen}
+  return {unseen, dot, toast, headline, closeToast: () => setToast(false), holdToast: setHoldToast, markSeen}
 }
 
 export function WhatsNewButton({
