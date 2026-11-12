@@ -8,7 +8,7 @@
 // - Phin trên tấm đồng hồ cũng đầy dần: điện thoại cắt tranh dọc không thấy phin trên quầy,
 //   và 2 phòng không có ly trong (xem themes.ts) chỉ có phin này
 
-import {useState, type ReactNode} from 'react'
+import {useEffect, useRef, useState, type ReactNode} from 'react'
 import {useT} from './i18n'
 
 // Phin ngắn hơn chừng này chỉ tính phút, không tính phin / quà kệ / thử thách chung
@@ -148,6 +148,7 @@ export function BrewPlate({
   onDrop,
   onSkipBreak,
   onCompact,
+  lite = false,
 }: {
   clock: string
   ariaLabel: string
@@ -170,9 +171,28 @@ export function BrewPlate({
   onDrop: () => void
   onSkipBreak: () => void
   onCompact: (compact: boolean) => void
+  // Tập trung một chạm: hàng phin (giờ, việc, Tạm dừng, ⋯) và hàng nhạc riêng bên dưới
+  lite?: boolean
 }) {
   const t = useT()
   const [asking, setAsking] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menu) return
+    const onDown = (e: PointerEvent) => !menuRef.current?.contains(e.target as Node) && setMenu(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setMenu(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [menu])
   const count = minutes > 60 ? Math.ceil(minutes / 2) : minutes
   const doneBlocks = Math.floor(progress * count)
   const elapsedMin = Math.round(progress * minutes)
@@ -218,6 +238,109 @@ export function BrewPlate({
             {t.focus.expand}
           </button>
         )}
+      </div>
+    )
+  }
+
+  const askDrop = () => (rest || elapsedMin < 1 ? onDrop() : setAsking(true))
+  const dropDialog = asking && (
+    <div role="alertdialog" aria-label={t.focus.drop} className="absolute inset-x-0 bottom-full mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#24222b] px-3 py-2.5 text-sm text-[#ede6dd] shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)]">
+      <span className="mr-auto min-w-0">{t.focus.dropAsk(elapsedMin)}</span>
+      <button type="button" autoFocus onClick={() => setAsking(false)} className={`${quiet} !h-9`}>
+        {t.focus.resume}
+      </button>
+      <button type="button" onClick={onDrop} className={`${quiet} !h-9 !border-[#e8b27d]/50 !text-[#f3cfa8]`}>
+        {t.focus.drop}
+      </button>
+    </div>
+  )
+  const progressBar = (
+    <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} className="mt-2.5 flex h-2 gap-[2px]">
+      {Array.from({length: count}).map((_, i) => (
+        <i
+          key={i}
+          className={`min-w-0 flex-1 ${
+            i < doneBlocks
+              ? rest
+                ? 'bg-[#9fd4a8]'
+                : 'bg-[#e8b27d]'
+              : i === doneBlocks
+                ? `${rest ? 'bg-[#e3f2e5]' : 'bg-[#f3cfa8]'} ${paused ? '' : 'motion-safe:animate-[chill-brew-now_1.6s_steps(2)_infinite]'}`
+                : 'bg-white/10'
+          }`}
+        />
+      ))}
+    </div>
+  )
+
+  if (lite) {
+    const headline = rest ? `${t.focus.breakTitle(long)} · ${t.focus.breakShort}` : `${paused ? `${t.focus.paused} · ` : ''}${task ?? t.focus.noTask}`
+    // Hàng phin chỉ có 1 nút chính (Tạm dừng / Bỏ nghỉ) + ⋯; nhạc là hàng riêng, có nút dừng của riêng nó
+    return (
+      <div className={`${frame} relative w-full max-w-[720px] p-3 sm:px-4`}>
+        {dropDialog}
+        {/* Điện thoại: dòng việc + vòng phin lên trên, hàng dưới đủ chỗ cho giờ và nút */}
+        <div className="mb-2 flex items-center gap-2 sm:hidden">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[#ede6dd]">{headline}</p>
+          {dots}
+        </div>
+        <div className="flex items-center gap-3">
+          <PhinSprite level={rest ? 1 : progress} dripping={!rest && !paused} className="h-[44px] shrink-0 max-sm:hidden" />
+          <span role="timer" aria-label={ariaLabel} className={`shrink-0 ${digitColor} ${paused ? 'opacity-50 [filter:none]' : ''}`}>
+            <PixelClock text={clock} className="h-[30px] sm:h-[36px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-[#ede6dd] max-sm:hidden">{headline}</p>
+            <span className="mt-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#a79e94] max-sm:hidden">
+              {dots}
+              <span className="truncate">{rest ? t.focus.nextPhin(nextMinutes) : t.focus.round(roundNow, roundOf)}</span>
+            </span>
+          </div>
+          {rest ? (
+            <button type="button" onClick={onSkipBreak} className="flex h-10 shrink-0 items-center rounded-full bg-[#9fd4a8] px-3.5 text-[13px] font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]">
+              {t.focus.skipBreak}
+            </button>
+          ) : (
+            pauseButton
+          )}
+          <div ref={menuRef} className="relative shrink-0">
+            <button type="button" aria-label={t.focus.liteActions} title={t.focus.liteActions} aria-expanded={menu} onClick={() => setMenu((v) => !v)} className={`${quiet} !w-10 !px-0`}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
+                <circle cx="2.5" cy="7" r="1.4" />
+                <circle cx="7" cy="7" r="1.4" />
+                <circle cx="11.5" cy="7" r="1.4" />
+              </svg>
+            </button>
+            {menu && (
+              <div role="menu" className="absolute bottom-full right-0 z-10 mb-2 grid min-w-44 gap-0.5 rounded-xl border border-white/10 bg-[#24222b] p-1.5 text-sm text-[#ede6dd] shadow-[0_12px_40px_-12px_rgba(0,0,0,0.8)]">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(false)
+                    onCompact(true)
+                  }}
+                  className="rounded-lg px-3 py-2 text-left transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                >
+                  {t.focus.compact}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(false)
+                    askDrop()
+                  }}
+                  className="rounded-lg px-3 py-2 text-left text-[#f0a070] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                >
+                  {rest ? t.focus.stop : `${t.focus.drop}…`}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        {progressBar}
+        <div className="mt-2.5 border-t border-white/[0.08] pt-2.5">{music}</div>
       </div>
     )
   }

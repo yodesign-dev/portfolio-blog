@@ -41,6 +41,7 @@ type Value = {
   brewDeskOpen?: boolean
   welcomeObOpen?: boolean
   compactOpen?: boolean
+  focusLiteOpen?: boolean
   tripOpen?: boolean
   tripPhins?: number
   seasonsOpen?: boolean
@@ -66,7 +67,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'compactOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'favOpen' | 'seasonsOpen' | 'liveOpen'
+type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'compactOpen' | 'focusLiteOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'favOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -80,6 +81,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'slipNewOpen', icon: '🩹', title: 'Mẩu ghi chú kiểu mới', short: 'Mẩu nhỏ dán băng keo, tự xoay vòng', desc: 'Mẩu giấy góc trái trên cảnh gọn lại (dán băng keo, bỏ đinh ghim) và tự xoay qua tối đa 5 mẩu: 3 mẩu khách mới nhất, câu mèo quán, câu hỏi của quán. Rê chuột thì dừng, đang chạy phin thì chỉ còn miếng băng keo. Cần bật Bảng nhật ký. Thử trước bằng ?slip=new.', delay: '30 giây'},
       {key: 'welcomeObOpen', icon: '👋', title: 'Màn chào mới', short: 'Mọi khách vào quán bằng 1 chạm', desc: 'Màn chào gọn lại, khách mới và khách quay lại dùng chung một bố cục. Nút chính là Nghe nhạc, có sẵn tên trạm và bài (khách quay lại lần trước hẹn giờ thì nút chính là Tập trung tiếp). Hai nút phụ: Tập trung (ChromoTime, bắt đầu ngay 1 phin) và Ngắm cảnh. Người ngồi quầy là công tắc Anh / Chị (chỉ phòng có bản nữ). Màn ngang là một thanh ở mép dưới, màn dọc thì chữ trên cảnh, nút dưới cảnh. Bỏ ô nhập tên ở màn chào. Tắt là về màn chào cũ. Thử trước bằng ?ob=1.', delay: '1 phút'},
       {key: 'compactOpen', icon: '🧹', title: 'Quán gọn', short: 'Màn hình gọn, khách tự bày thêm trong Thực đơn', desc: 'Máy tính gọn như điện thoại: thanh trên chỉ còn điểm đến (một nút mở bảng Cảnh), Thực đơn, Tập trung, Ngắm cảnh, cửa sổ nổi, toàn màn hình. Chia sẻ, Có gì mới, Góp ý, Mời Bin cà phê vào mục Khác của Thực đơn. Nhật ký, Bàn nhóm, lấp lánh và lời mời làm quen cất đi; trong Thực đơn có công tắc để khách tự bật, cùng hai nút Gọn / Bày hết. Khách quen đã dùng nhật ký hay bàn nhóm thì giữ nguyên cho họ. Nhật ký tự hiện từ lần ghé thứ hai, mỗi lần ghé chỉ một lời mời làm quen. Tắt là về như cũ. Thử trước bằng ?compact=1.', delay: '1 phút'},
+      {key: 'focusLiteOpen', icon: '⏱️', title: 'Tập trung một chạm', short: 'Bảng chuẩn bị gọn, tấm đồng hồ hai hàng', desc: 'Cần bật Bàn pha phin. Bảng Tập trung chỉ còn độ dài (15/25/45/60 phút), việc cho phin này, một dòng tóm tắt nhạc (bấm Đổi để chọn) và nút Bắt đầu ghi rõ số phút. Tiếng nền, giờ nghỉ, cửa sổ nổi, báo khi hết giờ, tự chạy vòng và độ dài lẻ vào mục Tuỳ chỉnh, đóng sẵn. Tab Khách quen chuyển thành dòng Thẻ khách quen trong Thực đơn. Đang pha: hàng phin chỉ có Tạm dừng và nút ⋯ (thu gọn, bỏ phin), hàng nhạc riêng bên dưới; nút Tập trung trên thanh trên không đếm giờ trùng nữa. Khách đã pha từ 3 phin: nút đổi thành Pha 25′, bấm là chạy, mũi tên bên cạnh mở bảng. Tắt là về bảng cũ, phin đang pha không mất. Thử trước bằng ?focus=lite.', delay: '1 phút'},
       {key: 'seatPickOpen', icon: '👩', title: 'Chọn người ngồi', short: 'Anh / Chị ở màn chào', desc: 'Màn chào và Cài đặt › Cảnh có thêm lựa chọn Anh / Chị. Hiện mới phòng Cửa sổ quán có bản nữ, phòng khác vẫn là nam.', delay: '1 phút'},
       {key: 'miniPlayerOpen', icon: '🪟', title: 'Cửa sổ nổi', short: 'Thu nhỏ quán, nổi trên mọi cửa sổ', desc: 'Nút Thu nhỏ đưa cảnh quán ra một cửa sổ nhỏ luôn nổi trên các ứng dụng khác (phát/dừng, bài tiếp, mưa). Chỉ Chrome / Edge máy tính có, trình duyệt khác không hiện nút. Kèm tên bài và nút điều khiển trên màn hình khoá, phím media. Thử trước bằng ?mini=1.', delay: '1 phút'},
       {key: 'brewDeskOpen', icon: '☕', title: 'Bàn pha phin', short: 'Đồng hồ lớn thay thanh nhạc, phin nhỏ giọt trong cảnh', desc: 'Đang pha phin thì tấm đồng hồ pixel thay chỗ thanh nhạc, phin trên quầy nhỏ giọt và ly đầy dần. Có tạm dừng, thu gọn và độ dài tuỳ chỉnh 5 đến 120 phút. Tắt là về bảng đồng hồ cũ, phiên đang chạy không mất.', delay: '1 phút'},

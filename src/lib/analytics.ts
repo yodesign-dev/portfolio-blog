@@ -26,7 +26,7 @@ export type AnalyticsEvent =
   | {name: 'Chill Welcome'; props: {goal: 'music' | 'focus' | 'look'; visitor: 'new' | 'returning'}}
   | {name: 'Chill Lang'; props: {lang: 'en' | 'vi'}}
   // Đồng hồ phin: bắt đầu / làm xong / dừng giữa chừng
-  | {name: 'Chill Focus'; props: {action: 'start' | 'done' | 'stop' | 'break-start' | 'break-done' | 'break-skip' | 'auto-on' | 'auto-off' | 'pause' | 'resume' | 'compact' | 'music-start' | 'music-reroll' | 'music-save'; break?: 'short' | 'long'; minutes?: number; music?: 'suggest' | 'list' | 'current'; mood?: string}}
+  | {name: 'Chill Focus'; props: {action: 'open' | 'start' | 'done' | 'stop' | 'break-start' | 'break-done' | 'break-skip' | 'auto-on' | 'auto-off' | 'pause' | 'resume' | 'compact' | 'music-start' | 'music-reroll' | 'music-save'; break?: 'short' | 'long'; minutes?: number; music?: 'suggest' | 'list' | 'current'; mood?: string; ui?: 'lite' | 'full'; quick?: boolean}}
   | {name: 'Chill Todo'; props: {action: 'add' | 'done' | 'book'}}
   | {name: 'Chill Shelf'; props: {action: 'gift' | 'open'}}
   // Mèo đi chơi xa: mời / tiễn / để mai / nhận bưu thiếp (hours = số giờ từ lúc mèo về tới lúc nhận) / ghé nơi đó

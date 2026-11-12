@@ -36,6 +36,10 @@ const MINUTES_KEY = 'chill:focus-min'
 const TODO_SEEN_KEY = 'chill:todo-seen'
 // Welcome.tsx dùng chung để ghi đúng số phút lên nút Tập trung
 export const OPTIONS = [15, 25, 45]
+// Tập trung một chạm: 60 phút thay chỗ nút Tuỳ chỉnh, độ dài lẻ nằm trong mục Tuỳ chỉnh
+const LITE_OPTIONS = [15, 25, 45, 60]
+// Đã pha từ bấy nhiêu phin → nút Tập trung thành "Pha 25′", bấm là chạy
+const QUICK_AFTER_PHINS = 3
 const AUTO_KEY = 'chill:focus-auto'
 const CHAIN_KEY = 'chill:focus-chain'
 const COMPACT_KEY = 'chill:brew-compact'
@@ -96,6 +100,9 @@ export function Focus({
   onMinutes,
   onBrewInfo,
   onControls,
+  lite = false,
+  musicSettings = null,
+  regularsSignal = 0,
 }: {
   regular: Regular
   // Bấm "Bắt đầu" → mở sẵn đường tiếng cho chuông lúc hết giờ
@@ -148,6 +155,12 @@ export function Focus({
   onBrewInfo?: (info: BrewInfo | null) => void
   // Nút trong cửa sổ nổi điều khiển phin
   onControls?: (controls: BrewControls) => void
+  // Tập trung một chạm (công tắc focusLiteOpen, cần Bàn pha phin): bảng gọn, tấm đồng hồ 2 hàng
+  lite?: boolean
+  // Phần cài đặt nhạc (tiếng nền, giờ nghỉ…) trong mục Tuỳ chỉnh của bảng gọn
+  musicSettings?: ReactNode
+  // Tăng 1 = mở thẳng Thẻ khách quen (dòng trong Thực đơn khi bảng gọn đã bỏ tab)
+  regularsSignal?: number
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -172,11 +185,16 @@ export function Focus({
   const [rested, setRested] = useState(false)
   const [custom, setCustom] = useState(false)
   const [compact, setCompact] = useState(false)
+  // Bảng gọn: mục Tuỳ chỉnh và danh sách việc đóng sẵn
+  const [more, setMore] = useState(false)
+  const [taskOpen, setTaskOpen] = useState(false)
   // Phiên vừa kết thúc — chặn interval + visibilitychange cùng báo hết giờ 2 lần
   const endedRef = useRef(0)
   // Phin đã hết giờ khi mở trang, chờ biết công tắc Bàn pha phin (cờ đọc sau khi hydrate)
   const lateRef = useRef<Session | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  // Phin sắp bắt đầu là từ nút "Pha 25′" (để ghi vào sự kiện start)
+  const quickRef = useRef(false)
 
   // Khôi phục sau khi hydrate: phút đã chọn + phiên đang chạy dở
   useEffect(() => {
@@ -277,7 +295,8 @@ export function Focus({
       setPicked(null)
       // Phin ngắn không góp vào thử thách chung
       if (minutes >= MIN_FULL_PHIN) onStart?.()
-      trackEvent({name: 'Chill Focus', props: {action: 'start', ...(brew ? {minutes} : {})}})
+      trackEvent({name: 'Chill Focus', props: {action: 'start', ...(brew ? {minutes, ui: lite ? 'lite' : 'full'} : {}), ...(quickRef.current ? {quick: true} : {})}})
+      quickRef.current = false
       if (brew) onBrewBegin?.(given === undefined, minutes)
     }
     onPrime()
@@ -286,6 +305,14 @@ export function Focus({
     setSession(next)
     store(FOCUS_KEY, next)
   }
+  const onRegularsSignal = useEffectEvent(() => {
+    setTab('regulars')
+    setOpen(true)
+  })
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- dòng Thẻ khách quen trong Thực đơn gửi tín hiệu từ ngoài
+    if (regularsSignal > 0) onRegularsSignal()
+  }, [regularsSignal])
   const onStartSignal = useEffectEvent(() => {
     if (!session) begin('phin')
   })
@@ -360,14 +387,24 @@ export function Focus({
     setOpen(false)
     setFinished(null)
     setRested(false)
+    // Bảng gọn không có tab: lần mở sau luôn về phần pha phin
+    if (lite) setTab('brew')
+    setTaskOpen(false)
+  }
+  // Khách tự mở bảng (không tính lúc bảng tự mở để tổng kết)
+  const openByUser = () => {
+    setOpen(true)
+    trackEvent({name: 'Chill Focus', props: {action: 'open', ui: lite ? 'lite' : 'full'}})
   }
 
   useEffect(() => onOpenChange(open), [open, onOpenChange])
+  // Đóng từ listener của document: luôn dùng close mới nhất (close đọc lite)
+  const closeFromOutside = useEffectEvent(() => close())
   useEffect(() => {
     if (!open) return
     // Bảng chọn nhạc nổi riêng ngoài bảng này: bấm trong đó không đóng bảng
-    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && !(e.target as Element).closest?.('[data-brew-keep]') && close()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && !(e.target as Element).closest?.('[data-brew-keep]') && closeFromOutside()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeFromOutside()
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -559,16 +596,249 @@ export function Focus({
     </div>
   )
 
+  // Tab Khách quen (bảng gọn: mở từ dòng Thẻ khách quen trong Thực đơn)
+  const regularsView = (
+    <>
+      {quest && (
+        <Tabs
+          small
+          className="mt-3"
+          value={sub}
+          onChange={setSub}
+          items={[
+            {id: 'mine', label: t.focus.tabs.mine},
+            {id: 'cafe', label: t.focus.tabs.cafe},
+          ]}
+        />
+      )}
+      {quest && sub === 'cafe' ? (
+        quest
+      ) : (
+        <div className="mt-3">
+          <NameField label={t.name.label} />
+          <p className="mt-0.5 text-[11px] leading-snug text-[#7d756d]">{t.name.shared}</p>
+          <div className="mt-3 border-t border-white/[0.08] pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.regular.card(card)}</p>
+              <span className="rounded-full border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2 py-0.5 text-[11px] font-medium text-[#f3cfa8]">
+                {t.regular.levels[levelOf(regular.total)]}
+              </span>
+            </div>
+            <ol className="mt-2 grid grid-cols-10 gap-1" aria-label={t.regular.stampsAria(stamps, CARD_SLOTS)}>
+              {Array.from({length: CARD_SLOTS}).map((_, i) => (
+                <li
+                  key={i}
+                  aria-hidden
+                  className={`flex aspect-square items-center justify-center rounded-full border ${
+                    i < stamps ? 'border-[#e8b27d] bg-[#e8b27d] text-[#2a1a10]' : 'border-dashed border-white/20 text-transparent'
+                  }`}
+                >
+                  <PawIcon />
+                </li>
+              ))}
+            </ol>
+            <p className="mt-2 text-xs leading-relaxed text-[#a79e94]">
+              {t.regular.summary(regular.total, streak, regular.phins)}
+            </p>
+            {shelfCount !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  close()
+                  onOpenShelf?.()
+                }}
+                className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.04] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                <span>
+                  {t.shelf.title} · {t.shelf.count(shelfCount, ITEMS.length)}
+                </span>
+                <span aria-hidden>→</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+
+  // Bảng gọn (Tập trung một chạm): độ dài, việc, 1 dòng nhạc, nút Bắt đầu ghi rõ số phút; phần còn
+  // lại nằm trong mục Tuỳ chỉnh đóng sẵn. Xong phin thì tổng kết + nghỉ / pha tiếp
+  const pickedTodo = picked ? todos.find((x) => x.id === picked && !x.doneDay) : undefined
+  const liteCustom = !LITE_OPTIONS.includes(minutes)
+  const liteView = (
+    <>
+      {rested && (
+        <div role="status">
+          <p className="mt-2 text-lg font-semibold tracking-tight text-[#f3ece4]">{t.focus.restedTitle}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[#c9c0b6]">{t.focus.restedBody}</p>
+        </div>
+      )}
+      {done ? (
+        summary
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-4 gap-1 rounded-xl border border-white/10 p-1" role="radiogroup" aria-label={t.focus.length}>
+            {LITE_OPTIONS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={minutes === m}
+                onClick={() => {
+                  setCustom(false)
+                  choose(m)
+                }}
+                className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                  minutes === m ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
+                }`}
+              >
+                {t.focus.minutes(m)}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-white/10 px-3 py-2">
+            <span className="w-10 shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{t.focus.liteTask}</span>
+            <span className={`min-w-0 flex-1 truncate text-[13px] ${pickedTodo ? 'text-[#ede6dd]' : 'text-[#a79e94]'}`}>{pickedTodo?.text ?? t.focus.liteNoTask}</span>
+            <button
+              type="button"
+              aria-expanded={taskOpen}
+              onClick={() => setTaskOpen((v) => !v)}
+              className="shrink-0 rounded-md px-1.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            >
+              {taskOpen ? t.focus.liteDone : todos.some((x) => !x.doneDay) ? t.focus.liteChange : t.focus.liteAddTask}
+            </button>
+          </div>
+          {taskOpen && <TodoList todos={todos} picked={picked} onPick={setPicked} onAdd={add} onCheck={check} onRemove={drop} />}
+          {musicSetup}
+        </>
+      )}
+      <div className="sticky -bottom-4 z-10 -mx-4 mt-3 bg-[#1b1a21] px-4 py-3 max-sm:-bottom-[max(1rem,env(safe-area-inset-bottom))]">
+        {done ? (
+          <>
+            <button
+              type="button"
+              onClick={() => beginFromPanel('break')}
+              className="w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
+            >
+              {t.focus.takeBreak(nextBreakLong ? LONG_BREAK_MIN : BREAK_MIN, nextBreakLong)}
+            </button>
+            <button
+              type="button"
+              onClick={() => beginFromPanel('phin')}
+              className="mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            >
+              {t.focus.again}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => beginFromPanel('phin')}
+            className="w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
+          >
+            {t.focus.liteStart(minutes)}
+          </button>
+        )}
+        {round > 0 && (
+          <div className="mt-2.5 flex items-center justify-center gap-2 text-xs text-[#a79e94]">
+            <span className="flex gap-1" role="img" aria-label={t.focus.chainAria(roundDots, LONG_EVERY)}>
+              {Array.from({length: LONG_EVERY}).map((_, i) => (
+                <span key={i} className={`h-2 w-2 rounded-full ${i < roundDots ? 'bg-[#e8b27d]' : 'border border-white/25'}`} />
+              ))}
+            </span>
+            <span>{t.focus.chainLeft(roundDots, LONG_EVERY)}</span>
+          </div>
+        )}
+      </div>
+      {!done && (
+      <button
+        type="button"
+        aria-expanded={more}
+        onClick={() => setMore((v) => !v)}
+        className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-[13px] text-[#a79e94] transition hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+      >
+        {t.focus.liteSettings}
+        <span aria-hidden>{more ? '▾' : '▸'}</span>
+      </button>
+      )}
+      {more && !done && (
+        <div className="mt-1 space-y-3 border-t border-white/[0.08] pt-3">
+          <div className="space-y-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.focus.liteOtherLength}</p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                aria-label={t.focus.fewer}
+                disabled={minutes <= CUSTOM_MIN}
+                onClick={() => {
+                  setCustom(true)
+                  choose(Math.max(CUSTOM_MIN, minutes - CUSTOM_STEP))
+                }}
+                className="size-10 rounded-lg border border-white/10 text-lg text-[#ede6dd] transition enabled:hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                −
+              </button>
+              <span className={`min-w-20 text-center font-mono text-lg tabular-nums ${liteCustom ? 'text-[#f3cfa8]' : 'text-[#ede6dd]'}`} aria-live="polite">
+                {t.focus.minutes(minutes)}
+              </span>
+              <button
+                type="button"
+                aria-label={t.focus.more}
+                disabled={minutes >= CUSTOM_MAX}
+                onClick={() => {
+                  setCustom(true)
+                  choose(Math.min(CUSTOM_MAX, minutes + CUSTOM_STEP))
+                }}
+                className="size-10 rounded-lg border border-white/10 text-lg text-[#ede6dd] transition enabled:hover:bg-white/[0.06] disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                +
+              </button>
+            </div>
+            {minutes < MIN_FULL_PHIN && <p className="text-center text-[11px] leading-snug text-[#a79e94]">{t.focus.shortNote}</p>}
+          </div>
+          {musicSettings}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={auto}
+            onClick={toggleAuto}
+            className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+          >
+            <span aria-hidden className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${auto ? 'bg-[#9fd4a8]' : 'bg-white/15'}`}>
+              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#1b1a21] transition-[left] ${auto ? 'left-3.5' : 'left-0.5'}`} />
+            </span>
+            <span>
+              <span className="block text-xs text-[#ede6dd]">{t.focus.auto}</span>
+              <span className="block text-[11px] leading-snug text-[#7d756d]">{t.focus.autoHint}</span>
+            </span>
+          </button>
+        </div>
+      )}
+    </>
+  )
+  // Khách quen: nút Tập trung thành "Pha 25′", bấm là chạy luôn; mũi tên bên cạnh mở bảng
+  const quick = lite && !session && finished === null && !rested && regular.phins >= QUICK_AFTER_PHINS
+  // Bảng gọn: tấm đồng hồ đã hiện giờ còn lại → nút trên thanh trên không đếm trùng
+  const chipClock = !lite || compact || zen
+
   return (
     // Điện thoại: bảng neo theo cả thanh trên (sát mép phải màn hình) cho khỏi tràn mép trái
     <div ref={ref} className="sm:relative">
-      <div className="relative">
+      <div className="relative flex items-center gap-1">
       <button
         type="button"
-        onClick={() => (open ? close() : brew && session ? chooseCompact(!compact) : setOpen(true))}
+        onClick={() => {
+          if (open) return close()
+          if (brew && session) return chooseCompact(!compact)
+          if (quick) {
+            quickRef.current = true
+            return begin('phin')
+          }
+          openByUser()
+        }}
         aria-expanded={open}
         aria-controls="chill-focus"
-        aria-label={session ? (onBreak ? t.focus.breakAria(clock(left)) : t.focus.runningAria(clock(left))) : t.focus.open}
+        aria-label={session ? (onBreak ? t.focus.breakAria(clock(left)) : t.focus.runningAria(clock(left))) : quick ? t.focus.liteQuickAria(minutes) : t.focus.open}
         title={t.focus.title}
         className={`relative flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
           session || open || done
@@ -583,12 +853,31 @@ export function Focus({
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-black/40 bg-[#f08a5d]" />
           </span>
         )}
-        {session ? <span className={`font-mono text-[11px] tabular-nums ${onBreak ? 'text-[#bfe3c4]' : ''}`}>{clock(left)}</span> : <span className="font-medium">{done ? t.focus.doneChip : t.focus.chip}</span>}
+        {session && chipClock ? (
+          <span className={`font-mono text-[11px] tabular-nums ${onBreak ? 'text-[#bfe3c4]' : ''}`}>{clock(left)}</span>
+        ) : (
+          <span className="font-medium">{session ? (onBreak ? t.focus.liteResting : t.focus.liteBrewing) : quick ? t.focus.liteQuick(minutes) : done ? t.focus.doneChip : t.focus.chip}</span>
+        )}
       </button>
+      {quick && (
+        <button
+          type="button"
+          onClick={() => (open ? close() : openByUser())}
+          aria-label={t.focus.liteOpenPanel}
+          title={t.focus.liteOpenPanel}
+          aria-expanded={open}
+          aria-controls="chill-focus"
+          className="flex h-9 w-7 items-center justify-center rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+        >
+          <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden>
+            <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
       {hint && !open && !session && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={openByUser}
           className="absolute -right-10 top-full z-10 mt-3 whitespace-nowrap rounded-lg bg-[#e8b27d] after:right-[3.25rem] sm:right-0 sm:after:right-3 px-3 py-2 text-xs font-semibold text-[#2a1a10] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] motion-safe:animate-[chill-pop_0.35s_ease-out] after:absolute after:bottom-full after:border-[6px] after:border-transparent after:border-b-[#e8b27d] after:content-['']"
         >
           {hint}
@@ -603,13 +892,26 @@ export function Focus({
           aria-label={t.focus.title}
           className={`z-40 overflow-y-auto overscroll-contain border border-white/10 bg-[#1b1a21]/95 p-4 text-left text-[#ede6dd] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl ${
             brew
-              ? 'fixed inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-5rem)] sm:w-[400px] sm:rounded-2xl sm:pb-4'
+              ? `fixed inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100dvh-5rem)] sm:rounded-2xl sm:pb-4 ${lite ? 'sm:w-[360px]' : 'sm:w-[400px]'}`
               : 'absolute right-3 top-full mt-2 max-h-[calc(100dvh-5rem)] w-[min(300px,calc(100vw-24px))] rounded-2xl sm:right-0'
           }`}
         >
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.title}</p>
-          {/* Đang chạy phin thì chỉ có đồng hồ, không tab */}
-          {!session && (
+          {lite && tab === 'regulars' ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTab('brew')}
+                className="-ml-1 rounded-md px-1.5 py-0.5 text-xs text-[#a79e94] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              >
+                ← {t.focus.liteBack}
+              </button>
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.regularsTitle}</p>
+            </div>
+          ) : (
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#e8b27d]">{t.focus.title}</p>
+          )}
+          {/* Đang chạy phin thì chỉ có đồng hồ, không tab. Bảng gọn không có tab */}
+          {!session && !lite && (
             <Tabs
               className="mt-2.5"
               value={tab}
@@ -621,7 +923,9 @@ export function Focus({
             />
           )}
 
-          {brew && session ? (
+          {lite && tab === 'regulars' ? (
+            regularsView
+          ) : brew && session ? (
             // Đang chạy thì giờ nằm ở tấm đồng hồ; bảng chỉ tự mở để tổng kết phin vừa xong
             <>
               {summary}
@@ -684,6 +988,8 @@ export function Focus({
                 {t.focus.stop}
               </button>
             </>
+          ) : lite ? (
+            liteView
           ) : tab === 'brew' ? (
             <>
               {rested ? (
@@ -808,67 +1114,7 @@ export function Focus({
               </button>
             </>
           ) : (
-            <>
-              {quest && (
-                <Tabs
-                  small
-                  className="mt-3"
-                  value={sub}
-                  onChange={setSub}
-                  items={[
-                    {id: 'mine', label: t.focus.tabs.mine},
-                    {id: 'cafe', label: t.focus.tabs.cafe},
-                  ]}
-                />
-              )}
-              {quest && sub === 'cafe' ? (
-                quest
-              ) : (
-                <div className="mt-3">
-                  <NameField label={t.name.label} />
-                  <p className="mt-0.5 text-[11px] leading-snug text-[#7d756d]">{t.name.shared}</p>
-                  <div className="mt-3 border-t border-white/[0.08] pt-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.regular.card(card)}</p>
-                      <span className="rounded-full border border-[#e8b27d]/40 bg-[#e8b27d]/10 px-2 py-0.5 text-[11px] font-medium text-[#f3cfa8]">
-                        {t.regular.levels[levelOf(regular.total)]}
-                      </span>
-                    </div>
-                    <ol className="mt-2 grid grid-cols-10 gap-1" aria-label={t.regular.stampsAria(stamps, CARD_SLOTS)}>
-                      {Array.from({length: CARD_SLOTS}).map((_, i) => (
-                        <li
-                          key={i}
-                          aria-hidden
-                          className={`flex aspect-square items-center justify-center rounded-full border ${
-                            i < stamps ? 'border-[#e8b27d] bg-[#e8b27d] text-[#2a1a10]' : 'border-dashed border-white/20 text-transparent'
-                          }`}
-                        >
-                          <PawIcon />
-                        </li>
-                      ))}
-                    </ol>
-                    <p className="mt-2 text-xs leading-relaxed text-[#a79e94]">
-                      {t.regular.summary(regular.total, streak, regular.phins)}
-                    </p>
-                    {shelfCount !== null && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          close()
-                          onOpenShelf?.()
-                        }}
-                        className="mt-2 flex w-full items-center justify-between rounded-lg border border-white/10 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.04] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
-                      >
-                        <span>
-                          {t.shelf.title} · {t.shelf.count(shelfCount, ITEMS.length)}
-                        </span>
-                        <span aria-hidden>→</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
+            regularsView
           )}
         </div>
       )}
@@ -895,6 +1141,7 @@ export function Focus({
             onDrop={stop}
             onSkipBreak={skipBreak}
             onCompact={chooseCompact}
+            lite={lite}
           />,
           brewSlot
         )}

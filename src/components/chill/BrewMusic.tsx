@@ -276,16 +276,33 @@ function ListChips({api}: {api: BrewMusicApi}) {
   )
 }
 
-// Trong bảng chuẩn bị phin
-export function MusicChooser({api, currentTitle, currentStation, canMini = false, onPrepareMini}: {api: BrewMusicApi; currentTitle: string; currentStation: string; canMini?: boolean; onPrepareMini?: () => void}) {
+// Trong bảng chuẩn bị phin. part: 'all' = như cũ; Tập trung một chạm (lite) tách làm 2 phần —
+// 'music' là 1 dòng tóm tắt, bấm Đổi mới mở chọn nhạc; 'settings' (tiếng nền, giờ nghỉ, cửa sổ nổi,
+// báo hết giờ) nằm trong mục Tuỳ chỉnh của bảng
+export function MusicChooser({
+  api,
+  currentTitle,
+  currentStation,
+  canMini = false,
+  onPrepareMini,
+  part = 'all',
+}: {
+  api: BrewMusicApi
+  currentTitle: string
+  currentStation: string
+  canMini?: boolean
+  onPrepareMini?: () => void
+  part?: 'all' | 'music' | 'settings'
+}) {
   const t = useT()
+  const [expanded, setExpanded] = useState(false)
   const {prefs, source, suggestion, byId, minutes} = api
   const list = prefs.lists[prefs.active]
   const found = list.ids.filter((id) => byId.has(id))
   const listMin = Math.round(totalSeconds(found, byId) / 60)
   const suggestMin = Math.round(totalSeconds(suggestion, byId) / 60)
-  return (
-    <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
+  const music = (
+    <>
       <div className="space-y-1.5">
         <p className={label}>{t.brew.music}</p>
         <Options
@@ -370,6 +387,10 @@ export function MusicChooser({api, currentTitle, currentStation, canMini = false
         </p>
       )}
 
+    </>
+  )
+  const settings = (
+    <>
       <div className="space-y-1.5">
         <p className={label}>{t.brew.ambience}</p>
         <Options aria={t.brew.ambience} columns="grid-cols-4" value={prefs.mix} onChange={api.setMix} items={SESSION_MIXES.map((id) => ({id, label: t.mix.presets[id]}))} />
@@ -380,6 +401,38 @@ export function MusicChooser({api, currentTitle, currentStation, canMini = false
       </div>
       {canMini && <Switch on={prefs.miniOnStart} title={t.brew.miniOnStart} hint={t.brew.miniOnStartHint} onToggle={() => api.setMiniOnStart(!prefs.miniOnStart)} onPrepare={onPrepareMini} />}
       {canNotify() && <Switch on={prefs.notify} title={t.brew.notify} hint={api.notifyBlocked ? t.brew.notifyBlocked : t.brew.notifyHint} onToggle={() => api.setNotify(!prefs.notify)} />}
+    </>
+  )
+  if (part === 'settings') return <div className="space-y-3">{settings}</div>
+  if (part === 'music') {
+    const summary =
+      source === 'suggest'
+        ? `${t.brew.sources.suggest} · ${t.brew.moods[prefs.mood]} · ${t.brew.tally(suggestion.length, suggestMin)}`
+        : source === 'list'
+          ? `${list.name} · ${t.brew.tally(found.length, listMin)}`
+          : `${t.brew.sources.current} · ${currentTitle}`
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="flex items-center gap-2.5 rounded-xl border border-white/10 px-3 py-2">
+          <span className="w-10 shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{t.brew.music}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-[#ede6dd]">{summary}</span>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+            className="shrink-0 rounded-md px-1.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+          >
+            {expanded ? t.focus.liteDone : t.focus.liteChange}
+          </button>
+        </div>
+        {expanded && <div className="space-y-3">{music}</div>}
+      </div>
+    )
+  }
+  return (
+    <div className="mt-3 space-y-3 border-t border-white/[0.08] pt-3">
+      {music}
+      {settings}
     </div>
   )
 }

@@ -171,6 +171,10 @@ type Prefs = {
   groupWall: GroupWall
 }
 
+// Thực đơn của quán gọn: Có gì (lời mời làm quen, thẻ khách quen) · Màn hình (bật tắt) · Khác
+const MENU_TABS = ['explore', 'screen', 'more'] as const
+type MenuTab = (typeof MENU_TABS)[number]
+
 // Bảng cài đặt chia 3 tab để khỏi cuộn dài — tab cuối cùng mở được nhớ lại
 type PanelTab = 'music' | 'scene' | 'atmosphere'
 
@@ -249,6 +253,7 @@ export function ChillRoom({
   brewDeskOn = false,
   welcomeObOn = false,
   compactOn = false,
+  focusLiteOn = false,
   tripOn = false,
   tripPhins = TRIP_PHINS_DEFAULT,
   seasons = [],
@@ -300,6 +305,9 @@ export function ChillRoom({
   // Quán gọn: màn hình mặc định gọn, khách tự bày thêm trong Thực đơn (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?compact=1 / ?compact=0 trên URL ghi đè. Xem layout.ts
   compactOn?: boolean
+  // Tập trung một chạm: bảng chuẩn bị gọn, tấm đồng hồ 2 hàng, nút "Pha 25′" cho khách quen (Studio
+  // "Chill · Cài đặt", cần Bàn pha phin), mặc định tắt. ?focus=lite / ?focus=full trên URL ghi đè
+  focusLiteOn?: boolean
   // Mèo đi chơi xa (Studio "Chill · Cài đặt", cần bật Kệ sưu tầm), mặc định tắt. ?trip=1 / ?trip=0
   // ghi đè, ?trip=back cho mèo về ngay để thử. tripPhins = số phin trong ngày để mèo muốn đi
   tripOn?: boolean
@@ -980,6 +988,15 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
     setBrewFlag(param ? param === '1' : brewDeskOn)
   }, [brewDeskOn])
+  const [focusLiteFlag, setFocusLiteFlag] = useState(false)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('focus')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setFocusLiteFlag(param ? param === 'lite' : focusLiteOn)
+  }, [focusLiteOn])
+  const focusLite = brewFlag && focusLiteFlag
+  // Tăng 1 = mở Thẻ khách quen (dòng trong Thực đơn, vì bảng phin gọn không còn tab)
+  const [regularsSignal, setRegularsSignal] = useState(0)
   const [brewInfo, setBrewInfo] = useState<BrewInfo | null>(null)
   const brewControls = useRef<BrewControls | null>(null)
   const onBrewControls = useCallback((c: BrewControls) => {
@@ -2585,6 +2602,8 @@ export function ChillRoom({
   const [guideHold, setGuideHold] = useState(false)
   const [diaryAvailable, setDiaryAvailable] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  // Quán gọn: Thực đơn chia 3 tab
+  const [menuTab, setMenuTab] = useState<MenuTab>('explore')
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc localStorage sau khi hydrate
     setGuideTried(loadTried())
@@ -3220,6 +3239,36 @@ export function ChillRoom({
       >
         <SlidersIcon />
       </RoundButton>
+    </div>
+  )
+  // Tập trung một chạm: hàng nhạc riêng dưới hàng phin — nút dừng nhạc của riêng nó, bấm tên bài để đổi nhạc
+  const brewMusicLite = (
+    <div className="flex items-center gap-2">
+      <span className="w-10 shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{t.brew.music}</span>
+      <RoundButton label={playing ? t.room.pause : t.room.play} onClick={togglePlay}>
+        {playing ? <PauseIcon small /> : <PlayIcon small />}
+      </RoundButton>
+      <RoundButton label={t.room.next} onClick={next}>
+        <NextIcon />
+      </RoundButton>
+      <button
+        type="button"
+        onClick={() => {
+          if (queue?.key.startsWith('list:') && queueOn) return brewMusicApi.setPickerOpen(true)
+          setWishOpen(false)
+          setChatOpen(false)
+          setPanelTab('music')
+          setPanelOpen(true)
+        }}
+        title={t.room.trackList}
+        className="min-w-0 flex-1 rounded-lg px-1 text-left transition hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+      >
+        <span className="block truncate text-sm font-semibold text-[#ede6dd]">{track.title}</span>
+        <span className="block truncate font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
+          {stationLabel} · {playingPos + 1}/{playingList.length}
+        </span>
+      </button>
+      {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
     </div>
   )
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
@@ -3889,10 +3938,12 @@ export function ChillRoom({
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Link
             href="/"
-            className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            title={compact ? 'Bin Nguyen' : undefined}
+            className={`flex h-9 items-center gap-1.5 rounded-md bg-black/45 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${compact ? 'w-9 justify-center' : 'px-2.5'}`}
           >
             <ArrowIcon dir="left" />
-            <span className="max-sm:sr-only">Bin Nguyen</span>
+            {/* Quán gọn: chỉ còn mũi tên, tên vẫn đọc được cho trình đọc màn hình */}
+            <span className={compact ? 'sr-only' : 'max-sm:sr-only'}>Bin Nguyen</span>
           </Link>
           <LiveBadge lives={lives} onJoin={() => { if (playing) togglePlay() }} />
           {/* Điện thoại: tên điểm đến nằm hàng riêng dưới hàng nút (chỗ bên trái hẹp); từ sm
@@ -3900,35 +3951,9 @@ export function ChillRoom({
           {/* Điện thoại: hàng này chỉ là 1 dòng chú thích trơn (điểm đến · giờ · số người), không
               đóng khung — mọi thứ bấm được nằm ở hàng trên */}
           <div className={`absolute left-4 top-[3.4rem] flex items-center gap-2 sm:contents ${INFO_ROW}`}>
-            {compact ? (
-              <>
-                <span className="pointer-events-none flex h-9 items-center whitespace-nowrap rounded-md bg-black/45 px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 backdrop-blur sm:hidden">
-                  {dest.name}
-                </span>
-                {/* Quán gọn: điểm đến · thời tiết · giờ gộp thành 1 nút, mở bảng Cảnh */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWishOpen(false)
-                    setChatOpen(false)
-                    setMenuOpen(false)
-                    setPanelTab('scene')
-                    setPanelOpen(true)
-                  }}
-                  title={t.room.scenePick}
-                  className="hidden h-9 items-center gap-2 whitespace-nowrap rounded-md bg-black/45 px-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] sm:flex"
-                >
-                  {dest.name}
-                  <span aria-hidden className="text-white/45">·</span>
-                  {weatherLabel}
-                  <span aria-hidden className="text-white/45">·</span>
-                  {timeLabel}
-                  <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden className="-mr-0.5 text-white/60">
-                    <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              </>
-            ) : (
+            {/* Quán gọn: khách tự chọn điểm đến / trời / giờ nên không nhắc lại trên màn hình
+                (đổi ở Cài đặt › Cảnh, nút cuối thanh nhạc) */}
+            {compact ? null : (
               [dest.name, weatherLabel, timeLabel].map((label, i) => (
                 <span
                   key={label}
@@ -3949,7 +3974,7 @@ export function ChillRoom({
                 <span aria-hidden className="tabular-nums">{t.room.online(online)}</span>
               </span>
             )}
-            <span className="hidden sm:contents">{menuButton}</span>
+            {!compact && <span className="hidden sm:contents">{menuButton}</span>}
           </div>
           {menuOpen && (
             <div
@@ -3957,10 +3982,35 @@ export function ChillRoom({
               id="chill-menu"
               role="dialog"
               aria-label={t.room.menuTitle}
-              className="absolute left-3 top-[5.25rem] z-40 max-h-[calc(100dvh-6.5rem)] w-[min(21rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] p-3 text-[#2a1a10] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.85)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:left-5 sm:top-[4.25rem]"
+              className={`absolute top-[5.25rem] z-40 max-h-[calc(100dvh-6.5rem)] w-[min(21rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] p-3 text-[#2a1a10] shadow-[0_18px_40px_-14px_rgba(0,0,0,0.85)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:top-[4.25rem] ${
+                compact ? 'right-3 sm:right-5' : 'left-3 sm:left-5'
+              }`}
             >
               <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menu}</p>
-              <p className="mt-0.5 text-base font-semibold leading-snug">{t.room.menuTitle}</p>
+              {compact ? (
+                // Quán gọn: 3 tab thay cho một bảng dài — Có gì · Màn hình · Khác
+                <div role="tablist" aria-label={t.room.menu} className="mt-1.5 grid grid-cols-3 gap-1 rounded-lg border-2 border-[#2a1a10] p-0.5">
+                  {MENU_TABS.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={menuTab === id}
+                      onClick={() => setMenuTab(id)}
+                      className={`relative rounded-md py-1.5 text-[13px] font-semibold transition focus-visible:outline-2 focus-visible:outline-[#9a6a45] ${
+                        menuTab === id ? 'bg-[#2a1a10] text-[#fbf1d2]' : 'hover:bg-[#e8b27d]/30'
+                      }`}
+                    >
+                      {t.room.menuTabs[id]}
+                      {id === 'more' && updatesSeen.dot && <span aria-hidden className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#d85a30]" />}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-0.5 text-base font-semibold leading-snug">{t.room.menuTitle}</p>
+              )}
+              {(!compact || menuTab === 'explore') && (
+              <>
               <ul className="mt-2 divide-y divide-dashed divide-[#2a1a10]/25">
                 {GUIDE_ORDER.filter((s) => guideCan[s]).map((s) => (
                   <li key={s}>
@@ -3989,12 +4039,35 @@ export function ChillRoom({
                   </li>
                 ))}
               </ul>
+              {focusLite && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setRegularsSignal((n) => n + 1)
+                  }}
+                  className="mt-1 flex w-full items-start gap-2.5 rounded-lg border-t border-dashed border-[#2a1a10]/25 px-1.5 pb-2 pt-2.5 text-left transition hover:bg-[#e8b27d]/30 focus-visible:outline-2 focus-visible:outline-[#9a6a45]"
+                >
+                  <span aria-hidden className="mt-0.5 w-4 shrink-0 text-center text-[12px]">
+                    🐾
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold leading-snug">{t.room.menuRegulars.title}</span>
+                    <span className="block text-xs leading-snug text-[#2a1a10]/70">{t.room.menuRegulars.desc}</span>
+                  </span>
+                  <span aria-hidden className="mt-0.5 text-sm text-[#9a6a45]">
+                    →
+                  </span>
+                </button>
+              )}
               <p className="mt-2 text-[11px] leading-snug text-[#2a1a10]/60">{t.room.menuNote}</p>
+              </>
+              )}
               {/* Quán gọn: khách tự chọn thứ gì nằm trên màn hình (layout.ts) */}
-              {compact && (
-                <div className="mt-2.5 border-t-2 border-[#2a1a10]/70 pt-2">
+              {compact && menuTab === 'screen' && (
+                <div className="mt-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.layoutTitle}</p>
+                    <p className="text-sm font-semibold leading-snug">{t.room.layoutTitle}</p>
                     <div role="group" aria-label={t.room.layoutPresets} className="flex gap-1">
                       {(
                         [
@@ -4040,7 +4113,7 @@ export function ChillRoom({
                 </div>
               )}
               {/* Cài quán thành ứng dụng — ẩn khi đang trong ứng dụng hoặc trình duyệt không cài được */}
-              {installMode && (
+              {installMode && (!compact || menuTab === 'more') && (
                 <div className="mt-2.5 rounded-xl border-2 border-[#2a1a10] bg-[#e8b27d]/35 p-2.5">
                   <button
                     type="button"
@@ -4072,8 +4145,9 @@ export function ChillRoom({
                 </div>
               )}
               {/* Điện thoại: những thứ ít dùng không còn nút riêng trên màn hình → nằm ở đây */}
-              <div className={`mt-2.5 border-t-2 border-[#2a1a10]/70 pt-2 ${compact ? '' : 'sm:hidden'}`}>
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menuMore}</p>
+              {(!compact || menuTab === 'more') && (
+              <div className={compact ? 'mt-2' : 'mt-2.5 border-t-2 border-[#2a1a10]/70 pt-2 sm:hidden'}>
+                {!compact && <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menuMore}</p>}
                 <div className="mt-1 grid grid-cols-2 gap-1">
                   {menuMore.map((item) => (
                     <button
@@ -4091,6 +4165,7 @@ export function ChillRoom({
                   ))}
                 </div>
               </div>
+              )}
             </div>
           )}
         </div>
@@ -4117,7 +4192,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} startSignal={focusStart} gift={gift} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={brewMusic} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} startSignal={focusStart} gift={gift} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={focusLite ? brewMusicLite : brewMusic} lite={focusLite} regularsSignal={regularsSignal} musicSettings={focusLite ? <MusicChooser part="settings" api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} /> : null} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser part={focusLite ? 'music' : 'all'} api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
             onBrewBegin(manual, minutes)
             // Trình duyệt chỉ cho mở cửa sổ nổi ngay trong cú bấm của khách
             if (manual && brewMusicApi.prefs.miniOnStart && miniFlag && canMini && !miniOpen) openMini('brew')
@@ -4127,7 +4202,8 @@ export function ChillRoom({
               <NameField label={t.name.onBoard} className="mt-1" />
             </div>
           ) : null} />
-          <span className="sm:hidden">{menuButton}</span>
+          {/* Quán gọn: Thực đơn đứng ngay cạnh Tập trung, cả máy tính lẫn điện thoại */}
+          <span className={compact ? 'contents' : 'sm:hidden'}>{menuButton}</span>
           <span className="pointer-events-none hidden h-9 items-center rounded-md bg-black/45 px-2.5 font-mono text-[11px] tabular-nums text-white/90 backdrop-blur sm:flex">
             {clock}
           </span>
