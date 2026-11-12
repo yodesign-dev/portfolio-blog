@@ -18,8 +18,9 @@ import type {TimeOfDay, Weather} from './scene'
 export type NeonColor = 'pink' | 'cyan' | 'red' | 'green' | 'yellow'
 export type NeonMode = 'sweep' | 'steady' | 'blink'
 // x, y: % chiều ngang / dọc của ảnh phố, là góc trái trên của hàng chữ (không tính dấu)
-// board: chữ sơn trên tấm bảng gỗ 2 chân, ban ngày cũng thấy; đêm chữ thành neon trên bảng tối
-export type NeonSign = {text: string; x: number; y: number; color?: NeonColor; mode?: NeonMode; board?: boolean}
+// board: chữ sơn trên tấm bảng gỗ 2 chân, ban ngày cũng thấy; đêm chữ thành neon gọn trên bảng tối
+// (không loang từng điểm, cho chữ khỏi nhoè). size: cỡ chữ, 1 = 1 pixel chữ / ½ ô lưới
+export type NeonSign = {text: string; x: number; y: number; color?: NeonColor; mode?: NeonMode; board?: boolean; size?: number}
 
 // Bảng hiệu mặc định khi điểm đến chưa đặt trong Studio (id = mã điểm đến)
 export const SIGN_DEFAULTS: Record<string, NeonSign[]> = {
@@ -28,8 +29,8 @@ export const SIGN_DEFAULTS: Record<string, NeonSign[]> = {
   // Chữ PHỞ vẽ sẵn trên bảng hiệu nhà xanh ngọc — đêm thì sáng neon đè đúng chỗ
   'hanoi-tau': [{text: 'PHỞ', x: 38, y: 60.5, color: 'yellow', mode: 'steady'}],
   // Bảng CHỢ NỔI dựng trên nóc nhà sàn giữa, ngay trên cụm ghe chợ (ô kính giữa, không bị người
-  // ngồi che): chân bảng chạm nóc mái ở y 186 px ảnh 1120
-  'cantho-river': [{text: 'CHỢ NỔI', x: 51.6, y: 34.9, color: 'yellow', mode: 'steady', board: true}],
+  // ngồi che): chữ to gấp rưỡi, giữa bảng ở x 604, chân bảng chạm nóc mái ở y 186 px ảnh 1120
+  'cantho-river': [{text: 'CHỢ NỔI', x: 50.45, y: 32.77, color: 'yellow', mode: 'steady', board: true, size: 1.5}],
 }
 
 // Đồ vật động treo trên mặt phố (sprite AI, Nano Banana 2.1): props.webp, mỗi món 1 hàng
@@ -480,13 +481,13 @@ export class Facade {
   // Bảng gỗ cho chữ (board): mép tối, 2 chân ngắn xuống nóc mái; ngày chữ sơn kem, đêm bảng tối
   // để chữ neon (drawSigns) nổi lên. Màu theo giờ cho khớp ảnh phố
   private drawBoards(ctx: CanvasRenderingContext2D, r: {x: number; y: number; w: number; h: number}) {
-    const p = r.w / 560
     const night = this.time === 'night'
     const rain = this.weather === 'rain'
     for (const s of this.signs) {
       if (!s.board) continue
+      const p = (r.w / 560) * (s.size ?? 1)
       const {px, width} = layout(s.text)
-      const ox = r.x + Math.round((s.x / 100) * 560) * p
+      const ox = r.x + Math.round((s.x / 100) * 560) * (r.w / 560)
       const oy = r.y + Math.round((s.y / 100) * 238) * (r.h / 238)
       const box = (x: number, y: number, w: number, h: number) => ctx.fillRect(ox + x * p, oy + y * p, w * p, h * p)
       const edge = night ? '#121019' : this.time === 'afternoon' ? '#4a2c1a' : '#3e2a1d'
@@ -506,13 +507,13 @@ export class Facade {
   // Chữ neon: 1 pixel chữ = 1 px của ảnh 560 (½ ô lưới), viền ống tối khi tắt
   private drawSigns(ctx: CanvasRenderingContext2D, r: {x: number; y: number; w: number; h: number}) {
     if (!this.signs.length) return
-    const p = r.w / 560
     const alpha = ctx.globalAlpha
     this.signs.forEach((s, si) => {
+      const p = (r.w / 560) * (s.size ?? 1)
       const {px, letters, width} = layout(s.text)
       if (!letters) return
       const [cr, cg, cb] = NEON_RGB[s.color ?? 'pink']
-      const ox = r.x + Math.round((s.x / 100) * 560) * p
+      const ox = r.x + Math.round((s.x / 100) * 560) * (r.w / 560)
       const oy = r.y + Math.round((s.y / 100) * 238) * (r.h / 238)
       const t = this.clock + si * 2.3
       const mode = s.mode ?? 'sweep'
@@ -536,10 +537,13 @@ export class Facade {
       ctx.fillStyle = `rgb(${Math.round(cr * 0.3)},${Math.round(cg * 0.25)},${Math.round(cb * 0.35)})`
       for (const [x, y, i] of px) if (!lit(i)) ctx.fillRect(ox + x * p, oy + y * p, p, p)
       // Quầng ống neon: mỗi pixel sáng loang 1 pixel ra xung quanh (vẽ trước, nằm dưới lõi)
-      ctx.globalCompositeOperation = 'lighter'
-      ctx.fillStyle = `rgba(${cr},${cg},${cb},0.22)`
-      for (const [x, y, i] of px) if (lit(i)) ctx.fillRect(ox + (x - 1) * p, oy + (y - 1) * p, p * 3, p * 3)
-      ctx.globalCompositeOperation = 'source-over'
+      // Bảng (board): bỏ quầng từng điểm — nét chữ sát nhau, loang ra là lấp kín khe thành một mảng
+      if (!s.board) {
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},0.22)`
+        for (const [x, y, i] of px) if (lit(i)) ctx.fillRect(ox + (x - 1) * p, oy + (y - 1) * p, p * 3, p * 3)
+        ctx.globalCompositeOperation = 'source-over'
+      }
       ctx.fillStyle = `rgb(${Math.min(255, cr + 40)},${Math.min(255, cg + 110)},${Math.min(255, cb + 70)})`
       for (const [x, y, i] of px) if (lit(i)) ctx.fillRect(ox + x * p, oy + y * p, p, p)
       if (!any) return
@@ -548,7 +552,7 @@ export class Facade {
       const cy = oy + 2.5 * p
       const rad = Math.max(width * p * 1.1, 12)
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
-      g.addColorStop(0, `rgba(${cr},${cg},${cb},0.4)`)
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},${s.board ? 0.16 : 0.4})`)
       g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`)
       ctx.fillStyle = g
       ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2)

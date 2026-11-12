@@ -29,7 +29,13 @@ type Config = {
   still?: [number, number, number, number][]
   // false: không thả hoa đăng
   drifts?: boolean
+  // Bến ghé (thay cho luồng chạy ngang): đò vào từ một mép, chèo tới chỗ đậu, đậu một lúc rồi
+  // quay mũi chèo ra lại mép đó — cho cảnh có ghe vẽ sẵn giữa sông, đò không đi xuyên qua.
+  // line: mép nước; from: 1 = vào từ trái; stop: tâm đò lúc đậu (khoảng ngẫu nhiên); scale: đò xa nhỏ
+  docks?: Dock[]
 }
+
+type Dock = {line: number; from: 1 | -1; stop: [number, number]; scale?: number}
 
 export const RIVER: Record<string, Config> = {
   hoian: {
@@ -50,11 +56,17 @@ export const RIVER: Record<string, Config> = {
     ],
     sparks: [[348,171],[667,241],[442,181],[762,240],[538,240],[859,227],[367,233],[597,238],[371,171],[489,220],[369,222],[442,201],[344,225],[410,236],[387,225],[426,225],[457,221],[693,231],[641,230],[879,237],[471,216],[303,225],[654,195],[705,192],[835,220],[888,248],[272,223],[667,226],[97,227],[168,231],[85,224],[750,186],[441,213],[777,186],[134,231],[404,236],[330,236],[215,217],[319,236],[400,236],[50,179],[403,219],[72,220],[9,179],[10,228],[307,181],[917,234],[939,229],[149,185],[161,185],[928,232],[1006,231],[987,237],[241,225],[257,221],[541,228],[1065,231],[892,232],[914,205],[944,219],[406,250],[953,219],[368,248],[326,250],[904,202],[948,213],[681,194],[744,243],[789,243],[796,186],[116,229],[283,219],[731,185],[599,227],[738,240],[792,232],[924,204],[1109,209],[744,232],[783,238]],
   },
-  // Bến Ninh Kiều nhìn ra chợ nổi (ảnh hd/cantho-river-*). Ghe chợ vẽ sẵn giữa sông, nên đò
-  // chỉ đi ở 2 luồng sát bến (gần hơn mọi ghe chợ, đè lên là đúng xa gần)
+  // Bến Ninh Kiều nhìn ra chợ nổi (ảnh hd/cantho-river-*). Ghe chợ vẽ sẵn giữa sông, đò chạy
+  // ngang sẽ đâm xuyên qua, nên đò chỉ ghé chợ: vào từ mép trái trên mặt nước trống ô kính trái,
+  // đậu chờ gần cụm ghe (mũi đò dừng trước x 240, khung hẹp vẫn thấy) rồi quay ra; xa xa dưới gầm cầu
+  // bên phải thỉnh thoảng một xuồng nhỏ vào từ mép phải, đậu rồi quay ra (chỉ nước trống x > 925)
   'cantho-river': {
     water: {top: 226, bottom: 370},
-    lanes: [350, 362],
+    lanes: [],
+    docks: [
+      {line: 352, from: 1, stop: [115, 170]},
+      {line: 282, from: -1, stop: [995, 1045], scale: 0.5},
+    ],
     still: [[305, 228, 920, 372], [740, 190, 1120, 262]],
     drifts: false,
     lanterns: [
@@ -127,7 +139,8 @@ const SOUND_GAP = 30
 // Nhuộm đò theo giờ cho khớp ảnh (ảnh phố đã vẽ sẵn ánh sáng từng giờ)
 const TINT: Record<TimeOfDay, string | null> = {morning: null, afternoon: '#ffe0c0', night: '#5f6a99'}
 
-type Boat = {x: number; dir: 1 | -1; speed: number; lane: number; kind: 0 | 1; clock: number}
+// line: mép nước; scale: đò xa nhỏ; dock: đò ghé bến (đang vào / đậu / ra) — đậu thì mái chèo nghỉ
+type Boat = {x: number; dir: 1 | -1; speed: number; line: number; kind: 0 | 1; clock: number; scale: number; dock?: {i: number; stop: number; wait: number; phase: 'in' | 'wait' | 'out'}}
 type Drift = {x: number; y: number; speed: number; phase: number; warm: number}
 
 const seeded = (i: number, k: number) => {
@@ -135,6 +148,7 @@ const seeded = (i: number, k: number) => {
   return s - Math.floor(s)
 }
 const between = ([a, b]: readonly number[]) => a + Math.random() * (b - a)
+const WAIT = [8, 15] // đò ghé bến đậu bao lâu (giây)
 
 export class River {
   private cfg: Config | null = null
@@ -155,9 +169,12 @@ export class River {
     const cfg = RIVER[id] ?? null
     if (cfg !== this.cfg) {
       // Vừa tới nơi: trên sông đã có sẵn vài chiếc đang đi
-      this.boats = cfg
-        ? [280, 760].map((x, i) => ({x, dir: (i ? -1 : 1) as 1 | -1, speed: between(SPEED), lane: i ? 0 : 2, kind: (i ? 1 : 0) as 0 | 1, clock: i}))
-        : []
+      // (bến ghé: một chiếc đang đậu sẵn ở bến đầu)
+      this.boats = !cfg
+        ? []
+        : cfg.docks
+          ? [this.dockBoat(cfg.docks[0], 0, 'wait')]
+          : [280, 760].map((x, i) => ({x, dir: (i ? -1 : 1) as 1 | -1, speed: between(SPEED), line: cfg.lanes[i ? 0 : 2], kind: (i ? 1 : 0) as 0 | 1, clock: i, scale: 1}))
       this.nextBoat = between(FIRST)
       this.drifts = cfg && cfg.drifts !== false
         ? Array.from({length: 6}, (_, i) => ({
@@ -180,29 +197,66 @@ export class River {
     }
   }
 
+  // Đò ghé bến: phase 'in' vào từ mép, 'wait' đang đậu ở stop, 'out' quay mũi ra lại mép cũ
+  private dockBoat(d: Dock, i: number, phase: 'in' | 'wait'): Boat {
+    const scale = d.scale ?? 1
+    const stop = between(d.stop)
+    const x = phase === 'wait' ? stop : d.from > 0 ? (-CELL_W * scale) / 2 - 4 : 1120 + (CELL_W * scale) / 2 + 4
+    const wait = phase === 'wait' ? between([3, 9]) : between(WAIT)
+    return {x, dir: d.from, speed: between(SPEED) * (0.6 + 0.4 * scale), line: d.line, kind: Math.random() < 0.5 ? 1 : 0, clock: Math.random() * 3, scale, dock: {i, stop, wait, phase}}
+  }
+
   // onBoat: đò vừa vào khung, len = số giây đò đi hết khung (cho tiếng mái chèo)
   update(dt: number, onBoat?: (dir: 1 | -1, len: number) => void) {
     if (!this.cfg) return
     this.clock += dt
     for (const b of this.boats) {
-      b.x += b.dir * b.speed * dt
       b.clock += dt
+      const dock = b.dock
+      if (dock?.phase === 'wait') {
+        if ((dock.wait -= dt) <= 0) {
+          dock.phase = 'out'
+          b.dir = -b.dir as 1 | -1
+        }
+        continue
+      }
+      b.x += b.dir * b.speed * dt
+      if (dock?.phase === 'in' && b.dir * (b.x - dock.stop) >= 0) {
+        b.x = dock.stop
+        dock.phase = 'wait'
+      }
     }
     this.boats = this.boats.filter((b) => b.x > -CELL_W && b.x < 1120 + CELL_W)
     this.nextBoat -= dt
     if (this.nextBoat <= 0) {
       this.nextBoat = between(EVERY) * (this.weather === 'rain' ? 2 : 1)
+      const docks = this.cfg.docks
+      if (docks) {
+        // Mỗi bến một chiếc: bến còn trống thì có đò ghé
+        const free = docks.map((_, i) => i).filter((i) => !this.boats.some((b) => b.dock?.i === i))
+        if (free.length) {
+          const i = free[Math.floor(Math.random() * free.length)]
+          const b = this.dockBoat(docks[i], i, 'in')
+          this.boats.push(b)
+          if (b.scale === 1 && this.clock >= this.soundFree) {
+            this.soundFree = this.clock + SOUND_GAP
+            onBoat?.(b.dir, Math.abs(b.dock!.stop - b.x) / b.speed)
+          }
+        }
+      } else {
       const lane = Math.floor(Math.random() * this.cfg.lanes.length)
       const dir = (Math.random() < 0.5 ? 1 : -1) as 1 | -1
       const from = dir > 0 ? 0 : 1120
       // Luồng đó có đò ở gần chỗ vào khung thì để lượt sau
-      if (this.boats.length < MAX_BOATS && !this.boats.some((b) => b.lane === lane && Math.abs(b.x - from) < CELL_W * 2)) {
+      const line = this.cfg.lanes[lane]
+      if (this.boats.length < MAX_BOATS && !this.boats.some((b) => b.line === line && Math.abs(b.x - from) < CELL_W * 2)) {
         const speed = between(SPEED)
-        this.boats.push({x: dir > 0 ? -CELL_W / 2 - 4 : 1120 + CELL_W / 2 + 4, dir, speed, lane, kind: Math.random() < 0.5 ? 1 : 0, clock: Math.random() * 3})
+        this.boats.push({x: dir > 0 ? -CELL_W / 2 - 4 : 1120 + CELL_W / 2 + 4, dir, speed, line, kind: Math.random() < 0.5 ? 1 : 0, clock: Math.random() * 3, scale: 1})
         if (this.clock >= this.soundFree) {
           this.soundFree = this.clock + SOUND_GAP
           onBoat?.(dir, (1120 + CELL_W) / speed)
         }
+      }
       }
     }
     for (const d of this.drifts) {
@@ -263,7 +317,7 @@ export class River {
     this.drawWater(ctx, cfg)
     if (this.time === 'night' && cfg.leds) this.drawLeds(ctx, cfg.leds)
     ctx.imageSmoothingEnabled = false
-    for (const b of [...this.boats].sort((a, c) => a.lane - c.lane)) this.drawBoat(ctx, cfg, b)
+    for (const b of [...this.boats].sort((a, c) => a.line - c.line)) this.drawBoat(ctx, cfg, b)
     ctx.imageSmoothingEnabled = true
     if (this.time === 'night') this.drawLanterns(ctx, cfg)
     ctx.imageSmoothingEnabled = smooth
@@ -320,10 +374,15 @@ export class River {
     const sheet = this.sheet()
     if (!sheet) return
     const spec = BOATS[b.kind]
-    const frame = FRAMES[Math.floor(b.clock * FPS) % FRAMES.length]
-    const line = cfg.lanes[b.lane] + Math.round(Math.sin(b.clock * 1.4))
-    const left = Math.round(b.x - CELL_W / 2)
-    const top = line - spec.keel
+    const k = b.scale
+    const moored = b.dock?.phase === 'wait'
+    // Đậu thì mái chèo nghỉ (khung đầu), chỉ còn nhấp nhô theo sóng
+    const frame = moored ? 0 : FRAMES[Math.floor(b.clock * FPS) % FRAMES.length]
+    const line = b.line + Math.round(Math.sin(b.clock * 1.4) * k)
+    const w = Math.round(CELL_W * k)
+    const keel = Math.round(spec.keel * k)
+    const left = Math.round(b.x - w / 2)
+    const top = line - keel
     const sx = frame * CELL_W
     // Bóng dưới nước, cắt theo mặt sông
     ctx.save()
@@ -331,34 +390,36 @@ export class River {
     ctx.rect(0, line, 1120, cfg.water.bottom - line)
     ctx.clip()
     ctx.globalAlpha = this.alpha * (this.time === 'night' ? 0.22 : 0.28)
-    ctx.translate(left + (b.dir < 0 ? CELL_W : 0), line)
+    ctx.translate(left + (b.dir < 0 ? w : 0), line)
     ctx.scale(b.dir, -1)
-    ctx.drawImage(sheet, sx, spec.y, CELL_W, spec.keel, 0, 0, CELL_W, spec.keel)
+    ctx.drawImage(sheet, sx, spec.y, CELL_W, spec.keel, 0, 0, w, keel)
     ctx.restore()
-    // Sóng sau đuôi
+    // Sóng sau đuôi (đậu thì không)
     ctx.fillStyle = this.time === 'night' ? '#b8c6e8' : '#ffffff'
     ctx.globalAlpha = this.alpha * 0.4
-    const stern = b.x - (b.dir * CELL_W) / 2
-    for (let i = 0; i < 3; i++) {
-      const wobble = Math.sin(b.clock * 2 + i) * 2
-      ctx.fillRect(Math.round(stern - b.dir * (8 + i * 14) + wobble), line + 1 + i, 12 - i * 3, 1)
-    }
+    const stern = b.x - (b.dir * w) / 2
+    if (!moored)
+      for (let i = 0; i < 3; i++) {
+        const wobble = Math.sin(b.clock * 2 + i) * 2 * k
+        ctx.fillRect(Math.round(stern - b.dir * (8 + i * 14) * k + wobble), line + 1 + i, Math.max(2, Math.round((12 - i * 3) * k)), 1)
+      }
     ctx.globalAlpha = this.alpha
     ctx.save()
-    ctx.translate(left + (b.dir < 0 ? CELL_W : 0), top)
+    ctx.translate(left + (b.dir < 0 ? w : 0), top)
     ctx.scale(b.dir, 1)
-    ctx.drawImage(sheet, sx, spec.y, CELL_W, spec.h, 0, 0, CELL_W, spec.h)
+    ctx.drawImage(sheet, sx, spec.y, CELL_W, spec.h, 0, 0, w, Math.round(spec.h * k))
     ctx.restore()
     // Đèn mũi đò
     if (this.time === 'night' || this.weather === 'rain') {
-      const lx = b.dir > 0 ? left + spec.lamp[0] : left + CELL_W - spec.lamp[0]
-      const ly = top + spec.lamp[1]
+      const lx = b.dir > 0 ? left + spec.lamp[0] * k : left + w - spec.lamp[0] * k
+      const ly = top + spec.lamp[1] * k
+      const g = 16 * k
       ctx.globalCompositeOperation = 'lighter'
       ctx.globalAlpha = this.alpha * 0.9
-      ctx.drawImage(this.glowSprite(), lx - 16, ly - 16, 32, 32)
+      ctx.drawImage(this.glowSprite(), lx - g, ly - g, g * 2, g * 2)
       ctx.fillStyle = '#ffb060'
       ctx.globalAlpha = this.alpha * 0.5
-      ctx.fillRect(lx - 1, line + 2, 3, Math.min(14, cfg.water.bottom - line - 2))
+      ctx.fillRect(lx - 1, line + 2, Math.max(1, Math.round(3 * k)), Math.min(14 * k, cfg.water.bottom - line - 2))
       ctx.globalCompositeOperation = 'source-over'
       ctx.globalAlpha = this.alpha
     }
