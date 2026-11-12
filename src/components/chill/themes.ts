@@ -49,7 +49,8 @@ export type CharacterVideo = {
   noel?: {hi: string; lo: string; glow: SheetSpec}
 }
 
-export type SketchArt = {interior: string; character: CharacterVideo; page: PageQuad}
+// thumb: ảnh thẻ phòng khi khách chọn Chị và bản ký hoạ đang bật (thay ảnh thẻ Chị gõ laptop)
+export type SketchArt = {interior: string; thumb?: string; character: CharacterVideo; page: PageQuad}
 
 export type CharacterFrames = {
   kind: 'frames'
@@ -169,6 +170,7 @@ export const THEMES: Theme[] = [
     // sheet khăn Noel: mùa Noel không quàng khăn
     girlSketch: {
       interior: '/chill/scenes/interior-girl-sketch.webp',
+      thumb: '/chill/scenes/room-cafe-girl-sketch-thumb.webp',
       character: {
         kind: 'video',
         at: {x: 429, y: 116, w: 211, h: 220},

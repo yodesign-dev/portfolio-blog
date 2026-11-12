@@ -30,6 +30,8 @@ import {TREE_MAX, activeSeason, loadSeasonPref, loadTree, momentOn, readSeasonPr
 import {Focus} from './Focus'
 import {MIN_FULL_PHIN, type BrewControls, type BrewInfo} from './BrewDesk'
 import {Welcome} from './Welcome'
+import {SeatToggle} from './SeatToggle'
+import {onRadioKey} from './radio-keys'
 import {AddTrackButton, MusicChooser, MusicPicker, notifyBrew, useBrewMusic} from './BrewMusic'
 import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, suggestQueue, totalSeconds, type MusicQueue} from './playlist'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
@@ -894,11 +896,22 @@ export function ChillRoom({
     sceneRef.current?.setStringLights(lights ? lights === '1' : stringLightsOn)
   }, [stringLightsOn])
 
+  // Chị ký hoạ đang bật thật (Studio hoặc ?sketch=): ảnh thẻ phòng Cửa sổ quán đổi theo
+  const [sketchShown, setSketchShown] = useState(sketchOn)
   useEffect(() => {
     const sketch = new URLSearchParams(window.location.search).get('sketch')
     const page = Number(new URLSearchParams(window.location.search).get('page'))
-    sceneRef.current?.setSketch(sketch ? sketch === '1' : sketchOn, page > 0 && page <= 1 ? page : null)
+    const on = sketch ? sketch === '1' : sketchOn
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tham số chỉ đọc được trên trình duyệt
+    setSketchShown(on)
+    sceneRef.current?.setSketch(on, page > 0 && page <= 1 ? page : null)
   }, [sketchOn])
+
+  // Mũi tên / Home / End trong mọi nhóm radio của quán (radio-keys.ts)
+  useEffect(() => {
+    window.addEventListener('keydown', onRadioKey, true)
+    return () => window.removeEventListener('keydown', onRadioKey, true)
+  }, [])
 
   useEffect(() => {
     const facade = new URLSearchParams(window.location.search).get('facade')
@@ -4295,15 +4308,18 @@ export function ChillRoom({
         <button type="button" aria-label={t.room.closeSettings} onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
       )}
 
-      {/* Dock nhạc nổi phía dưới */}
+      {/* Dock nhạc nổi phía dưới. Đang mở Cài đặt trên màn hẹp hơn 800px (tablet dọc, cửa sổ hẹp) thì bảng
+          chỉ chừa ~300px, các nút nhạc rớt thành 3 hàng → ẩn dock như trên điện thoại (ở đó bảng đã che nó) */}
       <div
         className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
-          panelOpen ? 'sm:pr-[436px]' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''
+          panelOpen ? 'sm:pr-[436px] max-[800px]:hidden' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''
         } ${fade} ${brewing ? 'hidden' : ''}`}
       >
         <div
           {...hoverProps}
-          className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
+          // @container: các nút co theo bề ngang thật của thanh nhạc (bị bảng Cài đặt chiếm chỗ trên tablet
+          // ngang), không theo bề ngang màn hình — để tên bài không bao giờ bị ép còn 1–2 chữ
+          className="@container relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
         >
           {resumeOffer && !started && (
             <button
@@ -4318,10 +4334,13 @@ export function ChillRoom({
               {t.room.resume}
             </button>
           )}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Thanh hẹp (< 448px, điện thoại dọc): tên trạm + tên bài lên 1 hàng riêng phía trên các nút,
+              để tên bài đọc được trọn thay vì "Mornin…" */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 @md:flex-nowrap sm:gap-x-3">
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-              {/* Điện thoại: nút bài trước nhường chỗ cho tên bài khi có nút trăng hoặc nút tim (Bài của tôi) */}
-              <span className={(sleepFlag && sleepOnPhone) || favFlag ? 'hidden sm:contents' : 'contents'}>
+              {/* Thanh nhạc hẹp (điện thoại, tablet / điện thoại ngang đang mở Cài đặt): nút bài trước nhường chỗ
+                  khi có nút trăng hoặc nút tim (Bài của tôi), để các nút vẫn nằm trên 1 hàng */}
+              <span className={(sleepFlag && sleepOnPhone) || favFlag ? 'hidden @md:contents' : 'contents'}>
                 <RoundButton label={t.room.prev} onClick={prev}>
                   <PrevIcon />
                 </RoundButton>
@@ -4339,12 +4358,13 @@ export function ChillRoom({
                 <NextIcon />
               </RoundButton>
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="order-first min-w-0 basis-full px-1 @md:order-none @md:flex-1 @md:basis-auto @md:px-0">
               <p className="truncate font-mono text-[11px] uppercase tracking-[0.12em] text-[#a79e94]">
                 {stationLabel} · {playingPos + 1}/{playingList.length}
               </p>
               <p className="truncate font-semibold">{track.title}</p>
             </div>
+            <span aria-hidden className="flex-1 @md:hidden" />
             {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             <Visualizer audioRef={audioRef} playing={playing} />
             <input
@@ -4355,10 +4375,11 @@ export function ChillRoom({
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
               aria-label={t.room.volume}
-              className="hidden w-24 accent-[#e8b27d] md:block touch:-my-3.5 touch:h-11"
+              className="hidden w-24 accent-[#e8b27d] @xl:block touch:-my-3.5 touch:h-11"
             />
-            {/* Điện thoại không đủ chỗ cho thanh volume — nút loa mở thanh trượt nổi phía trên */}
-            <div className="relative md:hidden">
+            {/* Thanh nhạc hẹp (điện thoại, tablet đang mở Cài đặt) không đủ chỗ cho thanh volume — nút loa
+                mở thanh trượt nổi phía trên */}
+            <div className="relative @xl:hidden">
               <button
                 type="button"
                 onClick={() => setVolumeOpen((o) => !o)}
@@ -4875,7 +4896,7 @@ export function ChillRoom({
                     const heOnly = shownSeat === 'girl' && !th.girl
                     // Ảnh thẻ theo người khách chọn: chọn Chị thì cả 3 thẻ đều thấy Chị ngồi, để hình dung
                     // trước khi vào phòng. Hai ảnh chồng nhau, đổi bằng mờ dần (không chớp trắng lúc tải)
-                    const girlThumb = seatPickOn && th.girl ? th.girl.thumb : null
+                    const girlThumb = seatPickOn && th.girl ? ((sketchShown && th.girlSketch?.thumb) || th.girl.thumb) : null
                     const showGirl = !!girlThumb && seat === 'girl'
                     return (
                       <button
@@ -4883,6 +4904,7 @@ export function ChillRoom({
                         type="button"
                         role="radio"
                         aria-checked={active}
+                        tabIndex={active ? 0 : -1}
                         onClick={() => setTheme(th.id)}
                         className={`group overflow-hidden rounded-xl border text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
                           active ? 'border-[#e8b27d]/70 ring-1 ring-[#e8b27d]/40' : 'border-white/10 hover:border-white/25'
@@ -4916,7 +4938,7 @@ export function ChillRoom({
                 {seatPickOn && (
                   <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span className="text-sm text-[#a79e94]">{t.room.seatTitle}</span>
-                    <SeatPicker seat={seat} onPick={setSeat} onWarm={warmSeat} loading={seatLoading} label={t.room.seatTitle} names={t.room.seats} />
+                    <SeatToggle seat={seat} onSeat={setSeat} onWarm={warmSeat} loading={seatLoading} label={t.room.seatTitle} names={t.room.seats} />
                     {seat === 'girl' && !girlHere && <p className="w-full text-xs text-[#a79e94]">{t.room.seatNoGirl}</p>}
                   </div>
                 )}
@@ -4934,6 +4956,7 @@ export function ChillRoom({
                         type="button"
                         role="radio"
                         aria-checked={active}
+                        tabIndex={active ? 0 : -1}
                         onClick={() => {
                           if (!active) trackEvent({name: 'Chill Place', props: {place: d.id, how: 'pick'}})
                           goTo(i)
@@ -5118,42 +5141,42 @@ export function ChillRoom({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Đáy cố định: phím tắt (desktop) + credit */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.06] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] font-mono text-[11px] text-[#a79e94]">
-          {[
-            ['Space', t.room.keys.play],
-            ['N / P', t.room.keys.nextPrev],
-            ['F', t.room.keys.fullscreen],
-            ['S', t.room.keys.settings],
-          ].map(([key, label]) => (
-            <span key={key} className="hidden sm:inline">
-              <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
+          {/* Cuối nội dung tab (cuộn theo, không ghim đáy): phím tắt (máy có bàn phím) + credit. Ghim đáy thì
+              trên điện thoại xoay ngang / iPhone SE khối này chiếm 1/4–1/3 bảng, che mất lựa chọn */}
+          <div className="-mx-5 -mb-5 mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/[0.06] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] font-mono text-[11px] text-[#a79e94]">
+            {[
+              ['Space', t.room.keys.play],
+              ['N / P', t.room.keys.nextPrev],
+              ['F', t.room.keys.fullscreen],
+              ['S', t.room.keys.settings],
+            ].map(([key, label]) => (
+              <span key={key} className="hidden sm:inline [@media(pointer:coarse)]:hidden">
+                <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
+              </span>
+            ))}
+            <span className="uppercase tracking-[0.08em] text-white/60 sm:basis-full">{t.room.credit}</span>
+            <span className="text-white/60 sm:basis-full">
+              {t.room.emojiCredit}{' '}
+              <a
+                href="https://googlefonts.github.io/noto-emoji-animation/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5"
+              >
+                Noto Emoji
+              </a>{' '}
+              (CC BY 4.0)
             </span>
-          ))}
-          <span className="uppercase tracking-[0.08em] text-white/60 sm:basis-full">{t.room.credit}</span>
-          <span className="text-white/60 sm:basis-full">
-            {t.room.emojiCredit}{' '}
-            <a
-              href="https://googlefonts.github.io/noto-emoji-animation/"
-              target="_blank"
-              rel="noreferrer"
-              className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5"
-            >
-              Noto Emoji
-            </a>{' '}
-            (CC BY 4.0)
-          </span>
-          <span className="text-white/60 sm:basis-full">
-            <Link href="/chill/terms" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
-              {t.room.terms}
-            </Link>
-            {' · '}
-            <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
-              {t.room.privacy}
-            </Link>
-          </span>
+            <span className="text-white/60 sm:basis-full">
+              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
+                {t.room.terms}
+              </Link>
+              {' · '}
+              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
+                {t.room.privacy}
+              </Link>
+            </span>
+          </div>
         </div>
       </aside>
       </div>
@@ -5246,7 +5269,7 @@ export function ChillRoom({
               // phòng chưa có bản nữ thì cảnh tạm là anh, có 1 dòng giải thích, không đổi phòng
               <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="mb-1 flex flex-col items-center gap-1.5">
                 <p className="text-xs text-white/80 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.welcome.seat}</p>
-                <SeatPicker seat={seat} onPick={setSeat} onWarm={warmSeat} loading={seatLoading} label={t.welcome.seat} names={t.room.seats} />
+                <SeatToggle seat={seat} onSeat={setSeat} onWarm={warmSeat} loading={seatLoading} label={t.welcome.seat} names={t.room.seats} variant="touch" />
                 {seat === 'girl' && !girlHere && (
                   <p className="max-w-xs text-center text-xs text-white/75 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{t.room.seatNoGirl}</p>
                 )}
@@ -5319,6 +5342,7 @@ function LangSwitch({className = ''}: {className?: string}) {
           type="button"
           role="radio"
           aria-checked={lang === l}
+          tabIndex={lang === l ? 0 : -1}
           aria-label={l === 'en' ? 'English' : 'Tiếng Việt'}
           onClick={() => choose(l)}
           className={`h-8 min-w-9 rounded px-2 font-mono text-[11px] uppercase tracking-[0.12em] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 touch:min-w-11 ${
@@ -5364,7 +5388,7 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
   }, [audioRef, playing])
 
   return (
-    <div ref={barsRef} className="hidden h-8 items-center gap-[3px] sm:flex" aria-hidden>
+    <div ref={barsRef} className="hidden h-8 items-center gap-[3px] @xl:flex" aria-hidden>
       {Array.from({length: 12}).map((_, i) => (
         <span key={i} className="h-full w-[3px] origin-center rounded-full bg-white/30 transition-transform duration-75" />
       ))}
@@ -5382,61 +5406,6 @@ function focusRunningAtMount() {
   } catch {
     return false
   }
-}
-
-const SEAT_FACES: Record<Seat, string> = {boy: '/chill/scenes/interior.webp', girl: '/chill/scenes/interior-girl.webp'}
-
-// Rê chuột / chạm / focus vào nút → tải sẵn người đó. `loading` = người đang tải → vòng xoay
-// thay ảnh mặt trên nút đó cho tới khi người mới hiện trong cảnh
-function SeatPicker({
-  seat,
-  onPick,
-  onWarm,
-  loading,
-  label,
-  names,
-}: {
-  seat: Seat
-  onPick: (s: Seat) => void
-  onWarm: (s: Seat) => void
-  loading: Seat | null
-  label: string
-  names: Record<Seat, string>
-}) {
-  return (
-    <div className="flex gap-1 rounded-full bg-black/45 p-1 backdrop-blur" role="radiogroup" aria-label={label}>
-      {SEATS.map((s) => {
-        const active = s === seat
-        return (
-          <button
-            key={s}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-busy={loading === s}
-            onPointerEnter={() => onWarm(s)}
-            onPointerDown={() => onWarm(s)}
-            onFocus={() => onWarm(s)}
-            onClick={() => onPick(s)}
-            className={`flex min-h-9 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold transition touch:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
-              active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/80 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <span aria-hidden className="relative block size-7 shrink-0">
-              <span
-                className="block size-7 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated]"
-                style={{backgroundImage: `url(${SEAT_FACES[s]})`, backgroundSize: '224px 126px', backgroundPosition: '-171px -47px'}}
-              />
-              {loading === s && (
-                <span className="absolute inset-0 animate-spin rounded-full border-2 border-[#2a1a10]/25 border-t-[#2a1a10] motion-reduce:animate-none" />
-              )}
-            </span>
-            {names[s]}
-          </button>
-        )
-      })}
-    </div>
-  )
 }
 
 function SectionTitle({index, title}: {index: string; title: string}) {

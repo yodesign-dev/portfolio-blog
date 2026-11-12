@@ -14,25 +14,13 @@ import {trackEvent} from '@/lib/analytics'
 import {CUSTOM_MAX, CUSTOM_MIN} from './BrewDesk'
 import {OPTIONS as FOCUS_OPTIONS} from './Focus'
 import {useT} from './i18n'
-import {SEATS, type Seat} from './themes'
+import {SeatToggle} from './SeatToggle'
+import type {Seat} from './themes'
 
 export type WelcomeGoal = 'music' | 'focus' | 'look'
 
 const GOAL_KEY = 'chill:welcome-goal'
 const MINUTES_KEY = 'chill:focus-min'
-
-// Mặt người ngồi cắt từ ảnh nội thất (giống nút chọn trong Cài đặt)
-const FACES: Record<Seat, string> = {boy: '/chill/scenes/interior.webp', girl: '/chill/scenes/interior-girl.webp'}
-function Face({seat, size}: {seat: Seat; size: number}) {
-  const k = size / 28
-  return (
-    <span
-      aria-hidden
-      className="block shrink-0 rounded-full bg-[#c4d6e2] bg-no-repeat [image-rendering:pixelated]"
-      style={{width: size, height: size, backgroundImage: `url(${FACES[seat]})`, backgroundSize: `${224 * k}px ${126 * k}px`, backgroundPosition: `${-171 * k}px ${-47 * k}px`}}
-    />
-  )
-}
 
 const NoteIcon = ({className = ''}: {className?: string}) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
@@ -96,59 +84,6 @@ function SecondaryButton({item, quiet = false, tall = false, busy, onChoose, cla
         {tall && <span className={`truncate text-[11.5px] font-semibold leading-snug text-[#b9aea2] ${short}`}>{item.sub}</span>}
       </span>
     </button>
-  )
-}
-
-// Công tắc người ngồi quầy. Rê chuột / chạm là tải sẵn người kia để đổi tức thì; mạng chậm thì
-// nút vừa chọn hiện vòng xoay tới khi người mới hiện ra
-function SeatToggle({
-  seat,
-  onSeat,
-  onWarm,
-  loading,
-  label,
-  names,
-  touch = false,
-}: {
-  seat: Seat
-  onSeat: (seat: Seat) => void
-  onWarm: (seat: Seat) => void
-  loading: Seat | null
-  label: string
-  names: Record<Seat, string>
-  // Màn dọc: nút cao 44px cho ngón tay
-  touch?: boolean
-}) {
-  return (
-    <div className="flex shrink-0 gap-1 rounded-full border border-white/10 bg-black/55 p-1 backdrop-blur" role="radiogroup" aria-label={label}>
-      {SEATS.map((s) => {
-        const active = s === seat
-        return (
-          <button
-            key={s}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-busy={loading === s}
-            onPointerEnter={() => onWarm(s)}
-            onPointerDown={() => onWarm(s)}
-            onFocus={() => onWarm(s)}
-            onClick={() => onSeat(s)}
-            // Màn thấp chỉ còn mặt: rê chuột vẫn thấy tên
-            title={names[s]}
-            className={`flex items-center gap-2 rounded-full pl-1 pr-3.5 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${touch ? 'h-11' : 'h-10 [@media(max-height:500px)]:size-11 [@media(max-height:500px)]:justify-center [@media(max-height:500px)]:p-0'} ${
-              active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/85 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <span className="relative block size-8 shrink-0">
-              <Face seat={s} size={32} />
-              {loading === s && <span aria-hidden className="absolute inset-0 animate-spin rounded-full border-2 border-[#2a1a10]/25 border-t-[#2a1a10] motion-reduce:animate-none" />}
-            </span>
-            <span className={touch ? '' : '[@media(max-height:500px)]:sr-only'}>{names[s]}</span>
-          </button>
-        )
-      })}
-    </div>
   )
 }
 
@@ -248,8 +183,17 @@ export function Welcome({
   const busy = !loaded
   const eyebrow = returning ? (visitDay >= 2 ? w.day(visitDay, level) : null) : 'Chill for work'
   const title = returning ? w.backNoName : t.welcome.title
+  // Công tắc Anh / Chị kèm nhãn nhìn thấy được ("Người ngồi"), để 2 nút không bị đọc như thêm
+  // một việc nữa cạnh Nghe nhạc / Tập trung. Màn thấp (xoay ngang) bỏ nhãn, chỉ còn mặt
   const seatToggle = (touch: boolean) =>
-    canPickSeat && <SeatToggle seat={seat} onSeat={onSeat} onWarm={onWarmSeat} loading={seatLoading} label={t.welcome.seat} names={t.room.seats} touch={touch} />
+    canPickSeat && (
+      <div className="flex shrink-0 items-center gap-2.5">
+        <span aria-hidden className="text-[12.5px] font-semibold text-[#cfc5ba] [@media(max-height:500px)]:hidden">
+          {t.room.seatTitle}
+        </span>
+        <SeatToggle seat={seat} onSeat={onSeat} onWarm={onWarmSeat} loading={seatLoading} label={t.welcome.seat} names={t.room.seats} variant={touch ? 'touch' : 'bar'} />
+      </div>
+    )
 
   return (
     <div
