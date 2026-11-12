@@ -3203,7 +3203,7 @@ export function ChillRoom({
   }
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   // Đang pha phin: thanh trên lui xuống, rê chuột là rõ lại
-  const topFade = brewing && !hideUi && entered && !hovering && !focusOpen && !menuOpen ? 'opacity-25 transition-opacity duration-700 focus-within:opacity-100' : fade
+  const topFade = brewing && !hideUi && entered && !hovering && !focusOpen && !menuOpen ? 'opacity-60 transition-opacity duration-700 focus-within:opacity-100' : fade
   // Hàng nhạc trong tấm đồng hồ: như thanh nhạc, gọn hơn
   const brewMusic = (
     <div className="flex items-center gap-2 sm:gap-3">
@@ -3215,9 +3215,9 @@ export function ChillRoom({
       <button
         type="button"
         onClick={togglePlay}
-        aria-label={playing ? t.room.pause : t.room.play}
-        title={`${playing ? t.room.pause : t.room.play} (Space)`}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e8b27d]/50 text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+        aria-label={playing ? t.focus.musicPause : t.focus.musicPlay}
+        title={`${playing ? t.focus.musicPause : t.focus.musicPlay} (Space)`}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e8b27d]/50 text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 touch:w-11"
       >
         {playing ? <PauseIcon /> : <PlayIcon />}
       </button>
@@ -3238,7 +3238,7 @@ export function ChillRoom({
         value={volume}
         onChange={(e) => setVolume(Number(e.target.value))}
         aria-label={t.room.volume}
-        className="hidden w-24 accent-[#e8b27d] md:block lg:hidden"
+        className="hidden w-24 accent-[#e8b27d] md:block lg:hidden touch:h-11"
       />
       {queue?.key.startsWith('suggest:') && queueOn && (
         <RoundButton label={t.brew.rerollShort} onClick={rerollPlaying}>
@@ -3275,7 +3275,7 @@ export function ChillRoom({
   const brewMusicLite = (
     <div className="flex items-center gap-2">
       <span className="w-10 shrink-0 font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{t.brew.music}</span>
-      <RoundButton label={playing ? t.room.pause : t.room.play} onClick={togglePlay}>
+      <RoundButton label={playing ? t.focus.musicPause : t.focus.musicPlay} onClick={togglePlay}>
         {playing ? <PauseIcon small /> : <PlayIcon small />}
       </RoundButton>
       <RoundButton label={t.room.next} onClick={next}>
@@ -3290,8 +3290,9 @@ export function ChillRoom({
           setPanelTab('music')
           setPanelOpen(true)
         }}
+        aria-label={t.focus.changeMusic(track.title, `${stationLabel} ${playingPos + 1}/${playingList.length}`)}
         title={t.room.trackList}
-        className="min-w-0 flex-1 rounded-lg px-1 text-left transition hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+        className="min-w-0 flex-1 rounded-lg px-1 text-left transition hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11"
       >
         <span className="block truncate text-sm font-semibold text-[#ede6dd]">{track.title}</span>
         <span className="block truncate font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
