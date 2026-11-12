@@ -6,8 +6,13 @@
 // - Đèn lồng: chỉ đêm. Đèn đã vẽ sẵn trong ảnh, lớp này cho chúng thở (quầng sáng) và lấp lánh.
 // - Đèn hoa đăng trôi: chỉ đêm không mưa.
 //
-// Toạ độ theo px ảnh 1120×476. Chỉ điểm đến có trong RIVER mới có lớp này.
+// Cùng lớp này cho Cần Thơ chợ nổi (công tắc Studio marketOpen, bộ ảnh cantho-river-*): bến
+// Ninh Kiều nhìn ra chợ nổi, ghe đi ngang ở luồng gần bến; đêm thêm dải đèn LED cầu đi bộ đổi
+// màu chầm chậm theo làn sóng dọc cầu (cả bóng đèn in dưới nước).
+//
+// Toạ độ theo px ảnh 1120×476. Chỉ bộ ảnh có trong RIVER (tra theo artOf) mới có lớp này.
 
+import type {Destination} from './destinations'
 import type {TimeOfDay, Weather} from './scene'
 
 type Config = {
@@ -18,6 +23,12 @@ type Config = {
   lanterns: [number, number, number][]
   // Đèn nhỏ, cửa sáng bờ bên kia (dò từ ảnh đêm)
   sparks: [number, number][]
+  // Bóng LED trên cầu và bóng in dưới nước (dò từ ảnh đêm): đêm đổi màu theo làn sóng
+  leds?: [number, number][]
+  // Vùng có ghe vẽ sẵn (x0, y0, x1, y1): không gợn sáng, không vòng mưa, không hoa đăng trôi qua
+  still?: [number, number, number, number][]
+  // false: không thả hoa đăng
+  drifts?: boolean
 }
 
 export const RIVER: Record<string, Config> = {
@@ -39,6 +50,63 @@ export const RIVER: Record<string, Config> = {
     ],
     sparks: [[348,171],[667,241],[442,181],[762,240],[538,240],[859,227],[367,233],[597,238],[371,171],[489,220],[369,222],[442,201],[344,225],[410,236],[387,225],[426,225],[457,221],[693,231],[641,230],[879,237],[471,216],[303,225],[654,195],[705,192],[835,220],[888,248],[272,223],[667,226],[97,227],[168,231],[85,224],[750,186],[441,213],[777,186],[134,231],[404,236],[330,236],[215,217],[319,236],[400,236],[50,179],[403,219],[72,220],[9,179],[10,228],[307,181],[917,234],[939,229],[149,185],[161,185],[928,232],[1006,231],[987,237],[241,225],[257,221],[541,228],[1065,231],[892,232],[914,205],[944,219],[406,250],[953,219],[368,248],[326,250],[904,202],[948,213],[681,194],[744,243],[789,243],[796,186],[116,229],[283,219],[731,185],[599,227],[738,240],[792,232],[924,204],[1109,209],[744,232],[783,238]],
   },
+  // Bến Ninh Kiều nhìn ra chợ nổi (ảnh hd/cantho-river-*). Ghe chợ vẽ sẵn giữa sông, nên đò
+  // chỉ đi ở 2 luồng sát bến (gần hơn mọi ghe chợ, đè lên là đúng xa gần)
+  'cantho-river': {
+    water: {top: 226, bottom: 370},
+    lanes: [350, 362],
+    still: [[305, 228, 920, 372], [740, 190, 1120, 262]],
+    drifts: false,
+    lanterns: [
+      // Đèn bến hai bên
+      [89, 113, 40],
+      [1027, 113, 40],
+      // Trụ đèn búp sen trên cầu đi bộ, xa nhỏ gần lớn
+      [760, 185, 18],
+      [798, 168, 20],
+      [836, 169, 20],
+      [858, 149, 22],
+      [913, 150, 22],
+      [983, 134, 24],
+      [1043, 139, 24],
+      [1103, 138, 26],
+      // Cửa sổ nhà sàn bờ bên kia
+      [455, 214, 16],
+      [569, 210, 14],
+      [590, 209, 14],
+      [630, 214, 16],
+      [681, 218, 16],
+      // Đèn dầu trên ghe chợ
+      [421, 304, 20],
+      [645, 308, 20],
+      [511, 330, 18],
+      // Bóng đèn bến in dưới nước
+      [1042, 354, 22],
+      [1104, 362, 22],
+    ],
+    sparks: [[21,172],[50,172],[80,172],[109,172],[137,172],[166,172],[207,172],[277,172],[322,172],[352,172],[236,173],[4,179],[10,179],[15,179],[21,179],[27,179],[48,179],[56,179],[61,179],[74,179],[81,179],[88,179],[95,179],[99,179],[104,179],[111,179],[116,179],[119,179],[128,180],[133,179],[147,179],[152,179],[157,179],[166,179],[171,179],[178,179],[185,179],[217,179],[228,179],[233,179],[239,179],[244,179],[250,179],[256,179],[263,179],[268,179],[274,179],[281,179],[287,179],[302,179],[307,179],[325,179],[331,179],[337,179],[343,179],[349,179],[361,179],[367,179],[520,212],[524,212],[495,214],[498,214],[693,214],[698,214],[4,242],[16,242],[44,242],[57,242],[63,242],[79,242],[84,242],[92,242],[96,242],[106,242],[109,242],[116,242],[121,242],[131,242],[137,242],[153,242],[173,242],[191,242],[206,242],[224,242],[20,246],[50,246],[80,246],[109,246],[137,246],[166,246],[206,246],[494,279],[495,282],[627,284],[499,283],[494,285],[421,298],[642,298],[635,300],[639,300],[646,301],[426,301],[430,304],[434,302],[643,302],[416,306],[637,305],[657,308],[526,309],[638,309],[511,324],[420,337],[420,340],[421,343],[647,346],[644,350],[875,352],[877,355],[512,355],[863,355],[512,359],[1048,358],[1043,362]],
+    leds: [[758,224],[761,229],[763,228],[765,222],[766,226],[769,221],[770,224],[772,220],[774,222],[778,218],[779,222],[781,217],[784,224],[785,216],[788,215],[790,226],[792,214],[795,213],[796,222],[798,220],[800,219],[801,212],[805,217],[806,211],[811,210],[818,209],[822,213],[823,208],[826,208],[830,206],[836,205],[836,214],[842,215],[843,204],[846,217],[849,204],[850,218],[853,220],[855,202],[856,220],[860,202],[861,277],[862,219],[865,216],[869,214],[872,212],[874,211],[875,201],[879,210],[886,208],[894,208],[897,201],[904,208],[906,291],[908,208],[910,200],[911,292],[913,293],[924,200],[929,296],[931,208],[937,209],[937,295],[946,201],[946,210],[946,295],[951,307],[952,295],[953,211],[959,297],[960,214],[962,216],[964,201],[965,294],[966,218],[970,220],[971,293],[973,222],[974,292],[975,202],[976,225],[976,341],[978,277],[979,230],[979,339],[983,339],[984,204],[986,339],[988,340],[990,313],[990,343],[992,232],[992,291],[996,204],[996,230],[999,228],[1001,227],[1003,314],[1004,296],[1006,224],[1007,205],[1008,300],[1011,315],[1012,301],[1014,223],[1014,303],[1016,207],[1020,304],[1022,220],[1022,316],[1027,209],[1029,308],[1032,317],[1036,210],[1036,317],[1043,221],[1044,211],[1044,309],[1048,318],[1052,214],[1057,318],[1059,215],[1060,224],[1060,310],[1067,319],[1070,216],[1070,226],[1072,227],[1074,320],[1077,311],[1094,222],[1095,310],[1096,232],[1100,310],[1102,225],[1102,320],[1104,236],[1107,227],[1110,320],[1112,308],[1114,240],[1116,229],[1117,318],[1118,242],[1118,304],[1118,306]],
+  },
+}
+
+// Điểm đến có bộ ảnh sông riêng sau công tắc Studio: id → mã bộ ảnh
+export const RIVER_ART: Record<string, string> = {cantho: 'cantho-river'}
+
+// Bật "Cần Thơ chợ nổi": Cần Thơ dùng bộ ảnh bến sông (public/chill/scenes/hd), thành cảnh ven
+// sông kiểu phố cổ (cấm xe, người đi dạo trên bến). Bảng hiệu Studio của ảnh cũ không còn đúng
+// chỗ nên bỏ, dùng SIGN_DEFAULTS của bộ ảnh mới
+export function withRiverArt(list: Destination[], on: boolean): Destination[] {
+  if (!on) return list
+  return list.map((d) => {
+    const art = RIVER_ART[d.id]
+    if (!art) return d
+    const streets = {
+      morning: `/chill/scenes/hd/${art}-morning.webp`,
+      afternoon: `/chill/scenes/hd/${art}-afternoon.webp`,
+      night: `/chill/scenes/hd/${art}-night.webp`,
+    }
+    return {...d, art, streets, streetsHd: streets, scenery: 'oldtown', signs: undefined, tilt: undefined, laneShift: undefined}
+  })
 }
 
 const BOATS_SRC = '/chill/scenes/boats.webp'
@@ -91,7 +159,7 @@ export class River {
         ? [280, 760].map((x, i) => ({x, dir: (i ? -1 : 1) as 1 | -1, speed: between(SPEED), lane: i ? 0 : 2, kind: (i ? 1 : 0) as 0 | 1, clock: i}))
         : []
       this.nextBoat = between(FIRST)
-      this.drifts = cfg
+      this.drifts = cfg && cfg.drifts !== false
         ? Array.from({length: 6}, (_, i) => ({
             x: seeded(i, 1) * 1120,
             y: cfg.water.top + 12 + seeded(i, 2) * (cfg.water.bottom - cfg.water.top - 20),
@@ -193,6 +261,7 @@ export class River {
     ctx.scale(s, s)
     const smooth = ctx.imageSmoothingEnabled
     this.drawWater(ctx, cfg)
+    if (this.time === 'night' && cfg.leds) this.drawLeds(ctx, cfg.leds)
     ctx.imageSmoothingEnabled = false
     for (const b of [...this.boats].sort((a, c) => a.lane - c.lane)) this.drawBoat(ctx, cfg, b)
     ctx.imageSmoothingEnabled = true
@@ -205,13 +274,14 @@ export class River {
     const {top, bottom} = cfg.water
     const t = this.clock
     const h = bottom - top
+    const still = (x: number, y: number) => !!cfg.still?.some(([x0, y0, x1, y1]) => x > x0 && x < x1 && y > y0 && y < y1)
     ctx.fillStyle = this.time === 'night' ? '#ffc27a' : this.time === 'afternoon' ? '#ffdcaa' : '#ffffff'
     const base = this.time === 'night' ? 0.34 : 0.2
     for (let i = 0; i < 64; i++) {
       const y = Math.round(top + 2 + seeded(i, 7) * (h - 4))
       const x = seeded(i, 8) * 1120 + Math.sin(t * 0.25 + i) * 10
       const a = Math.sin(t * (0.5 + seeded(i, 9)) + i * 2.1)
-      if (a <= 0.15) continue
+      if (a <= 0.15 || still(x, y)) continue
       ctx.globalAlpha = this.alpha * (a * base)
       ctx.fillRect(Math.round(x), y, 6 + Math.round(seeded(i, 10) * 18), 1)
     }
@@ -225,6 +295,7 @@ export class River {
         const x = seeded(i, n + 12) * 1120
         const y = top + 3 + seeded(i, n + 13) * (h - 6)
         const w = 2 + k * 9
+        if (still(x, y)) continue
         ctx.globalAlpha = this.alpha * ((1 - k) * 0.5)
         ctx.fillRect(Math.round(x - w / 2), Math.round(y), Math.round(w), 1)
       }
@@ -291,6 +362,26 @@ export class River {
       ctx.globalCompositeOperation = 'source-over'
       ctx.globalAlpha = this.alpha
     }
+  }
+
+  // LED cầu đi bộ: mỗi bóng một màu theo làn sóng chạy dọc cầu, đổi chầm chậm (hồng → tím →
+  // xanh ngọc → vàng…). Bóng in dưới nước (dưới mép cầu) nhạt hơn và lăn tăn
+  private drawLeds(ctx: CanvasRenderingContext2D, leds: [number, number][]) {
+    const t = this.clock
+    leds.forEach(([x, y], i) => {
+      const hue = (((300 + t * 8 - x * 0.5) % 360) + 360) % 360
+      const water = y > 250
+      const color = `hsl(${hue.toFixed(0)},75%,72%)`
+      const k = water ? 0.45 + 0.25 * Math.sin(t * 3 + i * 1.3) : 0.95
+      ctx.globalAlpha = this.alpha * k
+      ctx.fillStyle = color
+      ctx.fillRect(x - 1, y - 1, 2, 2)
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.globalAlpha = this.alpha * k * 0.28
+      ctx.fillRect(x - 2, y - 2, 4, 4)
+      ctx.globalCompositeOperation = 'source-over'
+    })
+    ctx.globalAlpha = this.alpha
   }
 
   private drawLanterns(ctx: CanvasRenderingContext2D, cfg: Config) {

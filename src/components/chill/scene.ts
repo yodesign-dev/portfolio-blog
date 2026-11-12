@@ -25,7 +25,7 @@
 
 import {Cat, CAT_NOEL_SRC, CAT_SRC, type ToyEvent} from './cat'
 import {Wand, drawWandProp, wandPropBox} from './wand'
-import {DESTINATIONS, type Destination} from './destinations'
+import {DESTINATIONS, artOf, type Destination} from './destinations'
 import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
 import {HIGHLAND, Highland, highlandStreets} from './highland'
 import {River} from './river'
@@ -935,7 +935,8 @@ export class ChillScene {
   }
 
   setAtmosphere(time: TimeOfDay, weather: Weather, destination = this.destination) {
-    if (time === this.time && weather === this.weather && destination.id === this.destination.id && !this.dirty) return
+    // So cả đối tượng: bật / tắt bộ ảnh khác (vd Cần Thơ chợ nổi) giữ nguyên id nhưng đổi ảnh
+    if (time === this.time && weather === this.weather && destination === this.destination && !this.dirty) return
     const next = this.image(this.streetsOf(destination)[time])
     if (next !== this.street) {
       this.prevStreet = ready(this.street) ? this.street : this.prevStreet
@@ -1923,12 +1924,12 @@ export class ChillScene {
     if (this.facadeOn && ready(this.street)) {
       const d = this.destination
       const panorama = this.highlandOn && !!HIGHLAND[d.id]
-      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[d.id] ?? [], PROP_SPOTS[d.id] ?? [], !panorama, !d.badge)
+      this.facade.set(this.street, this.time, this.weather, d.signs ?? SIGN_DEFAULTS[artOf(d)] ?? [], PROP_SPOTS[artOf(d)] ?? [], !panorama, !d.badge)
       this.facade.update(dt)
     }
     this.highland.set(this.highlandOn ? this.destination.id : '', this.time, this.weather)
     this.highland.update(dt, this.windDir)
-    this.river.set(this.destination.id, this.time, this.weather)
+    this.river.set(artOf(this.destination), this.time, this.weather)
     this.river.update(dt, (dir, len) => this.onSound?.('boat', 0, dir, len))
     if (this.noel) {
       const id = this.destination.id
@@ -1938,7 +1939,7 @@ export class ChillScene {
         theme: this.theme.id,
         streetDy: this.theme.streetDy * SCALE * RES,
         view: {x: this.theme.view.x * SCALE * RES, y: this.theme.view.y * SCALE * RES, w: this.theme.view.w * SCALE * RES, h: this.theme.view.h * SCALE * RES},
-        place: this.highlandOn && HIGHLAND[id] ? `${id}-mist` : id === 'hanoi' ? 'saigon' : id,
+        place: this.highlandOn && HIGHLAND[id] ? `${id}-mist` : this.destination.art ?? (id === 'hanoi' ? 'saigon' : id),
         street: ready(this.street) ? this.street : null,
         paused: this.paused,
       })

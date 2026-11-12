@@ -77,6 +77,8 @@ const CANOPY: Record<string, [number, number, number, number, number][]> = {
   danang: [[120, 125, 110, 85, 34]],
   nhatrang: [[120, 140, 115, 85, 34]],
   cantho: [[120, 140, 115, 85, 34]],
+  // Cần Thơ chợ nổi: không dây điện, đèn quấn ngọn dừa sau dãy nhà sàn ở ô kính giữa
+  'cantho-river': [[480, 150, 24, 13, 10], [548, 152, 24, 13, 10], [650, 150, 26, 13, 11]],
   tiengiang: [[120, 140, 115, 85, 34]],
   hue: [[190, 125, 180, 105, 44]],
   // Thông là cây Noel có sẵn ngoài đồi

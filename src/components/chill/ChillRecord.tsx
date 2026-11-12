@@ -21,6 +21,7 @@
 
 import {useEffect, useRef, useState} from 'react'
 import type {Destination} from './destinations'
+import {withRiverArt} from './river'
 import type {ChillScene, TimeOfDay, Weather} from './scene'
 import {SEATS, type Seat, type ThemeId} from './themes'
 import {readSeasonPreview, TREE_MAX} from './season'
@@ -52,8 +53,9 @@ type Setup = {
   busy: boolean
 }
 
-function readSetup(destinations: Destination[]): Setup {
+function readSetup(list: Destination[], marketOn: boolean): Setup {
   const p = new URLSearchParams(window.location.search)
+  const destinations = withRiverArt(list, p.has('market') ? p.get('market') === '1' : marketOn)
   const x = Number(p.get('x'))
   return {
     dest: destinations.find((d) => d.id === p.get('place')) ?? destinations[0],
@@ -73,6 +75,7 @@ function readSetup(destinations: Destination[]): Setup {
 // stringLightsOn: công tắc Studio "Đèn dây trong phòng"; ?lights=1 / ?lights=0 ghi đè
 // facadeOn: công tắc Studio "Mặt phố sống động"; ?facade=1 / ?facade=0 ghi đè
 // highlandOn: công tắc Studio "Đà Lạt sương mù"; ?highland=1 / ?highland=0 ghi đè
+// marketOn: công tắc Studio "Cần Thơ chợ nổi"; ?market=1 / ?market=0 ghi đè
 export function ChillRecord({
   destinations,
   streetMotionOn = false,
@@ -80,6 +83,7 @@ export function ChillRecord({
   sketchOn = false,
   facadeOn = false,
   highlandOn = false,
+  marketOn = false,
 }: {
   destinations: Destination[]
   streetMotionOn?: boolean
@@ -87,6 +91,7 @@ export function ChillRecord({
   sketchOn?: boolean
   facadeOn?: boolean
   highlandOn?: boolean
+  marketOn?: boolean
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -96,7 +101,7 @@ export function ChillRecord({
   const [live, setLive] = useState(false)
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- tham số chỉ đọc được trên trình duyệt
-  useEffect(() => setSetup(readSetup(destinations)), [destinations])
+  useEffect(() => setSetup(readSetup(destinations, marketOn)), [destinations, marketOn])
 
   // Giờ cố định theo link, hoặc theo đồng hồ thật của điểm đến (cập nhật mỗi phút)
   useEffect(() => {

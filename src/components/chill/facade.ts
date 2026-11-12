@@ -18,7 +18,8 @@ import type {TimeOfDay, Weather} from './scene'
 export type NeonColor = 'pink' | 'cyan' | 'red' | 'green' | 'yellow'
 export type NeonMode = 'sweep' | 'steady' | 'blink'
 // x, y: % chiều ngang / dọc của ảnh phố, là góc trái trên của hàng chữ (không tính dấu)
-export type NeonSign = {text: string; x: number; y: number; color?: NeonColor; mode?: NeonMode}
+// board: chữ sơn trên tấm bảng gỗ 2 chân, ban ngày cũng thấy; đêm chữ thành neon trên bảng tối
+export type NeonSign = {text: string; x: number; y: number; color?: NeonColor; mode?: NeonMode; board?: boolean}
 
 // Bảng hiệu mặc định khi điểm đến chưa đặt trong Studio (id = mã điểm đến)
 export const SIGN_DEFAULTS: Record<string, NeonSign[]> = {
@@ -26,6 +27,9 @@ export const SIGN_DEFAULTS: Record<string, NeonSign[]> = {
   saigon: [{text: 'CÀ PHÊ', x: 55.7, y: 61.3, color: 'pink', mode: 'sweep'}],
   // Chữ PHỞ vẽ sẵn trên bảng hiệu nhà xanh ngọc — đêm thì sáng neon đè đúng chỗ
   'hanoi-tau': [{text: 'PHỞ', x: 38, y: 60.5, color: 'yellow', mode: 'steady'}],
+  // Bảng CHỢ NỔI dựng trên nóc nhà sàn giữa, ngay trên cụm ghe chợ (ô kính giữa, không bị người
+  // ngồi che): chân bảng chạm nóc mái ở y 186 px ảnh 1120
+  'cantho-river': [{text: 'CHỢ NỔI', x: 51.6, y: 34.9, color: 'yellow', mode: 'steady', board: true}],
 }
 
 // Đồ vật động treo trên mặt phố (sprite AI, Nano Banana 2.1): props.webp, mỗi món 1 hàng
@@ -357,6 +361,7 @@ export class Facade {
     const night = this.time === 'night'
     const a = this.a?.w ? this.a : null
     this.drawProps(ctx, r)
+    this.drawBoards(ctx, r)
     if (night) {
       if (a) this.drawLights(ctx, a, r)
       this.drawSigns(ctx, r)
@@ -470,6 +475,32 @@ export class Facade {
     }
     ctx.globalCompositeOperation = 'source-over'
     ctx.globalAlpha = alpha
+  }
+
+  // Bảng gỗ cho chữ (board): mép tối, 2 chân ngắn xuống nóc mái; ngày chữ sơn kem, đêm bảng tối
+  // để chữ neon (drawSigns) nổi lên. Màu theo giờ cho khớp ảnh phố
+  private drawBoards(ctx: CanvasRenderingContext2D, r: {x: number; y: number; w: number; h: number}) {
+    const p = r.w / 560
+    const night = this.time === 'night'
+    const rain = this.weather === 'rain'
+    for (const s of this.signs) {
+      if (!s.board) continue
+      const {px, width} = layout(s.text)
+      const ox = r.x + Math.round((s.x / 100) * 560) * p
+      const oy = r.y + Math.round((s.y / 100) * 238) * (r.h / 238)
+      const box = (x: number, y: number, w: number, h: number) => ctx.fillRect(ox + x * p, oy + y * p, w * p, h * p)
+      const edge = night ? '#121019' : this.time === 'afternoon' ? '#4a2c1a' : '#3e2a1d'
+      const wood = night ? '#221d29' : this.time === 'afternoon' ? (rain ? '#62452f' : '#7d5233') : rain ? '#57412f' : '#6b4a33'
+      ctx.fillStyle = edge
+      box(1, 8, 1, 2)
+      box(width - 2, 8, 1, 2)
+      box(-3, -5, width + 6, 13)
+      ctx.fillStyle = wood
+      box(-2, -4, width + 4, 11)
+      if (night) continue
+      ctx.fillStyle = this.time === 'afternoon' ? (rain ? '#e3c9a2' : '#ffe0aa') : rain ? '#ddd3bf' : '#f4e7c8'
+      for (const [x, y] of px) box(x, y, 1, 1)
+    }
   }
 
   // Chữ neon: 1 pixel chữ = 1 px của ảnh 560 (½ ô lưới), viền ống tối khi tắt

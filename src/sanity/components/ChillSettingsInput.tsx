@@ -34,6 +34,7 @@ type Value = {
   sketchOpen?: boolean
   facadeOpen?: boolean
   highlandOpen?: boolean
+  marketOpen?: boolean
   miniPlayerOpen?: boolean
   sleepTimerOpen?: boolean
   brewDeskOpen?: boolean
@@ -63,7 +64,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
+type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -90,6 +91,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
       {key: 'stringLightsOpen', icon: '💡', title: 'Đèn dây trong phòng', short: 'Bóng thở, thỉnh thoảng chớp, màu trôi nhẹ', desc: 'Dây đèn vẽ sẵn ở phòng Bàn đêm sáng lên dịu xuống từng bóng, thỉnh thoảng một bóng chớp tắt mềm, màu trôi chậm vàng kem → hổ phách → hồng đào dọc dây. Ban đêm rõ, ban ngày nhẹ. Mùa Noel đổi sang đỏ / vàng / xanh lá. Thử bằng ?lights=1. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'facadeOpen', icon: '🏮', title: 'Mặt phố sống động', short: 'Ảnh phố nét hơn, đèn đêm, neon, bóng mây', desc: 'Cả 9 cảnh dùng ảnh phố 1120 px nét gấp đôi. Cờ, quần áo phơi, đèn lồng đung đưa ở Sài Gòn, Huế, Hà Nội đường tàu, Tiền Giang. Đêm: cửa sổ tự tắt bật lác đác, một nhà xem TV, đèn tuýp nháy khi bật, bảng hiệu neon (đặt ở Điểm đến › Mặt phố). Ngày trời quang: bóng mây trôi qua, chiều có vệt nắng lóe. Áp dụng cả trang quay /chill/record.', delay: '1 phút'},
       {key: 'highlandOpen', icon: '🌲', title: 'Đà Lạt sương mù', short: 'Ảnh Đà Lạt mới, sương trôi, khói ống khói, kính mờ', desc: 'Cảnh Đà Lạt dùng bộ ảnh mới: đồi thông nhiều lớp chìm trong sương, biệt thự Pháp có ống khói, màu lạnh và nhạt. Sương trôi chậm ngang phố, khói bay lên từ ống khói (sáng, tối), đêm có quầng sương quanh đèn đường, mép kính quán mờ hơi nước và lâu lâu một giọt chảy xuống. Chỉ ảnh hưởng Đà Lạt. Áp dụng cả trang quay /chill/record. Thử trước bằng ?highland=1.', delay: '1 phút'},
+      {key: 'marketOpen', icon: '🛶', title: 'Cần Thơ chợ nổi', short: 'Bến sông nhìn ra chợ nổi, ghe đi ngang, đèn cầu đổi màu', desc: 'Cảnh Cần Thơ đổi thành bến sông nhìn ra chợ nổi: ghe treo hàng trên cây bẹo, xuồng nón lá, nhà sàn, cầu đi bộ búp sen, cầu dây văng xa. Bến cấm xe, người đi dạo. Đò đi ngang sát bến, mặt sông lăn tăn. Bảng CHỢ NỔI trên nóc nhà sàn (ngày chữ sơn, đêm neon). Đêm: đèn bến, trụ đèn búp sen, dải LED cầu đổi màu chầm chậm, đèn dầu trên ghe. Bảng hiệu cần bật Mặt phố sống động. Chỉ ảnh hưởng Cần Thơ. Áp dụng cả trang quay /chill/record. Thử trước bằng ?market=1.', delay: '1 phút'},
     ],
   },
   {

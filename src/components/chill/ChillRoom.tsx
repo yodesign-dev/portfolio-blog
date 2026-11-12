@@ -5,6 +5,7 @@ import {useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useStat
 import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, destOpen, type Destination} from './destinations'
+import {withRiverArt} from './river'
 import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
@@ -225,7 +226,7 @@ function readPrefs(): Partial<Prefs> {
 // Mặc định dùng bộ có sẵn trong code; page.tsx truyền thêm nội dung từ Sanity
 export function ChillRoom({
   tracks = TRACKS,
-  destinations: allDestinations = DESTINATIONS,
+  destinations: rawDestinations = DESTINATIONS,
   updates = [],
   shelfOn = false,
   playCountsOn = false,
@@ -238,6 +239,7 @@ export function ChillRoom({
   miniPlayerOn = false,
   facadeOn = false,
   highlandOn = false,
+  marketOn = false,
   sleepTimerOn = false,
   brewDeskOn = false,
   welcomeObOn = false,
@@ -276,6 +278,9 @@ export function ChillRoom({
   // Đà Lạt sương mù: ảnh mới, sương trôi, khói ống khói, kính mờ (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?highland=1 / ?highland=0 trên URL ghi đè để so trước / sau
   highlandOn?: boolean
+  // Cần Thơ chợ nổi: bến sông, ghe đi ngang, đèn cầu đổi màu, bảng CHỢ NỔI (Studio "Chill · Cài
+  // đặt"), mặc định tắt. ?market=1 / ?market=0 trên URL ghi đè để so trước / sau
+  marketOn?: boolean
   // Hẹn giờ tắt nhạc 15/30/60/90 phút (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?sleep=1 / ?sleep=0 trên URL ghi đè để thử
   sleepTimerOn?: boolean
@@ -301,6 +306,15 @@ export function ChillRoom({
     const param = new URLSearchParams(window.location.search).get('ob')
     return param ? param === '1' : initialWelcomeOb.current
   }
+  // Cần Thơ chợ nổi: thay bộ ảnh Cần Thơ ngay trong danh sách điểm đến, nên cảnh, thẻ chọn cảnh,
+  // bưu thiếp đều dùng ảnh mới. Lúc render trên server theo công tắc, ?market= đọc sau khi gắn
+  const [market, setMarket] = useState(marketOn)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('market')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tham số chỉ đọc được trên trình duyệt
+    setMarket(param ? param === '1' : marketOn)
+  }, [marketOn])
+  const allDestinations = useMemo(() => withRiverArt(rawDestinations, market), [rawDestinations, market])
   // Điểm đến theo lịch (Xóm đạo): máy khách so giờ mỗi phút, ?at= để xem trước. Danh sách chỉ đổi
   // khi có cảnh mở hoặc đóng, nên các effect theo danh sách không chạy lại mỗi phút
   const [placeClock, setPlaceClock] = useState(0)

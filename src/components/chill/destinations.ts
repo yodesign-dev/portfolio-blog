@@ -37,7 +37,13 @@ export type Destination = {
   showUntil?: string
   // Nhãn trên thẻ chọn điểm đến
   badge?: 'noel'
+  // Bộ ảnh khác của cùng điểm đến (vd 'cantho-river' khi bật "Cần Thơ chợ nổi"): các lớp vẽ
+  // chồng theo toạ độ ảnh (sông, bảng hiệu, đèn Noel) tra theo mã này thay cho id
+  art?: string
 }
+
+// Mã tra các lớp vẽ chồng theo toạ độ ảnh
+export const artOf = (d: Destination) => d.art ?? d.id
 
 // Điểm đến thường luôn mở. now = 0 (chưa biết giờ, lúc render trên server) thì cảnh theo lịch chưa hiện
 export const destOpen = (d: Destination, now: number) =>

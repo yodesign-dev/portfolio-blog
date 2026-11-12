@@ -28,6 +28,7 @@ export default defineType({
     defineField({name: 'seatPickOpen', title: 'Khách chọn người ngồi nam / nữ', type: 'boolean', initialValue: false}),
     defineField({name: 'facadeOpen', title: 'Mặt phố sống động (ảnh nét, đèn đêm, neon, bóng mây)', type: 'boolean', initialValue: false}),
     defineField({name: 'highlandOpen', title: 'Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ)', type: 'boolean', initialValue: false}),
+    defineField({name: 'marketOpen', title: 'Cần Thơ chợ nổi (bến sông, ghe, đèn cầu, bảng CHỢ NỔI)', type: 'boolean', initialValue: false}),
     defineField({name: 'streetMotionOpen', title: 'Chuyển động phố mượt (người, xe, chó)', type: 'boolean', initialValue: false}),
     defineField({name: 'sketchOpen', title: 'Chị ký hoạ ở giá vẽ (Cửa sổ quán) thay vì gõ laptop', type: 'boolean', initialValue: false}),
     defineField({name: 'stringLightsOpen', title: 'Đèn dây trong phòng thở, chớp, đổi màu nhẹ', type: 'boolean', initialValue: false}),

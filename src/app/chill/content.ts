@@ -73,6 +73,7 @@ const CHILL_QUERY = `{
   "miniPlayerOpen": *[_id == "chillSettings"][0].miniPlayerOpen,
   "facadeOpen": *[_id == "chillSettings"][0].facadeOpen,
   "highlandOpen": *[_id == "chillSettings"][0].highlandOpen,
+  "marketOpen": *[_id == "chillSettings"][0].marketOpen,
   "sleepTimerOpen": *[_id == "chillSettings"][0].sleepTimerOpen,
   "brewDeskOpen": *[_id == "chillSettings"][0].brewDeskOpen,
   "welcomeObOpen": *[_id == "chillSettings"][0].welcomeObOpen,
@@ -126,6 +127,7 @@ type ChillContent = {
   miniPlayerOpen?: boolean | null
   facadeOpen?: boolean | null
   highlandOpen?: boolean | null
+  marketOpen?: boolean | null
   sleepTimerOpen?: boolean | null
   brewDeskOpen?: boolean | null
   welcomeObOpen?: boolean | null
@@ -275,6 +277,8 @@ export async function getChillContent(revalidate: number) {
   const facadeOn = content.facadeOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_FACADE === '1')
   // Đà Lạt sương mù (ảnh mới, sương trôi, khói, kính mờ). Máy dev: CHILL_DEV_HIGHLAND=1
   const highlandOn = content.highlandOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_HIGHLAND === '1')
+  // Cần Thơ chợ nổi (bến sông, ghe, đèn cầu, bảng CHỢ NỔI). Máy dev: CHILL_DEV_MARKET=1
+  const marketOn = content.marketOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_MARKET === '1')
   // Hẹn giờ tắt nhạc 15/30/60/90 phút. Máy dev: CHILL_DEV_SLEEP=1
   const sleepTimerOn = content.sleepTimerOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_SLEEP === '1')
   // Bàn pha phin: tấm đồng hồ thay thanh nhạc, phin trong cảnh. Máy dev: CHILL_DEV_BREW=1
@@ -286,5 +290,5 @@ export async function getChillContent(revalidate: number) {
   const tripPhins = Math.min(8, Math.max(1, Math.round(content.tripPhins ?? 3)))
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
-  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, sleepTimerOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
 }
