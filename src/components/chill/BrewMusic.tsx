@@ -213,7 +213,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).p
 const segOn = 'bg-[#e8b27d]/15 font-medium text-[#f3cfa8]'
 const segOff = 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
 const label = 'font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]'
-const ghost = 'rounded-full border border-white/15 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
+const ghost = 'touch:min-h-11 rounded-full border border-white/15 px-3 py-2 text-xs text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
 
 function Options<T extends string>({items, value, onChange, aria, columns}: {items: {id: T; label: string}[]; value: T; onChange: (id: T) => void; aria: string; columns: string}) {
   return (
@@ -225,7 +225,7 @@ function Options<T extends string>({items, value, onChange, aria, columns}: {ite
           role="radio"
           aria-checked={value === it.id}
           onClick={() => onChange(it.id)}
-          className={`min-h-9 rounded-lg px-1 py-1.5 text-xs leading-tight transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${value === it.id ? segOn : segOff}`}
+          className={`min-h-9 rounded-lg px-1 py-1.5 text-xs leading-tight transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 ${value === it.id ? segOn : segOff}`}
         >
           {it.label}
         </button>
@@ -243,7 +243,7 @@ function Switch({on, title, hint, onToggle, onPrepare}: {on: boolean; title: str
       onClick={onToggle}
       onPointerEnter={onPrepare}
       onFocus={onPrepare}
-      className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+      className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11"
     >
       <span aria-hidden className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${on ? 'bg-[#9fd4a8]' : 'bg-white/15'}`}>
         <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#1b1a21] transition-[left] ${on ? 'left-3.5' : 'left-0.5'}`} />
@@ -329,7 +329,7 @@ export function MusicChooser({
                     onClick={() => api.swapAt(i)}
                     aria-label={t.brew.swapAria(byId.get(id)?.title ?? '')}
                     title={t.brew.swap}
-                    className="size-7 shrink-0 rounded-md text-sm text-[#a79e94] transition hover:bg-white/[0.07] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                    className="size-7 shrink-0 rounded-md text-sm text-[#a79e94] touch:size-11 transition hover:bg-white/[0.07] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
                   >
                     ×
                   </button>
@@ -420,7 +420,7 @@ export function MusicChooser({
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((v) => !v)}
-            className="shrink-0 rounded-md px-1.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            className="shrink-0 rounded-md px-1.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:px-3"
           >
             {expanded ? t.focus.liteDone : t.focus.liteChange}
           </button>

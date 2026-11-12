@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Màn chạm hoặc màn dưới 1024px (điện thoại, máy tính bảng): vùng bấm tối thiểu 44×44 ở trang
+   /chill. Màn máy tính có chuột giữ nguyên kích thước — dùng: touch:size-11 */
+@custom-variant touch {
+  @media (pointer: coarse), (max-width: 1023.98px) {
+    @slot;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -187,4 +195,25 @@ body {
 @keyframes chill-eq {
   0%, 100% { height: 25%; }
   50% { height: 100%; }
+}
+
+/* ---------- /chill: truy cập (a11y) ---------- */
+/* Viền focus mặc định cho mọi thứ bấm được trong quán: kem sáng, dày 2px, cách 2px — thấy rõ
+   trên nền tối lẫn trên cảnh. :where() giữ độ ưu tiên 0 nên chỗ nào đã có focus-visible riêng
+   (bảng giấy kem dùng viền nâu) vẫn giữ màu của nó */
+.chill-root :where(button, a[href], input, select, textarea, summary, [role="slider"], [role="switch"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid #f3cfa8;
+  outline-offset: 2px;
+}
+/* Giảm chuyển động: dừng mọi hiệu ứng lặp và rút ngắn chuyển cảnh trong quán (cảnh vẽ bằng
+   canvas đã tự dừng, xem ChillRoom: scenePaused) */
+@media (prefers-reduced-motion: reduce) {
+  .chill-root *,
+  .chill-root *::before,
+  .chill-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

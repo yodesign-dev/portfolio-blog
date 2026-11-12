@@ -349,7 +349,7 @@ export function ChillChat({
             className="h-full space-y-1 overflow-y-auto overscroll-contain px-4 py-4"
             aria-live="polite"
           >
-            <li className="pb-2 text-center text-[11px] text-[#7d756d]">{t.chat.rules}</li>
+            <li className="pb-2 text-center text-[11px] text-[#8a837c]">{t.chat.rules}</li>
             {!messages.some((m) => m.kind === 'msg') && <li className="py-10 text-center text-sm text-[#a79e94]">{t.chat.empty} {withNoto('👋')}</li>}
             {rows.map((m, i) => {
               if (m.kind === 'visits') {
@@ -488,7 +488,7 @@ function Bubble({
             <span className="font-semibold" style={{color}}>
               {own ? t.common.you : m.name}
             </span>
-            <time dateTime={new Date(m.ts).toISOString()} className="font-mono text-[10px] text-[#7d756d]">
+            <time dateTime={new Date(m.ts).toISOString()} className="font-mono text-[10px] text-[#8a837c]">
               {timeOf(m.ts)}
             </time>
           </p>
@@ -715,7 +715,7 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
           }}
           placeholder={t.chat.placeholder}
           aria-label={t.chat.message}
-          className="max-h-28 min-h-11 flex-1 resize-none rounded-2xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-[#ede6dd] outline-none placeholder:text-[#7d756d] focus:border-[#e8b27d]/60"
+          className="max-h-28 min-h-11 flex-1 resize-none rounded-2xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-[#ede6dd] outline-none placeholder:text-[#8a837c] focus:border-[#e8b27d]/60"
         />
         <button
           type="submit"
@@ -732,7 +732,7 @@ function Composer({me, open, onSent, onTyping}: {me: Me; open: boolean; onSent: 
         <span className="text-[#f08a5d]" role="alert">
           {error}
         </span>
-        {text.length > MAX - 40 && <span className="tabular-nums text-[#7d756d]">{MAX - text.length}</span>}
+        {text.length > MAX - 40 && <span className="tabular-nums text-[#8a837c]">{MAX - text.length}</span>}
       </div>
     </form>
   )

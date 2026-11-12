@@ -297,7 +297,7 @@ export function Changelog({
                         {t.updates.unseen}
                       </span>
                     )}
-                    {u.version && <span className="ml-auto font-mono text-[11px] text-[#6f6862]">v{u.version.replace(/^v/i, '')}</span>}
+                    {u.version && <span className="ml-auto font-mono text-[11px] text-[#89837e]">v{u.version.replace(/^v/i, '')}</span>}
                   </div>
                   <h3 className="mt-2 text-base font-semibold leading-snug text-[#ede6dd]">{pick(lang, u.title, u.titleEn)}</h3>
 

@@ -218,7 +218,7 @@ export function Shelf({
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#8a6a50]/20" role="progressbar" aria-valuemin={0} aria-valuemax={phins + left} aria-valuenow={phins}>
                       <div className="h-full rounded-full bg-[#8a5a2b]" style={{width: `${(phins / (phins + left || 1)) * 100}%`}} />
                     </div>
-                    <p className="mt-1 text-xs text-[#8a6a50]">{t.shelf.left(left)}</p>
+                    <p className="mt-1 text-xs text-[#84664d]">{t.shelf.left(left)}</p>
                   </>
                 )}
               </>
@@ -327,7 +327,7 @@ function CollectorCard({item, have, number, total, label, children}: {item: Shel
       style={{borderColor: RARITY_COLOR[r]}}
       aria-live="polite"
     >
-      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-[#8a6a50]">
+      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-[#84664d]">
         <span>{t.shelf.number(number, total)}</span>
         <span className="rounded-full px-2 py-0.5 font-bold text-[#2a1a10]" style={{background: RARITY_COLOR[r]}}>
           {t.shelf.rarity[r]}
@@ -350,7 +350,7 @@ function CollectorCard({item, have, number, total, label, children}: {item: Shel
           />
         </span>
       </div>
-      <p className={`mt-2.5 text-lg font-semibold leading-tight ${have ? '' : 'text-[#8a6a50]'}`}>{label}</p>
+      <p className={`mt-2.5 text-lg font-semibold leading-tight ${have ? '' : 'text-[#84664d]'}`}>{label}</p>
       {children}
     </div>
   )

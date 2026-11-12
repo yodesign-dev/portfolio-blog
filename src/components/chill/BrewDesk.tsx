@@ -209,7 +209,7 @@ export function BrewPlate({
     <button
       type="button"
       onClick={onPause}
-      className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#e8b27d] px-3.5 text-[13px] font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]`}
+      className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#e8b27d] px-3.5 touch:h-11 text-[13px] font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]`}
     >
       <svg width="13" height="13" viewBox="0 0 15 15" fill="currentColor" aria-hidden>
         <path d={paused ? 'M3 1.5v12l10-6z' : 'M3 1.5h3.2v12H3zM8.8 1.5H12v12H8.8z'} />
@@ -217,7 +217,7 @@ export function BrewPlate({
       {paused ? t.focus.resume : t.focus.pause}
     </button>
   )
-  const quiet = 'flex h-10 shrink-0 items-center justify-center rounded-full border border-white/15 px-3.5 text-[13px] text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
+  const quiet = 'flex h-10 shrink-0 items-center justify-center rounded-full border border-white/15 px-3.5 touch:h-11 touch:min-w-11 text-[13px] text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
 
   if (compact || zen) {
     return (
@@ -297,7 +297,7 @@ export function BrewPlate({
             </span>
           </div>
           {rest ? (
-            <button type="button" onClick={onSkipBreak} className="flex h-10 shrink-0 items-center rounded-full bg-[#9fd4a8] px-3.5 text-[13px] font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]">
+            <button type="button" onClick={onSkipBreak} className="flex h-10 shrink-0 items-center rounded-full bg-[#9fd4a8] touch:h-11 px-3.5 text-[13px] font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]">
               {t.focus.skipBreak}
             </button>
           ) : (

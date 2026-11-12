@@ -131,7 +131,7 @@ export function SupporterBoard({
               <span aria-hidden className={`absolute left-1/2 top-1.5 h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-[0_1px_0_rgba(0,0,0,0.4)] ${pick(PINS, s.id)}`} />
               <div className="flex items-baseline justify-between gap-2">
                 <p className="truncate font-semibold">{s.name || t.board.friend}</p>
-                <p className="shrink-0 text-[11px] text-[#8a6a4a]">{ago(s.at, t, lang)}</p>
+                <p className="shrink-0 text-[11px] text-[#846647]">{ago(s.at, t, lang)}</p>
               </div>
               <p className="mt-0.5 text-xs text-[#7a5a3a]">
                 {t.board.treated(s.drink.icon, s.drink.label)}

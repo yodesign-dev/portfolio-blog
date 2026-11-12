@@ -616,7 +616,7 @@ export function Focus({
       ) : (
         <div className="mt-3">
           <NameField label={t.name.label} />
-          <p className="mt-0.5 text-[11px] leading-snug text-[#7d756d]">{t.name.shared}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-[#8a837c]">{t.name.shared}</p>
           <div className="mt-3 border-t border-white/[0.08] pt-3">
             <div className="flex items-center justify-between gap-2">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">{t.regular.card(card)}</p>
@@ -688,7 +688,7 @@ export function Focus({
                   setCustom(false)
                   choose(m)
                 }}
-                className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 ${
                   minutes === m ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
                 }`}
               >
@@ -703,7 +703,7 @@ export function Focus({
               type="button"
               aria-expanded={taskOpen}
               onClick={() => setTaskOpen((v) => !v)}
-              className="shrink-0 rounded-md px-1.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              className="shrink-0 rounded-md px-1.5 py-1 text-xs text-[#f3cfa8] transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:px-3"
             >
               {taskOpen ? t.focus.liteDone : todos.some((x) => !x.doneDay) ? t.focus.liteChange : t.focus.liteAddTask}
             </button>
@@ -718,14 +718,14 @@ export function Focus({
             <button
               type="button"
               onClick={() => beginFromPanel('break')}
-              className="w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
+              className="w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold touch:min-h-11 text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
             >
               {t.focus.takeBreak(nextBreakLong ? LONG_BREAK_MIN : BREAK_MIN, nextBreakLong)}
             </button>
             <button
               type="button"
               onClick={() => beginFromPanel('phin')}
-              className="mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              className="mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm touch:min-h-11 text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
             >
               {t.focus.again}
             </button>
@@ -734,7 +734,7 @@ export function Focus({
           <button
             type="button"
             onClick={() => beginFromPanel('phin')}
-            className="w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
+            className="w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold touch:min-h-11 text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]"
           >
             {t.focus.liteStart(minutes)}
           </button>
@@ -755,7 +755,7 @@ export function Focus({
         type="button"
         aria-expanded={more}
         onClick={() => setMore((v) => !v)}
-        className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-[13px] text-[#a79e94] transition hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+        className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-[13px] text-[#a79e94] touch:min-h-11 transition hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
       >
         {t.focus.liteSettings}
         <span aria-hidden>{more ? '▾' : '▸'}</span>
@@ -802,14 +802,14 @@ export function Focus({
             role="switch"
             aria-checked={auto}
             onClick={toggleAuto}
-            className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11"
           >
             <span aria-hidden className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${auto ? 'bg-[#9fd4a8]' : 'bg-white/15'}`}>
               <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#1b1a21] transition-[left] ${auto ? 'left-3.5' : 'left-0.5'}`} />
             </span>
             <span>
               <span className="block text-xs text-[#ede6dd]">{t.focus.auto}</span>
-              <span className="block text-[11px] leading-snug text-[#7d756d]">{t.focus.autoHint}</span>
+              <span className="block text-[11px] leading-snug text-[#8a837c]">{t.focus.autoHint}</span>
             </span>
           </button>
         </div>
@@ -840,7 +840,7 @@ export function Focus({
         aria-controls="chill-focus"
         aria-label={session ? (onBreak ? t.focus.breakAria(clock(left)) : t.focus.runningAria(clock(left))) : quick ? t.focus.liteQuickAria(minutes) : t.focus.open}
         title={t.focus.title}
-        className={`relative flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+        className={`relative flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs backdrop-blur transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] touch:h-11 ${
           session || open || done
             ? 'border-[#e8b27d]/60 bg-[#2a1f18]/85 text-[#f6dcbd]'
             : 'border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] hover:border-[#e8b27d]/80 hover:text-white'
@@ -867,7 +867,7 @@ export function Focus({
           title={t.focus.liteOpenPanel}
           aria-expanded={open}
           aria-controls="chill-focus"
-          className="flex h-9 w-7 items-center justify-center rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+          className="flex h-9 w-7 items-center justify-center rounded-md border touch:h-11 touch:w-11 border-[#e8b27d]/45 bg-[#2a1f18]/75 text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
         >
           <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden>
             <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -932,7 +932,7 @@ export function Focus({
               <button
                 type="button"
                 onClick={close}
-                className="mt-3 w-full rounded-full border border-white/15 py-2 text-sm text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                className="mt-3 w-full rounded-full border border-white/15 py-2 text-sm touch:min-h-11 text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
               >
                 {t.focus.closeSummary}
               </button>
@@ -951,7 +951,7 @@ export function Focus({
                 <button
                   type="button"
                   onClick={stop}
-                  className="rounded-full border border-white/15 py-2 text-sm text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                  className="rounded-full border border-white/15 py-2 text-sm touch:min-h-11 text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
                 >
                   {t.focus.stop}
                 </button>
@@ -983,7 +983,7 @@ export function Focus({
               <button
                 type="button"
                 onClick={stop}
-                className="mt-3 w-full rounded-full border border-white/15 py-2 text-sm text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                className="mt-3 w-full rounded-full border border-white/15 py-2 text-sm touch:min-h-11 text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
               >
                 {t.focus.stop}
               </button>
@@ -1014,7 +1014,7 @@ export function Focus({
                       setCustom(false)
                       choose(m)
                     }}
-                    className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                    className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 ${
                       minutes === m && !custom ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
                     }`}
                   >
@@ -1027,7 +1027,7 @@ export function Focus({
                     role="radio"
                     aria-checked={custom}
                     onClick={() => setCustom(true)}
-                    className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                    className={`rounded-lg py-2 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 ${
                       custom ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
                     }`}
                   >
@@ -1080,7 +1080,7 @@ export function Focus({
                 <button
                   type="button"
                   onClick={() => beginFromPanel('break')}
-                  className="w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
+                  className="w-full rounded-full bg-[#9fd4a8] py-2.5 text-sm font-semibold touch:min-h-11 text-[#14261a] transition hover:bg-[#b3dfba] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9fd4a8]"
                 >
                   {t.focus.takeBreak(nextBreakLong ? LONG_BREAK_MIN : BREAK_MIN, nextBreakLong)}
                 </button>
@@ -1090,8 +1090,8 @@ export function Focus({
                 onClick={() => beginFromPanel('phin')}
                 className={
                   done
-                    ? 'mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
-                    : `${brew ? '' : 'mt-3 '}w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]`
+                    ? 'mt-2 w-full rounded-full border border-[#e8b27d]/50 py-2 text-sm touch:min-h-11 text-[#f3cfa8] transition hover:bg-[#e8b27d]/10 focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
+                    : `${brew ? '' : 'mt-3 '}w-full rounded-full bg-[#e8b27d] py-2.5 text-sm font-semibold touch:min-h-11 text-[#2a1a10] transition hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]`
                 }
               >
                 {done ? t.focus.again : t.focus.start}
@@ -1109,7 +1109,7 @@ export function Focus({
                 </span>
                 <span>
                   <span className="block text-xs text-[#ede6dd]">{t.focus.auto}</span>
-                  <span className="block text-[11px] leading-snug text-[#7d756d]">{t.focus.autoHint}</span>
+                  <span className="block text-[11px] leading-snug text-[#8a837c]">{t.focus.autoHint}</span>
                 </span>
               </button>
             </>
@@ -1195,7 +1195,7 @@ function Tabs<T extends string>({items, value, onChange, small = false, classNam
           role="tab"
           aria-selected={value === it.id}
           onClick={() => onChange(it.id)}
-          className={`rounded-lg transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${small ? 'py-1 text-xs' : 'py-1.5 text-[13px] font-medium'} ${
+          className={`rounded-lg transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${small ? 'py-1 text-xs' : 'py-1.5 text-[13px] font-medium'} touch:min-h-11 ${
             value === it.id ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
           }`}
         >

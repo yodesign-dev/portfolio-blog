@@ -2511,6 +2511,19 @@ export function ChillRoom({
     audio.seek(sec)
     setPosition(sec)
   }
+  // Thanh tua bằng bàn phím: ←/→ lùi/tới 5 giây, Home/End về đầu/cuối bài
+  const seekKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const audio = audioRef.current
+    if (!audio || !started || !duration) return
+    const to = e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? position - 5 : e.key === 'ArrowRight' || e.key === 'ArrowUp' ? position + 5 : e.key === 'Home' ? 0 : e.key === 'End' ? duration - 1 : null
+    if (to === null) return
+    e.preventDefault()
+    // Phím ←/→ trên thanh tua không được lọt ra phím tắt của quán
+    e.stopPropagation()
+    const sec = Math.min(Math.max(0, to), Math.max(0, duration - 1))
+    audio.seek(sec)
+    setPosition(sec)
+  }
 
   // Kéo 1 thanh trong bộ trộn: bắt đầu từ mức đang nghe (theo cảnh hoặc bản trộn cũ), từ
   // đó là bản trộn riêng. Kéo thanh / bấm nút là thao tác người dùng → được phép bật âm thanh
@@ -2900,6 +2913,8 @@ export function ChillRoom({
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const el = e.target as HTMLElement
+      // Phím gửi thẳng vào document (không qua phần tử nào) thì không có closest
+      if (typeof el.closest !== 'function') return
       if (el.closest('input, select, textarea, [contenteditable="true"]')) return
       switch (e.key) {
         case ' ':
@@ -3138,8 +3153,10 @@ export function ChillRoom({
       }}
       aria-expanded={menuOpen}
       aria-controls="chill-menu"
-      className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#f6dcbd] backdrop-blur transition hover:border-[#e8b27d]/80 hover:text-white focus-visible:outline-2 focus-visible:outline-[#e8b27d] sm:text-[11px] ${
-        menuOpen ? 'border-[#e8b27d]/80 bg-[#2a1f18]/90' : 'border-[#e8b27d]/45 bg-[#2a1f18]/75'
+      className={`relative flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 backdrop-blur transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 ${
+        compact
+          ? `text-xs font-medium text-white/90 hover:bg-black/65 ${menuOpen ? 'bg-black/70' : 'bg-black/45'}`
+          : `border font-mono text-[10px] uppercase tracking-[0.18em] text-[#f6dcbd] hover:border-[#e8b27d]/80 hover:text-white sm:text-[11px] ${menuOpen ? 'border-[#e8b27d]/80 bg-[#2a1f18]/90' : 'border-[#e8b27d]/45 bg-[#2a1f18]/75'}`
       }`}
     >
       <MenuCardIcon />
@@ -3155,7 +3172,7 @@ export function ChillRoom({
         role="radio"
         aria-checked={showMine}
         onClick={() => setMineTab(true)}
-        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition ${
+        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
           showMine ? 'border-rose-300/50 bg-rose-300/10 text-rose-100' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
         }`}
       >
@@ -3274,7 +3291,7 @@ export function ChillRoom({
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
 
   return (
-    <div className={`relative h-dvh w-full select-none overflow-clip bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle && !zenList) ? 'cursor-none' : ''}`}>
+    <div className={`chill-root relative h-dvh w-full select-none overflow-clip bg-[#16131a] text-[#ede6dd] ${hideUi || (zen && idle && !zenList) ? 'cursor-none' : ''}`}>
       <h1 className="sr-only">Chill for work — slow morning, strong coffee</h1>
 
       {/* Ngang: cảnh phủ kín màn hình. Dọc (điện thoại): khung cảnh nằm giữa thanh trên và
@@ -3374,7 +3391,7 @@ export function ChillRoom({
                       role="radio"
                       aria-checked={on}
                       onClick={() => pickStation(st.id)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
+                      className={`rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
                         st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
                     >
@@ -3546,7 +3563,7 @@ export function ChillRoom({
                     className="relative block rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1.5 text-[12px] leading-snug text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)]"
                     style={{width: 'max-content', maxWidth: Math.max(150, Math.min(240, box.width * 2))}}
                   >
-                    <span className="block text-[10px] font-medium text-[#9a6a45]">{f.name}</span>
+                    <span className="block text-[10px] font-medium text-[#8e623f]">{f.name}</span>
                     <span className="line-clamp-2">{clip(bubble.text)}</span>
                     <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-[#2a1d15] bg-[#fbf6ec]" />
                   </span>
@@ -3609,7 +3626,7 @@ export function ChillRoom({
           style={{left: headBox.left + headBox.width / 2, top: headBox.top}}
         >
           <span className="relative block max-w-[min(240px,70vw)] rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1.5 text-[12px] leading-snug text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)]" style={{width: 'max-content'}}>
-            <span className="block text-[10px] font-medium text-[#9a6a45]">{t.common.you}</span>
+            <span className="block text-[10px] font-medium text-[#8e623f]">{t.common.you}</span>
             <span className="line-clamp-2">{clip(myBubble.text)}</span>
             <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-[#2a1d15] bg-[#fbf6ec]" />
           </span>
@@ -3626,7 +3643,7 @@ export function ChillRoom({
           className="absolute left-1/2 top-[64px] z-10 max-w-[min(360px,calc(100vw-24px))] -translate-x-1/2 truncate rounded-[4px] border-2 border-[#2a1d15] bg-[#fbf6ec] px-2.5 py-1 text-[12px] text-[#2a1d15] shadow-[3px_3px_0_rgba(42,29,21,0.35)] motion-safe:animate-[chill-pop_0.25s_ease-out] sm:top-[76px]"
           title={t.room.seeTable}
         >
-          <span className="font-medium text-[#9a6a45]">{latestBubble.name}:</span> {clip(latestBubble.text, 48)}
+          <span className="font-medium text-[#8e623f]">{latestBubble.name}:</span> {clip(latestBubble.text, 48)}
         </button>
       )}
 
@@ -3872,7 +3889,7 @@ export function ChillRoom({
             type="button"
             aria-label={`${t.shelf.title}: ${t.shelf.items[id]?.name ?? ''}`}
             onClick={() => openShelf(id)}
-            className="group absolute cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+            className="group absolute cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80 touch:min-h-11 touch:min-w-11"
             style={box}
           >
             <span
@@ -3918,7 +3935,7 @@ export function ChillRoom({
           aria-expanded={boardOpen}
           aria-controls="chill-board"
           onClick={openBoard}
-          className="group absolute cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
+          className="group absolute cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80 touch:min-h-11 touch:min-w-11"
           style={jarBox}
         >
           <span
@@ -3939,7 +3956,7 @@ export function ChillRoom({
           <Link
             href="/"
             title={compact ? 'Bin Nguyen' : undefined}
-            className={`flex h-9 items-center gap-1.5 rounded-md bg-black/45 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${compact ? 'w-9 justify-center' : 'px-2.5'}`}
+            className={`flex h-9 items-center gap-1.5 rounded-md bg-black/45 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 ${compact ? 'w-9 justify-center touch:w-11' : 'px-2.5'}`}
           >
             <ArrowIcon dir="left" />
             {/* Quán gọn: chỉ còn mũi tên, tên vẫn đọc được cho trình đọc màn hình */}
@@ -3986,7 +4003,7 @@ export function ChillRoom({
                 compact ? 'right-3 sm:right-5' : 'left-3 sm:left-5'
               }`}
             >
-              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menu}</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8e623f]">{t.room.menu}</p>
               {compact ? (
                 // Quán gọn: 3 tab thay cho một bảng dài — Có gì · Màn hình · Khác
                 <div role="tablist" aria-label={t.room.menu} className="mt-1.5 grid grid-cols-3 gap-1 rounded-lg border-2 border-[#2a1a10] p-0.5">
@@ -3997,7 +4014,7 @@ export function ChillRoom({
                       role="tab"
                       aria-selected={menuTab === id}
                       onClick={() => setMenuTab(id)}
-                      className={`relative rounded-md py-1.5 text-[13px] font-semibold transition focus-visible:outline-2 focus-visible:outline-[#9a6a45] ${
+                      className={`relative rounded-md py-1.5 text-[13px] font-semibold transition focus-visible:outline-2 focus-visible:outline-[#9a6a45] touch:min-h-11 ${
                         menuTab === id ? 'bg-[#2a1a10] text-[#fbf1d2]' : 'hover:bg-[#e8b27d]/30'
                       }`}
                     >
@@ -4032,7 +4049,7 @@ export function ChillRoom({
                         </span>
                         <span className="block text-xs leading-snug text-[#2a1a10]/70">{t.room.menuItems[s].desc}</span>
                       </span>
-                      <span aria-hidden className="mt-0.5 text-sm text-[#9a6a45]">
+                      <span aria-hidden className="mt-0.5 text-sm text-[#8e623f]">
                         →
                       </span>
                     </button>
@@ -4055,12 +4072,12 @@ export function ChillRoom({
                     <span className="block text-sm font-semibold leading-snug">{t.room.menuRegulars.title}</span>
                     <span className="block text-xs leading-snug text-[#2a1a10]/70">{t.room.menuRegulars.desc}</span>
                   </span>
-                  <span aria-hidden className="mt-0.5 text-sm text-[#9a6a45]">
+                  <span aria-hidden className="mt-0.5 text-sm text-[#8e623f]">
                     →
                   </span>
                 </button>
               )}
-              <p className="mt-2 text-[11px] leading-snug text-[#2a1a10]/60">{t.room.menuNote}</p>
+              <p className="mt-2 text-[11px] leading-snug text-[#2a1a10]/75">{t.room.menuNote}</p>
               </>
               )}
               {/* Quán gọn: khách tự chọn thứ gì nằm trên màn hình (layout.ts) */}
@@ -4080,7 +4097,7 @@ export function ChillRoom({
                           type="button"
                           aria-pressed={pressed}
                           onClick={() => changeLayout((st) => setAll(id === 'all' ? LAYOUT_ALL : {...LAYOUT_MIN, shelf: st.on.shelf}), 'preset')}
-                          className={`rounded-md border-2 px-2 py-0.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-[#9a6a45] ${
+                          className={`rounded-md border-2 px-2 py-0.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-[#9a6a45] touch:min-h-11 touch:px-3 ${
                             pressed ? 'border-[#2a1a10] bg-[#2a1a10] text-[#fbf1d2]' : 'border-[#2a1a10]/40 hover:bg-[#e8b27d]/30'
                           }`}
                         >
@@ -4131,7 +4148,7 @@ export function ChillRoom({
                       <span className="block text-sm font-semibold leading-snug">{t.install.title}</span>
                       <span className="block text-xs leading-snug text-[#2a1a10]/70">{t.install.desc}</span>
                     </span>
-                    <span aria-hidden className="text-sm text-[#9a6a45]">
+                    <span aria-hidden className="text-sm text-[#8e623f]">
                       {installMode === 'prompt' ? '↓' : installHelp ? '▴' : '▾'}
                     </span>
                   </button>
@@ -4147,14 +4164,14 @@ export function ChillRoom({
               {/* Điện thoại: những thứ ít dùng không còn nút riêng trên màn hình → nằm ở đây */}
               {(!compact || menuTab === 'more') && (
               <div className={compact ? 'mt-2' : 'mt-2.5 border-t-2 border-[#2a1a10]/70 pt-2 sm:hidden'}>
-                {!compact && <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9a6a45]">{t.room.menuMore}</p>}
+                {!compact && <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8e623f]">{t.room.menuMore}</p>}
                 <div className="mt-1 grid grid-cols-2 gap-1">
                   {menuMore.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={item.run}
-                      className="relative flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-left text-[13px] font-semibold leading-snug transition hover:bg-[#e8b27d]/30 focus-visible:outline-2 focus-visible:outline-[#9a6a45]"
+                      className="relative flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-left text-[13px] font-semibold leading-snug transition hover:bg-[#e8b27d]/30 focus-visible:outline-2 focus-visible:outline-[#9a6a45] touch:min-h-11"
                     >
                       <span aria-hidden className="w-4 shrink-0 text-center text-[12px]">
                         {item.icon}
@@ -4323,7 +4340,7 @@ export function ChillRoom({
               </RoundButton>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[10px] uppercase tracking-[0.2em] text-[#a79e94]">
+              <p className="truncate font-mono text-[11px] uppercase tracking-[0.12em] text-[#a79e94]">
                 {stationLabel} · {playingPos + 1}/{playingList.length}
               </p>
               <p className="truncate font-semibold">{track.title}</p>
@@ -4338,7 +4355,7 @@ export function ChillRoom({
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
               aria-label={t.room.volume}
-              className="hidden w-24 accent-[#e8b27d] md:block"
+              className="hidden w-24 accent-[#e8b27d] md:block touch:-my-3.5 touch:h-11"
             />
             {/* Điện thoại không đủ chỗ cho thanh volume — nút loa mở thanh trượt nổi phía trên */}
             <div className="relative md:hidden">
@@ -4348,7 +4365,7 @@ export function ChillRoom({
                 aria-label={t.room.volume}
                 aria-expanded={volumeOpen}
                 aria-controls="chill-volume"
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition ${
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition touch:h-11 touch:w-11 ${
                   volumeOpen ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
                 }`}
               >
@@ -4367,7 +4384,7 @@ export function ChillRoom({
                     value={volume}
                     onChange={(e) => setVolume(Number(e.target.value))}
                     aria-label={t.room.volume}
-                    className="w-full accent-[#e8b27d]"
+                    className="w-full accent-[#e8b27d] touch:h-11"
                   />
                   <span className="w-8 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#a79e94]">{Math.round(volume * 100)}</span>
                 </div>
@@ -4387,7 +4404,7 @@ export function ChillRoom({
                   aria-expanded={sleepOpen}
                   aria-controls="chill-sleep"
                   aria-describedby={sleepNudge ? 'chill-sleep-nudge' : undefined}
-                  className={`relative flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border px-2.5 transition ${
+                  className={`relative flex h-10 min-w-10 items-center justify-center gap-1 rounded-full border px-2.5 transition touch:h-11 touch:min-w-11 ${
                     sleepNudge || (!sleepSeen && lay.hints)
                       ? 'chill-moon-glow border-[#f6d58a]/70 bg-[#f6d58a]/15 text-[#fbe3a6]'
                       : sleepOpen || sleepEnd !== null
@@ -4490,7 +4507,7 @@ export function ChillRoom({
                 aria-controls="chill-panel"
                 aria-describedby={showHintTip ? 'chill-settings-hint' : undefined}
                 title={`${t.room.settings} (S)`}
-                className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition ${
+                className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition touch:h-11 touch:w-11 ${
                   panelOpen || settingsGlow
                     ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]'
                     : 'border-white/10 text-[#ede6dd] hover:bg-white/[0.06]'
@@ -4518,13 +4535,15 @@ export function ChillRoom({
             <span className="w-8">{formatTime(position)}</span>
             <div
               role="slider"
-              tabIndex={-1}
+              tabIndex={started ? 0 : -1}
               aria-label={t.room.seek}
               aria-valuemin={0}
               aria-valuemax={Math.round(duration)}
               aria-valuenow={Math.round(position)}
+              aria-valuetext={`${formatTime(position)} / ${formatTime(duration)}`}
               onClick={seek}
-              className="relative h-3 flex-1 cursor-pointer"
+              onKeyDown={seekKey}
+              className="relative h-3 flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11"
             >
               <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
               <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]" style={{width: `${progress * 100}%`}} />
@@ -4756,7 +4775,7 @@ export function ChillRoom({
                       role="radio"
                       aria-checked={on}
                       onClick={() => pickStation(st.id)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] transition ${
+                      className={`rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
                         st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                       }`}
                     >
@@ -4785,7 +4804,7 @@ export function ChillRoom({
                     type="button"
                     onClick={toggleRepeat}
                     aria-pressed={repeatOne}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition touch:min-h-11 ${
                       repeatOne ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
                     }`}
                   >
@@ -4797,7 +4816,7 @@ export function ChillRoom({
                   type="button"
                   onClick={() => setShuffle((s) => !s)}
                   aria-pressed={shuffle}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition touch:min-h-11 ${
                     shuffle ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
                   }`}
                 >
@@ -4966,7 +4985,7 @@ export function ChillRoom({
                           travelRef.current = 0
                           setTravelElapsed(0)
                         }}
-                        className={`rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                        className={`rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:min-w-11 ${
                           travel === o.value ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
                         }`}
                       >
@@ -5026,7 +5045,7 @@ export function ChillRoom({
                               setTableSignal((n) => n + 1)
                             }
                           }}
-                          className="text-[#e8b27d] underline-offset-2 transition hover:text-[#f3cfa8] hover:underline"
+                          className="text-[#e8b27d] underline-offset-2 transition hover:text-[#f3cfa8] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5"
                         >
                           {tableMembers ? t.room.goToTable : t.room.inviteFriends}
                         </button>
@@ -5053,7 +5072,7 @@ export function ChillRoom({
                       type="button"
                       aria-pressed={mixPreset === id}
                       onClick={() => choosePreset(id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                      className={`rounded-full border px-3 py-1.5 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 ${
                         mixPreset === id ? 'border-[#e8b27d]/70 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#c9c0b6] hover:bg-white/[0.06] hover:text-[#ede6dd]'
                       }`}
                     >
@@ -5080,7 +5099,7 @@ export function ChillRoom({
                         onChange={(e) => changeChannel(c, Number(e.target.value))}
                         aria-label={t.mix.channelAria(t.mix.channels[c])}
                         aria-valuetext={`${Math.round(mixShown[c] * 100)}%`}
-                        className="w-full accent-[#e8b27d]"
+                        className="w-full accent-[#e8b27d] touch:-my-3.5 touch:h-11"
                       />
                       <span className="w-9 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#a79e94]">{Math.round(mixShown[c] * 100)}</span>
                     </label>
@@ -5091,7 +5110,7 @@ export function ChillRoom({
                   <button
                     type="button"
                     onClick={() => choosePreset('mute')}
-                    className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-xs text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                    className="shrink-0 rounded-full border border-white/10 px-2.5 py-1 text-xs text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:px-3.5"
                   >
                     {t.mix.muteAll}
                   </button>
@@ -5113,25 +5132,25 @@ export function ChillRoom({
               <kbd className="rounded border border-white/15 px-1.5 py-0.5 text-[#ede6dd]">{key}</kbd> {label}
             </span>
           ))}
-          <span className="uppercase tracking-[0.2em] text-white/30 sm:basis-full">{t.room.credit}</span>
-          <span className="text-white/30 sm:basis-full">
+          <span className="uppercase tracking-[0.08em] text-white/60 sm:basis-full">{t.room.credit}</span>
+          <span className="text-white/60 sm:basis-full">
             {t.room.emojiCredit}{' '}
             <a
               href="https://googlefonts.github.io/noto-emoji-animation/"
               target="_blank"
               rel="noreferrer"
-              className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline"
+              className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5"
             >
               Noto Emoji
             </a>{' '}
             (CC BY 4.0)
           </span>
-          <span className="text-white/30 sm:basis-full">
-            <Link href="/chill/terms" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline">
+          <span className="text-white/60 sm:basis-full">
+            <Link href="/chill/terms" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
               {t.room.terms}
             </Link>
             {' · '}
-            <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline">
+            <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-[#ede6dd] hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
               {t.room.privacy}
             </Link>
           </span>
@@ -5167,7 +5186,7 @@ export function ChillRoom({
               <Link
                 href="/"
                 aria-label={t.welcome.home}
-                className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+                className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11"
               >
                 <ArrowIcon dir="left" />
                 Bin Nguyen
@@ -5177,11 +5196,11 @@ export function ChillRoom({
           }
           legal={
             <>
-              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline">
+              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
                 {t.room.terms}
               </Link>
               {' · '}
-              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-white hover:underline">
+              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-white hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
                 {t.room.privacy}
               </Link>
             </>
@@ -5201,7 +5220,7 @@ export function ChillRoom({
             <Link
               href="/"
               aria-label={t.welcome.home}
-              className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+              className="flex h-9 items-center gap-1.5 rounded-md bg-black/45 px-2.5 text-xs text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11"
             >
               <ArrowIcon dir="left" />
               Bin Nguyen
@@ -5267,11 +5286,11 @@ export function ChillRoom({
             </div>
             {/* Bấm link không được tính là "vào quán" (cả màn chào bắt click) */}
             <p className="mt-1 text-[10px] text-white/45" onClick={(e) => e.stopPropagation()}>
-              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline">
+              <Link href="/chill/terms" className="underline-offset-2 transition hover:text-white hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
                 {t.room.terms}
               </Link>
               {' · '}
-              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-white hover:underline">
+              <Link href="/chill/privacy" className="underline-offset-2 transition hover:text-white hover:underline touch:-my-3.5 touch:inline-block touch:py-3.5">
                 {t.room.privacy}
               </Link>
             </p>
@@ -5302,7 +5321,7 @@ function LangSwitch({className = ''}: {className?: string}) {
           aria-checked={lang === l}
           aria-label={l === 'en' ? 'English' : 'Tiếng Việt'}
           onClick={() => choose(l)}
-          className={`h-8 min-w-9 rounded px-2 font-mono text-[11px] uppercase tracking-[0.12em] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+          className={`h-8 min-w-9 rounded px-2 font-mono text-[11px] uppercase tracking-[0.12em] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 touch:min-w-11 ${
             lang === l ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-white/80 hover:text-white'
           }`}
         >
@@ -5324,6 +5343,11 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
       bars.forEach((b) => (b.style.transform = 'scaleY(0.15)'))
       return
     }
+    // Giảm chuyển động: sóng đứng yên ở mức vừa, không nhảy theo nhạc
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      bars.forEach((b, i) => (b.style.transform = `scaleY(${(0.3 + 0.25 * Math.abs(Math.sin(i))).toFixed(2)})`))
+      return
+    }
     const data = new Uint8Array(32)
     let raf = 0
     const loop = () => {
@@ -5342,7 +5366,7 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
   return (
     <div ref={barsRef} className="hidden h-8 items-center gap-[3px] sm:flex" aria-hidden>
       {Array.from({length: 12}).map((_, i) => (
-        <span key={i} className="h-full w-[3px] origin-center rounded-full bg-[#e8b27d] transition-transform duration-75" />
+        <span key={i} className="h-full w-[3px] origin-center rounded-full bg-white/30 transition-transform duration-75" />
       ))}
     </div>
   )
@@ -5394,7 +5418,7 @@ function SeatPicker({
             onPointerDown={() => onWarm(s)}
             onFocus={() => onWarm(s)}
             onClick={() => onPick(s)}
-            className={`flex min-h-9 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
+            className={`flex min-h-9 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold transition touch:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
               active ? 'bg-[#e8b27d] text-[#2a1a10]' : 'text-white/80 hover:bg-white/10 hover:text-white'
             }`}
           >
@@ -5450,7 +5474,7 @@ function Segmented<T extends string>({
           type="button"
           onClick={() => onChange(o.value)}
           aria-pressed={value === o.value}
-          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2 text-[13px] transition ${
+          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2 text-[13px] transition touch:min-h-11 ${
             value === o.value ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
           }`}
         >
@@ -5468,7 +5492,7 @@ function RoundButton({label, onClick, children}: {label: string; onClick: () => 
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-[#ede6dd] transition hover:bg-white/[0.06]"
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-[#ede6dd] transition hover:bg-white/[0.06] touch:h-11 touch:w-11"
     >
       {children}
     </button>
@@ -5532,7 +5556,7 @@ function ZenToggle({
         onClick={onToggle}
         className={
           iconOnly
-            ? 'relative flex h-9 w-9 items-center justify-center rounded-md bg-black/45 text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d]'
+            ? 'relative flex h-9 w-9 items-center justify-center rounded-md bg-black/45 text-white/90 backdrop-blur transition hover:bg-black/65 focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 touch:w-11'
             : `relative flex items-center gap-2.5 rounded-md border border-[#e8b27d]/45 bg-[#2a1f18]/80 pl-3 pr-2 text-xs font-medium text-[#f6dcbd] shadow-[0_4px_14px_-6px_rgba(0,0,0,0.8)] backdrop-blur transition hover:border-[#e8b27d]/80 hover:bg-[#3a2a1e]/85 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] ${
                 floating ? 'h-11 sm:h-9' : 'h-9'
               }`
@@ -5633,7 +5657,7 @@ function StageButton({label, onClick, children}: {label: string; onClick: () => 
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex h-9 w-9 items-center justify-center rounded-md bg-black/45 text-white/90 backdrop-blur transition hover:bg-black/65"
+      className="flex h-9 w-9 items-center justify-center rounded-md bg-black/45 text-white/90 backdrop-blur transition hover:bg-black/65 touch:h-11 touch:w-11"
     >
       {children}
     </button>
@@ -5710,7 +5734,7 @@ function FavButton({on, title, onToggle, round = false}: {on: boolean; title: st
       aria-pressed={on}
       aria-label={label}
       title={label}
-      className={`flex h-10 w-10 shrink-0 items-center justify-center transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${round ? 'rounded-full' : 'rounded-lg'} ${
+      className={`flex h-10 w-10 shrink-0 items-center justify-center transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 touch:w-11 ${round ? 'rounded-full' : 'rounded-lg'} ${
         on ? 'text-rose-300 hover:bg-white/[0.06]' : 'text-[#a79e94] hover:bg-white/[0.06] hover:text-rose-200'
       }`}
     >

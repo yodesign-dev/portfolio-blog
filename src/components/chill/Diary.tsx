@@ -61,14 +61,14 @@ const EMPTY: Store = {mine: [], hidden: [], seen: 0, read: []}
 const MOOD_ICON: Record<Mood, string> = {calm: '☕', drive: '🔥', heavy: '🌧', sleepy: '😴', grateful: '✨'}
 // Giấy theo tâm trạng: nền · chữ · chữ phụ
 const PAPER: Record<Mood, {bg: string; ink: string; soft: string}> = {
-  calm: {bg: '#f6ead2', ink: '#3b2a17', soft: '#8a6a3f'},
-  drive: {bg: '#dff2e6', ink: '#12382a', soft: '#3f7a61'},
-  heavy: {bg: '#dfe6f1', ink: '#1d2b44', soft: '#566b8f'},
-  sleepy: {bg: '#e9e4f6', ink: '#2b2350', soft: '#6c62a3'},
-  grateful: {bg: '#fbe3e6', ink: '#4b1f2a', soft: '#a15a6a'},
+  calm: {bg: '#f6ead2', ink: '#3b2a17', soft: '#7f623a'},
+  drive: {bg: '#dff2e6', ink: '#12382a', soft: '#3c755d'},
+  heavy: {bg: '#dfe6f1', ink: '#1d2b44', soft: '#516586'},
+  sleepy: {bg: '#e9e4f6', ink: '#2b2350', soft: '#685e9c'},
+  grateful: {bg: '#fbe3e6', ink: '#4b1f2a', soft: '#945362'},
 }
 // Giấy kem của mẩu mèo quán trên khung cửa
-const PIN_PAPER = {bg: '#fbf1d2', ink: '#2a1a10', soft: '#9a6a45'}
+const PIN_PAPER = {bg: '#fbf1d2', ink: '#2a1a10', soft: '#8e623f'}
 // Giấy trắng ngà của câu hỏi của quán (mẩu ghi chú kiểu mới)
 const QUESTION_PAPER = {bg: '#f3efe4', ink: '#2a1a10', soft: '#7a6a55'}
 
@@ -416,7 +416,7 @@ export function Diary({
         }}
         aria-label={`${t.diary.slipAria}: ${top ? top.text : cafeText}`}
         className={`group/pin absolute left-5 top-[4.75rem] z-10 hidden w-[214px] origin-top -rotate-2 text-left drop-shadow-[4px_5px_0_rgba(42,26,16,0.45)] transition duration-300 hover:rotate-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e8b27d] sm:block ${
-          hidden || open || slipHidden || !pick ? 'pointer-events-none -translate-y-1 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100'
+          hidden || open || slipHidden || !pick ? 'pointer-events-none -translate-y-1 opacity-0' : dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-[0.88] hover:opacity-100 focus-visible:opacity-100'
         }`}
       >
         {behind.map((n, i) => (
@@ -483,7 +483,7 @@ export function Diary({
       >
         {sparkle && <Sparkles />}
         <span className="relative block border-2 border-[#2a1a10] px-2.5 pb-2 pt-1.5" style={{background: topPaper.bg, color: topPaper.ink}}>
-          <span className="flex items-center justify-between gap-2 font-mono text-[8px] uppercase tracking-[0.16em]" style={{color: topPaper.soft}}>
+          <span className="flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.16em]" style={{color: topPaper.soft}}>
             <span className="truncate">{top ? t.diary.slipFrom : t.diary.slipFromCat}</span>
             <span aria-hidden className="shrink-0 text-[11px] leading-none">→</span>
           </span>
@@ -523,7 +523,7 @@ export function Diary({
             }`}
             style={{background: slipPaper.bg, color: slipPaper.ink}}
           >
-            <span className="hidden items-center justify-between gap-1.5 font-mono text-[8px] uppercase tracking-[0.08em] sm:flex" style={{color: slipPaper.soft}}>
+            <span className="hidden items-center justify-between gap-1.5 font-mono text-[9px] uppercase tracking-[0.08em] sm:flex" style={{color: slipPaper.soft}}>
               <span className="truncate">{slipNote ? t.diary.slipFrom : slipQuestion ? t.diary.slipQuestion : t.diary.slipFromCat}</span>
               <span className="shrink-0 tabular-nums">{slipNote && slipNote.day === today ? clock(slipNote.ts) : `${slipDay.slice(8, 10)}.${slipDay.slice(5, 7)}`}</span>
             </span>
