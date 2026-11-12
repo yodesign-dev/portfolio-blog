@@ -35,6 +35,7 @@ export default defineType({
     defineField({name: 'miniPlayerOpen', title: 'Thu nhỏ quán thành cửa sổ nổi', type: 'boolean', initialValue: false}),
     defineField({name: 'brewDeskOpen', title: 'Bàn pha phin (đồng hồ mới, phin trong cảnh)', type: 'boolean', initialValue: false}),
     defineField({name: 'welcomeObOpen', title: 'Màn chào kiểu onboarding (Nghe nhạc / ChromoTime)', type: 'boolean', initialValue: false}),
+    defineField({name: 'compactOpen', title: 'Quán gọn (khách tự bày thêm trong Thực đơn)', type: 'boolean', initialValue: false}),
     defineField({name: 'sleepTimerOpen', title: 'Hẹn giờ tắt nhạc', type: 'boolean', initialValue: false}),
     defineField({name: 'favOpen', title: 'Bài của tôi (thả tim bài, phát lặp 1 bài)', type: 'boolean', initialValue: false}),
     defineField({name: 'tripOpen', title: 'Mèo đi chơi xa (bưu thiếp)', type: 'boolean', initialValue: false}),

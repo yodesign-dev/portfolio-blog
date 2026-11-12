@@ -78,6 +78,7 @@ const CHILL_QUERY = `{
   "favOpen": *[_id == "chillSettings"][0].favOpen,
   "brewDeskOpen": *[_id == "chillSettings"][0].brewDeskOpen,
   "welcomeObOpen": *[_id == "chillSettings"][0].welcomeObOpen,
+  "compactOpen": *[_id == "chillSettings"][0].compactOpen,
   "tripOpen": *[_id == "chillSettings"][0].tripOpen,
   "tripPhins": *[_id == "chillSettings"][0].tripPhins,
   "seasonsOpen": *[_id == "chillSettings"][0].seasonsOpen,
@@ -133,6 +134,7 @@ type ChillContent = {
   favOpen?: boolean | null
   brewDeskOpen?: boolean | null
   welcomeObOpen?: boolean | null
+  compactOpen?: boolean | null
   tripOpen?: boolean | null
   tripPhins?: number | null
   seasonsOpen?: boolean | null
@@ -289,10 +291,12 @@ export async function getChillContent(revalidate: number) {
   const brewDeskOn = content.brewDeskOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_BREW === '1')
   // Màn chào kiểu onboarding (khách mới 2 bước, khách quay lại 1 chạm). Máy dev: CHILL_DEV_OB=1
   const welcomeObOn = content.welcomeObOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_OB === '1')
+  // Quán gọn: màn hình mặc định gọn, khách tự bày thêm trong Thực đơn. Máy dev: CHILL_DEV_COMPACT=1
+  const compactOn = content.compactOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_COMPACT === '1')
   // Mèo đi chơi xa (cần Kệ sưu tầm). Máy dev: CHILL_DEV_TRIP=1
   const tripOn = content.tripOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_TRIP === '1')
   const tripPhins = Math.min(8, Math.max(1, Math.round(content.tripPhins ?? 3)))
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
-  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, brewDeskOn, welcomeObOn, tripOn, tripPhins}
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, brewDeskOn, welcomeObOn, compactOn, tripOn, tripPhins}
 }
