@@ -2074,7 +2074,20 @@ export function ChillRoom({
       const {source, prefs, suggestion, byId} = brewMusicApi
       if (manual && prefs.mix !== 'scene') audioRef.current?.setMix(MIX_PRESETS[prefs.mix], true)
       trackEvent({name: 'Chill Focus', props: {action: 'music-start', music: source, ...(source === 'suggest' ? {mood: prefs.mood} : {})}})
-      if (source === 'current') return
+      if (source === 'current') {
+        // "Nhạc đang nghe" mà nhạc chưa phát / đang dừng (vd khách quen vào thẳng quán, chưa bấm
+        // "Bật nhạc lên") → bấm bắt đầu phin là phát tiếp bài đang chờ, kể cả bộ "Bài của tôi"
+        const audio = audioRef.current
+        if (manual && !playing && audio) {
+          if (!started) playAt(index)
+          else {
+            wakeIfSlept(audio)
+            audio.resume()
+            setPlaying(true)
+          }
+        }
+        return
+      }
       const key = source === 'suggest' ? `suggest:${prefs.mood}` : `list:${prefs.active}`
       if (queue?.key === key && queueOn && playing) {
         if (source !== 'suggest') return
@@ -2090,7 +2103,7 @@ export function ChillRoom({
       applyQueue({key, label: source === 'suggest' ? t.brew.queueLabel(t.brew.moods[prefs.mood]) : list.name, ids})
       if (manual) playAt(tracks.findIndex((tr) => tr.id === ids[0]), playing)
     },
-    [brewMusicApi, queue, queueOn, playing, track.id, tracks, time, weather, applyQueue, playAt, t]
+    [brewMusicApi, queue, queueOn, playing, started, index, track.id, tracks, time, weather, applyQueue, playAt, t]
   )
   // Đổi bộ khác lúc đang pha: bài đang phát chạy nốt, các bài sau đổi hết
   const rerollPlaying = useCallback(() => {
@@ -3118,6 +3131,9 @@ export function ChillRoom({
           </svg>
         </RoundButton>
       )}
+      {/* Bật Bài của tôi: tim là nút lưu duy nhất ngoài bảng chọn nhạc của phin — nút "+" (thêm vào
+          danh sách của phin) chỉ còn trong bảng chọn, để khách không gặp hai nút lưu cạnh nhau */}
+      {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
       {queue?.key.startsWith('list:') && queueOn ? (
         <RoundButton label={t.brew.openList} onClick={() => brewMusicApi.setPickerOpen(true)}>
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" aria-hidden>
@@ -3125,7 +3141,7 @@ export function ChillRoom({
           </svg>
         </RoundButton>
       ) : (
-        <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(track.id)} title={track.title} onToggle={() => brewMusicApi.toggleInList(track.id)} />
+        !favFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(track.id)} title={track.title} onToggle={() => brewMusicApi.toggleInList(track.id)} />
       )}
       <RoundButton
         label={t.room.settings}
@@ -4594,7 +4610,7 @@ export function ChillRoom({
                         </span>
                       </button>
                       {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
-                      {brewFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
+                      {brewFlag && !favFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
                     </li>
                   )
                 })}
