@@ -1,6 +1,6 @@
 // Trang sketchbook trên giá vẽ (Cửa sổ quán, bản chị): ký hoạ bút chì chính con phố đang ở
 // ngoài cửa sổ, nét hiện dần theo tiến độ — pha phin thì vẽ theo phin (phin xong = bức xong),
-// không pha thì một bức mỗi 25 phút. Đổi điểm đến / giờ là sang trang mới vẽ cảnh mới.
+// không pha thì một bức mỗi 25 phút. Luôn vẽ theo ảnh ban ngày; đổi điểm đến là sang trang mới.
 //
 // Trang trong ảnh tĩnh và trong từng khung người ngồi đều trong suốt (khoét nền xanh), nên trang
 // vẽ DƯỚI ảnh nội thất: viền giấy, giá vẽ và bàn tay cầm bút nằm đè lên. Toạ độ theo px đệm

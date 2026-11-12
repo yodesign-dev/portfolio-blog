@@ -3593,7 +3593,11 @@ export class ChillScene {
   // = bức xong); không pha thì theo đồng hồ thật, một bức mỗi 25 phút, tải lại trang vẫn vẽ tiếp
   private drawSketchPage(ctx: CanvasRenderingContext2D, page: PageQuad) {
     if (!this.sketchPage || this.sketchPage.quad !== page) this.sketchPage = new SketchPage(page)
-    if (ready(this.street)) this.sketchPage.setSource(this.street, this.destination.id)
+    // Luôn ký hoạ từ ảnh ban ngày: ảnh chiều/tối nhiều mảng tối, thành gạch bóng kín cả trang.
+    // Trang vẫn nhận màu phòng theo giờ qua wash
+    const src = this.streetsOf(this.destination).morning
+    const day = this.image(src)
+    if (ready(day)) this.sketchPage.setSource(day, src)
     const progress = this.sketchFixed ?? this.brewLevel ?? idleProgress(Date.now() / 1000)
     this.sketchPage.draw(ctx, progress, (c, w, h) => this.wash(c, w, h), `${this.time}|${this.weather}`)
   }
