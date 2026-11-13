@@ -33,6 +33,9 @@ export function ZoomableImage({
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [zoomed, setZoomed] = useState(false)
+  // Ảnh ngang rõ rệt (sơ đồ luồng 1322×680, 1322×520): cầm dọc thì ảnh chỉ chiếm
+  // một dải mỏng giữa màn hình. Ảnh gần vuông (Before/After 1500×1245) không cần.
+  const wide = width / height >= 1.3
 
   const show = () => {
     setZoomed(false)
@@ -107,7 +110,7 @@ export function ZoomableImage({
             ref={scrollerRef}
             onClick={zoomed ? undefined : close}
             className={`h-full w-full overflow-auto overscroll-contain ${
-              zoomed ? '' : 'flex items-center justify-center p-4 pt-16 pb-14 sm:p-12'
+              zoomed ? '' : 'flex items-center justify-center p-4 pt-16 pb-14 sm:p-12 sm:pt-16'
             }`}
           >
             {/* Cỡ thật: ảnh thấp hơn màn hình thì vẫn nằm giữa theo chiều dọc
@@ -151,10 +154,24 @@ export function ZoomableImage({
           </button>
         </div>
 
-        {caption && !zoomed && (
-          <p className="pointer-events-none fixed inset-x-0 bottom-0 px-4 pb-4 text-center text-sm italic text-neutral-300">
-            {caption}
-          </p>
+        {!zoomed && (wide || caption) && (
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 flex flex-col items-center gap-3 px-4 pb-4">
+            {/* Gợi ý xoay ngang: chỉ cho ảnh ngang (sơ đồ luồng) trên máy cảm ứng
+                đang cầm dọc — xoay sang ngang thì ảnh to gấp ~2 lần mà không phải
+                kéo. Ẩn bằng CSS (portrait:) nên tự biến mất ngay khi xoay máy.
+                Dùng pointer-coarse: chứ không dùng touch: — touch: gồm cả cửa sổ
+                máy tính hẹp dưới 1024px, ở đó "xoay điện thoại" là sai. */}
+            {wide && (
+              <p className="hidden items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-neutral-100 pointer-coarse:portrait:flex">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="size-5 shrink-0">
+                  <rect x="3" y="9" width="14" height="10" rx="2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 3.5a7 7 0 0 1 7.5 6.5M20.5 10l1.5-2.5M20.5 10l-2.6-1.3" />
+                </svg>
+                Turn your phone sideways for a bigger view
+              </p>
+            )}
+            {caption && <p className="text-center text-sm italic text-neutral-300">{caption}</p>}
+          </div>
         )}
       </dialog>
     </>
