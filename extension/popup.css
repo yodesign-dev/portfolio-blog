@@ -101,3 +101,19 @@ p, h1 { margin: 0; }
 .foot span { flex-grow: 1; }
 .foot.error span { color: var(--accent); }
 kbd { padding: 2px 6px; border-radius: 4px; background: var(--line); color: var(--soft); font: 11px ui-monospace, monospace; }
+
+/* Nút ghim sang bảng bên (side panel) — chỉ hiện trong popup, khi Chrome có chrome.sidePanel */
+.pin {
+  width: 32px; height: 32px; border: 1px solid var(--edge); border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; background: transparent; color: var(--soft);
+}
+.pin:hover { color: var(--accent-hi); border-color: var(--accent); }
+.pin[hidden] { display: none; }
+
+/* Bảng bên: cùng trang với popup (build.mjs chép popup.html → panel.html, thêm class panel),
+   co giãn theo bề rộng khách kéo; ảnh quán giữ tỉ lệ 16:9 */
+body.panel { width: auto; min-width: 300px; min-height: 100vh; }
+body.panel .popup { max-width: 520px; margin: 0 auto; }
+body.panel .scene { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+body.panel .scene img { width: 100%; height: 100%; object-fit: cover; }
+body.panel .pin { display: none; }

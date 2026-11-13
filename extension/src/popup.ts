@@ -1,12 +1,13 @@
 // Popup: chỉ vẽ trạng thái và gửi lệnh cho background — nhạc nằm ở offscreen document,
 // nên đóng popup nhạc vẫn phát. Trạng thái bài đang phát đến qua tin nhắn 'status'.
 
-import {BASE, getCatalog, getNowPlaying, getPrefs, type BgCommand, type NowPlaying, type Prefs, type Station, type StatusMessage} from './shared'
+import {BASE, getCatalog, getNowPlaying, getPrefs, sendSafe, type BgCommand, type NowPlaying, type Prefs, type Station, type StatusMessage} from './shared'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
 const els = {
   open: $<HTMLAnchorElement>('open'),
+  pin: $<HTMLButtonElement>('pin'),
   scene: $('scene'),
   chip: $('chip'),
   rainBtn: $<HTMLButtonElement>('rain-btn'),
@@ -34,9 +35,19 @@ let prefs: Prefs
 let stations: Station[] = []
 let now: NowPlaying | null = null
 
+const NOTE = 'Đóng ô này nhạc vẫn phát'
+const ERRORS = {
+  offline: `Không kết nối được quán (${new URL(BASE).host}) — thử lại sau`,
+  empty: 'Quán chưa có bài nào để phát',
+  error: 'Có lỗi khi phát nhạc — bấm lại thử nhé',
+}
+
+// null = service worker không trả lời (extension vừa cập nhật, trang này đã cũ)
 const send = async (cmd: BgCommand) => {
-  const res = (await chrome.runtime.sendMessage(cmd)) as {ok: boolean} | undefined
-  if (res && !res.ok) showError(`Không kết nối được quán (${new URL(BASE).host}) — thử lại sau`)
+  const res = await sendSafe(cmd)
+  if (!res) showError('Mất kết nối với extension — đóng ô này rồi mở lại')
+  else if (!res.ok) showError(ERRORS[res.reason])
+  else clearError()
 }
 
 const clock = (s: number) => {
@@ -106,13 +117,24 @@ function showError(text: string) {
   els.note.textContent = text
 }
 
+function clearError() {
+  if (!els.foot.classList.contains('error')) return
+  els.foot.classList.remove('error')
+  els.note.textContent = NOTE
+}
+
 async function init() {
   els.open.href = `${BASE}/chill`
   els.chip.textContent = `Quán · ${partOfDay()}`
 
   prefs = await getPrefs()
+  // Nhờ background soát lại "đang phát" trước khi đọc (offscreen có thể đã bị Chrome đóng)
+  await sendSafe({target: 'background', type: 'sync'})
   now = await getNowPlaying()
   renderMix()
+
+  // Ghim sang bảng bên: chỉ trong popup, và chỉ khi trình duyệt có chrome.sidePanel
+  if (!document.body.classList.contains('panel') && 'sidePanel' in chrome) els.pin.hidden = false
 
   const [command] = await chrome.commands.getAll().then((all) => all.filter((c) => c.name === 'toggle-play'))
   if (command?.shortcut) {
@@ -137,10 +159,31 @@ els.music.addEventListener('input', () => setPrefs({volume: Number(els.music.val
 els.rain.addEventListener('input', () => setPrefs({rain: Number(els.rain.value) / 100}))
 els.cafe.addEventListener('input', () => setPrefs({cafe: Number(els.cafe.value) / 100}))
 
+els.pin.addEventListener('click', async () => {
+  try {
+    // Phải gọi ngay trong lần bấm (Chrome đòi thao tác của người dùng), rồi mới đóng popup
+    const win = await chrome.windows.getCurrent()
+    await chrome.sidePanel.open({windowId: win.id!})
+    window.close()
+  } catch {
+    showError('Chrome này chưa mở được bảng bên')
+  }
+})
+
 chrome.runtime.onMessage.addListener((msg: StatusMessage) => {
   if (msg.target !== 'status') return
   now = msg.now
   if (prefs) renderNow()
+})
+
+// Popup và bảng bên có thể mở cùng lúc, và background có thể tự đổi trạm (trạm đã lưu
+// không còn bài) → đổi ở đâu thì chỗ còn lại vẽ lại theo
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.prefs || !prefs) return
+  prefs = {...prefs, ...(changes.prefs.newValue as Partial<Prefs>)}
+  renderMix()
+  renderStations()
+  renderNow()
 })
 
 void init()

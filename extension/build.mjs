@@ -35,6 +35,8 @@ function copyStatic() {
   if (!zip) manifest.key = readFileSync(join(here, 'dev-key.txt'), 'utf8').trim()
   writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2))
   for (const f of ['popup.html', 'popup.css', 'offscreen.html']) cpSync(join(here, f), join(out, f))
+  // Bảng bên (side panel) dùng chung trang với popup, chỉ khác class trên <body>
+  writeFileSync(join(out, 'panel.html'), readFileSync(join(here, 'popup.html'), 'utf8').replace('<body>', '<body class="panel">'))
   cpSync(join(here, 'public'), out, {recursive: true})
   cpSync(join(root, 'public/chill/scenes/room-cafe-thumb.webp'), join(out, 'scene.webp'))
   mkdirSync(join(out, 'chill/sfx'), {recursive: true})
