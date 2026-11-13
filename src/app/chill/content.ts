@@ -55,6 +55,7 @@ const CHILL_QUERY = `{
     kind,
     version,
     announce,
+    banner,
     action,
     actionLabel,
     actionLabelEn,

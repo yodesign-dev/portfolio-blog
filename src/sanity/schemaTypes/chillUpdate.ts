@@ -143,6 +143,15 @@ export default defineType({
       description: 'Bật cho bản lớn: chấm cam trên nút "Có gì mới" + thông báo nhỏ 1 lần. Tắt cho bản sửa lặt vặt.',
     }),
     defineField({
+      name: 'banner',
+      title: 'Hiện banner trong quán',
+      type: 'boolean',
+      initialValue: false,
+      description:
+        'Thẻ nhỏ phía trên thanh nhạc, hiện 1 lần cho mỗi khách (cả khách mới) vài giây sau khi vào quán, có nút "Thử ngay". Cần chọn nút "Thử ngay" bên dưới. Chỉ bản mới nhất bật ô này mới hiện; bật ô này thì thông báo nhỏ dưới nút "Có gì mới" không hiện nữa (banner thay nó).',
+      hidden: ({document}) => !document?.action,
+    }),
+    defineField({
       name: 'version',
       title: 'Phiên bản',
       type: 'string',

@@ -18,7 +18,7 @@ export type AnalyticsEvent =
   | {name: 'Chill Visit'; props: {visitor: 'new' | 'returning' | 'same-day' | 'within-week' | 'later'; ref: string; trip?: 'home' | 'away' | 'back'}}
   // from: welcome = nút ở màn chào · resume = nút "Bật nhạc" khách cũ thấy khi vào thẳng quán
   // · player = nút phát / phím Space
-  | {name: 'Chill Start'; props: {from: 'welcome' | 'player' | 'resume'}}
+  | {name: 'Chill Start'; props: {from: 'welcome' | 'player' | 'resume' | 'banner'}}
   | {name: 'Chill Listen'; props: {minutes: number}}
   | {name: 'Chill Look Around'; props?: undefined}
   // Màn chào kiểu onboarding (welcomeObOpen): khách chọn gì để vào quán
@@ -47,6 +47,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Donate Thanks'; props: {method: string}}
   | {name: 'Chill Updates Open'; props: {from: string}}
   | {name: 'Chill Update Try'; props: {action: string}}
+  // Banner tin mới trên thanh nhạc: hiện / bấm nút chính / mở Có gì mới / đóng
+  | {name: 'Chill Update Banner'; props: {act: 'show' | 'try' | 'more' | 'close'; action: string}}
   | {name: 'Chill Table'; props: {action: 'create' | 'join' | 'copy' | 'leave' | 'view' | 'wall-glass' | 'wall-brick'}}
   | {name: 'Chill Zen'; props: {on: 'on' | 'off'}}
   // Cảnh nào được thích: `place` = slug điểm đến trong Studio.

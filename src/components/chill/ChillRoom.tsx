@@ -40,6 +40,7 @@ import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
 import {InAppHint} from './InAppHint'
+import {UpdateBanner} from './UpdateBanner'
 import {LiveBadge} from './LiveBadge'
 import {LAYOUT_ALL, LAYOUT_GROUPS, LAYOUT_MIN, LAYOUT_NEW, autoOpen, loadLayout, saveLayout, setAll, setGroup, type Layout, type LayoutGroup, type LayoutState} from './layout'
 import type {ChillLive} from './live'
@@ -56,6 +57,9 @@ const PREFS_KEY = 'chill:prefs'
 const CAT_PETTED_KEY = 'chill:cat-petted'
 // Đã mở bảng cài đặt lần nào chưa — chưa thì nút Settings sáng lên + gợi ý
 const SETTINGS_SEEN_KEY = 'chill:settings-seen'
+// Mã mục "Có gì mới" đã hiện banner trên thanh nhạc (UpdateBanner.tsx)
+const BANNER_KEY = 'chill:update-banner'
+const BANNER_DELAY = 5000
 // Đã bật Zen lần nào chưa (chưa → công tắc có chấm cam + vòng sáng), đã hiện gợi ý chưa
 const ZEN_SEEN_KEY = 'chill:zen-seen'
 // Từ ngần này người (tính cả mình) mới nêu số người đang ở quán
@@ -417,7 +421,7 @@ export function ChillRoom({
   // Màn chào: chưa "bước vào quán" thì chỉ có cảnh + 1 nút lớn, mọi nút khác ẩn
   const [entered, setEntered] = useState(false)
   const [welcomeGone, setWelcomeGone] = useState(false)
-  const startFrom = useRef<'welcome' | 'player' | 'resume'>('player')
+  const startFrom = useRef<'welcome' | 'player' | 'resume' | 'banner'>('player')
   // Khách cũ vào thẳng quán, bỏ qua màn chào → mời bấm 1 lần để bật nhạc (trình duyệt
   // chỉ cho phát tiếng sau 1 cú bấm, nên không tự phát được)
   const [resumeOffer, setResumeOffer] = useState(false)
@@ -1312,7 +1316,32 @@ export function ChillRoom({
   // Chưa qua màn chào thì chưa báo "Có gì mới" (nút đang ẩn)
   const updatesSeen = useUpdatesSeen(updates, entered ? returning : null)
 
-  const openUpdates = (from: 'button' | 'toast') => {
+  // Banner 1 lần trên thanh nhạc: mục "Có gì mới" mới nhất bật "Hiện banner trong quán" (UpdateBanner.tsx).
+  // Hiện cho mọi khách (cả khách mới) 5 giây sau khi vào quán; ghi nhớ ngay lúc hiện để không lặp lại
+  const bannerUpdate = useMemo(() => updates.find((u) => u.banner && u.action) ?? null, [updates])
+  const [bannerOn, setBannerOn] = useState(false)
+  useEffect(() => {
+    if (!entered || !bannerUpdate) return
+    try {
+      if (localStorage.getItem(BANNER_KEY) === bannerUpdate.id) return
+    } catch {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(BANNER_KEY, bannerUpdate.id)
+      } catch {}
+      setBannerOn(true)
+      trackEvent({name: 'Chill Update Banner', props: {act: 'show', action: bannerUpdate.action ?? ''}})
+    }, BANNER_DELAY)
+    return () => window.clearTimeout(timer)
+  }, [entered, bannerUpdate])
+  const closeBanner = (act: 'close' | 'more') => {
+    setBannerOn(false)
+    trackEvent({name: 'Chill Update Banner', props: {act, action: bannerUpdate?.action ?? ''}})
+  }
+
+  const openUpdates = (from: 'button' | 'toast' | 'banner') => {
     setPanelOpen(false)
     setWishOpen(false)
     setBoardOpen(false)
@@ -2225,6 +2254,21 @@ export function ChillRoom({
     setIndex(first)
     setPosition(0)
     setDuration(tracks[first].duration)
+  }
+
+  // Nút chính của banner: tin về trạm nhạc thì chuyển trạm và phát luôn bài đầu, tin khác như "Thử ngay"
+  const tryBanner = () => {
+    const action = bannerUpdate?.action
+    setBannerOn(false)
+    if (!action) return
+    trackEvent({name: 'Chill Update Banner', props: {act: 'try', action}})
+    const [kind, id] = action.split(':')
+    const first = kind === 'station' ? tracks.findIndex((tr) => stationOf(tr) === id) : -1
+    if (first < 0) return runAction(action)
+    setMineTab(false)
+    setStation(id as StationId)
+    if (!started) startFrom.current = 'banner'
+    playAt(first)
   }
 
   // Nút "Thử ngay" trong nhật ký: đưa người xem tới đúng tính năng
@@ -4329,6 +4373,17 @@ export function ChillRoom({
           // ngang), không theo bề ngang màn hình — để tên bài không bao giờ bị ép còn 1–2 chữ
           className="@container relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
         >
+          {bannerOn && bannerUpdate && !zen && !panelOpen && !otherOverlay && !(resumeOffer && !started) && !(bannerUpdate.action === `station:${station}` && !showMine) && (
+            <UpdateBanner
+              update={bannerUpdate}
+              onTry={tryBanner}
+              onMore={() => {
+                closeBanner('more')
+                openUpdates('banner')
+              }}
+              onClose={() => closeBanner('close')}
+            />
+          )}
           {resumeOffer && !started && (
             <button
               type="button"

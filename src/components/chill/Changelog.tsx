@@ -21,6 +21,8 @@ export type ChillUpdate = {
   kind?: 'new' | 'improved' | 'fixed'
   version?: string
   announce?: boolean
+  // Banner 1 lần trên thanh nhạc (UpdateBanner.tsx), thay cho thông báo nhỏ dưới nút
+  banner?: boolean
   action?: string
   actionLabel?: string
   actionLabelEn?: string
@@ -96,7 +98,8 @@ export function useUpdatesSeen(updates: ChillUpdate[], returning: boolean | null
     // Bản đã xem nằm sau headline (cũ hơn) hoặc không còn trong danh sách → headline là mới
     const seenAt = updates.findIndex((u) => u.id === saved)
     const fresh = seenAt === -1 || seenAt > updates.indexOf(headline)
-    if (!fresh || read(TOAST_KEY) === headline.id) return
+    // Bản có banner trên thanh nhạc thì không bật thêm thông báo nhỏ cho cùng tin đó
+    if (!fresh || read(TOAST_KEY) === headline.id || (headline.banner && headline.action)) return
     // Đợi cảnh hiện lên rồi mới báo
     const t = window.setTimeout(() => {
       write(TOAST_KEY, headline.id)
