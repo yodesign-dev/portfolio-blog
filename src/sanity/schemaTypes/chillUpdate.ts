@@ -23,6 +23,7 @@ export const UPDATE_ACTIONS = [
   {title: 'Chuyển kênh Deep Focus', value: 'station:focus'},
   {title: 'Chuyển kênh Night & Sleep', value: 'station:night'},
   {title: 'Chuyển kênh Sax Lounge', value: 'station:sax'},
+  {title: 'Chuyển kênh 2000s Throwback', value: 'station:throwback'},
   {title: 'Chuyển kênh Lo-fi', value: 'station:lofi'},
   {title: 'Chuyển kênh Study Beats', value: 'station:study'},
   {title: 'Mở bảng cảm ơn (lọ tip)', value: 'board'},
