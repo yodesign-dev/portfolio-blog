@@ -110,3 +110,18 @@ test('đọc prefs hỏng hoặc thiếu vẫn ra bản dùng được', () => {
   assert.deepEqual(p.lists[0], {name: 'A', ids: ['a']})
   assert.deepEqual(p.lists[1], {name: 'B', ids: []})
 })
+
+test('bài có lời không vào gợi ý ở mood nào, bài không lời cùng trạm vẫn vào', () => {
+  const lib = [
+    ...library,
+    ...Array.from({length: 4}, (_, i) => track(`throwback-${i}`, 'throwback')),
+    ...Array.from({length: 3}, (_, i) => track(`throwback-vocal-${i}`, 'throwback', 180, 'AI vocal · Ballad', {vocals: true})),
+  ]
+  for (const mood of ['deep', 'gentle', 'melodic', 'surprise']) {
+    assert.ok(moodPool(lib, mood).every((t) => !t.vocals), `${mood}: lọt bài có lời`)
+    const ids = suggestQueue({tracks: lib, mood, minutes: 9999, rand: seeded(7)})
+    assert.ok(ids.every((id) => !id.startsWith('throwback-vocal')), `${mood}: bộ gợi ý có bài có lời`)
+  }
+  assert.ok(moodPool(lib, 'melodic').some((t) => t.station === 'throwback'))
+  assert.ok(moodPool(lib, 'surprise').some((t) => t.station === 'throwback'))
+})

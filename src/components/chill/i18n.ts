@@ -345,8 +345,8 @@ const en = {
     moodWhy: {
       deep: 'A steady pulse with little change, for work that needs thinking.',
       gentle: 'Rhodes, piano and soft drums, for steady hands-on work.',
-      melodic: 'Guitar and sax, for when you need a little spark.',
-      surprise: 'Random from every station except Night & Sleep.',
+      melodic: 'Guitar, sax and 2000s ballads, for when you need a little spark.',
+      surprise: 'Random from every station except Night & Sleep, no songs with vocals.',
     },
     breakModes: {duck: 'Lower music', keep: 'Keep music', ambient: 'Sounds only'},
     tally: (n: number, m: number) => `${n} ${n === 1 ? 'track' : 'tracks'} · ${m} min`,
@@ -1132,8 +1132,8 @@ const vi: typeof en = {
     moodWhy: {
       deep: 'Nhịp đều, ít thay đổi, hợp việc cần nghĩ sâu.',
       gentle: 'Rhodes, piano, trống nhẹ cho việc đều tay.',
-      melodic: 'Guitar và sax cho lúc cần thêm chút hứng.',
-      surprise: 'Ngẫu nhiên từ mọi trạm, trừ Night & Sleep.',
+      melodic: 'Guitar, sax và ballad 2000s cho lúc cần thêm chút hứng.',
+      surprise: 'Ngẫu nhiên từ mọi trạm, trừ Night & Sleep và bài có lời.',
     },
     breakModes: {duck: 'Nhạc nhỏ lại', keep: 'Giữ nhạc', ambient: 'Chỉ tiếng nền'},
     tally: (n, m) => `${n} bài · ${m} phút`,

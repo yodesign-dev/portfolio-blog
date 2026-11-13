@@ -15,11 +15,12 @@ import {isLiveUrl, type ChillLive} from '@/components/chill/live'
 // nhạc mới chưa mở cho khách).
 const CHILL_QUERY = `{
   "tracks": *[_type == "chillTrack" && ($showHidden || hidden != true) && (defined(audio.asset) || defined(localFile))]
-    | order(select(station == "acoustic" => 0, station == "noel" => 1, station == "focus" => 2, station == "night" => 3, station == "sax" => 4, station == "lofi" => 5, station == "study" => 6, 7) asc,
+    | order(select(station == "acoustic" => 0, station == "noel" => 1, station == "focus" => 2, station == "night" => 3, station == "sax" => 4, station == "throwback" => 5, station == "lofi" => 6, station == "study" => 7, 8) asc,
             coalesce(order, 9999) asc, _createdAt asc) {
     "id": coalesce(key.current, _id),
     title,
     mood,
+    vocals,
     station,
     offSeasonStation,
     duration,
@@ -101,7 +102,7 @@ const CHILL_QUERY = `{
 }`
 
 type ChillContent = {
-  tracks: {id: string; title: string; mood?: string; station?: string; offSeasonStation?: string; duration?: number; _createdAt?: string; src: string}[]
+  tracks: {id: string; title: string; mood?: string; vocals?: boolean; station?: string; offSeasonStation?: string; duration?: number; _createdAt?: string; src: string}[]
   destinations: {
     id: string
     name: string
@@ -196,6 +197,7 @@ export async function getChillContent(revalidate: number) {
     id: t.id,
     title: t.title,
     mood: t.mood ?? '',
+    ...(t.vocals ? {vocals: true} : {}),
     duration: t.duration ?? 0,
     src: t.src,
     station: STATIONS.some((st) => st.id === t.station) ? (t.station as StationId) : undefined,

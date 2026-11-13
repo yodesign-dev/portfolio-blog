@@ -13,6 +13,7 @@ export const STATION_OPTIONS = [
   {title: 'Deep Focus', value: 'focus'},
   {title: 'Night & Sleep', value: 'night'},
   {title: 'Sax Lounge', value: 'sax'},
+  {title: '2000s Throwback', value: 'throwback'},
   {title: 'Lo-fi', value: 'lofi'},
   {title: 'Study Beats', value: 'study'},
 ]
@@ -53,6 +54,13 @@ export default defineType({
       hidden: ({document}) => document?.station !== 'noel',
     }),
     defineField({
+      name: 'vocals',
+      title: 'Có lời',
+      type: 'boolean',
+      initialValue: false,
+      description: 'Bài có giọng hát. Bàn pha phin không tự chọn bài này khi "Quán chọn giúp", để khách đang tập trung không bị lời hát làm phân tâm. Nên ghi rõ ở Mô tả ngắn, vd. "AI vocal · Ballad".',
+    }),
+    defineField({
       name: 'mood',
       title: 'Mô tả ngắn',
       type: 'string',
@@ -64,7 +72,7 @@ export default defineType({
       type: 'file',
       options: {accept: 'audio/*'},
       description:
-        'Nhạc không lời, .m4a (AAC) hoặc .mp3 ~128kbps, nên dưới 4MB (~3 phút); bài dài trạm Night & Sleep 96kbps, tới ~7MB (~8 phút). File càng nhẹ càng đỡ tốn băng thông Sanity (100GB/tháng ở gói Free).',
+        'Nhạc .m4a (AAC) hoặc .mp3 ~128kbps, nên dưới 4MB (~3 phút); bài dài trạm Night & Sleep 96kbps, tới ~7MB (~8 phút). File càng nhẹ càng đỡ tốn băng thông Sanity (100GB/tháng ở gói Free).',
       hidden: ({document}) => Boolean(document?.localFile) && !document?.audio,
       validation: (Rule) =>
         Rule.custom((value, {document}) => (value || document?.localFile ? true : 'Cần upload file nhạc')),

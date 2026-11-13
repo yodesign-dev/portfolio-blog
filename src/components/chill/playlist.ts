@@ -9,11 +9,11 @@ import type {StationId, Track} from './tracks'
 export const MOODS = ['deep', 'gentle', 'melodic', 'surprise'] as const
 export type Mood = (typeof MOODS)[number]
 
-// null ở `surprise` = mọi trạm trừ trạm ngủ
+// null ở `surprise` = mọi trạm trừ trạm ngủ. Bài có lời (vocals) không vào gợi ý ở mood nào
 const MOOD_STATIONS: Record<Mood, StationId[] | null> = {
   deep: ['focus', 'lofi'],
   gentle: ['study', 'lofi'],
-  melodic: ['acoustic', 'sax', 'noel'],
+  melodic: ['acoustic', 'sax', 'throwback', 'noel'],
   surprise: null,
 }
 
@@ -163,7 +163,7 @@ export type SuggestInput = {
 
 export function moodPool(tracks: Track[], mood: Mood): Track[] {
   const stations = MOOD_STATIONS[mood]
-  return tracks.filter((t) => (stations ? stations.includes(stationOf(t)) : stationOf(t) !== 'night'))
+  return tracks.filter((t) => !t.vocals && (stations ? stations.includes(stationOf(t)) : stationOf(t) !== 'night'))
 }
 
 function weightOf(t: Track, {mood, recent = [], skips = {}, time, weather}: SuggestInput): number {

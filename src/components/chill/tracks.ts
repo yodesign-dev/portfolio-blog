@@ -21,7 +21,7 @@ export type SynthSpec = {
 
 // Trạm nhạc theo mood — mỗi trạm phát liền mạch, các bài chồng mờ vào nhau. Trạm chưa có
 // bài nào (hoặc mọi bài đang ẩn trong Studio) thì không hiện tab
-export type StationId = 'acoustic' | 'noel' | 'focus' | 'night' | 'sax' | 'lofi' | 'study'
+export type StationId = 'acoustic' | 'noel' | 'focus' | 'night' | 'sax' | 'throwback' | 'lofi' | 'study'
 
 export const STATIONS: {id: StationId; label: string; short: string}[] = [
   // Chỉ có bài trong mùa Noel (content.ts lọc theo lịch "Chill · Mùa"), ngoài mùa không hiện tab
@@ -31,6 +31,9 @@ export const STATIONS: {id: StationId; label: string; short: string}[] = [
   // Nhạc ngủ: bài dài ~8 phút (ghép 3 đoạn Lyria), không trống, êm, cuối bài nhỏ dần 60 giây
   {id: 'night', label: 'Night & Sleep', short: 'Sleep'},
   {id: 'sax', label: 'Sax Lounge', short: 'Sax'},
+  // Ballad / city pop đầu 2000s phối lofi, khoảng 1/3 bài có lời (vocals) — bài có lời không vào
+  // gợi ý của Bàn pha phin (playlist.ts)
+  {id: 'throwback', label: '2000s Throwback', short: '2000s'},
   {id: 'lofi', label: 'Lo-fi', short: 'Lo-fi'},
   {id: 'study', label: 'Study Beats', short: 'Study'},
 ]
@@ -44,6 +47,8 @@ export type Track = {
   src?: string
   synth?: SynthSpec
   station?: StationId // bỏ trống = 'lofi'
+  // Bài có giọng hát — quán không tự chọn bài này cho phiên tập trung
+  vocals?: boolean
   // Upload chưa quá NEW_TRACK_DAYS ngày → nhãn "Mới" trong danh sách (content.ts tính phía server)
   isNew?: boolean
 }

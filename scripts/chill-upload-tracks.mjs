@@ -6,6 +6,7 @@
 //
 // File danh sách: [{"file": "final/hue-morning-rain.m4a", "title": "Hue Morning Rain",
 //   "mood": "Fingerstyle guitar · Rain", "station": "acoustic", "order": 55, "hidden": false}, ...]
+// Bài có giọng hát thêm "vocals": true.
 // Đường dẫn `file` tính từ thư mục chứa file danh sách. Mã bài = <trạm>-<tên bài viết thường>,
 // _id = chillTrack-<mã bài> (giống các bài sẵn có). Bài đã có _id đó thì bỏ qua, chạy lại thoải mái.
 
@@ -33,7 +34,7 @@ const client = createClient({
   useCdn: false,
 })
 
-const STATIONS = ['acoustic', 'noel', 'focus', 'night', 'sax', 'lofi', 'study']
+const STATIONS = ['acoustic', 'noel', 'focus', 'night', 'sax', 'throwback', 'lofi', 'study']
 const FFMPEG = process.env.FFMPEG || 'ffmpeg'
 const slug = (s) =>
   s
@@ -70,7 +71,7 @@ for (const t of list) {
     continue
   }
   const duration = seconds(file)
-  console.log(`${write ? '↑' : '·'} ${t.title.padEnd(24)} ${t.station} · ${t.mood} · ${duration ?? '?'}s · thứ tự ${t.order}${t.hidden ? ' · ẩn' : ''}`)
+  console.log(`${write ? '↑' : '·'} ${t.title.padEnd(24)} ${t.station} · ${t.mood} · ${duration ?? '?'}s · thứ tự ${t.order}${t.vocals ? ' · có lời' : ''}${t.hidden ? ' · ẩn' : ''}`)
   if (!write) continue
   const asset = await client.assets.upload('file', fs.createReadStream(file), {filename: `${key}${path.extname(file)}`})
   await client.createIfNotExists({
@@ -83,6 +84,7 @@ for (const t of list) {
     duration,
     order: t.order,
     hidden: Boolean(t.hidden),
+    vocals: Boolean(t.vocals),
     audio: {_type: 'file', asset: {_type: 'reference', _ref: asset._id}},
   })
   added++
