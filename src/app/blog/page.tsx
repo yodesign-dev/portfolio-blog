@@ -6,6 +6,7 @@ import {getLocale} from '@/lib/get-locale'
 import {getDictionary, type Locale} from '@/lib/i18n'
 import {pageMetadata} from '@/lib/site'
 import {getMediumPosts, MEDIUM_URL, type MediumPost} from '@/lib/medium'
+import {formatViews} from '@/lib/post-format'
 
 export const revalidate = 60
 
@@ -60,12 +61,6 @@ function formatDate(dateString: string, locale: Locale) {
   })
 }
 
-function formatViewCount(count: number | undefined, viewsSuffix: string) {
-  const value = count ?? 0
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k ${viewsSuffix}`
-  return `${value} ${viewsSuffix}`
-}
-
 export default async function BlogPage({
   searchParams,
 }: {
@@ -92,10 +87,12 @@ export default async function BlogPage({
         {/* Bộ lọc chỉ có ích khi có đủ bài để lọc — 1-2 bài mà hiện 4 chip
             tag thì chỉ thêm nhiễu. Đang lọc theo tag thì luôn hiện để quay lại. */}
         {allTags.length >= 2 && (tag || posts.length >= 3) && (
+          // Chip lọc là nút chính của trang danh sách: trên màn chạm cao đủ 44px
+          // (touch:, xem globals.css); máy có chuột giữ cỡ gọn như cũ.
           <div className="mb-10 flex flex-wrap gap-2">
             <Link
               href="/blog"
-              className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+              className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium transition touch:min-h-11 touch:px-4 ${
                 !tag
                   ? 'border-neutral-900 bg-neutral-900 text-white'
                   : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
@@ -107,7 +104,7 @@ export default async function BlogPage({
               <Link
                 key={tg}
                 href={`/blog?tag=${encodeURIComponent(tg)}`}
-                className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium transition touch:min-h-11 touch:px-4 ${
                   tag === tg
                     ? 'border-neutral-900 bg-neutral-900 text-white'
                     : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
@@ -120,7 +117,7 @@ export default async function BlogPage({
         )}
 
         {posts.length === 0 && tag ? (
-          <p className="text-center text-neutral-400">{t.blog.emptyTag(tag)}</p>
+          <p className="text-center text-neutral-500">{t.blog.emptyTag(tag)}</p>
         ) : posts.length === 0 && mediumPosts.length > 0 ? (
           <MediumList posts={mediumPosts} locale={locale} />
         ) : posts.length === 0 ? (
@@ -188,8 +185,8 @@ function FeaturedPost({post, locale, viewsSuffix}: {post: Post; locale: Locale; 
             <p className="mt-3 text-[15px] leading-relaxed text-neutral-600">{post.excerpt}</p>
           )}
 
-          <p className="mt-4 text-sm text-neutral-400">
-            {[post.author, formatDate(post.publishedAt, locale), formatViewCount(post.viewCount, viewsSuffix)]
+          <p className="mt-4 text-sm text-neutral-500">
+            {[post.author, formatDate(post.publishedAt, locale), formatViews(post.viewCount, viewsSuffix)]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -247,8 +244,8 @@ function PostRow({post, locale, viewsSuffix}: {post: Post; locale: Locale; views
           </p>
         )}
 
-        <p className="mt-2 text-xs text-neutral-400">
-          {[post.author, formatDate(post.publishedAt, locale), formatViewCount(post.viewCount, viewsSuffix)]
+        <p className="mt-2 text-xs text-neutral-500">
+          {[post.author, formatDate(post.publishedAt, locale), formatViews(post.viewCount, viewsSuffix)]
             .filter(Boolean)
             .join(' · ')}
         </p>
@@ -329,7 +326,7 @@ function MediumList({posts, locale}: {posts: MediumPost[]; locale: Locale}) {
                 <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-neutral-500">{post.excerpt}</p>
               )}
 
-              <p className="mt-2 text-xs text-neutral-400">
+              <p className="mt-2 text-xs text-neutral-500">
                 {[post.publishedAt && formatDate(post.publishedAt, locale), `${f.onMedium} ↗`]
                   .filter(Boolean)
                   .join(' · ')}
@@ -344,7 +341,7 @@ function MediumList({posts, locale}: {posts: MediumPost[]; locale: Locale}) {
           href={MEDIUM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-8 inline-block text-sm font-semibold text-neutral-600 transition-colors hover:text-neutral-900"
+          className="mt-6 inline-flex min-h-11 items-center text-sm font-semibold text-neutral-600 transition-colors hover:text-neutral-900"
         >
           {f.allOnMedium} ↗
         </a>

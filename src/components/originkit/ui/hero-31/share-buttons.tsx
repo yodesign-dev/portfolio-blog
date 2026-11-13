@@ -63,7 +63,7 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
           type="button"
           onClick={() => handleShare(platform.href, platform.name)}
           aria-label={`Share "${title}" on ${platform.name}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
+          className="flex h-8 w-8 touch:size-11 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
         >
           {platform.icon}
         </button>
@@ -72,7 +72,7 @@ export const ShareButtons = ({ url, title }: ShareButtonsProps) => {
         type="button"
         onClick={handleCopyLink}
         aria-label={copied ? "Link copied" : "Copy link"}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
+        className="flex h-8 w-8 touch:size-11 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-neutral-900 hover:bg-neutral-900 hover:text-white"
       >
         {copied ? (
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

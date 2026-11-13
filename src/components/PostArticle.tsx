@@ -1,13 +1,25 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import type {Metadata} from 'next'
-import {PortableText, type PortableTextComponents} from '@portabletext/react'
+import {
+  PortableText,
+  type PortableTextBlockComponent,
+  type PortableTextComponents,
+} from '@portabletext/react'
 import {getImageDimensions, urlFor} from '@/sanity/lib/image'
 import {sanityFetch} from '@/sanity/lib/fetch'
 import {ShareButtons} from '@/components/originkit/ui/hero-31/share-buttons'
 import {ViewTracker} from '@/components/ViewTracker'
 import {SITE_NAME, SITE_URL, ogImageUrl} from '@/lib/site'
 import {ImpactStats, type ImpactMetric} from '@/components/ImpactStats'
+import {ReadingProgress, TocRail} from '@/components/ArticleNav'
+import {buildToc, formatViews, type TocItem} from '@/lib/post-format'
+
+// Bài có từ ngần này mục trở lên mới hiện mục lục — 1-2 mục thì mục lục chỉ
+// là nhiễu, cuộn là thấy hết.
+const TOC_MIN_ITEMS = 3
+const TOC_LABEL = 'On this page'
+const ARTICLE_BODY_ID = 'article-body'
 
 // Dùng chung cho trang chi tiết Writing (/blog/[slug]) và Work
 // (/work/[slug]) — cùng 1 schema post, case study chỉ thêm khối
@@ -133,13 +145,28 @@ function readingMinutes(body: unknown): number {
   return Math.max(1, Math.round(words / 200))
 }
 
-function formatViewCount(count?: number) {
-  const value = count ?? 0
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k views`
-  return `${value} views`
-}
+// Cột chữ hẹp hơn cột bài: 38rem ≈ 67 ký tự/dòng ở cỡ 18px Mulish (đo thật:
+// trung bình 9px/ký tự). Cột bài 44rem (704px) cũ cho ~78 ký tự — quá dài, mắt
+// khó tìm lại đầu dòng. Ảnh và bảng vẫn dùng hết 44rem nên ảnh chụp màn hình
+// trong case study không bị thu nhỏ. Không dùng max-w-prose (65ch): "ch" đo theo
+// chữ số 0, rộng hơn chữ trung bình, nên 65ch ở đây vẫn ra ~700px.
+const PROSE = 'max-w-[38rem]'
 
-const portableTextComponents: PortableTextComponents = {
+// Tiêu đề mục: có id cho mục lục; scroll-mt để khi nhảy tới không dính sát mép
+// trên (và không nằm dưới thanh tiến trình đọc).
+const SECTION_HEADING =
+  'mb-4 mt-12 scroll-mt-8 text-2xl font-semibold leading-snug tracking-tight text-neutral-900 sm:text-3xl'
+
+function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
+  // H1 trong thân bài cũng vẽ thành <h2>: trang chỉ có một <h1> là tiêu đề bài.
+  // Studio vẫn cho chọn H1, nên bài cũ dùng H1 làm tiêu đề mục vẫn hiện đúng.
+  const sectionHeading: PortableTextBlockComponent = ({children, value}) => (
+    <h2 id={value._key ? idByKey.get(value._key) : undefined} className={`${PROSE} ${SECTION_HEADING}`}>
+      {children}
+    </h2>
+  )
+
+  return {
   types: {
     image: ({value}) => {
       const imageUrl = urlFor(value)?.width(1200).fit('max').url()
@@ -184,14 +211,26 @@ const portableTextComponents: PortableTextComponents = {
     },
     table: ({value}) => {
       if (!value?.rows?.length) return null
+      // Màn hẹp: bảng cuộn ngang trong khung riêng thay vì ép mỗi cột còn vài
+      // chữ (w-full cũ chia 327px cho mọi cột). min-w trên ô giữ cột đủ rộng để
+      // đọc; bảng ít cột vẫn giãn hết khung nhờ min-w-full. Khung cuộn được
+      // nhận Tab (role=region + nhãn) để người dùng bàn phím cuộn được bằng phím mũi tên.
       return (
-        <div className="my-8 overflow-x-auto">
-          <table className="w-full border-collapse border border-neutral-200 text-left text-base">
+        <div
+          role="region"
+          aria-label="Table"
+          tabIndex={0}
+          className="my-8 overflow-x-auto rounded-lg border border-neutral-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          <table className="min-w-full border-collapse text-left text-[15px] leading-snug sm:text-base">
             <tbody>
               {value.rows.map((row: {_key?: string; cells?: string[]}, rowIndex: number) => (
-                <tr key={row._key ?? rowIndex}>
+                <tr key={row._key ?? rowIndex} className="border-b border-neutral-200 last:border-0">
                   {row.cells?.map((cell: string, cellIndex: number) => (
-                    <td key={cellIndex} className="border border-neutral-200 px-4 py-2 text-gray-800">
+                    <td
+                      key={cellIndex}
+                      className="min-w-32 border-r border-neutral-200 px-4 py-2.5 align-top text-gray-800 last:border-r-0"
+                    >
                       {cell}
                     </td>
                   ))}
@@ -204,34 +243,32 @@ const portableTextComponents: PortableTextComponents = {
     },
   },
   block: {
-    h1: ({children}) => (
-      <h1 className="mb-6 mt-10 text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-        {children}
-      </h1>
-    ),
-    h2: ({children}) => (
-      <h2 className="mb-4 mt-10 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-        {children}
-      </h2>
-    ),
+    h1: sectionHeading,
+    h2: sectionHeading,
     h3: ({children}) => (
-      <h3 className="mb-3 mt-8 text-xl font-semibold text-neutral-900 sm:text-2xl">{children}</h3>
+      <h3 className={`${PROSE} mb-3 mt-8 text-xl font-semibold leading-snug text-neutral-900 sm:text-2xl`}>
+        {children}
+      </h3>
     ),
     normal: ({children}) => (
-      <p className="mb-6 text-lg leading-relaxed text-gray-800">{children}</p>
+      <p className={`${PROSE} mb-6 text-lg leading-[1.7] text-gray-800`}>{children}</p>
     ),
     blockquote: ({children}) => (
-      <blockquote className="my-10 border-l-4 border-neutral-900 pl-6 text-xl italic leading-relaxed text-neutral-700 sm:text-2xl">
+      <blockquote
+        className={`${PROSE} my-10 border-l-4 border-neutral-900 pl-5 text-xl italic leading-relaxed text-neutral-700 sm:pl-6 sm:text-2xl`}
+      >
         {children}
       </blockquote>
     ),
   },
   list: {
     bullet: ({children}) => (
-      <ul className="mb-6 list-disc space-y-2 pl-6 text-lg leading-relaxed text-gray-800">{children}</ul>
+      <ul className={`${PROSE} mb-6 list-disc space-y-2 pl-6 text-lg leading-[1.7] text-gray-800`}>{children}</ul>
     ),
     number: ({children}) => (
-      <ol className="mb-6 list-decimal space-y-2 pl-6 text-lg leading-relaxed text-gray-800">{children}</ol>
+      <ol className={`${PROSE} mb-6 list-decimal space-y-2 pl-6 text-lg leading-[1.7] text-gray-800`}>
+        {children}
+      </ol>
     ),
   },
   marks: {
@@ -239,8 +276,11 @@ const portableTextComponents: PortableTextComponents = {
     em: ({children}) => <em className="italic">{children}</em>,
     underline: ({children}) => <span className="underline">{children}</span>,
     'strike-through': ({children}) => <span className="line-through">{children}</span>,
+    // overflow-wrap:anywhere: tên hàm/đường dẫn dài liền một chuỗi được ngắt
+    // xuống dòng thay vì đẩy tràn khung 375px. 0.9em thay vì text-base để code
+    // trong tiêu đề không bé hơn chữ xung quanh.
     code: ({children}) => (
-      <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-base text-neutral-800">
+      <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[0.9em] text-neutral-800 [overflow-wrap:anywhere]">
         {children}
       </code>
     ),
@@ -261,6 +301,46 @@ const portableTextComponents: PortableTextComponents = {
       <span style={{fontFamily: value?.font || undefined}}>{children}</span>
     ),
   },
+  }
+}
+
+// Mục lục cho màn hẹp (dưới lg): khối gập native, không cần JS, mở/đóng bằng
+// bàn phím sẵn. Hàng tiêu đề và từng mục cao tối thiểu 44px để dễ chạm.
+function TocDisclosure({items}: {items: TocItem[]}) {
+  return (
+    <details className="group mt-8 rounded-lg border border-neutral-200 lg:hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 text-sm font-semibold text-neutral-900 [&::-webkit-details-marker]:hidden">
+        {TOC_LABEL}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="size-5 shrink-0 text-neutral-500 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </summary>
+      <nav aria-label={TOC_LABEL} className="border-t border-neutral-200 px-2 py-2">
+        <ol>
+          {items.map((item, i) => (
+            <li key={item.id}>
+              <a
+                href={`#${item.id}`}
+                className="flex min-h-11 items-baseline gap-3 rounded-md px-2 py-2.5 text-[15px] leading-snug text-neutral-700 hover:bg-neutral-50 hover:text-neutral-900"
+              >
+                <span className="w-5 shrink-0 text-right text-xs tabular-nums text-neutral-500">{i + 1}</span>
+                {item.text}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </details>
+  )
 }
 
 
@@ -323,109 +403,147 @@ export function PostArticle({post}: {post: Post}) {
     ? {href: '/work', label: '← Back to Work'}
     : {href: '/blog', label: '← Back to Writing'}
 
+  const {items: tocAll, idByKey} = buildToc(post.body)
+  const toc = tocAll.length >= TOC_MIN_ITEMS ? tocAll : []
+  const hasToc = toc.length > 0
+  const components = buildComponents(idByKey)
+
+  // Có mục lục thì từ lg trở lên mở rộng khung để chừa cột mục lục bên phải
+  // (44rem bài + 3rem khoảng cách + 12rem mục lục + 4rem lề = 63rem); không có
+  // thì giữ khung 3xl căn giữa như cũ. Header dùng cùng khung để mũi tên "Back"
+  // thẳng hàng với tiêu đề bài.
+  const frame = `mx-auto px-6 sm:px-8 ${hasToc ? 'max-w-3xl lg:max-w-[63rem]' : 'max-w-3xl'}`
+
+  const meta = [
+    formatDate(post.publishedAt),
+    `${readingMinutes(post.body)} min read`,
+    formatViews(post.viewCount, 'views'),
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
       <ViewTracker postId={post._id} slug={post.slug.current} />
+      <ReadingProgress targetId={ARTICLE_BODY_ID} />
 
       <header className="border-b border-neutral-200">
-        <div className="mx-auto max-w-3xl px-6 py-6 sm:px-8">
-          <Link href={back.href} className="text-sm text-neutral-500 transition-colors hover:text-neutral-900">
+        {/* py-3 + link cao 44px: vùng chạm đủ lớn, header vẫn cao như cũ (~68px) */}
+        <div className={`${frame} py-3`}>
+          <Link
+            href={back.href}
+            className="inline-flex min-h-11 items-center text-sm text-neutral-500 transition-colors hover:text-neutral-900"
+          >
             {back.label}
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-12 sm:px-8 sm:py-16">
-        <article>
-          {post.isCaseStudy ? (
-            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-brand">
-              Case study
-            </p>
-          ) : (
-            post.tags &&
-            post.tags.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {post.tags.map((t) => (
-                  <Link
-                    key={t}
-                    href={`/blog?tag=${encodeURIComponent(t)}`}
-                    className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-200"
-                  >
-                    {t}
-                  </Link>
-                ))}
+      <main className={`${frame} py-12 sm:py-16`}>
+        <div className={hasToc ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_12rem] lg:gap-12' : undefined}>
+          {/* min-w-0: con của grid mặc định không co nhỏ hơn nội dung — thiếu nó,
+              một bảng rộng sẽ đẩy cả cột bài tràn ngang */}
+          <div className="min-w-0">
+            <article>
+              {post.isCaseStudy ? (
+                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-brand">Case study</p>
+              ) : (
+                post.tags &&
+                post.tags.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-x-1.5">
+                    {/* Link cao 44px trên màn chạm (vùng bấm trong suốt), viên tag
+                        bên trong giữ cỡ nhỏ như cũ để không lấn tiêu đề bài */}
+                    {post.tags.map((t) => (
+                      <Link
+                        key={t}
+                        href={`/blog?tag=${encodeURIComponent(t)}`}
+                        className="group inline-flex items-center touch:min-h-11"
+                      >
+                        <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 transition group-hover:bg-neutral-200">
+                          {t}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )
+              )}
+
+              <h1 className="text-3xl font-semibold leading-tight tracking-tight text-balance text-neutral-900 sm:text-4xl sm:leading-tight">
+                {post.title}
+              </h1>
+
+              {post.isCaseStudy && post.excerpt && (
+                <p className={`${PROSE} mt-4 text-lg leading-relaxed text-neutral-600`}>{post.excerpt}</p>
+              )}
+
+              {post.isCaseStudy && <CaseStudyMeta post={post} />}
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                {/* neutral-500 thay neutral-400: 4.7:1 trên nền trắng (cũ 2.5:1, dưới chuẩn) */}
+                <p className="text-sm text-neutral-500">{meta}</p>
+                <ShareButtons url={postUrl} title={post.title} />
               </div>
-            )
-          )}
 
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-4xl">
-            {post.title}
-          </h1>
+              {/* Case study mở bằng khối tóm tắt, ảnh đại diện chỉ dùng khi chia sẻ link */}
+              {mainImageUrl && !post.isCaseStudy && (
+                <div className="mt-8 overflow-hidden rounded-lg bg-neutral-100">
+                  <Image
+                    src={mainImageUrl}
+                    alt={post.mainImage?.alt || post.title}
+                    width={1600}
+                    height={900}
+                    sizes="(min-width: 768px) 704px, 100vw"
+                    priority
+                    className="aspect-video w-full object-cover"
+                  />
+                </div>
+              )}
 
-          {post.isCaseStudy && post.excerpt && (
-            <p className="mt-4 text-lg leading-relaxed text-neutral-600">{post.excerpt}</p>
-          )}
+              {hasToc && <TocDisclosure items={toc} />}
 
-          {post.isCaseStudy && <CaseStudyMeta post={post} />}
+              <div id={ARTICLE_BODY_ID} className="mt-10">
+                <PortableText value={post.body} components={components} />
+              </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm text-neutral-400">
-              {formatDate(post.publishedAt)} · {readingMinutes(post.body)} min read ·{' '}
-              {formatViewCount(post.viewCount)}
-            </p>
-            <ShareButtons url={postUrl} title={post.title} />
+              <div className="mt-12 border-t border-neutral-200 pt-8">
+                <ShareButtons url={postUrl} title={post.title} />
+              </div>
+            </article>
+
+            {post.more && post.more.length > 0 && (
+              <aside className="mt-16 border-t border-neutral-200 pt-10">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+                  {post.isCaseStudy ? 'More case studies' : 'Keep reading'}
+                </h2>
+                <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+                  {post.more.map((item) => (
+                    <li key={item._id}>
+                      <Link
+                        href={postPath(item)}
+                        className="group block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-400"
+                      >
+                        <p className="font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
+                          {item.title}
+                        </p>
+                        {item.excerpt && (
+                          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-neutral-500">
+                            {item.excerpt}
+                          </p>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </aside>
+            )}
           </div>
 
-          {/* Case study mở bằng khối tóm tắt, ảnh đại diện chỉ dùng khi chia sẻ link */}
-          {mainImageUrl && !post.isCaseStudy && (
-            <div className="mt-8 overflow-hidden rounded-lg bg-neutral-100">
-              <Image
-                src={mainImageUrl}
-                alt={post.mainImage?.alt || post.title}
-                width={1600}
-                height={900}
-                sizes="(min-width: 768px) 704px, 100vw"
-                priority
-                className="aspect-video w-full object-cover"
-              />
-            </div>
+          {hasToc && (
+            <aside className="hidden lg:block">
+              <TocRail items={toc} label={TOC_LABEL} />
+            </aside>
           )}
-
-          <div className="mt-10">
-            <PortableText value={post.body} components={portableTextComponents} />
-          </div>
-
-          <div className="mt-12 border-t border-neutral-200 pt-8">
-            <ShareButtons url={postUrl} title={post.title} />
-          </div>
-        </article>
-
-        {post.more && post.more.length > 0 && (
-          <aside className="mt-16 border-t border-neutral-200 pt-10">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
-              {post.isCaseStudy ? 'More case studies' : 'Keep reading'}
-            </h2>
-            <ul className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {post.more.map((item) => (
-                <li key={item._id}>
-                  <Link
-                    href={postPath(item)}
-                    className="group block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-400"
-                  >
-                    <p className="font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
-                      {item.title}
-                    </p>
-                    {item.excerpt && (
-                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-neutral-500">
-                        {item.excerpt}
-                      </p>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
+        </div>
       </main>
     </div>
   )
