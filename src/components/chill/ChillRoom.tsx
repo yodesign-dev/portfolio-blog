@@ -6,7 +6,7 @@ import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, destOpen, type Destination} from './destinations'
 import {withRiverArt} from './river'
-import {STATIONS, TRACKS, stationOf, type StationId, type Track} from './tracks'
+import {STATIONS, TRACKS, newStations, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
 import {Diary} from './Diary'
@@ -46,7 +46,7 @@ import type {ChillLive} from './live'
 import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
-import {HotBadge, NewBadge, PlayMeter, playStats} from './PlayMeter'
+import {HotBadge, NewBadge, NewStationBadge, PlayMeter, playStats, VocalBadge} from './PlayMeter'
 import {addMinutes, addPhin, levelOf, loadRegular, stampToday, streakOf, todayOf, visitDayOf, type Regular} from './regular'
 import {PostcardAlbum, PostcardDialog, TripOffer} from './TripPostcard'
 import {TRIP_PHINS_DEFAULT, canOffer, collectTrip, declineTrip, forceBack, loadSeen, loadTrip, markPlaceSeen, pickPlace, sendTrip, souvenirFor, tripMode, tripModeNow, type Postcard, type TripState} from './trip'
@@ -2851,6 +2851,8 @@ export function ChillRoom({
     const key = newKeys.get(id)
     return Boolean(key && newSeen && !newSeen.includes(key))
   }
+  // Trạm mới mở (mọi bài còn "Mới"): tab ghi chữ "Mới" suốt tuần đầu, kể cả khi đã mở xem
+  const freshStations = useMemo(() => newStations(tracks), [tracks])
   const zenBarRef = useRef<HTMLDivElement>(null)
   // Danh sách đang mở: chạm / bấm ra ngoài thanh nhạc là đóng (khỏi phải bấm lại nút)
   useEffect(() => {
@@ -3416,11 +3418,15 @@ export function ChillRoom({
                         </>
                       )}
                       {st.short}
-                      {hasUnseenNew(st.id) && (
-                        <>
-                          <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
-                          <span className="sr-only">, {t.room.newInStation}</span>
-                        </>
+                      {freshStations.has(st.id) ? (
+                        <NewStationBadge />
+                      ) : (
+                        hasUnseenNew(st.id) && (
+                          <>
+                            <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
+                            <span className="sr-only">, {t.room.newInStation}</span>
+                          </>
+                        )
                       )}
                     </button>
                   )
@@ -3444,7 +3450,8 @@ export function ChillRoom({
                         </span>
                         <span className="flex min-w-0 items-center gap-1.5">
                           <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
-                          <NewBadge track={tr} />
+                          <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
+                          <VocalBadge track={tr} />
                           <HotBadge stat={plays?.get(tr.id)} />
                         </span>
                         <span className="flex flex-col items-end">
@@ -4808,11 +4815,15 @@ export function ChillRoom({
                         </>
                       )}
                       {st.short}
-                      {hasUnseenNew(st.id) && (
-                        <>
-                          <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
-                          <span className="sr-only">, {t.room.newInStation}</span>
-                        </>
+                      {freshStations.has(st.id) ? (
+                        <NewStationBadge />
+                      ) : (
+                        hasUnseenNew(st.id) && (
+                          <>
+                            <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
+                            <span className="sr-only">, {t.room.newInStation}</span>
+                          </>
+                        )
                       )}
                     </button>
                   )
@@ -4866,7 +4877,8 @@ export function ChillRoom({
                         <span className="min-w-0">
                           <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
                           <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#a79e94]">
-                            <NewBadge track={tr} />
+                            <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
+                            <VocalBadge track={tr} />
                             <HotBadge stat={plays?.get(tr.id)} />
                             <span className="truncate">{tr.mood}</span>
                           </span>

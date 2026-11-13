@@ -57,6 +57,15 @@ export const NEW_TRACK_DAYS = 7
 
 export const stationOf = (t: Track): StationId => t.station ?? 'lofi'
 
+// Trạm mới mở: mọi bài trong trạm đều còn nhãn "Mới" (lên chưa quá NEW_TRACK_DAYS ngày). Tab trạm
+// hiện chữ "Mới" thay cho chấm, và từng bài trong trạm bỏ nhãn "Mới" cho đỡ rối
+export function newStations(tracks: Track[]): Set<StationId> {
+  const out = new Set<StationId>()
+  for (const t of tracks) if (t.isNew) out.add(stationOf(t))
+  for (const t of tracks) if (!t.isNew) out.delete(stationOf(t))
+  return out
+}
+
 // Dự phòng khi Sanity không trả về bài nào — playlist thật quản lý trong Studio
 // ("Chill · Nhạc"). Mỗi trạm 1 bài, trỏ thẳng vào file trên Sanity CDN (CDN vẫn
 // phục vụ file kể cả khi API truy vấn lỗi).

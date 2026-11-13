@@ -12,11 +12,11 @@
 // - Nút trong cửa sổ nổi là portal React → dùng chung state với ChillRoom
 // - Trình duyệt không có API (Safari, Firefox, điện thoại) → canMiniPlayer() = false, không hiện nút
 
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {useT} from './i18n'
-import {HotBadge, NewBadge, PlayMeter, type PlayStat} from './PlayMeter'
-import {STATIONS, stationOf, type StationId, type Track} from './tracks'
+import {HotBadge, NewBadge, NewStationBadge, PlayMeter, VocalBadge, type PlayStat} from './PlayMeter'
+import {STATIONS, newStations, stationOf, type StationId, type Track} from './tracks'
 import {PixelClock, type BrewControls, type BrewInfo} from './BrewDesk'
 
 type DocumentPiP = {
@@ -103,6 +103,7 @@ export function MiniPlayer({
   const [listOpen, setListOpen] = useState(false)
   // Tab trạm đang xem trong danh sách — mở danh sách là về trạm của bài đang phát
   const [tab, setTab] = useState<StationId | 'queue'>(queue ? 'queue' : stationOf(track))
+  const freshStations = useMemo(() => newStations(tracks), [tracks])
   const [tall, setTall] = useState(false)
 
   // Đóng cửa sổ (nút X của trình duyệt / nút về quán / tắt trang) → báo ChillRoom
@@ -344,6 +345,7 @@ export function MiniPlayer({
                   }`}
                 >
                   {st.short}
+                  {freshStations.has(st.id) && <NewStationBadge />}
                 </button>
               )
             })}
@@ -372,7 +374,8 @@ export function MiniPlayer({
                     <span className="font-mono text-[11px] tabular-nums text-[#a79e94]">{active && playing ? '♪' : String(pos + 1).padStart(2, '0')}</span>
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span className={`truncate text-[13px] ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
-                      <NewBadge track={tr} />
+                      <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
+                      <VocalBadge track={tr} />
                       <HotBadge stat={plays?.get(tr.id)} />
                     </span>
                     <span className="flex items-center gap-2 font-mono text-[11px] tabular-nums text-[#a79e94]">

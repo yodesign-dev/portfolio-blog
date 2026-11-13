@@ -67,11 +67,36 @@ export function PlayMeter({stat}: {stat?: PlayStat}) {
 
 // Nhãn nhỏ cạnh tên / dòng phụ của bài nằm trong top trạm
 // Màu bạc hà để khác nhãn "Nghe nhiều" (cam)
-export function NewBadge({track}: {track: Track}) {
+// `quiet`: bài trong trạm mới mở — tab trạm đã ghi "Mới" rồi
+export function NewBadge({track, quiet}: {track: Track; quiet?: boolean}) {
   const t = useT()
-  if (!track.isNew) return null
+  if (!track.isNew || quiet) return null
   return (
     <span className="shrink-0 rounded-full border border-[#9fdcbc]/35 bg-[#9fdcbc]/10 px-1.5 text-[10.5px] leading-4 text-[#9fdcbc]">{t.room.newTrack}</span>
+  )
+}
+
+// Chữ "Mới" trên tab trạm mới mở (cùng màu bạc hà với nhãn bài mới)
+export function NewStationBadge() {
+  const t = useT()
+  return (
+    <>
+      <span aria-hidden className="ml-1.5 inline-block rounded-full border border-[#9fdcbc]/40 bg-[#9fdcbc]/15 px-1.5 align-[1px] text-[10px] font-medium uppercase leading-4 tracking-[0.06em] text-[#9fdcbc]">
+        {t.room.newTrack}
+      </span>
+      <span className="sr-only">, {t.room.newStation}</span>
+    </>
+  )
+}
+
+// Bài có giọng hát (Studio: "Có lời") — màu tím nhạt, khác "Mới" (bạc hà) và "Nghe nhiều" (cam)
+export function VocalBadge({track}: {track: Track}) {
+  const t = useT()
+  if (!track.vocals) return null
+  return (
+    <span title={t.room.vocalsTitle} className="shrink-0 rounded-full border border-[#cdb6ee]/35 bg-[#cdb6ee]/10 px-1.5 text-[10.5px] leading-4 text-[#cdb6ee]">
+      {t.room.vocals}
+    </span>
   )
 }
 

@@ -125,3 +125,16 @@ test('bài có lời không vào gợi ý ở mood nào, bài không lời cùng
   assert.ok(moodPool(lib, 'melodic').some((t) => t.station === 'throwback'))
   assert.ok(moodPool(lib, 'surprise').some((t) => t.station === 'throwback'))
 })
+
+test('trạm mới mở = mọi bài trong trạm đều còn nhãn Mới', async () => {
+  const {newStations} = await import('../src/components/chill/tracks.ts')
+  const lib = [
+    track('a', 'throwback', 180, 'x', {isNew: true}),
+    track('b', 'throwback', 180, 'x', {isNew: true}),
+    track('c', 'lofi', 180, 'x', {isNew: true}),
+    track('d', 'lofi'),
+    track('e', 'focus'),
+  ]
+  assert.deepEqual([...newStations(lib)], ['throwback'])
+  assert.equal(newStations([]).size, 0)
+})
