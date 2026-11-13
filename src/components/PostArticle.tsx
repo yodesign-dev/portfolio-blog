@@ -13,6 +13,7 @@ import {ViewTracker} from '@/components/ViewTracker'
 import {SITE_NAME, SITE_URL, ogImageUrl} from '@/lib/site'
 import {ImpactStats, type ImpactMetric} from '@/components/ImpactStats'
 import {ReadingProgress, TocRail} from '@/components/ArticleNav'
+import {ZoomableImage} from '@/components/ZoomableImage'
 import {buildToc, formatViews, type TocItem} from '@/lib/post-format'
 
 // Bài có từ ngần này mục trở lên mới hiện mục lục — 1-2 mục thì mục lục chỉ
@@ -20,6 +21,8 @@ import {buildToc, formatViews, type TocItem} from '@/lib/post-format'
 const TOC_MIN_ITEMS = 3
 const TOC_LABEL = 'On this page'
 const ARTICLE_BODY_ID = 'article-body'
+// Ảnh gốc từ ngần này px trở lên (cột bài 704px) mới có chạm-để-phóng-to
+const ZOOM_MIN_WIDTH = 800
 
 // Dùng chung cho trang chi tiết Writing (/blog/[slug]) và Work
 // (/work/[slug]) — cùng 1 schema post, case study chỉ thêm khối
@@ -174,19 +177,39 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
       // Kích thước thật của ảnh (thay cho 1200x800 cố định) — trình duyệt
       // giữ chỗ đúng tỉ lệ trong lúc lazy-load, nền xám làm placeholder
       // thay vì để trống trắng như trước.
-      const dims = getImageDimensions(value) ?? {width: 1200, height: 800}
+      const realDims = getImageDimensions(value)
+      const dims = realDims ?? {width: 1200, height: 800}
+      const inline = (
+        <div className="overflow-hidden rounded-lg bg-neutral-100">
+          <Image
+            src={imageUrl}
+            alt={value.alt || ''}
+            width={dims.width}
+            height={dims.height}
+            sizes="(min-width: 768px) 704px, 100vw"
+            className="h-auto w-full"
+          />
+        </div>
+      )
+      // Ảnh gốc rộng hơn cột bài đáng kể thì cho chạm để xem lớn (ZoomableImage).
+      // Ảnh nhỏ phóng ra cũng không nét hơn nên giữ nguyên. Bản xem lớn lấy
+      // đúng cỡ gốc (tối đa 2400px) — không thể nét hơn file đã tải lên Studio.
+      const zoomWidth = realDims && realDims.width >= ZOOM_MIN_WIDTH ? Math.min(realDims.width, 2400) : 0
       return (
         <figure className="my-8">
-          <div className="overflow-hidden rounded-lg bg-neutral-100">
-            <Image
-              src={imageUrl}
+          {zoomWidth && realDims ? (
+            <ZoomableImage
+              src={urlFor(value).width(zoomWidth).fit('max').url()}
+              width={zoomWidth}
+              height={Math.round((realDims.height * zoomWidth) / realDims.width)}
               alt={value.alt || ''}
-              width={dims.width}
-              height={dims.height}
-              sizes="(min-width: 768px) 704px, 100vw"
-              className="h-auto w-full"
-            />
-          </div>
+              caption={value.caption}
+            >
+              {inline}
+            </ZoomableImage>
+          ) : (
+            inline
+          )}
           {/* MỚI: caption dưới ảnh — style giống Medium, in nghiêng, căn giữa */}
           {value.caption && (
             <figcaption className="mt-3 text-center text-sm italic text-neutral-500">
