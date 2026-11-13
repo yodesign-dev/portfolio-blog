@@ -6,7 +6,7 @@
 
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
-import {useT} from './i18n'
+import {useLang, useT} from './i18n'
 import {
   BREAK_MODES,
   LIST_SLOTS,
@@ -29,7 +29,7 @@ import {
   type MusicSource,
   type SessionMix,
 } from './playlist'
-import {STATIONS, stationOf, type StationId, type Track} from './tracks'
+import {STATIONS, stationName, stationOf, type StationId, type Track} from './tracks'
 
 const SHOWN_SUGGESTIONS = 4
 
@@ -440,6 +440,7 @@ export function MusicChooser({
 // Bảng chọn bài: thư viện của quán + danh sách đang sửa
 export function MusicPicker({api, tracks, playingId, onPreview}: {api: BrewMusicApi; tracks: Track[]; playingId: string | null; onPreview?: (id: string) => void}) {
   const t = useT()
+  const lang = useLang()
   const {prefs, byId} = api
   const stations = useMemo(() => STATIONS.filter((st) => st.id !== 'night' && tracks.some((tr) => stationOf(tr) === st.id)), [tracks])
   const [tab, setTab] = useState<StationId>(() => stations[0]?.id ?? 'focus')
@@ -493,7 +494,7 @@ export function MusicPicker({api, tracks, playingId, onPreview}: {api: BrewMusic
             <div className="flex flex-wrap gap-1">
               {stations.map((st) => (
                 <button key={st.id} type="button" aria-pressed={tab === st.id} onClick={() => setTab(st.id)} className={`min-h-8 rounded-full px-3 py-1 text-xs transition ${tab === st.id ? segOn : segOff}`}>
-                  {st.short}
+                  {stationName(st, lang, 'short')}
                 </button>
               ))}
             </div>

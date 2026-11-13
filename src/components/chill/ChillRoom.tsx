@@ -6,7 +6,7 @@ import {ChillAudio, type Ambience} from './audio'
 import {ChillScene, SCENE_H, SCENE_W, type GroupWall, type TimeOfDay, type Weather} from './scene'
 import {DESTINATIONS, destOpen, type Destination} from './destinations'
 import {withRiverArt} from './river'
-import {STATIONS, TRACKS, newStations, stationOf, type StationId, type Track} from './tracks'
+import {STATIONS, TRACKS, VOCAL_STATIONS, newStations, stationName, stationNameOf, stationOf, type StationId, type Track} from './tracks'
 import {trackEvent} from '@/lib/analytics'
 import {Wishlist} from './Wishlist'
 import {Diary} from './Diary'
@@ -2404,28 +2404,28 @@ export function ChillRoom({
   useEffect(() => {
     if (!('mediaSession' in navigator) || !started) return
     // Công tắc cửa sổ nổi bật: thêm trạm, điểm đến và ảnh quán
-    const stationName = queueLabel ?? STATIONS.find((st) => st.id === stationOf(track))?.label ?? ''
+    const stationTitle = queueLabel ?? stationNameOf(stationOf(track), lang)
     // Đang pha phin: màn hình khoá hiện giờ còn lại, đổi mỗi phút
     const brewLine = !brewInfo?.running ? null : brewInfo.paused ? t.brew.lockPaused : brewInfo.rest ? t.brew.lockBreak(brewInfo.leftMin) : t.brew.lockLeft(brewInfo.leftMin)
     navigator.mediaSession.metadata = new MediaMetadata(
       miniFlag
         ? {
             title: track.title,
-            artist: brewLine ? `${brewLine} · ${stationName}` : `${stationName} · Lofi Pixel Cafe`,
+            artist: brewLine ? `${brewLine} · ${stationTitle}` : `${stationTitle} · Lofi Pixel Cafe`,
             album: destinations[destIndex]?.name,
             artwork: [
               {src: '/chill/app/icon-192.png', sizes: '192x192', type: 'image/png'},
               {src: '/chill/app/icon-512.png', sizes: '512x512', type: 'image/png'},
             ],
           }
-        : {title: track.title, artist: brewLine ? `${brewLine} · ${stationName}` : 'Chill for work', album: track.mood}
+        : {title: track.title, artist: brewLine ? `${brewLine} · ${stationTitle}` : 'Chill for work', album: track.mood}
     )
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
     navigator.mediaSession.setActionHandler('play', togglePlay)
     navigator.mediaSession.setActionHandler('pause', togglePlay)
     navigator.mediaSession.setActionHandler('nexttrack', next)
     navigator.mediaSession.setActionHandler('previoustrack', prev)
-  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex, queueLabel, brewInfo?.running, brewInfo?.paused, brewInfo?.rest, brewInfo?.leftMin, t])
+  }, [started, playing, track, togglePlay, next, prev, miniFlag, destinations, destIndex, queueLabel, brewInfo?.running, brewInfo?.paused, brewInfo?.rest, brewInfo?.leftMin, t, lang])
 
   const closeMini = useCallback(() => {
     miniRef.current = false
@@ -3048,7 +3048,7 @@ export function ChillRoom({
   const mixShown = effectiveMix ?? sceneMix(ambience, AMBIENCE_FOR[weather].kind)
   const mixPreset = presetOf(effectiveMix)
   const progress = duration ? Math.min(1, position / duration) : 0
-  const stationLabel = queueLabel ?? STATIONS.find((st) => st.id === playingStation)?.label ?? ''
+  const stationLabel = queueLabel ?? stationNameOf(playingStation, lang)
   const hideUi = idle && started && !panelOpen && !volumeOpen && !sleepOpen && !sleepNudge && !showHintTip && !wishOpen && !todayOpen && !chatOpen && !boardOpen && !updatesOpen && !diaryOpen && !shelfOpen && !updatesToast && !focusOpen && !drinkOpen && !menuOpen && !(guideHold && activeGuide) && !hovering
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
@@ -3417,7 +3417,7 @@ export function ChillRoom({
                           <EventStar />
                         </>
                       )}
-                      {st.short}
+                      {stationName(st, lang, 'short')}
                       {freshStations.has(st.id) ? (
                         <NewStationBadge />
                       ) : (
@@ -3451,7 +3451,7 @@ export function ChillRoom({
                         <span className="flex min-w-0 items-center gap-1.5">
                           <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
                           <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
-                          <VocalBadge track={tr} />
+                          <VocalBadge track={tr} quiet={!showMine && VOCAL_STATIONS.has(stationOf(tr))} />
                           <HotBadge stat={plays?.get(tr.id)} />
                         </span>
                         <span className="flex flex-col items-end">
@@ -4814,7 +4814,7 @@ export function ChillRoom({
                           <EventStar />
                         </>
                       )}
-                      {st.short}
+                      {stationName(st, lang, 'short')}
                       {freshStations.has(st.id) ? (
                         <NewStationBadge />
                       ) : (
@@ -4878,7 +4878,7 @@ export function ChillRoom({
                           <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
                           <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#a79e94]">
                             <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
-                            <VocalBadge track={tr} />
+                            <VocalBadge track={tr} quiet={!showMine && VOCAL_STATIONS.has(stationOf(tr))} />
                             <HotBadge stat={plays?.get(tr.id)} />
                             <span className="truncate">{tr.mood}</span>
                           </span>

@@ -138,3 +138,17 @@ test('trạm mới mở = mọi bài trong trạm đều còn nhãn Mới', asyn
   assert.deepEqual([...newStations(lib)], ['throwback'])
   assert.equal(newStations([]).size, 0)
 })
+
+test('trạm Memories (bài có lời) không vào gợi ý, tên tiếng Việt chỉ đổi ở trạm có tên riêng', async () => {
+  const {STATIONS, VOCAL_STATIONS, stationName, stationNameOf} = await import('../src/components/chill/tracks.ts')
+  const lib = [...library, ...Array.from({length: 5}, (_, i) => track(`memories-${i}`, 'memories', 180, 'AI vocal · Ballad', {vocals: true}))]
+  for (const mood of ['deep', 'gentle', 'melodic', 'surprise']) {
+    assert.ok(moodPool(lib, mood).every((t) => t.station !== 'memories'), `${mood}: lọt bài Memories`)
+  }
+  const ids = STATIONS.map((st) => st.id)
+  assert.equal(ids.indexOf('memories'), ids.indexOf('throwback') + 1, 'Memories nằm ngay sau 2000s')
+  assert.ok(VOCAL_STATIONS.has('memories') && !VOCAL_STATIONS.has('throwback'))
+  assert.equal(stationNameOf('memories', 'vi', 'short'), 'Hoài niệm')
+  assert.equal(stationNameOf('memories', 'en', 'short'), 'Memories')
+  assert.equal(stationName(STATIONS.find((st) => st.id === 'sax'), 'vi', 'short'), 'Sax')
+})

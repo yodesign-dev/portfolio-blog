@@ -6,7 +6,7 @@
 //
 // File danh sách: [{"file": "final/hue-morning-rain.m4a", "title": "Hue Morning Rain",
 //   "mood": "Fingerstyle guitar · Rain", "station": "acoustic", "order": 55, "hidden": false}, ...]
-// Bài có giọng hát thêm "vocals": true.
+// Bài có giọng hát thêm "vocals": true (bài hát 2000s có lời vào trạm "memories", không phải "throwback").
 // Đường dẫn `file` tính từ thư mục chứa file danh sách. Mã bài = <trạm>-<tên bài viết thường>,
 // _id = chillTrack-<mã bài> (giống các bài sẵn có). Bài đã có _id đó thì bỏ qua, chạy lại thoải mái.
 
@@ -34,7 +34,7 @@ const client = createClient({
   useCdn: false,
 })
 
-const STATIONS = ['acoustic', 'noel', 'focus', 'night', 'sax', 'throwback', 'lofi', 'study']
+const STATIONS = ['acoustic', 'noel', 'focus', 'night', 'sax', 'throwback', 'memories', 'lofi', 'study']
 const FFMPEG = process.env.FFMPEG || 'ffmpeg'
 const slug = (s) =>
   s

@@ -90,9 +90,10 @@ export function NewStationBadge() {
 }
 
 // Bài có giọng hát (Studio: "Có lời") — màu tím nhạt, khác "Mới" (bạc hà) và "Nghe nhiều" (cam)
-export function VocalBadge({track}: {track: Track}) {
+// `quiet`: đang xem trạm mà bài nào cũng có lời (Memories), nhãn ở từng bài thành thừa
+export function VocalBadge({track, quiet}: {track: Track; quiet?: boolean}) {
   const t = useT()
-  if (!track.vocals) return null
+  if (!track.vocals || quiet) return null
   return (
     <span title={t.room.vocalsTitle} className="shrink-0 rounded-full border border-[#cdb6ee]/35 bg-[#cdb6ee]/10 px-1.5 text-[10.5px] leading-4 text-[#cdb6ee]">
       {t.room.vocals}

@@ -14,9 +14,9 @@
 
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {useT} from './i18n'
+import {useLang, useT} from './i18n'
 import {HotBadge, NewBadge, NewStationBadge, PlayMeter, VocalBadge, type PlayStat} from './PlayMeter'
-import {STATIONS, newStations, stationOf, type StationId, type Track} from './tracks'
+import {STATIONS, VOCAL_STATIONS, newStations, stationName, stationOf, type StationId, type Track} from './tracks'
 import {PixelClock, type BrewControls, type BrewInfo} from './BrewDesk'
 
 type DocumentPiP = {
@@ -98,6 +98,7 @@ export function MiniPlayer({
   queue?: {label: string; indices: number[]} | null
 }) {
   const t = useT()
+  const lang = useLang()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const track = tracks[index]
   const [listOpen, setListOpen] = useState(false)
@@ -344,7 +345,7 @@ export function MiniPlayer({
                     on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                   }`}
                 >
-                  {st.short}
+                  {stationName(st, lang, 'short')}
                   {freshStations.has(st.id) && <NewStationBadge />}
                 </button>
               )
@@ -375,7 +376,7 @@ export function MiniPlayer({
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span className={`truncate text-[13px] ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
                       <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
-                      <VocalBadge track={tr} />
+                      <VocalBadge track={tr} quiet={tab !== 'queue' && VOCAL_STATIONS.has(stationOf(tr))} />
                       <HotBadge stat={plays?.get(tr.id)} />
                     </span>
                     <span className="flex items-center gap-2 font-mono text-[11px] tabular-nums text-[#a79e94]">

@@ -16,7 +16,7 @@ import type {Destination} from './destinations'
 import {useLang} from './i18n'
 import type {ChillScene, TimeOfDay, Weather} from './scene'
 import {activeSeason, type Season} from './season'
-import {STATIONS, stationOf, type StationId, type Track} from './tracks'
+import {STATIONS, stationName, stationOf, type StationId, type Track} from './tracks'
 
 const POSTER = '/chill/scenes/room-cafe-thumb.webp'
 
@@ -62,7 +62,8 @@ function embedHost() {
 }
 
 export function ChillEmbed({tracks, destinations, seasons = []}: {tracks: Track[]; destinations: Destination[]; seasons?: Season[]}) {
-  const t = STRINGS[useLang()]
+  const lang = useLang()
+  const t = STRINGS[lang]
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<ChillScene | null>(null)
@@ -353,7 +354,7 @@ export function ChillEmbed({tracks, destinations, seasons = []}: {tracks: Track[
                 st.id === station ? 'bg-white/90 text-[#16131a]' : 'bg-black/40 text-white/75 hover:text-white'
               }`}
             >
-              {st.short}
+              {stationName(st, lang, 'short')}
             </button>
           ))}
         </div>

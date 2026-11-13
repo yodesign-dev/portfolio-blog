@@ -15,7 +15,7 @@ import {isLiveUrl, type ChillLive} from '@/components/chill/live'
 // nhạc mới chưa mở cho khách).
 const CHILL_QUERY = `{
   "tracks": *[_type == "chillTrack" && ($showHidden || hidden != true) && (defined(audio.asset) || defined(localFile))]
-    | order(select(station == "acoustic" => 0, station == "noel" => 1, station == "focus" => 2, station == "night" => 3, station == "sax" => 4, station == "throwback" => 5, station == "lofi" => 6, station == "study" => 7, 8) asc,
+    | order(select(station == "acoustic" => 0, station == "noel" => 1, station == "focus" => 2, station == "night" => 3, station == "sax" => 4, station == "throwback" => 5, station == "memories" => 6, station == "lofi" => 7, station == "study" => 8, 9) asc,
             coalesce(order, 9999) asc, _createdAt asc) {
     "id": coalesce(key.current, _id),
     title,

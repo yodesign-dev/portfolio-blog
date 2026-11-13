@@ -13,7 +13,8 @@ export const STATION_OPTIONS = [
   {title: 'Deep Focus', value: 'focus'},
   {title: 'Night & Sleep', value: 'night'},
   {title: 'Sax Lounge', value: 'sax'},
-  {title: '2000s Throwback', value: 'throwback'},
+  {title: '2000s Throwback (không lời)', value: 'throwback'},
+  {title: 'Memories / Hoài niệm (bài có lời)', value: 'memories'},
   {title: 'Lo-fi', value: 'lofi'},
   {title: 'Study Beats', value: 'study'},
 ]
