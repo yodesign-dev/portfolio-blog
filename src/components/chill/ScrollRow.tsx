@@ -2,7 +2,10 @@
 
 // Hàng chip cuộn ngang (dãy trạm nhạc trong tab Music và danh sách Ngắm cảnh): một dòng thay vì
 // rớt 2–3 dòng. Thanh cuộn ẩn, mép nào còn chip khuất thì mờ dần để khách biết còn nữa.
-// - Chip đang chọn ([aria-checked="true"]) tự cuộn vào giữa khi hàng hiện ra / đổi lựa chọn
+// - Chip đang chọn ([aria-checked="true"]) tự cuộn về sát mép trái (ngay sau mũi tên ‹, chừa
+//   một mẩu chip trước nó để biết còn chip bên trái) khi hàng hiện ra, khi đổi lựa chọn và khi
+//   chip thêm / bớt. Không đổi thứ tự chip: khách nhớ chỗ từng trạm, chip không nhảy dưới ngón
+//   tay, phím mũi tên vẫn đi đúng thứ tự
 // - Chuột: lăn dọc trên hàng thành cuộn ngang; tới mép rồi thì trả cú lăn cho danh sách bên ngoài
 // - Bàn phím: mũi tên / Home / End vẫn do radio-keys.ts lo, scroll-padding giữ chip được focus
 //   ra khỏi vùng mờ
@@ -13,6 +16,9 @@
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react'
 
 const FADE = 24
+// Khoảng trống bên trái chip đang chọn khi cuộn về trái. Mũi tên ‹ cùng quầng tối quanh nó phủ
+// ~38px tính từ mép, nên 56px mới chừa được ~12px viền chip trước nó (để biết còn chip bên trái)
+const PEEK = 56
 
 export function ScrollRow({children, selectedKey, className = '', ...aria}: {children: ReactNode; selectedKey: string; className?: string; role?: string; 'aria-label'?: string}) {
   const ref = useRef<HTMLDivElement>(null)
@@ -35,9 +41,9 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     // Chip thêm / bớt ngay trong hàng (vd thả tim bài đầu → tab "Của tôi" chen vào đầu) đẩy cả dãy
-    // sang bên: chip đang chọn có thể trôi vào vùng mờ dưới mũi tên, nên kéo nó về giữa nếu bị khuất
+    // sang bên: kéo chip đang chọn về lại mép trái, đứng yên (không trượt)
     const mo = new MutationObserver((list) => {
-      if (list.some((m) => m.type === 'childList' && m.target === el)) centerSelected(el, true)
+      if (list.some((m) => m.type === 'childList' && m.target === el)) alignSelected(el, false)
       measure()
     })
     mo.observe(el, {childList: true, subtree: true, characterData: true})
@@ -59,10 +65,12 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
     }
   }, [measure])
 
-  // Đưa chip đang chọn vào giữa hàng. Tự tính scrollLeft (không scrollIntoView) để không kéo
-  // cả bảng cài đặt cuộn dọc theo. Bảng cài đặt đóng chỉ là trượt ra ngoài, hàng vẫn có bề rộng
+  // Lần đầu hàng hiện ra: đặt thẳng vào chỗ. Đổi lựa chọn sau đó: trượt êm (giảm chuyển động thì
+  // nhảy thẳng). Bảng cài đặt đóng chỉ là trượt ra ngoài, hàng vẫn có bề rộng để tính
+  const mounted = useRef(false)
   useEffect(() => {
-    if (ref.current) centerSelected(ref.current, false)
+    if (ref.current) alignSelected(ref.current, mounted.current)
+    mounted.current = true
   }, [selectedKey])
 
   const mask =
@@ -91,13 +99,16 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
   )
 }
 
-// Đưa chip đang chọn vào giữa hàng. `onlyIfHidden`: để yên nếu chip đã nằm trọn ngoài vùng mờ
-function centerSelected(el: HTMLElement, onlyIfHidden: boolean) {
+// Cuộn chip đang chọn về sát mép trái. Tự tính scrollLeft (không scrollIntoView) để không kéo cả
+// bảng cài đặt cuộn dọc theo. Chip đầu hàng thì về 0; chip cuối hàng thì trình duyệt tự dừng ở
+// mức cuộn tối đa (chip nằm bên phải, vẫn hiện đủ)
+function alignSelected(el: HTMLElement, smooth: boolean) {
   const on = el.querySelector<HTMLElement>('[aria-checked="true"]')
   if (!on || !el.clientWidth) return
-  const start = on.offsetLeft - el.offsetLeft
-  if (onlyIfHidden && start >= el.scrollLeft + FADE && start + on.offsetWidth <= el.scrollLeft + el.clientWidth - FADE) return
-  el.scrollTo({left: Math.max(0, start - (el.clientWidth - on.offsetWidth) / 2)})
+  const left = Math.max(0, on.offsetLeft - el.offsetLeft - PEEK)
+  if (Math.abs(left - el.scrollLeft) < 1) return
+  const calm = !smooth || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  el.scrollTo({left, behavior: calm ? 'instant' : 'smooth'})
 }
 
 // Mũi tên ở mép hàng. Ẩn với trình đọc màn hình và phím Tab: bàn phím đã có mũi tên trong nhóm radio
