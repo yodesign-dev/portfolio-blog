@@ -2612,6 +2612,75 @@ export function ChillRoom({
 
   const [panelOpen, setPanelOpen] = useState(false)
   const [volumeOpen, setVolumeOpen] = useState(false)
+  const settingsBtnRef = useRef<HTMLButtonElement>(null)
+  // Cú tương tác gần nhất là phím (true) hay chuột / chạm (false): quyết định có dời focus khi
+  // mở / đóng bảng cài đặt không
+  const lastKeyRef = useRef(false)
+  useEffect(() => {
+    const onKey = () => (lastKeyRef.current = true)
+    const onPointer = () => (lastKeyRef.current = false)
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('pointerdown', onPointer, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('pointerdown', onPointer, true)
+    }
+  }, [])
+  // Focus theo bảng cài đặt (WCAG 2.4.3). Mở: vào tab đang chọn, để bàn phím / trình đọc màn hình
+  // biết bảng đã mở. Đóng: trả về nút Cài đặt nếu focus đang ở trong bảng (hoặc đã rơi về body).
+  // Chỉ làm khi dùng bàn phím, hoặc trên màn chạm / màn hẹp (dock chứa nút Cài đặt bị ẩn lúc bảng
+  // mở, focus sẽ rơi mất). Desktop dùng chuột thì để nguyên: Space vẫn phát / dừng như cũ
+  const panelWasOpen = useRef(false)
+  useEffect(() => {
+    const panel = document.getElementById('chill-panel')
+    const coarse = window.matchMedia('(pointer: coarse), (max-width: 800px)').matches
+    if (panelOpen) {
+      panelWasOpen.current = true
+      if (!lastKeyRef.current && !coarse) return
+      const raf = requestAnimationFrame(() => panel?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({preventScroll: true}))
+      return () => cancelAnimationFrame(raf)
+    }
+    if (!panelWasOpen.current) return
+    panelWasOpen.current = false
+    const active = document.activeElement
+    if (active && active !== document.body && !panel?.contains(active)) return
+    if (!lastKeyRef.current && !coarse) return
+    // Chờ 1 khung hình: trên màn hẹp dock (chứa nút) vừa hiện lại. Vào Ngắm cảnh thì nút đã ẩn,
+    // focus() không làm gì
+    const raf = requestAnimationFrame(() => settingsBtnRef.current?.focus({preventScroll: true}))
+    return () => cancelAnimationFrame(raf)
+  }, [panelOpen])
+  // Điện thoại (dưới 640px): sheet che gần hết màn → phần còn lại của quán thành inert (không Tab,
+  // trình đọc màn hình không đọc được), như chạm đã bị nút nền chặn. Trừ nút nền (data-panel-close)
+  // để chạm ra ngoài vẫn đóng được. Phần tử đã inert sẵn thì để nguyên, chỉ gỡ cái mình gắn
+  useEffect(() => {
+    const panel = document.getElementById('chill-panel')
+    const root = panel?.closest('.chill-root')
+    if (!panelOpen || !panel || !root) return
+    const mq = window.matchMedia('(max-width: 639.98px)')
+    let marked: Element[] = []
+    const release = () => {
+      marked.forEach((el) => el.removeAttribute('inert'))
+      marked = []
+    }
+    const apply = () => {
+      release()
+      if (!mq.matches) return
+      for (let node: Element = panel; node !== root && node.parentElement; node = node.parentElement) {
+        for (const sib of node.parentElement.children) {
+          if (sib === node || sib.hasAttribute('inert') || sib.hasAttribute('data-panel-close')) continue
+          sib.setAttribute('inert', '')
+          marked.push(sib)
+        }
+      }
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => {
+      mq.removeEventListener('change', apply)
+      release()
+    }
+  }, [panelOpen])
 
   // Chạm ra ngoài thì đóng thanh volume nổi (chỉ có trên điện thoại)
   useEffect(() => {
@@ -2989,7 +3058,10 @@ export function ChillRoom({
       const el = e.target as HTMLElement
       // Phím gửi thẳng vào document (không qua phần tử nào) thì không có closest
       if (typeof el.closest !== 'function') return
-      if (el.closest('input, select, textarea, [contenteditable="true"]')) return
+      // Đang gõ chữ thì bỏ qua mọi phím tắt. Riêng thanh trượt (âm nền, âm lượng) vẫn nhận Esc để
+      // đóng bảng — thanh trượt không dùng Esc vào việc gì
+      const slider = el instanceof HTMLInputElement && el.type === 'range'
+      if (el.closest('input, select, textarea, [contenteditable="true"]') && !(slider && e.key === 'Escape')) return
       switch (e.key) {
         case ' ':
           // Space trên nút đang focus đã tự bấm nút đó rồi
@@ -4402,7 +4474,7 @@ export function ChillRoom({
 
       {/* Bấm ra ngoài để đóng bảng cài đặt */}
       {panelOpen && (
-        <button type="button" aria-label={t.room.closeSettings} onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
+        <button type="button" data-panel-close aria-label={t.room.closeSettings} tabIndex={-1} onClick={() => setPanelOpen(false)} className="absolute inset-0 z-10 cursor-default" />
       )}
 
       {/* Dock nhạc nổi phía dưới. Đang mở Cài đặt trên màn hẹp hơn 800px (tablet dọc, cửa sổ hẹp) thì bảng
@@ -4624,6 +4696,7 @@ export function ChillRoom({
             {/* Người chưa mở cài đặt lần nào thấy vòng cam + gợi ý */}
             <div className="relative shrink-0">
               <button
+                ref={settingsBtnRef}
                 type="button"
                 onClick={() => {
                   setVolumeOpen(false)
