@@ -42,6 +42,8 @@ export type AnalyticsEvent =
   | {name: 'Chill Fav'; props: {action: 'add' | 'remove' | 'play' | 'repeat-on' | 'repeat-off'; from?: 'list' | 'bar'; count?: number}}
   | {name: 'Chill Pet Cat'; props?: undefined}
   | {name: 'Chill Cat Toy'; props?: undefined}
+  // Mèo trò chuyện (catTalkOpen): câu mèo thật sự nói ra — chào (id = loại chào), lời mời (id = món), lúc chơi
+  | {name: 'Chill Cat Talk'; props: {kind: 'greet' | 'guide' | 'play'; id: string}}
   | {name: 'Chill Donate Open'; props?: {from: string}}
   | {name: 'Chill Board Open'; props?: undefined}
   | {name: 'Chill Donate Thanks'; props: {method: string}}

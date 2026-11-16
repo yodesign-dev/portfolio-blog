@@ -84,6 +84,7 @@ const CHILL_QUERY = `{
   "focusLiteOpen": *[_id == "chillSettings"][0].focusLiteOpen,
   "tripOpen": *[_id == "chillSettings"][0].tripOpen,
   "tripPhins": *[_id == "chillSettings"][0].tripPhins,
+  "catTalkOpen": *[_id == "chillSettings"][0].catTalkOpen,
   "seasonsOpen": *[_id == "chillSettings"][0].seasonsOpen,
   "seasons": *[_type == "chillSeason" && enabled == true && defined(start) && defined(end) && defined(key.current)] | order(start asc) {
     "id": key.current,
@@ -141,6 +142,7 @@ type ChillContent = {
   focusLiteOpen?: boolean | null
   tripOpen?: boolean | null
   tripPhins?: number | null
+  catTalkOpen?: boolean | null
   seasonsOpen?: boolean | null
   seasons?: {id: string; pack?: string; start: string; end: string; layers?: Partial<SeasonLayers> | null; moments?: SeasonMoment[] | null}[] | null
   liveOpen?: boolean | null
@@ -303,7 +305,9 @@ export async function getChillContent(revalidate: number) {
   // Mèo đi chơi xa (cần Kệ sưu tầm). Máy dev: CHILL_DEV_TRIP=1
   const tripOn = content.tripOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_TRIP === '1')
   const tripPhins = Math.min(8, Math.max(1, Math.round(content.tripPhins ?? 3)))
+  // Mèo trò chuyện: chào khách, dẫn đường cho lời mời làm quen, biểu cảm pixel. Máy dev: CHILL_DEV_CATTALK=1
+  const catTalkOn = content.catTalkOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_CATTALK === '1')
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
-  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, brewDeskOn, welcomeObOn, compactOn, focusLiteOn, tripOn, tripPhins}
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, brewDeskOn, welcomeObOn, compactOn, focusLiteOn, tripOn, tripPhins, catTalkOn}
 }

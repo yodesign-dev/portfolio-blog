@@ -10,6 +10,10 @@
 // → vồ → ôm hoặc hụt. Giấu xuống dưới bậu rồi ló ra thì hăng hơn, vẫy loạn thì chán quay
 // lưng, vồ chừng 7 lần là hết sức, đi ngủ. Khung riêng ở hàng thứ hai của atlas: rình
 // (stalk-*), lắc mông (wiggle-*), vồ (pounce-*), ôm lông vũ (hug-*), dõi theo (head-*).
+//
+// Mèo trò chuyện (công tắc Studio catTalkOpen, `lively`): chào khách (greet), quay đầu về món
+// được mời làm quen (gaze), bong bóng biểu cảm pixel nhỏ trên đầu (emote), vuốt quá tay thì
+// quay lưng ngủ một lúc (sulk). Chỉ dùng lại khung có sẵn — quay đầu sang trái là lật khung.
 
 import type {Wand} from './wand'
 
@@ -59,16 +63,39 @@ const FRAMES = {
 
 type Frame = keyof typeof FRAMES
 
-type Step = [Frame, number] // khung, số giây
+type Step = [Frame, number, boolean?] // khung, số giây, lật ngược hướng nhìn (thân đứng yên)
 // Trạng thái lúc có cần câu ('off' = không chơi, mèo sống theo nhịp thường)
 type Hunt = 'off' | 'sleep' | 'watch' | 'sit' | 'stalk' | 'pounce' | 'catch' | 'miss' | 'ignore' | 'turn' | 'tired' | 'home'
 export type ToyEvent = 'bat' | 'catch' | 'miss' | 'tired'
+// Sự kiện báo ra ngoài: trò cần câu + 'sulk' (bị vuốt quá tay, quay lưng ngủ)
+export type CatEvent = ToyEvent | 'sulk'
+// Bong bóng biểu cảm pixel trên đầu mèo
+export type Emote = '!' | '?' | '…' | 'z' | '♥' | '♪'
+export type GreetStyle = 'wave' | 'hearts' | 'stretch' | 'peek'
 // Khung ôm: lông vũ kẹp giữa hai chân trước, chỗ này (px gốc từ chân sau, cao trên bậu)
 const HUG_AT: Partial<Record<Frame, [number, number]>> = {'hug-0': [25, 27], 'hug-1': [25, 75]}
 // Thân mèo nằm dài chừng này (px gốc): quay đầu thì chân sau đổi sang mút bên kia
 const BODY = 76
 // Sức chơi: mỗi cú vồ / ôm / khều tốn một ít, xuống tới mức này thì mèo đi ngủ
 const TIRED_AT = 18
+// Vuốt quá tay: bấy nhiêu lần chạm trong SULK_WINDOW giây → quay lưng ngủ SULK_FOR giây
+const SULK_TAPS = 6
+const SULK_WINDOW = 30
+const SULK_FOR = 20
+// Biểu cảm: sống bấy lâu (giây), 2 cái cách nhau ít nhất EMOTE_GAP, cùng loại thì EMOTE_SAME
+const EMOTE_LIFE = 1.6
+const EMOTE_GAP = 3
+const EMOTE_SAME = 8
+// Hình biểu cảm, mỗi ô 2px gốc (cùng cỡ ô với tim)
+const EMOTE_ART: Record<Emote, string[]> = {
+  '!': ['#', '#', '#', '.', '#'],
+  '?': ['###', '..#', '.##', '...', '.#.'],
+  '…': ['.....', '.....', '#.#.#', '.....', '.....'],
+  z: ['###', '..#', '.#.', '#..', '###'],
+  '♥': ['##.##', '#####', '#####', '.###.', '..#..'],
+  '♪': ['..##', '..#.', '..#.', '###.', '##..'],
+}
+const EMOTE_INK: Partial<Record<Emote, string>> = {'!': '226,104,60', '♥': '240,90,110'}
 
 // Chân sau của mèo (px gốc 640×360) — mỗi theme đặt mèo một chỗ (xem themes.ts)
 type Pt = {x: number; y: number}
@@ -170,10 +197,13 @@ type Heart = {x: number; y: number; age: number; drift: number}
 type CatNote = {x: number; y: number; vx: number; vy: number; age: number; hit: boolean}
 type Spark = {x: number; y: number; age: number; big: boolean}
 type Jump = {x0: number; x1: number; t: number; dur: number; hgt: number; land: () => void}
+type EmoteFx = {kind: Emote; age: number}
 
 export class Cat {
   private queue: Step[] = []
   private frame: Frame = 'sleep'
+  // Bước hiện tại lật ngược hướng nhìn (quay đầu sang phía kia mà thân không dời chỗ)
+  private mirror = false
   private hold = 0
   private next = 5
   private breath = 0
@@ -210,7 +240,14 @@ export class Cat {
   private cool = 0
   private wiggle = 1
   private batDone = false
-  onToy?: (e: ToyEvent) => void
+  // Mèo trò chuyện (catTalkOpen): biểu cảm, giận dỗi khi vuốt quá tay
+  lively = false
+  private emotes: EmoteFx[] = []
+  private emoteAt = -99
+  private emoteLast: Partial<Record<Emote, number>> = {}
+  private tapTimes: number[] = []
+  private sulkUntil = 0
+  onToy?: (e: CatEvent) => void
 
   setRear(p: Pt, room: [number, number] = [p.x - 40, p.x + BODY + 40]) {
     this.rear = p
@@ -227,6 +264,9 @@ export class Cat {
     this.hearts = []
     this.notes = []
     this.sparks = []
+    this.emotes = []
+    this.mirror = false
+    this.sulkUntil = 0
   }
 
   // Điểm cách chân sau `dx` px về phía mèo đang nhìn
@@ -260,6 +300,8 @@ export class Cat {
     this.updateNotes(dt)
     for (const s of this.sparks) s.age += dt
     this.sparks = this.sparks.filter((s) => s.age < 0.9)
+    for (const e of this.emotes) e.age += dt
+    this.emotes = this.emotes.filter((e) => e.age < EMOTE_LIFE)
 
     if (this.toy) this.track(dt)
     else if (this.hunt === 'off') this.energy = Math.min(100, this.energy + dt * 5)
@@ -289,8 +331,10 @@ export class Cat {
     const step = this.queue.shift()
     if (step) {
       ;[this.frame, this.hold] = step
+      this.mirror = step[2] === true
       return
     }
+    this.mirror = false
     if (this.then) {
       const then = this.then
       this.then = null
@@ -328,6 +372,105 @@ export class Cat {
     this.hold = 0
   }
 
+  // Đang rảnh để diễn chào / quay đầu (không chơi cần câu, không gừ gừ, không giận dỗi)
+  private get free() {
+    return this.hunt === 'off' && !this.purring && !this.jump && this.breath >= this.sulkUntil
+  }
+
+  // Chào khách lúc vào quán: hé mắt → ngẩng nhìn khách (lúc bong bóng hiện) → ngồi dậy vẫy chân
+  // → nằm lại. `stretch` = lâu không gặp, vươn vai trước · `hearts` = lên cấp, tim bay
+  // `peek` = quay lại trong ngày, chỉ ngẩng lên nhìn
+  greet(style: GreetStyle) {
+    if (!this.free) return false
+    const wave: Step[] = [
+      ['paw-0', 0.4],
+      ['paw-4', 0.5],
+      ['paw-1', 0.2],
+      ['paw-4', 0.5],
+      ['paw-5', 0.6],
+      ['look', 0.6],
+    ]
+    const look: Step[] = [
+      ['stir', 0.3],
+      ['head-1', 1.6],
+    ]
+    const stretch: Step[] = [
+      ['stir', 0.4],
+      ['stretch-0', 0.5],
+      ['stretch-1', 0.8],
+      ['stretch-2', 1.1],
+      ['stretch-1', 0.3],
+      ['stretch-3', 0.6],
+    ]
+    this.action = 'look'
+    this.then = null
+    this.hold = 0
+    this.queue = style === 'peek' ? [...look, ['look', 0.8]] : style === 'stretch' ? [...stretch, ['head-1', 1.4], ...wave] : [...look, ...wave]
+    this.next = 8
+    if (style === 'hearts') for (let i = 0; i < 3; i++) this.addHeart(i, -1.9 - i * 0.18)
+    return true
+  }
+
+  // Lời mời làm quen: nhìn khách lúc nói → quay đầu về phía món (`x` px gốc; null = món nằm ngoài
+  // cảnh như nút trên thanh) → nhìn lại khách. Món ở sau lưng thì lật khung. Không kèm biểu cảm:
+  // bong bóng lời nói đã nằm ngay trên đầu
+  gaze(x: number | null) {
+    if (!this.free) return false
+    const steps: Step[] = [
+      ['look', 0.35],
+      ['head-1', 1.8],
+    ]
+    if (x !== null) {
+      const behind = (x - this.at(60)) * this.dir < 0
+      steps.push(['head-0', 1.6, behind], ['head-1', 0.8])
+    }
+    steps.push(['look', 0.6])
+    this.action = 'look'
+    this.then = null
+    this.hold = 0
+    this.queue = steps
+    this.next = 8
+    return true
+  }
+
+  // Bong bóng biểu cảm trên đầu. `force` bỏ qua giới hạn nhịp (dùng cho phản hồi trực tiếp)
+  emote(kind: Emote, force = false) {
+    if (!this.lively) return
+    const t = this.breath
+    if (!force && (t - this.emoteAt < EMOTE_GAP || t - (this.emoteLast[kind] ?? -99) < EMOTE_SAME)) return
+    this.emoteAt = t
+    this.emoteLast[kind] = t
+    this.emotes = [{kind, age: 0}]
+  }
+
+  // Cảnh tạm dừng (giảm chuyển động): đặt thẳng 1 tư thế tĩnh + biểu cảm đứng yên, null = về ngủ
+  still(frame: Frame | null, emote?: Emote) {
+    this.queue = []
+    this.then = null
+    this.mirror = false
+    this.action = frame ? 'look' : null
+    this.frame = frame ?? 'sleep'
+    this.hold = frame ? 999 : 0
+    this.emotes = frame && emote && this.lively ? [{kind: emote, age: 0.3}] : []
+    if (!frame) this.hearts = []
+  }
+
+  // Vuốt quá tay → "…", quay lưng ngủ một lúc. Chạm lúc này chỉ được vẫy đuôi
+  private sulk() {
+    this.sulkUntil = this.breath + SULK_FOR
+    this.tapTimes = []
+    this.action = 'stir'
+    this.emote('…', true)
+    this.hold = 0
+    this.queue = [['look', 0.7]]
+    this.then = () => {
+      this.emote('z', true)
+      this.queue = [['sleep', Math.max(0.5, this.sulkUntil - this.breath), true]]
+      this.next = 4
+    }
+    this.onToy?.('sulk')
+  }
+
   // Chuột lướt qua lúc đang ngủ → hé mắt nhìn (gợi ý là bấm vào được)
   notice() {
     if (this.action || this.hunt !== 'off') return
@@ -342,7 +485,25 @@ export class Cat {
   // Người xem bấm vào mèo: mỗi lần một phản ứng — ngẩng lên nhìn, rửa mặt làm dáng, vươn vai
   // ngáp, hoặc (đang phát nhạc) ngồi dậy vờn nốt nhạc. Chọn theo không khí, không lặp lại
   // phản ứng vừa diễn. Tim bay lên ở mọi phản ứng
-  pet(): 'meow' | 'purr' {
+  pet(): 'meow' | 'purr' | null {
+    if (this.lively && this.hunt === 'off') {
+      const t = this.breath
+      // Đang dỗi: chỉ phẩy đuôi (vẫn quay lưng), không tim, không kêu
+      if (t < this.sulkUntil) {
+        this.queue = [
+          ['tail', 0.4, true],
+          ['sleep', Math.max(0.5, this.sulkUntil - t - 0.4), true],
+        ]
+        this.hold = 0
+        this.then = null
+        return null
+      }
+      this.tapTimes = [...this.tapTimes.filter((x) => t - x < SULK_WINDOW), t]
+      if (this.tapTimes.length >= SULK_TAPS) {
+        this.sulk()
+        return null
+      }
+    }
     this.pets++
     const {music, night} = this.mood
     const options = TAP_REACTIONS.map(([a, quiet, withMusic, atNight]) => [a, a === this.lastTap ? 0 : (music ? withMusic : quiet) * (night ? atNight : 1)] as const)
@@ -378,7 +539,7 @@ export class Cat {
 
   // Nhấn giữ vào mèo → gừ gừ (ChillRoom phát tiếng), thả ra thì ngẩng lên nhìn
   setPurring(on: boolean) {
-    if (on === this.purring || (on && this.hunt !== 'off')) return
+    if (on === this.purring || (on && (this.hunt !== 'off' || this.breath < this.sulkUntil))) return
     this.purring = on
     this.purrT = 0
     this.hold = 0
@@ -411,6 +572,8 @@ export class Cat {
       this.toy = toy
       this.purring = false
       this.action = null
+      this.mirror = false
+      this.sulkUntil = 0
       if (this.hunt === 'off') {
         this.queue = []
         this.hold = 0
@@ -426,6 +589,7 @@ export class Cat {
   }
 
   private run(steps: Step[], then?: () => void) {
+    this.mirror = false
     this.queue = steps
     this.hold = 0
     this.then = then ?? null
@@ -456,9 +620,16 @@ export class Cat {
     const awake = this.hunt === 'watch' || this.hunt === 'sit' || this.hunt === 'stalk'
     if (awake && !toy.hidden && toy.speed > 280 && Math.hypot(toy.x - h.x, toy.y - h.y) < 200) this.bored += dt
     else this.bored = Math.max(0, this.bored - dt * 0.8)
-    if (toy.hidden) this.hidT += dt
-    else {
-      if (this.hidT > 0.6 && awake) this.excite = Math.min(1, this.excite + 0.5)
+    if (toy.hidden) {
+      // Lông vũ trốn đi → "?"
+      if (awake && this.hidT <= 0.6 && this.hidT + dt > 0.6) this.emote('?')
+      this.hidT += dt
+    } else {
+      if (this.hidT > 0.6 && awake) {
+        this.excite = Math.min(1, this.excite + 0.5)
+        // Ló ra → "!" (hăng lên)
+        this.emote('!', true)
+      }
       this.hidT = 0
     }
     this.excite = Math.max(0, this.excite - dt * 0.04)
@@ -682,6 +853,7 @@ export class Cat {
     if (this.toy) this.toy.pin = null
     this.toy = null
     this.hunt = 'tired'
+    this.emote('z', true)
     this.onToy?.('tired')
     this.run(
       [
@@ -751,19 +923,21 @@ export class Cat {
     const h = sh / ATLAS_SCALE
     // Gừ gừ: cả thân rung nửa px qua lại
     const shake = this.purring ? (Math.floor(this.purrT * 24) % 2 ? 0.5 : -0.5) : 0
-    const rx = this.x + shake
+    // Lật hướng nhìn mà thân đứng yên: vẽ như đã quay đầu (chân sau sang mút bên kia)
+    const dir = this.mirror ? (this.dir === 1 ? -1 : 1) : this.dir
+    const rx = (this.mirror ? this.x + this.dir * BODY : this.x) + shake
     const sitting = this.frame.startsWith('paw') || this.frame === 'stretch-3'
     // Bóng mềm dưới thân (nhỏ lại khi đang nhảy)
     ctx.fillStyle = 'rgba(40,20,10,0.22)'
     const shrink = Math.max(0.3, 1 - this.lift / 40)
     const bw = (sitting ? w - 16 : BODY) * shrink
-    const mid = sitting ? rx - this.dir * (ax / ATLAS_SCALE) + (this.dir * w) / 2 : this.at(BODY / 2 - 2)
+    const mid = sitting ? rx - dir * (ax / ATLAS_SCALE) + (dir * w) / 2 : this.at(BODY / 2 - 2)
     ctx.fillRect(mid - bw / 2, this.rear.y - 2, bw, 2)
     ctx.fillRect(mid - bw / 2 + 6, this.rear.y, Math.max(0, bw - 12), 2)
     // Thở: lưng phồng lên 1px rồi xẹp xuống (~3.5s/nhịp) khi đang nằm ngủ
     const inhale = this.frame === 'sleep' && this.breath % 3.5 < 1.6 ? 0.5 : 0
     const y = this.rear.y - h - inhale - this.lift
-    if (this.dir === 1) {
+    if (dir === 1) {
       ctx.drawImage(atlas, sx, sy, sw, sh, rx - ax / ATLAS_SCALE, y, w, h + inhale)
     } else {
       // Quay sang trái: lật khung quanh chân sau
@@ -776,6 +950,37 @@ export class Cat {
     this.drawHearts(ctx)
     this.drawNotes(ctx)
     this.drawSparks(ctx)
+    this.drawEmotes(ctx, y, rx - dir * (ax / ATLAS_SCALE), w, dir)
+  }
+
+  // Bong bóng biểu cảm: nền kem viền nâu, hình ô 2px, nổi lên trên đầu rồi mờ đi.
+  // (top = mép trên khung đang vẽ; left / w / dir = vị trí khung để đặt ngay trên đầu)
+  private drawEmotes(ctx: CanvasRenderingContext2D, top: number, left: number, w: number, dir: 1 | -1) {
+    for (const e of this.emotes) {
+      const art = EMOTE_ART[e.kind]
+      const cols = Math.max(3, art[0].length)
+      const k = Math.min(1, e.age * 6)
+      const a = k * Math.max(0, Math.min(1, (EMOTE_LIFE - e.age) / 0.35))
+      if (a <= 0) continue
+      const bw = (cols + 2) * 2 + 2
+      const bh = (art.length + 2) * 2 + 2
+      // Đầu mèo ở phía mặt quay về, cách mép khung chừng 1/4 bề rộng
+      const headX = dir === 1 ? left + w * 0.72 : left - w * 0.72
+      const x = Math.round(headX - bw / 2)
+      const y = Math.round(top - bh - 3 - (1 - k) * 3)
+      ctx.fillStyle = `rgba(42,26,16,${a})`
+      ctx.fillRect(x + 1, y, bw - 2, bh)
+      ctx.fillRect(x, y + 1, bw, bh - 2)
+      ctx.fillRect(x + 3, y + bh, 2, 2)
+      ctx.fillStyle = `rgba(251,241,210,${a})`
+      ctx.fillRect(x + 1, y + 1, bw - 2, bh - 2)
+      const ink = EMOTE_INK[e.kind] ?? '42,26,16'
+      ctx.fillStyle = `rgba(${ink},${a})`
+      const ox = x + 3 + Math.floor((cols - art[0].length) / 2) * 2
+      art.forEach((row, j) => {
+        for (let i = 0; i < row.length; i++) if (row[i] === '#') ctx.fillRect(ox + i * 2, y + 3 + j * 2, 2, 2)
+      })
+    }
   }
 
   // Nốt móc đơn (ô 2px, cùng dáng nốt bay ra từ tai nghe), khều trúng thì ngả màu hổ phách

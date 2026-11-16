@@ -44,6 +44,7 @@ type Value = {
   focusLiteOpen?: boolean
   tripOpen?: boolean
   tripPhins?: number
+  catTalkOpen?: boolean
   seasonsOpen?: boolean
   liveOpen?: boolean
   questOpen?: boolean
@@ -67,7 +68,7 @@ type Value = {
   diaryQuoteBy?: string
 }
 
-type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'compactOpen' | 'focusLiteOpen' | 'tripOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'favOpen' | 'seasonsOpen' | 'liveOpen'
+type FeatureKey = 'brewDeskOpen' | 'welcomeObOpen' | 'compactOpen' | 'focusLiteOpen' | 'tripOpen' | 'catTalkOpen' | 'chatOpen' | 'groupTableOpen' | 'diaryOpen' | 'slipNewOpen' | 'shelfOpen' | 'playCountsOpen' | 'questOpen' | 'catToyOpen' | 'seatPickOpen' | 'streetMotionOpen' | 'stringLightsOpen' | 'sketchOpen' | 'facadeOpen' | 'highlandOpen' | 'marketOpen' | 'miniPlayerOpen' | 'sleepTimerOpen' | 'favOpen' | 'seasonsOpen' | 'liveOpen'
 
 type Feature = {key: FeatureKey; icon: string; title: string; short: string; desc: string; delay: string}
 
@@ -105,6 +106,7 @@ const FEATURE_GROUPS: {title: string; items: Feature[]}[] = [
     items: [
       {key: 'shelfOpen', icon: '🏺', title: 'Kệ sưu tầm', short: 'Xong phin, mèo mang ra một món', desc: 'Xong phin, mèo mang ra một món cho kệ. 20 món, chỉ lưu trên máy khách.', delay: '1 phút'},
       {key: 'tripOpen', icon: '🎒', title: 'Mèo đi chơi xa', short: 'Đủ phin trong ngày, tiễn mèo đi, mai mèo về với bưu thiếp', desc: 'Pha đủ số phin bên dưới trong một ngày thì tổng kết phin mời khách tiễn mèo đi một điểm đến (ưu tiên nơi khách chưa ghé). Bậu cửa còn cái gối và mẩu giấy, cần câu cất đi, phin không có món kệ. Từ 5:00 sáng hôm sau (đi ít nhất 8 tiếng) mèo về cạnh ba lô và bưu thiếp: ảnh cảnh, lời mèo kể, nút ghé nơi đó, món kệ của nơi đó nếu chưa có. Sổ bưu thiếp nằm cuối Kệ sưu tầm. Cần bật Kệ sưu tầm. Thử trước bằng ?trip=1, cho mèo về ngay bằng ?trip=back.', delay: '1 phút'},
+      {key: 'catTalkOpen', icon: '🐱', title: 'Mèo trò chuyện', short: 'Mèo chào khách, dẫn đường cho lời mời làm quen, biểu cảm pixel', desc: 'Mèo chào khách khi vào quán (cả khách lần đầu), câu chào khách quen theo ngữ cảnh (lên Khách quen / Khách ruột / Người nhà, thẻ đủ 10 dấu, lâu không ghé, quay lại trong ngày). Lời mời làm quen (phin, ly, sổ, kệ…) do mèo nói rồi quay đầu về món đó. Bong bóng biểu cảm nhỏ ! ? … z ♥ khi vuốt và khi chơi cần câu; vuốt quá tay thì mèo quay lưng ngủ một lúc. Mỗi lần ghé tối đa 5 câu tự nói, im hẳn lúc Ngắm cảnh và lúc chạy phin. Tắt là về như cũ. Thử trước bằng ?cattalk=1, xem từng câu chào bằng ?catgreet=new|lv3|lv7|lv30|card|gap|same.', delay: '1 phút'},
       {key: 'catToyOpen', icon: '🪶', title: 'Trêu mèo', short: 'Cần câu lông vũ cạnh mèo', desc: 'Cần câu lông vũ dựng cạnh mèo. Khách cầm lên đung đưa, mèo rình, lắc mông, vồ, khều. Chơi chừng 7 lần vồ là mèo đi ngủ.', delay: '1 phút'},
       {key: 'playCountsOpen', icon: '🎧', title: 'Lượt nghe', short: 'Từ 50 lượt mới hiện số', desc: 'Đếm lượt nghe từng bài (nghe đủ 30 giây, 1 máy 1 lượt mỗi ngày). Bài từ 50 lượt mới hiện số trong danh sách.', delay: '5 phút'},
     ],

@@ -40,6 +40,8 @@ import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
 import {InAppHint} from './InAppHint'
+import {GREET_WAIT_MS, canSpeak, emptyLog, forcedGreeting, greetStyle, guideWait, loadLastSeen, logSpoken, pickGreeting, saveLastSeen, speakMs, type GreetId, type VoiceKind, type VoiceLog} from './cat-voice'
+import type {Emote} from './cat'
 import {UpdateBanner} from './UpdateBanner'
 import {LiveBadge} from './LiveBadge'
 import {LAYOUT_ALL, LAYOUT_GROUPS, LAYOUT_MIN, LAYOUT_NEW, autoOpen, loadLayout, saveLayout, setAll, setGroup, type Layout, type LayoutGroup, type LayoutState} from './layout'
@@ -263,6 +265,7 @@ export function ChillRoom({
   focusLiteOn = false,
   tripOn = false,
   tripPhins = TRIP_PHINS_DEFAULT,
+  catTalkOn = false,
   seasons = [],
   lives = [],
 }: {
@@ -319,6 +322,9 @@ export function ChillRoom({
   // ghi đè, ?trip=back cho mèo về ngay để thử. tripPhins = số phin trong ngày để mèo muốn đi
   tripOn?: boolean
   tripPhins?: number
+  // Mèo trò chuyện (Studio "Chill · Cài đặt", cat-voice.ts), mặc định tắt. ?cattalk=1 / ?cattalk=0
+  // ghi đè, ?catgreet=new|lv3|lv7|lv30|card|gap|same để xem từng câu chào
+  catTalkOn?: boolean
   // Lịch mùa (Noel…) từ Studio, máy khách tự so giờ, xem season.ts
   seasons?: Season[]
   // Lịch live YouTube từ Studio, máy khách tự so giờ, xem live.ts
@@ -572,9 +578,18 @@ export function ChillRoom({
   const [returning, setReturning] = useState<boolean | null>(null)
   const [catPetted, setCatPetted] = useState(true)
   // Bong bóng lời nói của mèo: chờ hiện (khung donate đang che mèo trên điện thoại) → hiện → mờ dần
-  const [catSay, setCatSay] = useState<{text: string; show: boolean} | null>(null)
+  const [catSay, setCatSay] = useState<{text: string; show: boolean; kind?: VoiceKind} | null>(null)
   const catSayQueued = useRef<string | null>(null)
   const catSayTimers = useRef<number[]>([])
+  // Mèo trò chuyện (cat-voice.ts): công tắc, sổ nhịp độ của lần ghé này, câu cho trình đọc màn
+  // hình (1 vùng đọc riêng, bong bóng nhìn thấy thì aria-hidden), câu chào đang chờ
+  const [catTalkFlag, setCatTalkFlag] = useState(false)
+  const catTalkRef = useRef(false)
+  const catVoice = useRef<VoiceLog>(emptyLog())
+  const [catAnnounce, setCatAnnounce] = useState('')
+  const catHover = useRef(false)
+  const [catGreet, setCatGreet] = useState<{id: GreetId; streak: number; at: number} | null>(null)
+  const [inAppOn, setInAppOn] = useState(false)
 
   const track = tracks[index]
   // Bài của tôi (favOpen): bài đã thả tim, tab "Của tôi" đang mở, phát lặp 1 bài.
@@ -1339,6 +1354,13 @@ export function ChillRoom({
     }, BANNER_DELAY)
     return () => window.clearTimeout(timer)
   }, [entered, bannerUpdate])
+  // Mèo trò chuyện: tới giờ hiện banner mà mèo đang chào khách → banner đợi mèo nói xong. Đã hiện
+  // rồi thì thôi, không ẩn đi hiện lại
+  const [bannerLive, setBannerLive] = useState(false)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chốt 1 lần khi banner được hiện
+    if (bannerOn && !bannerLive && catSay?.kind !== 'greet') setBannerLive(true)
+  }, [bannerOn, bannerLive, catSay])
   const closeBanner = (act: 'close' | 'more') => {
     setBannerOn(false)
     trackEvent({name: 'Chill Update Banner', props: {act, action: bannerUpdate?.action ?? ''}})
@@ -1442,7 +1464,8 @@ export function ChillRoom({
 
   // Chưa cầm lần nào: nhãn tự hiện (cả điện thoại, nơi không rê chuột được), mèo liếc sang.
   // Đang chạy phin thì chỉ còn sao lấp lánh, khỏi làm khách xao nhãng
-  const toyHintOn = entered && !toySeen && toyAvailable && !toyOut && !toyRest && !focusLabel
+  // Mèo trò chuyện: mèo đang nói thì nhãn đợi mèo nói xong (không 2 lời cùng lúc)
+  const toyHintOn = entered && !toySeen && toyAvailable && !toyOut && !toyRest && !focusLabel && !(catTalkFlag && catSay)
   useEffect(() => {
     if (!toyHintOn) return
     const show = window.setTimeout(() => {
@@ -1457,6 +1480,8 @@ export function ChillRoom({
     }
   }, [toyHintOn])
 
+  // Mèo trò chuyện: câu lúc chơi (đặt ở dưới, cần state khai báo sau) — gọi qua ref
+  const catEventRef = useRef<(e: string) => void>(() => {})
   const toyRestTimer = useRef(0)
   const toyTipTimer = useRef(0)
   useEffect(() => () => window.clearTimeout(toyTipTimer.current), [])
@@ -1464,6 +1489,7 @@ export function ChillRoom({
     const scene = sceneRef.current
     if (!scene) return
     scene.onCatToy = (e) => {
+      catEventRef.current(e)
       if (e === 'catch') audioRef.current?.catSound('meow')
       if (e !== 'tired') return
       // Mèo hết sức nhả cần câu: cần câu về chỗ dựng, mèo ngủ bù 20 giây mới chơi tiếp
@@ -1525,14 +1551,33 @@ export function ChillRoom({
     setToyIn(toyOut ? null : theme)
   }
 
-  const sayCat = useCallback((text: string) => {
-    catSayTimers.current.forEach(clearTimeout)
-    setCatSay({text, show: true})
-    catSayTimers.current = [
-      window.setTimeout(() => setCatSay((c) => (c ? {...c, show: false} : c)), CAT_SAY_MS),
-      window.setTimeout(() => setCatSay(null), CAT_SAY_MS + 600),
-    ]
-  }, [])
+  // `kind` cho luật nhịp độ (cat-voice.ts), `quiet` = không đọc lên trình đọc màn hình (câu lúc
+  // chơi). Mèo trò chuyện bật: bong bóng nằm lâu theo độ dài câu, rê chuột / focus vào mèo thì giữ lại
+  const sayCat = useCallback(
+    (text: string, {kind = 'reply', quiet = false}: {kind?: VoiceKind; quiet?: boolean} = {}) => {
+      catSayTimers.current.forEach(clearTimeout)
+      setCatSay({text, show: true, kind})
+      setCatAnnounce(quiet ? '' : `${t.room.cat}: ${text}`)
+      catVoice.current = logSpoken(catVoice.current, kind, Date.now())
+      const talk = catTalkRef.current
+      const hide = () => {
+        if (talk && catHover.current) {
+          catSayTimers.current = [window.setTimeout(hide, 800)]
+          return
+        }
+        setCatSay((c) => (c ? {...c, show: false} : c))
+        catSayTimers.current = [
+          window.setTimeout(() => {
+            setCatSay(null)
+            setCatAnnounce('')
+            catVoice.current = {...catVoice.current, lastEnd: Date.now()}
+          }, 600),
+        ]
+      }
+      catSayTimers.current = [window.setTimeout(hide, talk ? speakMs(text) : CAT_SAY_MS)]
+    },
+    [t],
+  )
   useEffect(() => () => catSayTimers.current.forEach(clearTimeout), [])
 
   // Người xem báo đã mời cafe → mèo ngẩng lên, kêu, tim bay + nói cảm ơn.
@@ -1565,13 +1610,21 @@ export function ChillRoom({
     const before = loadRegular()
     const {regular: next, fresh} = stampToday(before)
     setRegular(next)
+    // Mèo trò chuyện: chọn câu chào theo ngữ cảnh (cả khách lần đầu), nói khi quán yên (xem dưới)
+    if (catTalkWanted(catTalkOn)) {
+      const id = forcedGreeting(window.location.search) ?? pickGreeting(before, new Date(), streakOf(next), loadLastSeen())
+      saveLastSeen()
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 1 lần mỗi lần ghé, đọc localStorage
+      if (id) setCatGreet({id, streak: Math.max(2, streakOf(next)), at: Date.now()})
+      return
+    }
     if (!fresh || before.total === 0) return
     const id = window.setTimeout(() => {
       sceneRef.current?.noticeCat()
       sayCat(t.room.catBack(streakOf(next)))
     }, CAT_GREET_DELAY_MS)
     return () => window.clearTimeout(id)
-  }, [entered, loaded, sayCat, t])
+  }, [entered, loaded, sayCat, t, catTalkOn])
 
   // ---------- Kệ sưu tầm ----------
 
@@ -2742,6 +2795,12 @@ export function ChillRoom({
   // Lời mời vừa hiện thì giữ giao diện lại 1 lúc (khách ngồi yên thì giao diện tự ẩn sau 3,5s,
   // lời mời sẽ không ai thấy)
   const [guideHold, setGuideHold] = useState(false)
+  // Mèo đang nói lời mời → nhãn ở món chờ mèo nói xong mới hiện
+  const [guideMuted, setGuideMuted] = useState(false)
+  const guideMuteTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(guideMuteTimer.current), [])
+  // Mèo nói lời mời của món `step` (trả về false nếu mèo không nói được → nhãn hiện như cũ)
+  const voiceGuideRef = useRef<(step: GuideStep) => boolean>(() => false)
   const [diaryAvailable, setDiaryAvailable] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   // Quán gọn: Thực đơn chia 3 tab
@@ -2781,21 +2840,25 @@ export function ChillRoom({
   const activeGuide = guide && guideCan[guide.step] && (guide.forced || !guideDone[guide.step]) ? guide.step : null
   // Cửa sổ nổi đang mở → khách không nhìn tab quán, gợi ý chờ tới khi đưa quán về
   const guideBusy = panelOpen || volumeOpen || otherOverlay || focusOpen || drinkOpen || menuOpen || miniOpen
+  // Mèo trò chuyện: mèo đang nói / câu chào còn chờ → lời mời đợi, rồi cách câu trước ≥ 20 s
+  const guideWaitCat = catTalkFlag && (catSay !== null || catGreet !== null)
   useEffect(() => {
     // Đang chạy 1 phin → khách đang tập trung, không mời thêm gì
-    if (!entered || zen || activeGuide || !guideNext || focusLabel || miniOpen) return
+    if (!entered || zen || activeGuide || !guideNext || focusLabel || miniOpen || guideWaitCat) return
+    const base = guideShown.length ? GUIDE_GAP_MS : GUIDE_FIRST_MS
     const id = window.setTimeout(
       () => {
         guideLeft.current = GUIDE_SHOW_MS
         setGuideShown((shown) => [...shown, guideNext])
         setGuide({step: guideNext, forced: false})
-        setGuideHold(true)
+        // Mèo nói lời mời trước, nhãn ở món hiện sau khi mèo nói xong (không 2 dòng chữ cùng lúc)
+        if (!voiceGuideRef.current(guideNext)) setGuideHold(true)
         trackEvent({name: 'Chill Guide', props: {action: 'hint', step: guideNext}})
       },
-      guideShown.length ? GUIDE_GAP_MS : GUIDE_FIRST_MS,
+      catTalkRef.current ? Math.max(base, guideWait(catVoice.current, Date.now())) : base,
     )
     return () => window.clearTimeout(id)
-  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel, miniOpen])
+  }, [entered, zen, activeGuide, guideNext, guideShown.length, focusLabel, miniOpen, guideWaitCat])
   useEffect(() => {
     if (!guideHold) return
     const id = window.setTimeout(() => setGuideHold(false), GUIDE_HOLD_MS)
@@ -2815,6 +2878,7 @@ export function ChillRoom({
   }, [activeGuide, panTo])
   const pointAt = (step: GuideStep) => {
     setMenuOpen(false)
+    setGuideMuted(false)
     guideLeft.current = GUIDE_POINT_MS
     setGuide({step, forced: true})
     setGuideHold(true)
@@ -2833,8 +2897,122 @@ export function ChillRoom({
   }, [menuOpen])
   const [tableAvailable, setTableAvailable] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
-  const hintTip = activeGuide === 'settings'
+  const hintTip = activeGuide === 'settings' && !guideMuted
   const settingsGlow = guideShown.includes('settings') && !settingsSeen
+
+  // ---------- Mèo trò chuyện (cat-voice.ts, công tắc catTalkOpen) ----------
+
+  useEffect(() => {
+    const on = catTalkWanted(catTalkOn)
+    catTalkRef.current = on
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setCatTalkFlag(on)
+    sceneRef.current?.setCatTalk(on)
+  }, [catTalkOn])
+
+  // Lần cuối khách còn ở quán → câu "Lại ghé nữa hả?" khi quay lại trong ngày sau ≥ 2 giờ
+  useEffect(() => {
+    if (!catTalkFlag) return
+    const mark = () => saveLastSeen()
+    const onVis = () => document.visibilityState === 'hidden' && mark()
+    window.addEventListener('pagehide', mark)
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.removeEventListener('pagehide', mark)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [catTalkFlag])
+
+  // Tắt hẳn: Ngắm cảnh, đang chạy phin / nghỉ giữa phin, cửa sổ nổi, bàn nhóm, mèo đi vắng.
+  // Nhường chỗ (chờ): bảng đang mở, lời mời mở trình duyệt, gợi ý cần câu / kéo cảnh, bong bóng
+  // của khách khác, nhắc đi ngủ, thông báo cập nhật, đang cầm cần câu
+  const catQuiet = catTalkFlag && entered && !zen && focusLabel === null && !miniOpen && !groupView && catTrip !== 'away'
+  const catYield = guideBusy || inAppOn || toyHint || panHint || !!latestBubble || sleepNudge || updatesToast || toyOut
+
+  // Mèo diễn kèm câu nói. Cảnh tạm dừng (giảm chuyển động / nút dừng cảnh): 1 tư thế tĩnh nhìn
+  // khách + biểu cảm đứng yên trong lúc nói, xong thì nằm lại
+  const catStillTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(catStillTimer.current), [])
+  const catAct = useCallback((act: (scene: ChillScene) => unknown, ms: number, emote?: Emote) => {
+    const scene = sceneRef.current
+    if (!scene) return
+    if (!scenePausedRef.current) {
+      act(scene)
+      return
+    }
+    scene.catStill(true, emote)
+    scene.frame(performance.now())
+    window.clearTimeout(catStillTimer.current)
+    catStillTimer.current = window.setTimeout(() => {
+      scene.catStill(false)
+      scene.frame(performance.now())
+    }, ms)
+  }, [])
+
+  // Câu chào: chờ quán yên rồi nói (CAT_GREET_DELAY_MS sau khi yên), chờ quá 60 s thì thôi.
+  // Mèo đi chơi về thì câu "có bưu thiếp cho bạn" thay cho câu chào
+  useEffect(() => {
+    if (!catGreet) return
+    const left = catGreet.at + GREET_WAIT_MS - Date.now()
+    if (catTrip === 'back' || left <= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- bỏ câu chào đã quá hạn
+      setCatGreet(null)
+      return
+    }
+    const ready = catQuiet && !catYield && !catSay && canSpeak(catVoice.current, 'greet', Date.now(), false)
+    const id = window.setTimeout(
+      () => {
+        setCatGreet(null)
+        if (!ready) return
+        const text = t.catTalk.greet[catGreet.id](catGreet.streak)
+        sayCat(text, {kind: 'greet'})
+        catAct((scene) => scene.greetCat(greetStyle(catGreet.id)), speakMs(text))
+        trackEvent({name: 'Chill Cat Talk', props: {kind: 'greet', id: catGreet.id}})
+      },
+      ready ? CAT_GREET_DELAY_MS : left,
+    )
+    return () => window.clearTimeout(id)
+  }, [catGreet, catQuiet, catYield, catSay, catTrip, t, sayCat, catAct])
+
+  // Lời mời làm quen do mèo nói: mèo quay đầu về món (ly, sổ, kệ), nhãn ở món hiện sau khi nói xong
+  useEffect(() => {
+    voiceGuideRef.current = (step) => {
+      if (!catQuiet || toyOut || !canSpeak(catVoice.current, 'guide', Date.now(), catSay !== null, GUIDE_PER_VISIT)) return false
+      const scene = sceneRef.current
+      const text = t.catTalk.guide[step]
+      const ms = speakMs(text)
+      setGuideMuted(true)
+      sayCat(text, {kind: 'guide'})
+      const box = !scene ? null : step === 'drink' ? scene.drinkHitBox : step === 'diary' ? scene.notebookHitBox : step === 'shelf' ? scene.shelfFirstSlotBox : null
+      catAct((sc) => sc.catLookAt(box), ms)
+      window.clearTimeout(guideMuteTimer.current)
+      guideMuteTimer.current = window.setTimeout(() => {
+        setGuideMuted(false)
+        setGuideHold(true)
+      }, ms)
+      trackEvent({name: 'Chill Cat Talk', props: {kind: 'guide', id: step}})
+      return true
+    }
+  })
+
+  // Câu lúc chơi (vuốt quá tay, cần câu): không đọc lên trình đọc màn hình, các câu cách nhau ≥ 60 s.
+  // "Bắt được" và "đủ rồi nha" chỉ 1 lần mỗi lần ghé; "hụt" sau 3 lần hụt liền
+  const catPlayed = useRef<Set<string>>(new Set())
+  const catMisses = useRef(0)
+  useEffect(() => {
+    catEventRef.current = (e) => {
+      if (!catTalkRef.current) return
+      if (e === 'catch') catMisses.current = 0
+      if (e === 'miss') catMisses.current += 1
+      const line = e === 'sulk' ? 'sulk' : e === 'catch' ? 'caught' : e === 'tired' ? 'tired' : e === 'miss' && catMisses.current >= 3 ? 'missed' : null
+      if (!line || ((line === 'sulk' || line === 'caught') && catPlayed.current.has(line))) return
+      if (zen || groupView || !canSpeak(catVoice.current, 'play', Date.now(), catSay !== null)) return
+      catPlayed.current.add(line)
+      if (line === 'missed') catMisses.current = 0
+      sayCat(t.catTalk[line], {kind: 'play', quiet: true})
+      trackEvent({name: 'Chill Cat Talk', props: {kind: 'play', id: line}})
+    }
+  })
 
   // Zen là tính năng mới: công tắc có chấm cam + vòng sáng tới khi bật thử lần đầu.
   // Người đã quen quán (đã mở cài đặt) thì thêm 1 bong bóng gợi ý — nhường thông báo
@@ -3184,7 +3362,7 @@ export function ChillRoom({
   // Lời mời chỉ hiện (và chỉ tính giờ) khi khách thấy được nó: không bảng nào đang mở, giao
   // diện không tự ẩn. Gợi ý Settings tự giữ giao diện lại nên không phụ thuộc hideUi
   const guideVisible = entered && !zen && !guideBusy && (activeGuide === 'settings' || !hideUi)
-  const guideOn = (step: GuideStep) => activeGuide === step && guideVisible
+  const guideOn = (step: GuideStep) => activeGuide === step && guideVisible && !guideMuted
   useEffect(() => {
     if (!guide || !guideVisible) return
     const t0 = performance.now()
@@ -3708,9 +3886,13 @@ export function ChillRoom({
 
       {/* Mèo đang nằm ngoài khung (màn dọc đã phóng to / đang xem bàn nhóm) → lời của mèo
           hiện thành 1 dòng phía trên cảnh thay cho bong bóng cạnh mèo */}
+      {/* Lời mèo cho trình đọc màn hình: 1 vùng đọc riêng (bong bóng nhìn thấy thì aria-hidden) */}
+      <p aria-live="polite" className="sr-only">
+        {catAnnounce}
+      </p>
       {catSay && (!catBox || groupView) && (
         <p
-          role="status"
+          aria-hidden
           className={`pointer-events-none absolute left-1/2 top-[10rem] z-10 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-center text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 sm:top-24 ${
             catSay.show ? 'opacity-100' : 'opacity-0'
           }`}
@@ -3889,26 +4071,26 @@ export function ChillRoom({
           type="button"
           aria-label={catTrip === 'away' && trip.trip ? t.trip.noteAria(placeOf(trip.trip.place)) : t.room.petCat}
           onClick={onCatClick}
-          onPointerEnter={() => sceneRef.current?.noticeCat()}
+          onPointerEnter={() => {
+            catHover.current = true
+            sceneRef.current?.noticeCat()
+          }}
           onPointerDown={startPurrHold}
           onPointerUp={stopPurrHold}
-          onPointerLeave={stopPurrHold}
+          onPointerLeave={() => {
+            catHover.current = false
+            stopPurrHold()
+          }}
+          // Chỉ giữ bong bóng khi focus bằng bàn phím (bấm chuột cũng để focus lại trên nút)
+          onFocus={(e) => (catHover.current = e.currentTarget.matches(':focus-visible'))}
+          onBlur={() => (catHover.current = false)}
           onPointerCancel={stopPurrHold}
           // Nhấn giữ trên điện thoại không bật menu ngữ cảnh / khung chọn chữ
           onContextMenu={(e) => e.preventDefault()}
           className="group absolute cursor-pointer touch-none rounded-2xl outline-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
           style={catBox}
         >
-          {catSay && (
-            <span
-              role="status"
-              className={`pointer-events-none absolute bottom-full left-[62%] z-10 mb-2 w-max max-w-[240px] origin-bottom-left rounded-2xl rounded-bl-sm border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-left text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 ${
-                catSay.show ? 'scale-100 opacity-100' : 'translate-y-1 scale-95 opacity-0'
-              } motion-safe:animate-[chill-pop_0.35s_ease-out]`}
-            >
-              {catSay.text} 🐾
-            </span>
-          )}
+          {catSay && <CatBubble text={catSay.text} show={catSay.show} />}
           {/* Nhãn mời vuốt chỉ dành cho người chưa chạm vào mèo lần nào — sau đó ẩn hẳn, vì nó
               nằm đúng chỗ tim / nốt nhạc / tia lấp lánh bay lên */}
           <span
@@ -3923,6 +4105,13 @@ export function ChillRoom({
             <span className="absolute left-1/2 top-full -ml-1 border-x-4 border-t-4 border-x-transparent border-t-black/60" />
           </span>
         </button>
+      )}
+
+      {/* Đang cầm cần câu: nút mèo ẩn đi, lời mèo vẫn hiện ngay trên đầu mèo */}
+      {catBox && !groupView && toyOut && catSay && (
+        <div className="pointer-events-none absolute" style={catBox}>
+          <CatBubble text={catSay.text} show={catSay.show} />
+        </div>
       )}
 
       {/* Cần câu lông vũ dựng cạnh mèo: bấm để cầm lên trêu mèo, bấm lại (hoặc Esc) để cất */}
@@ -4492,7 +4681,7 @@ export function ChillRoom({
           // ngang), không theo bề ngang màn hình — để tên bài không bao giờ bị ép còn 1–2 chữ
           className="@container relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
         >
-          {bannerOn && bannerUpdate && !zen && !panelOpen && !otherOverlay && !(resumeOffer && !started) && !(bannerUpdate.action === `station:${station}` && !showMine) && (
+          {bannerOn && bannerLive && bannerUpdate && !zen && !panelOpen && !otherOverlay && !(resumeOffer && !started) && !(bannerUpdate.action === `station:${station}` && !showMine) && (
             <UpdateBanner
               update={bannerUpdate}
               onTry={tryBanner}
@@ -5426,7 +5615,7 @@ export function ChillRoom({
           </div>
         </div>
       )}
-      <InAppHint />
+      <InAppHint onShow={setInAppOn} />
     </div>
   )
 }
@@ -5505,6 +5694,27 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
 // Chọn người ngồi nam / nữ: 2 nút có mặt nhân vật, cắt từ ảnh nội thất phòng Cửa sổ quán
 // (vùng đầu người ngồi, px 1280: x 980–1140, y 270–430)
 // Phin đang chạy dở từ lần trước (Focus.tsx lưu ở chill:focus)
+// Bong bóng lời mèo cạnh mèo (aria-hidden: trình đọc màn hình đọc vùng riêng, xem catAnnounce).
+// Giảm chuyển động: chỉ mờ dần, không nảy / phóng
+function CatBubble({text, show}: {text: string; show: boolean}) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute bottom-full left-[62%] z-10 mb-2 w-max max-w-[240px] origin-bottom-left rounded-2xl rounded-bl-sm border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-left text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 motion-reduce:transition-opacity ${
+        show ? 'scale-100 opacity-100' : 'translate-y-1 scale-95 opacity-0 motion-reduce:translate-y-0 motion-reduce:scale-100'
+      } motion-safe:animate-[chill-pop_0.35s_ease-out]`}
+    >
+      {text} 🐾
+    </span>
+  )
+}
+
+// Mèo trò chuyện: ?cattalk=1 / ?cattalk=0 ghi đè công tắc Studio
+function catTalkWanted(on: boolean) {
+  const param = new URLSearchParams(window.location.search).get('cattalk')
+  return param ? param !== '0' : on
+}
+
 function focusRunningAtMount() {
   try {
     const saved = JSON.parse(localStorage.getItem('chill:focus') ?? 'null') as {endsAt?: number; pausedLeft?: number} | null

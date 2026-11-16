@@ -23,7 +23,7 @@
 //   chờ → mèo → cần câu trên tay người xem → hơi
 //   cà phê, nốt nhạc → ánh đèn
 
-import {Cat, CAT_NOEL_SRC, CAT_SRC, type ToyEvent} from './cat'
+import {Cat, CAT_NOEL_SRC, CAT_SRC, type CatEvent, type Emote, type GreetStyle} from './cat'
 import {Wand, drawWandProp, wandPropBox} from './wand'
 import {DESTINATIONS, artOf, type Destination} from './destinations'
 import {Facade, PROP_SPOTS, SIGN_DEFAULTS} from './facade'
@@ -583,7 +583,7 @@ export class ChillScene {
   // Cần câu lông vũ: dựng chờ cạnh mèo (toyProp) hoặc đang trong tay người xem (wand)
   private wand: Wand | null = null
   private toyProp = false
-  onCatToy?: (e: ToyEvent) => void
+  onCatToy?: (e: CatEvent) => void
   // Lọ tip: số ly Bin đã xác nhận + ly của chính người xem (vừa mời trên máy này).
   // Vẽ vào lớp riêng, chỉ vẽ lại khi đổi → tô màu theo giờ giống nội thất
   private tip = {cups: 0, cup: false}
@@ -2126,6 +2126,25 @@ export class ChillScene {
 
   noticeCat() {
     this.cat.notice()
+  }
+
+  // Mèo trò chuyện (catTalkOpen, cat-voice.ts): biểu cảm, chào khách, quay đầu về món được mời
+  setCatTalk(on: boolean) {
+    this.cat.lively = on
+  }
+  greetCat(style: GreetStyle) {
+    return this.trip !== 'away' && this.cat.greet(style)
+  }
+  // `box` px gốc 640×360 (vùng bấm của món), null = món ngoài cảnh
+  catLookAt(box: {x: number; w: number} | null) {
+    return this.trip !== 'away' && this.cat.gaze(box ? box.x + box.w / 2 : null)
+  }
+  catEmote(kind: Emote) {
+    if (this.trip !== 'away') this.cat.emote(kind, true)
+  }
+  // Cảnh tạm dừng (giảm chuyển động): tư thế tĩnh lúc nói, null = về ngủ
+  catStill(talking: boolean, emote?: Emote) {
+    if (this.trip !== 'away') this.cat.still(talking ? 'head-1' : null, emote)
   }
 
   // Người xem nhấn giữ vào mèo → gừ gừ tới khi thả ra

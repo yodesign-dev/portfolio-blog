@@ -41,7 +41,8 @@ function externalUrl(android: boolean) {
   return `x-safari-${url.href}`
 }
 
-export function InAppHint() {
+// onShow: lời mời đang hiện hay không (mèo quán chờ, không nói đè lên lời mời)
+export function InAppHint({onShow}: {onShow?: (on: boolean) => void} = {}) {
   const t = useT()
   const [app, setApp] = useState<string | null>(null)
   const [android, setAndroid] = useState(false)
@@ -62,6 +63,10 @@ export function InAppHint() {
     /* eslint-enable react-hooks/set-state-in-effect */
     trackEvent({name: 'Chill InApp', props: {action: 'view', app: found}})
   }, [])
+
+  useEffect(() => {
+    onShow?.(app !== null)
+  }, [app, onShow])
 
   if (!app) return null
 
