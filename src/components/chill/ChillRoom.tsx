@@ -3317,6 +3317,7 @@ export function ChillRoom({
         type="button"
         role="radio"
         aria-checked={showMine}
+        tabIndex={showMine ? 0 : -1}
         onClick={() => setMineTab(true)}
         className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
           showMine ? 'border-rose-300/50 bg-rose-300/10 text-rose-100' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
@@ -3350,6 +3351,7 @@ export function ChillRoom({
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={on ? 0 : -1}
             onClick={() => pickStation(st.id)}
             className={`flex items-center rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
               st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
@@ -4917,7 +4919,7 @@ export function ChillRoom({
         <div
           role="tablist"
           aria-label={t.room.settings}
-          className="grid grid-cols-3 border-b border-white/[0.08] px-3"
+          className="grid grid-cols-3 border-b border-white/[0.08] px-1 sm:px-3"
           onKeyDown={(e) => {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
             e.preventDefault()
@@ -4939,7 +4941,7 @@ export function ChillRoom({
                 aria-controls={`chill-tabpanel-${tab.id}`}
                 tabIndex={on ? 0 : -1}
                 onClick={() => setPanelTab(tab.id)}
-                className={`relative flex min-w-0 items-center justify-center gap-2 px-2 py-3 text-sm transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#e8b27d] ${
+                className={`relative flex min-w-0 items-center justify-center gap-1.5 px-1 py-3 text-sm transition max-[359px]:text-[13px] sm:gap-2 sm:px-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#e8b27d] ${
                   on ? 'font-semibold text-[#f3cfa8]' : 'text-[#a79e94] hover:text-[#ede6dd]'
                 }`}
               >
@@ -5101,6 +5103,7 @@ export function ChillRoom({
                         type="button"
                         role="radio"
                         aria-checked={travel === o.value}
+                        tabIndex={travel === o.value ? 0 : -1}
                         onClick={() => {
                           // Tắt chuyển ga khi đang ở cảnh này = muốn dừng lại ở đây
                           if (!o.value && travel) trackEvent({name: 'Chill Place', props: {place: dest.id, how: 'stop'}})
@@ -5135,14 +5138,15 @@ export function ChillRoom({
           {panelTab === 'atmosphere' && (
             <div className="space-y-4">
               <SwitchRow title={t.zen.name} desc={zen ? t.zen.descOn : t.zen.desc} on={zen} onToggle={toggleZen} />
-              <Field label={t.room.time}>
-                <Segmented options={TIMES.map((o) => ({...o, label: t.room.times[o.value]}))} value={time} onChange={setTime} />
+              <Field id="chill-f-time" label={t.room.time}>
+                <Segmented labelledBy="chill-f-time" options={TIMES.map((o) => ({...o, label: t.room.times[o.value]}))} value={time} onChange={setTime} />
               </Field>
-              <Field label={t.room.weather}>
-                <Segmented options={WEATHERS.map((o) => ({...o, label: t.room.weathersShort[o.value]}))} value={weather} onChange={setWeather} />
+              <Field id="chill-f-weather" label={t.room.weather}>
+                <Segmented labelledBy="chill-f-weather" options={WEATHERS.map((o) => ({...o, label: t.room.weathersShort[o.value]}))} value={weather} onChange={setWeather} />
               </Field>
               {theme === 'cafe' && (
                 <Field
+                  id="chill-f-wall"
                   label={
                     <>
                       {t.room.tableWall}
@@ -5151,7 +5155,7 @@ export function ChillRoom({
                   }
                 >
                   <div>
-                    <Segmented options={WALLS.map((o) => ({...o, label: t.room.walls[o.value]}))} value={groupWall} onChange={chooseWall} />
+                    <Segmented labelledBy="chill-f-wall" options={WALLS.map((o) => ({...o, label: t.room.walls[o.value]}))} value={groupWall} onChange={chooseWall} />
                     {/* Chỉ thấy ở bàn nhóm → nói rõ tác dụng, dẫn tới chỗ xem được */}
                     {!groupView && (
                       <p className="mt-1.5 text-xs text-[#a79e94]">
@@ -5179,8 +5183,8 @@ export function ChillRoom({
               )}
               <SwitchRow title={t.room.pauseScene} desc={t.room.pauseSceneDesc} on={scenePaused} onToggle={() => setScenePaused((p) => !p)} />
               {season && (
-                <Field label={t.room.seasonLabel}>
-                  <Segmented options={(['on', 'quiet', 'off'] as const).map((value) => ({value, label: t.room.seasonOptions[value], icon: null}))} value={seasonPref} onChange={chooseSeasonPref} />
+                <Field id="chill-f-season" label={t.room.seasonLabel}>
+                  <Segmented labelledBy="chill-f-season" options={(['on', 'quiet', 'off'] as const).map((value) => ({value, label: t.room.seasonOptions[value], icon: null}))} value={seasonPref} onChange={chooseSeasonPref} />
                   <p className="mt-1.5 text-xs text-[#a79e94]">{t.room.seasonDesc}</p>
                 </Field>
               )}
@@ -5517,34 +5521,42 @@ function SectionTitle({index, title}: {index: string; title: string}) {
   )
 }
 
-function Field({label, children}: {label: React.ReactNode; children: React.ReactNode}) {
+// `id`: gắn cho nhãn, để nhóm nút bên cạnh (Segmented labelledBy) đọc được tên nhóm
+function Field({id, label, children}: {id?: string; label: React.ReactNode; children: React.ReactNode}) {
   return (
     <div className="grid items-center gap-2 sm:grid-cols-[6rem_minmax(0,1fr)]">
-      <span className="flex items-center gap-1.5 text-sm text-[#a79e94]">{label}</span>
+      <span id={id} className="flex items-center gap-1.5 text-sm text-[#a79e94]">{label}</span>
       {children}
     </div>
   )
 }
 
+// Nhóm chọn một (Thời gian, Thời tiết, Tường bàn, Trang trí Noel): radiogroup như mọi nhóm
+// chọn-một khác trong quán — 1 lần Tab, mũi tên đổi lựa chọn (radio-keys.ts). Ô đang chọn có viền
+// cam (4:1 trên nền bảng) ngoài nền cam nhạt, không chỉ dựa vào màu nền 1.3:1
 function Segmented<T extends string>({
   options,
   value,
   onChange,
+  labelledBy,
 }: {
   options: {value: T; label: string; icon: React.ReactNode}[]
   value: T
   onChange: (v: T) => void
+  labelledBy?: string
 }) {
   return (
-    <div className={`grid gap-1 rounded-xl border border-white/10 p-1 ${options.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+    <div role="radiogroup" aria-labelledby={labelledBy} className={`grid gap-1 rounded-xl border border-white/10 p-1 ${options.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          tabIndex={value === o.value ? 0 : -1}
           onClick={() => onChange(o.value)}
-          aria-pressed={value === o.value}
-          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2 text-[13px] transition touch:min-h-11 ${
-            value === o.value ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
+          className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border px-1 py-[7px] text-[13px] transition touch:min-h-11 ${
+            value === o.value ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-transparent text-[#a79e94] hover:bg-white/[0.04] hover:text-[#ede6dd]'
           }`}
         >
           {o.icon}
