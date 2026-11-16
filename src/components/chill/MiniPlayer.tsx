@@ -15,7 +15,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {useLang, useT} from './i18n'
-import {HotBadge, NewBadge, NewStationBadge, PlayMeter, VocalBadge, type PlayStat} from './PlayMeter'
+import {EqualizerIcon, HotBadge, NewBadge, NewStationBadge, PlayMeter, VocalBadge, type PlayStat} from './PlayMeter'
 import {STATIONS, VOCAL_STATIONS, newStations, stationName, stationOf, type StationId, type Track} from './tracks'
 import {PixelClock, type BrewControls, type BrewInfo} from './BrewDesk'
 
@@ -191,7 +191,9 @@ export function MiniPlayer({
   const listLabel = listOpen ? t.room.miniListClose : t.room.miniList
 
   return createPortal(
-    <div className="relative flex h-full w-full select-none flex-col">
+    // chill-root: cửa sổ nổi là trang riêng, phải gắn lại để nhận viền focus kem và quy tắc giảm
+    // chuyển động của quán (globals.css), vd sóng nhạc đứng yên
+    <div className="chill-root relative flex h-full w-full select-none flex-col">
       <div className={`group relative w-full ${tall ? 'aspect-video shrink-0' : 'min-h-0 flex-1'}`}>
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" role="img" aria-label={track.title} />
         <div
@@ -369,12 +371,16 @@ export function MiniPlayer({
                     aria-current={active ? 'true' : undefined}
                     data-mini-current={active ? '' : undefined}
                     className={`grid w-full grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition ${
-                      active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
+                      active ? 'bg-[#e8b27d]/10 shadow-[inset_2px_0_0_#e8b27d] hover:bg-[#e8b27d]/[0.14]' : 'hover:bg-white/[0.05]'
                     }`}
                   >
-                    <span className="font-mono text-[11px] tabular-nums text-[#a79e94]">{active && playing ? '♪' : String(pos + 1).padStart(2, '0')}</span>
+                    {/* Như danh sách trong quán: bài đang phát nền cam nhạt, vạch cam, tên cam; đang kêu thì
+                        sóng nhạc thay số, tạm dừng thì số màu cam */}
+                    <span className={`flex items-center font-mono text-[11px] tabular-nums ${active ? 'text-[#e8b27d]' : 'text-[#a79e94]'}`}>
+                      {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
+                    </span>
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className={`truncate text-[13px] ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+                      <span className={`truncate text-[13px] ${active ? 'font-medium text-[#e8b27d]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
                       <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
                       <VocalBadge track={tr} quiet={tab !== 'queue' && VOCAL_STATIONS.has(stationOf(tr))} />
                       <HotBadge stat={plays?.get(tr.id)} />

@@ -97,3 +97,25 @@ export function HotBadge({stat}: {stat?: PlayStat}) {
     <span className="shrink-0 rounded-full border border-[#e8b27d]/35 bg-[#e8b27d]/10 px-1.5 text-[10.5px] leading-4 text-[#e8b27d]">{t.room.hot}</span>
   )
 }
+
+// Sóng nhạc của bài đang phát. Mỗi vạch có chiều cao riêng: giảm chuyển động thì hiệu ứng tắt,
+// sóng đứng yên ở 3 mức cao thấp (không có chiều cao riêng thì vạch về 0, sóng biến mất).
+// `small`: bản nhỏ trên chip trạm đang phát. Dùng chung cho danh sách nhạc và cửa sổ nổi (MiniPlayer)
+export function EqualizerIcon({small}: {small?: boolean}) {
+  const t = useT()
+  return (
+    <span role="img" className={`flex items-end gap-[2px] ${small ? 'ml-1.5 h-2.5' : 'h-3'}`} aria-label={small ? `, ${t.room.playing}` : t.room.playing}>
+      {[
+        [0, '45%'],
+        [150, '100%'],
+        [300, '70%'],
+      ].map(([delay, height]) => (
+        <span
+          key={delay}
+          className={`animate-[chill-eq_0.9s_ease-in-out_infinite] rounded-full bg-[#e8b27d] ${small ? 'w-[2px]' : 'w-[3px]'}`}
+          style={{animationDelay: `${delay}ms`, height}}
+        />
+      ))}
+    </span>
+  )
+}
