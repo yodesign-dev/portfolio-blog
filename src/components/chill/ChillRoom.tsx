@@ -4907,8 +4907,8 @@ export function ChillRoom({
           panelOpen ? 'translate-x-0 translate-y-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'
         }`}
       >
-        <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-4">
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d]">Chill for work</p>
+        <div className="flex items-center justify-between gap-4 px-5 pb-3 pt-4 max-[359px]:gap-2">
+          <p className="whitespace-nowrap font-mono text-xs uppercase tracking-[0.25em] text-[#e8b27d] max-[359px]:tracking-[0.12em]">Chill for work</p>
           <LangSwitch className="ml-auto" />
           <RoundButton label={`${t.room.closeSettings} (Esc)`} onClick={() => setPanelOpen(false)}>
             <CloseIcon />
@@ -4921,10 +4921,11 @@ export function ChillRoom({
           aria-label={t.room.settings}
           className="grid grid-cols-3 border-b border-white/[0.08] px-1 sm:px-3"
           onKeyDown={(e) => {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
             e.preventDefault()
             const i = PANEL_TABS.findIndex((t) => t.id === panelTab)
-            const nextTab = PANEL_TABS[(i + (e.key === 'ArrowRight' ? 1 : -1) + PANEL_TABS.length) % PANEL_TABS.length]
+            const to = e.key === 'Home' ? 0 : e.key === 'End' ? PANEL_TABS.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + PANEL_TABS.length) % PANEL_TABS.length
+            const nextTab = PANEL_TABS[to]
             setPanelTab(nextTab.id)
             document.getElementById(`chill-tab-${nextTab.id}`)?.focus()
           }}
@@ -4938,7 +4939,8 @@ export function ChillRoom({
                 type="button"
                 role="tab"
                 aria-selected={on}
-                aria-controls={`chill-tabpanel-${tab.id}`}
+                // Chỉ tab đang chọn có panel trong trang (2 tab kia không render) → không trỏ id không có
+                aria-controls={on ? `chill-tabpanel-${tab.id}` : undefined}
                 tabIndex={on ? 0 : -1}
                 onClick={() => setPanelTab(tab.id)}
                 className={`relative flex min-w-0 items-center justify-center gap-1.5 px-1 py-3 text-sm transition max-[359px]:text-[13px] sm:gap-2 sm:px-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#e8b27d] ${
@@ -5083,7 +5085,7 @@ export function ChillRoom({
                           </span>
                         )}
                         {active && (
-                          <span className="absolute right-1.5 top-1.5 rounded bg-[#e8b27d] px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#2a1a10]">
+                          <span aria-hidden className="absolute right-1.5 top-1.5 rounded bg-[#e8b27d] px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-[#2a1a10]">
                             {t.room.now}
                           </span>
                         )}
@@ -5092,8 +5094,8 @@ export function ChillRoom({
                     )
                   })}
                 </div>
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <span id="chill-travel" className="text-sm text-[#a79e94]">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <span id="chill-travel" className="whitespace-nowrap text-sm text-[#a79e94]">
                     {t.room.autoTravel}
                   </span>
                   <div role="radiogroup" aria-labelledby="chill-travel" className="flex rounded-full border border-white/10 bg-black/20 p-0.5">
@@ -5111,7 +5113,7 @@ export function ChillRoom({
                           travelRef.current = 0
                           setTravelElapsed(0)
                         }}
-                        className={`rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:min-w-11 ${
+                        className={`whitespace-nowrap rounded-full px-3 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:min-w-11 ${
                           travel === o.value ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]' : 'text-[#c9c0b6] hover:text-[#ede6dd]'
                         }`}
                       >
@@ -5971,7 +5973,7 @@ function EventStar() {
 function NewDot() {
   const t = useT()
   return (
-    <span aria-label={t.common.isNew} className="relative inline-flex h-2 w-2 shrink-0">
+    <span role="img" aria-label={t.common.isNew} className="relative inline-flex h-2 w-2 shrink-0">
       <span className="absolute inline-flex h-full w-full rounded-full bg-[#f08a5d] opacity-60 motion-safe:animate-ping" />
       <span className="relative inline-flex h-2 w-2 rounded-full bg-[#f08a5d]" />
     </span>
