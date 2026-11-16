@@ -34,7 +34,12 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
     el.addEventListener('scroll', measure, {passive: true})
     const ro = new ResizeObserver(measure)
     ro.observe(el)
-    const mo = new MutationObserver(measure)
+    // Chip thêm / bớt ngay trong hàng (vd thả tim bài đầu → tab "Của tôi" chen vào đầu) đẩy cả dãy
+    // sang bên: chip đang chọn có thể trôi vào vùng mờ dưới mũi tên, nên kéo nó về giữa nếu bị khuất
+    const mo = new MutationObserver((list) => {
+      if (list.some((m) => m.type === 'childList' && m.target === el)) centerSelected(el, true)
+      measure()
+    })
     mo.observe(el, {childList: true, subtree: true, characterData: true})
     // Lăn dọc → cuộn ngang, chỉ khi hàng còn chỗ cuộn theo hướng đó (touchpad lăn ngang để nguyên)
     const onWheel = (e: WheelEvent) => {
@@ -57,11 +62,7 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
   // Đưa chip đang chọn vào giữa hàng. Tự tính scrollLeft (không scrollIntoView) để không kéo
   // cả bảng cài đặt cuộn dọc theo. Bảng cài đặt đóng chỉ là trượt ra ngoài, hàng vẫn có bề rộng
   useEffect(() => {
-    const el = ref.current
-    const on = el?.querySelector<HTMLElement>('[aria-checked="true"]')
-    if (!el || !on || !el.clientWidth) return
-    const left = on.offsetLeft - el.offsetLeft - (el.clientWidth - on.offsetWidth) / 2
-    el.scrollTo({left: Math.max(0, left)})
+    if (ref.current) centerSelected(ref.current, false)
   }, [selectedKey])
 
   const mask =
@@ -88,6 +89,15 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
       {edges.end && <EdgeArrow dir={1} onClick={() => nudge(1)} />}
     </div>
   )
+}
+
+// Đưa chip đang chọn vào giữa hàng. `onlyIfHidden`: để yên nếu chip đã nằm trọn ngoài vùng mờ
+function centerSelected(el: HTMLElement, onlyIfHidden: boolean) {
+  const on = el.querySelector<HTMLElement>('[aria-checked="true"]')
+  if (!on || !el.clientWidth) return
+  const start = on.offsetLeft - el.offsetLeft
+  if (onlyIfHidden && start >= el.scrollLeft + FADE && start + on.offsetWidth <= el.scrollLeft + el.clientWidth - FADE) return
+  el.scrollTo({left: Math.max(0, start - (el.clientWidth - on.offsetWidth) / 2)})
 }
 
 // Mũi tên ở mép hàng. Ẩn với trình đọc màn hình và phím Tab: bàn phím đã có mũi tên trong nhóm radio
