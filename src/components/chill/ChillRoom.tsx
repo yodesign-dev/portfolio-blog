@@ -48,6 +48,7 @@ import {loadMe, onMeChange} from './identity'
 import type {QuestState} from './quest-shared'
 import {BookSparkles, TodayBook} from './TodayBook'
 import {HotBadge, NewBadge, NewStationBadge, PlayMeter, playStats, VocalBadge} from './PlayMeter'
+import {ScrollRow} from './ScrollRow'
 import {addMinutes, addPhin, levelOf, loadRegular, stampToday, streakOf, todayOf, visitDayOf, type Regular} from './regular'
 import {PostcardAlbum, PostcardDialog, TripOffer} from './TripPostcard'
 import {TRIP_PHINS_DEFAULT, canOffer, collectTrip, declineTrip, forceBack, loadSeen, loadTrip, markPlaceSeen, pickPlace, sendTrip, souvenirFor, tripMode, tripModeNow, type Postcard, type TripState} from './trip'
@@ -615,6 +616,8 @@ export function ChillRoom({
   const playingStation = stationOf(track)
   const playingList = queueOn ? queueIdx.map((i) => tracks[i]) : tracks.filter((tr) => stationOf(tr) === playingStation)
   const playingPos = playingList.indexOf(track)
+  // Chip nào mang sóng nhạc: nơi bài đang kêu thuộc về (bộ "Của tôi" hoặc trạm của bài)
+  const playingFrom: StationId | 'mine' | null = !started || !playing ? null : queueOn && queue?.key === 'fav' ? 'mine' : playingStation
   const dest = destinations[destIndex] ?? destinations[0]
   const nextDest = destinations[(destIndex + 1) % destinations.length]
 
@@ -2891,6 +2894,18 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- ghi nhận vừa xem danh sách
     setNewSeen(next)
   }, [listOpen, station, newKeys, newSeen])
+  // Mở danh sách / về trạm có bài đang phát: cuộn tới bài đó nếu nó đang khuất (đang xem thì để yên).
+  // Không theo mỗi lần đổi bài, để khách đang lướt danh sách không bị kéo đi
+  useEffect(() => {
+    if (!listOpen) return
+    for (const box of document.querySelectorAll<HTMLElement>('[data-list-scroll]')) {
+      const row = box.querySelector<HTMLElement>('[data-current]')
+      if (!row) continue
+      const r = row.getBoundingClientRect()
+      const b = box.getBoundingClientRect()
+      if (r.top < b.top || r.bottom > b.bottom) row.scrollIntoView({block: 'center'})
+    }
+  }, [listOpen, station, showMine])
   const hasUnseenNew = (id: StationId) => {
     const key = newKeys.get(id)
     return Boolean(key && newSeen && !newSeen.includes(key))
@@ -3240,12 +3255,110 @@ export function ChillRoom({
         </span>
         {t.room.favTab}
         <span className="font-mono text-[11px] tabular-nums opacity-70">{favIds.length}</span>
+        {playingFrom === 'mine' && <EqualizerIcon small />}
       </button>
     ) : null
   const toggleRepeat = () => {
     const on = !repeatOne
     setRepeatOne(on)
     trackEvent({name: 'Chill Fav', props: {action: on ? 'repeat-on' : 'repeat-off'}})
+  }
+  // Dãy trạm nhạc (tab Music và danh sách Ngắm cảnh): một hàng cuộn ngang (ScrollRow). Chip của
+  // nơi nhạc đang phát có 3 vạch sóng nhỏ, để đang xem trạm khác vẫn biết nhạc phát ở đâu
+  const stationChips = (
+    <ScrollRow role="radiogroup" aria-label={t.room.stationAria} selectedKey={showMine ? 'mine' : station} className="flex-1">
+      {mineTabButton}
+      {STATIONS.map((st) => {
+        const count = tracks.filter((t) => stationOf(t) === st.id).length
+        const on = !showMine && st.id === station
+        if (count === 0) return null
+        return (
+          <button
+            key={st.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => pickStation(st.id)}
+            className={`flex items-center rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
+              st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
+            }`}
+          >
+            {st.id === 'noel' && (
+              <>
+                <NoelTabLights />
+                <EventStar />
+              </>
+            )}
+            {stationName(st, lang, 'short')}
+            {freshStations.has(st.id) ? (
+              <NewStationBadge />
+            ) : (
+              hasUnseenNew(st.id) && (
+                <>
+                  <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
+                  <span className="sr-only">, {t.room.newInStation}</span>
+                </>
+              )
+            )}
+            {playingFrom === st.id && <EqualizerIcon small />}
+          </button>
+        )
+      })}
+    </ScrollRow>
+  )
+  // Một hàng trong danh sách bài. Bài đang phát (đã bấm phát, kể cả đang tạm dừng): nền cam nhạt,
+  // vạch cam mép trái, tên cam; đang kêu thì sóng nhạc thay số thứ tự, tạm dừng thì số màu cam.
+  // Rê chuột / focus bàn phím: số thành ▶ (bài đang kêu thì ⏸). Màn chạm không có hover — cả hàng
+  // vẫn là nút chạm-là-phát, nên không cần icon riêng
+  const trackRow = ({tr, i}: {tr: Track; i: number}, pos: number, zenRow = false) => {
+    const active = i === index
+    const current = active && started
+    const sounding = current && playing
+    return (
+      <li key={tr.id} data-current={current ? '' : undefined} className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => (active && started ? togglePlay() : pickRow(i))}
+          aria-current={active ? 'true' : undefined}
+          className={`group grid min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 text-left transition ${zenRow ? 'min-h-11 py-2' : 'py-2.5'} ${
+            current ? 'bg-[#e8b27d]/10 shadow-[inset_2px_0_0_#e8b27d] hover:bg-[#e8b27d]/[0.14]' : active ? 'bg-white/[0.06] hover:bg-white/[0.08]' : 'hover:bg-white/[0.05]'
+          }`}
+        >
+          <span className="relative flex h-5 items-center justify-center font-mono text-xs tabular-nums">
+            <span className={`flex items-center group-hover:invisible group-focus-visible:invisible ${current ? 'text-[#e8b27d]' : 'text-[#a79e94]'}`}>
+              {sounding ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
+            </span>
+            <span aria-hidden className="invisible absolute inset-0 flex items-center justify-center text-[#ede6dd] group-hover:visible group-focus-visible:visible">
+              {sounding ? <PauseIcon small /> : <PlayIcon small />}
+            </span>
+          </span>
+          {zenRow ? (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className={`block truncate text-sm ${current ? 'font-medium text-[#e8b27d]' : active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
+              <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
+              <VocalBadge track={tr} quiet={!showMine && VOCAL_STATIONS.has(stationOf(tr))} />
+              <HotBadge stat={plays?.get(tr.id)} />
+            </span>
+          ) : (
+            <span className="min-w-0">
+              <span className={`block truncate text-sm font-medium ${current ? 'text-[#e8b27d]' : active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#a79e94]">
+                <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
+                <VocalBadge track={tr} quiet={!showMine && VOCAL_STATIONS.has(stationOf(tr))} />
+                <HotBadge stat={plays?.get(tr.id)} />
+                <span className="truncate">{tr.mood}</span>
+              </span>
+            </span>
+          )}
+          <span className="flex flex-col items-end">
+            <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
+            <PlayMeter stat={plays?.get(tr.id)} />
+          </span>
+        </button>
+        {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
+        {!zenRow && brewFlag && !favFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
+      </li>
+    )
   }
   const fade = `transition-opacity duration-700 ${hideUi || !entered ? 'pointer-events-none opacity-0' : 'opacity-100'}`
   // Đang pha phin: thanh trên lui xuống, rê chuột là rõ lại
@@ -3437,77 +3550,9 @@ export function ChillRoom({
           }`}
         >
           {zenList && (
-            <div className="mb-2 max-h-[min(55dvh,420px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md">
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.room.stationAria}>
-                {mineTabButton}
-                {STATIONS.map((st) => {
-                  const count = tracks.filter((t) => stationOf(t) === st.id).length
-                  const on = !showMine && st.id === station
-                  if (count === 0) return null
-                  return (
-                    <button
-                      key={st.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => pickStation(st.id)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
-                        st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
-                      }`}
-                    >
-                      {st.id === 'noel' && (
-                        <>
-                          <NoelTabLights />
-                          <EventStar />
-                        </>
-                      )}
-                      {stationName(st, lang, 'short')}
-                      {freshStations.has(st.id) ? (
-                        <NewStationBadge />
-                      ) : (
-                        hasUnseenNew(st.id) && (
-                          <>
-                            <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
-                            <span className="sr-only">, {t.room.newInStation}</span>
-                          </>
-                        )
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-              <ol className="mt-2 divide-y divide-white/[0.06]">
-                {shownList.map(({tr, i}, pos) => {
-                  const active = i === index
-                  return (
-                    <li key={tr.id} className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => (active && started ? togglePlay() : pickRow(i))}
-                        aria-current={active ? 'true' : undefined}
-                        className={`grid min-h-11 min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition ${
-                          active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
-                          {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
-                        </span>
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <span className={`block truncate text-sm ${active ? 'font-medium text-[#f3cfa8]' : 'text-[#ede6dd]'}`}>{tr.title}</span>
-                          <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
-                          <VocalBadge track={tr} quiet={!showMine && VOCAL_STATIONS.has(stationOf(tr))} />
-                          <HotBadge stat={plays?.get(tr.id)} />
-                        </span>
-                        <span className="flex flex-col items-end">
-                          <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
-                          <PlayMeter stat={plays?.get(tr.id)} />
-                        </span>
-                      </button>
-                      {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
-                    </li>
-                  )
-                })}
-              </ol>
+            <div data-list-scroll className="mb-2 max-h-[min(55dvh,420px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md">
+              {stationChips}
+              <ol className="mt-1 divide-y divide-white/[0.06]">{shownList.map((row, pos) => trackRow(row, pos, true))}</ol>
             </div>
           )}
           <div className="flex h-14 items-center gap-1 rounded-2xl border border-white/10 bg-[#16131a]/80 px-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.9)] backdrop-blur-md">
@@ -4841,114 +4886,28 @@ export function ChillRoom({
           id={`chill-tabpanel-${panelTab}`}
           role="tabpanel"
           aria-labelledby={`chill-tab-${panelTab}`}
+          data-list-scroll={panelTab === 'music' ? '' : undefined}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5"
         >
           {panelTab === 'music' && (
             <>
-              {/* Trạm nhạc theo mood — mỗi trạm phát liền mạch như 1 bản mix */}
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.room.stationAria}>
-                {mineTabButton}
-                {STATIONS.map((st) => {
-                  const count = tracks.filter((t) => stationOf(t) === st.id).length
-                  const on = !showMine && st.id === station
-                  if (count === 0) return null
-                  return (
-                    <button
-                      key={st.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => pickStation(st.id)}
-                      className={`rounded-full border px-3 py-1.5 text-[13px] transition touch:min-h-11 ${
-                        st.id === 'noel' ? noelTabClass(on) : on ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
-                      }`}
-                    >
-                      {st.id === 'noel' && (
-                        <>
-                          <NoelTabLights />
-                          <EventStar />
-                        </>
-                      )}
-                      {stationName(st, lang, 'short')}
-                      {freshStations.has(st.id) ? (
-                        <NewStationBadge />
-                      ) : (
-                        hasUnseenNew(st.id) && (
-                          <>
-                            <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-[#9fdcbc]" />
-                            <span className="sr-only">, {t.room.newInStation}</span>
-                          </>
-                        )
-                      )}
-                    </button>
-                  )
-                })}
+              {/* Trạm nhạc theo mood (mỗi trạm phát liền mạch như 1 bản mix) và 2 nút Lặp 1 bài / Trộn bài
+                  chung một hàng, để màn hình thấy được nhiều bài hơn. Volume nằm trên thanh phát nhạc */}
+              <div className="flex items-center gap-2">
+                {stationChips}
+                <div className="flex shrink-0 items-center gap-1 border-l border-white/10 pl-2">
+                  {favFlag && (
+                    <ToggleIconButton on={repeatOne} label={t.room.repeatOne} onClick={toggleRepeat}>
+                      <RepeatOneIcon />
+                    </ToggleIconButton>
+                  )}
+                  <ToggleIconButton on={shuffle} label={t.room.shuffle} onClick={() => setShuffle((s) => !s)}>
+                    <ShuffleIcon />
+                  </ToggleIconButton>
+                </div>
               </div>
 
-              {/* Volume nằm trên thanh phát nhạc (desktop: thanh trượt, điện thoại: nút loa) */}
-              <div className="mt-4 flex items-center justify-end gap-2">
-                {favFlag && (
-                  <button
-                    type="button"
-                    onClick={toggleRepeat}
-                    aria-pressed={repeatOne}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition touch:min-h-11 ${
-                      repeatOne ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
-                    }`}
-                  >
-                    <RepeatOneIcon />
-                    {t.room.repeatOne}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShuffle((s) => !s)}
-                  aria-pressed={shuffle}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition touch:min-h-11 ${
-                    shuffle ? 'border-[#e8b27d]/60 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:text-[#ede6dd]'
-                  }`}
-                >
-                  <ShuffleIcon />
-                  {t.room.shuffle}
-                </button>
-              </div>
-
-              <ol className="mt-3 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-                {shownList.map(({tr, i}, pos) => {
-                  const active = i === index
-                  return (
-                    <li key={tr.id} className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => (active && started ? togglePlay() : pickRow(i))}
-                        aria-current={active ? 'true' : undefined}
-                        className={`grid min-w-0 flex-1 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition ${
-                          active ? 'bg-white/[0.06]' : 'hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <span className="flex justify-center font-mono text-xs tabular-nums text-[#a79e94]">
-                          {active && playing ? <EqualizerIcon /> : String(pos + 1).padStart(2, '0')}
-                        </span>
-                        <span className="min-w-0">
-                          <span className={`block truncate text-sm font-medium ${active ? 'text-[#f3cfa8]' : ''}`}>{tr.title}</span>
-                          <span className="flex min-w-0 items-center gap-1.5 text-xs text-[#a79e94]">
-                            <NewBadge track={tr} quiet={freshStations.has(stationOf(tr))} />
-                            <VocalBadge track={tr} quiet={!showMine && VOCAL_STATIONS.has(stationOf(tr))} />
-                            <HotBadge stat={plays?.get(tr.id)} />
-                            <span className="truncate">{tr.mood}</span>
-                          </span>
-                        </span>
-                        <span className="flex flex-col items-end">
-                          <span className="font-mono text-xs tabular-nums text-[#a79e94]">{tr.duration ? formatTime(tr.duration) : '–:––'}</span>
-                          <PlayMeter stat={plays?.get(tr.id)} />
-                        </span>
-                      </button>
-                      {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
-                      {brewFlag && !favFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
-                    </li>
-                  )
-                })}
-              </ol>
+              <ol className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">{shownList.map((row, pos) => trackRow(row, pos))}</ol>
             </>
           )}
 
@@ -5994,18 +5953,45 @@ function CloudIcon() {
   )
 }
 
-function EqualizerIcon() {
+// Sóng nhạc của bài đang phát. Mỗi vạch có chiều cao riêng: giảm chuyển động thì hiệu ứng tắt,
+// sóng đứng yên ở 3 mức cao thấp (không có chiều cao riêng thì vạch về 0, sóng biến mất).
+// `small`: bản nhỏ trên chip trạm đang phát
+function EqualizerIcon({small}: {small?: boolean}) {
   const t = useT()
   return (
-    <span className="flex h-3 items-end gap-[2px]" aria-label={t.room.playing}>
-      {[0, 150, 300].map((delay) => (
+    <span role="img" className={`flex items-end gap-[2px] ${small ? 'ml-1.5 h-2.5' : 'h-3'}`} aria-label={small ? `, ${t.room.playing}` : t.room.playing}>
+      {[
+        [0, '45%'],
+        [150, '100%'],
+        [300, '70%'],
+      ].map(([delay, height]) => (
         <span
           key={delay}
-          className="w-[3px] animate-[chill-eq_0.9s_ease-in-out_infinite] rounded-full bg-[#e8b27d]"
-          style={{animationDelay: `${delay}ms`}}
+          className={`animate-[chill-eq_0.9s_ease-in-out_infinite] rounded-full bg-[#e8b27d] ${small ? 'w-[2px]' : 'w-[3px]'}`}
+          style={{animationDelay: `${delay}ms`, height}}
         />
       ))}
     </span>
+  )
+}
+
+// Nút bật / tắt chỉ có icon (Lặp 1 bài, Trộn bài): 32px trên máy tính, 44px trên màn chạm. Đang bật:
+// nền cam và chấm nhỏ dưới icon (không chỉ dựa vào màu)
+function ToggleIconButton({on, label, onClick, children}: {on: boolean; label: string; onClick: () => void; children: React.ReactNode}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={label}
+      title={label}
+      className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition touch:h-11 touch:w-11 ${
+        on ? 'bg-[#e8b27d]/15 text-[#f3cfa8]' : 'text-[#a79e94] hover:bg-white/[0.06] hover:text-[#ede6dd]'
+      }`}
+    >
+      {children}
+      {on && <span aria-hidden className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#e8b27d] touch:bottom-1.5" />}
+    </button>
   )
 }
 
