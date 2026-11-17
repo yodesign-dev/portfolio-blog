@@ -1434,11 +1434,12 @@ export function ChillRoom({
   }, [])
   useEffect(() => stopPurrHold, [stopPurrHold])
   // Mèo trò chuyện: vừa kéo tay dọc lưng mèo → cú "click" lúc thả tay không tính là 1 lần vuốt
-  const catStroke = useRef<{x: number; done: boolean} | null>(null)
+  const catStroke = useRef<{x: number; done: boolean; at: number} | null>(null)
   const onCatMove = (e: React.PointerEvent<HTMLButtonElement>) => {
     const s = catStroke.current
     if (!catTalkRef.current || !s || s.done || Math.abs(e.clientX - s.x) < 24) return
     s.done = true
+    s.at = e.timeStamp
     window.clearTimeout(purrTimers.current.wait)
     if (sceneRef.current?.strokeCat()) {
       audioRef.current?.catSound('purr')
@@ -1446,7 +1447,10 @@ export function ChillRoom({
     }
   }
   const onCatClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const stroked = catStroke.current?.done
+    // Chỉ bỏ cú click ngay sau khi vuốt (kéo tay trượt ra ngoài mèo thì không có click → không nuốt
+    // mất lần bấm / Enter kế tiếp)
+    const s = catStroke.current
+    const stroked = !!s?.done && e.timeStamp - s.at < 600
     catStroke.current = null
     if (purrHeld.current || stroked) return
     // Mèo đi vắng: bấm vào mẩu giấy trên gối → đọc lời nhắn
@@ -3983,7 +3987,7 @@ export function ChillRoom({
                 }
               : undefined
           }
-          className={`${catTalkFlag && !groupView && catSay.show ? 'pointer-events-auto flex min-h-11 cursor-pointer items-center' : 'pointer-events-none'} absolute left-1/2 top-[10rem] z-10 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-center text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 sm:top-24 ${
+          className={`${catTalkFlag && !groupView && catSay.show ? 'pointer-events-auto min-h-11 cursor-pointer py-2.5' : 'pointer-events-none py-2'} absolute left-1/2 top-[10rem] z-10 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-2xl border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 text-center text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 sm:top-24 ${
             catSay.show ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -4166,7 +4170,7 @@ export function ChillRoom({
             sceneRef.current?.noticeCat()
           }}
           onPointerDown={(e) => {
-            catStroke.current = {x: e.clientX, done: false}
+            catStroke.current = {x: e.clientX, done: false, at: 0}
             startPurrHold(e)
           }}
           onPointerMove={onCatMove}
@@ -4184,7 +4188,7 @@ export function ChillRoom({
           className="group absolute cursor-pointer touch-none rounded-2xl outline-none [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-[#e8b27d]/80"
           style={catBox}
         >
-          {catSay && <CatBubble text={catSay.text} show={catSay.show} />}
+          {catSay && <CatBubble text={catSay.text} show={catSay.show} anchor={catBox.left + catBox.width * 0.62} />}
           {/* Nhãn mời vuốt chỉ dành cho người chưa chạm vào mèo lần nào — sau đó ẩn hẳn, vì nó
               nằm đúng chỗ tim / nốt nhạc / tia lấp lánh bay lên */}
           <span
@@ -4204,7 +4208,7 @@ export function ChillRoom({
       {/* Đang cầm cần câu: nút mèo ẩn đi, lời mèo vẫn hiện ngay trên đầu mèo */}
       {catBox && !groupView && toyOut && catSay && (
         <div className="pointer-events-none absolute" style={catBox}>
-          <CatBubble text={catSay.text} show={catSay.show} />
+          <CatBubble text={catSay.text} show={catSay.show} anchor={catBox.left + catBox.width * 0.62} />
         </div>
       )}
 
@@ -5788,14 +5792,25 @@ function Visualizer({audioRef, playing}: {audioRef: React.RefObject<ChillAudio |
 
 // Chọn người ngồi nam / nữ: 2 nút có mặt nhân vật, cắt từ ảnh nội thất phòng Cửa sổ quán
 // (vùng đầu người ngồi, px 1280: x 980–1140, y 270–430)
-// Phin đang chạy dở từ lần trước (Focus.tsx lưu ở chill:focus)
 // Bong bóng lời mèo cạnh mèo (aria-hidden: trình đọc màn hình đọc vùng riêng, xem catAnnounce).
-// Giảm chuyển động: chỉ mờ dần, không nảy / phóng
-function CatBubble({text, show}: {text: string; show: boolean}) {
+// Giảm chuyển động: chỉ mờ dần, không nảy / phóng. Mèo sát mép màn (điện thoại dọc sau khi lia cảnh) → đẩy bong bóng
+// vào trong cho trọn trong màn, cách mép ≥ 8 px. `anchor` = mép trái bong bóng khi neo mặc định
+// (px màn hình), đổi khi cảnh lia
+function CatBubble({text, show, anchor}: {text: string; show: boolean; anchor: number}) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [shift, setShift] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const left = Math.max(8, Math.min(anchor, window.innerWidth - 8 - el.offsetWidth))
+    setShift(Math.round(left - anchor))
+  }, [text, anchor])
   return (
     <span
+      ref={ref}
       aria-hidden
-      className={`pointer-events-none absolute bottom-full left-[62%] z-10 mb-2 w-max max-w-[240px] origin-bottom-left rounded-2xl rounded-bl-sm border-2 border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-left text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 motion-reduce:transition-opacity ${
+      style={shift ? {marginLeft: shift} : undefined}
+      className={`pointer-events-none absolute bottom-full left-[62%] z-10 mb-2 w-max max-w-[min(240px,calc(100vw-16px))] origin-bottom-left rounded-2xl border-2 ${shift < -24 ? '' : 'rounded-bl-sm'} border-[#2a1a10] bg-[#fbf1d2] px-3 py-2 text-left text-sm font-semibold leading-snug text-[#2a1a10] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] transition duration-500 motion-reduce:transition-opacity ${
         show ? 'scale-100 opacity-100' : 'translate-y-1 scale-95 opacity-0 motion-reduce:translate-y-0 motion-reduce:scale-100'
       } motion-safe:animate-[chill-pop_0.35s_ease-out]`}
     >
@@ -5810,6 +5825,7 @@ function catTalkWanted(on: boolean) {
   return param ? param !== '0' : on
 }
 
+// Phin đang chạy dở từ lần trước (Focus.tsx lưu ở chill:focus)
 function focusRunningAtMount() {
   try {
     const saved = JSON.parse(localStorage.getItem('chill:focus') ?? 'null') as {endsAt?: number; pausedLeft?: number} | null

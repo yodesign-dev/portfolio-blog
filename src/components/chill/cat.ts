@@ -93,6 +93,9 @@ const TIRED_AT = 18
 const SULK_TAPS = 6
 const SULK_WINDOW = 30
 const SULK_FOR = 20
+// Đồng hồ thật (giây) cho vuốt quá tay / nằm ngửa / vuốt lưng: `breath` chỉ chạy khi cảnh chạy,
+// cảnh tạm dừng (giảm chuyển động, nút Dừng cảnh) thì gần như đứng yên → mèo dỗi mãi không hết
+const wall = () => performance.now() / 1000
 // Ngồi nói (meow-0 há miệng, meow-1 khép miệng) — 1 câu ~ vài lần mấp máy rồi ngồi cười
 const TALK: Step[] = [
   ['paw-0', 0.3],
@@ -413,7 +416,7 @@ export class Cat {
 
   // Đang rảnh để diễn chào / quay đầu (không chơi cần câu, không gừ gừ, không giận dỗi)
   private get free() {
-    return this.hunt === 'off' && !this.purring && !this.jump && this.breath >= this.sulkUntil
+    return this.hunt === 'off' && !this.purring && !this.jump && wall() >= this.sulkUntil
   }
 
   // Chào khách lúc vào quán: hé mắt → ngẩng nhìn khách (lúc bong bóng hiện) → ngồi dậy vẫy chân
@@ -506,8 +509,8 @@ export class Cat {
   // Vuốt dọc lưng (kéo tay qua thân mèo): đuôi phẩy, tim. Không tính vào "vuốt quá tay"
   private strokeAt = -99
   stroke() {
-    if (!this.lively || !this.free || this.breath - this.strokeAt < 1.2) return false
-    this.strokeAt = this.breath
+    if (!this.lively || !this.free || wall() - this.strokeAt < 1.2) return false
+    this.strokeAt = wall()
     this.play('stroke')
     this.next = 6
     this.emote('♥')
@@ -516,7 +519,7 @@ export class Cat {
 
   // Vuốt quá tay → "…", quay lưng ngủ một lúc. Chạm lúc này chỉ được vẫy đuôi
   private sulk() {
-    this.sulkUntil = this.breath + SULK_FOR
+    this.sulkUntil = wall() + SULK_FOR
     this.tapTimes = []
     this.action = 'stir'
     this.emote('…', true)
@@ -524,7 +527,7 @@ export class Cat {
     this.queue = [['look', 0.7]]
     this.then = () => {
       this.emote('z', true)
-      this.queue = [['sleep', Math.max(0.5, this.sulkUntil - this.breath), true]]
+      this.queue = [['sleep', Math.max(0.5, this.sulkUntil - wall()), true]]
       this.next = 4
     }
     this.onToy?.('sulk')
@@ -547,7 +550,7 @@ export class Cat {
   // `part` = 'head' khi chạm đúng vùng đầu (Mèo trò chuyện): gãi cằm thay cho các phản ứng thường
   pet(part: 'head' | 'body' = 'body'): 'meow' | 'purr' | null {
     if (this.lively && this.hunt === 'off') {
-      const t = this.breath
+      const t = wall()
       // Đang dỗi: chỉ phẩy đuôi (vẫn quay lưng), không tim, không kêu
       if (t < this.sulkUntil) {
         this.queue = [
@@ -565,7 +568,7 @@ export class Cat {
       }
     }
     // Đang nằm ngửa mời gãi bụng mà khách chạm tiếp → "bẫy bụng": ôm tay, đạp chân
-    if (this.lively && this.hunt === 'off' && this.breath < this.bellyUntil) {
+    if (this.lively && this.hunt === 'off' && wall() < this.bellyUntil) {
       this.bellyUntil = 0
       this.lastTap = 'pet'
       this.action = 'pet'
@@ -596,7 +599,7 @@ export class Cat {
       ]
       this.hold = 0
       this.then = null
-      this.bellyUntil = this.breath + 2.6
+      this.bellyUntil = wall() + 2.6
       this.next = 6
       return 'purr'
     }
@@ -641,7 +644,7 @@ export class Cat {
 
   // Nhấn giữ vào mèo → gừ gừ (ChillRoom phát tiếng), thả ra thì ngẩng lên nhìn
   setPurring(on: boolean) {
-    if (on === this.purring || (on && (this.hunt !== 'off' || this.breath < this.sulkUntil))) return
+    if (on === this.purring || (on && (this.hunt !== 'off' || wall() < this.sulkUntil))) return
     this.purring = on
     this.purrT = 0
     this.hold = 0
