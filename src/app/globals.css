@@ -8,6 +8,15 @@
   }
 }
 
+/* Màn thấp nằm ngang (điện thoại xoay ngang): /chill thu thanh nhạc còn 1 hàng và né con mèo trên
+   bậu cửa — dùng: lowland:p-2. Khai báo SAU touch để lowland: thắng touch: và sm: khi cùng thuộc tính.
+   Đổi điều kiện ở đây thì đổi luôn LOWLAND_QUERY trong ChillRoom.tsx */
+@custom-variant lowland {
+  @media (orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px) {
+    @slot;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

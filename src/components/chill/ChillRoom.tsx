@@ -152,6 +152,13 @@ const PAN_HINT_MS = 8000
 const CAT_GREET_DELAY_MS = 2500
 // Không đụng chuột/phím bao lâu thì giấu giao diện
 const IDLE_MS = 3500
+// Màn thấp nằm ngang (biến thể Tailwind `lowland:` trong globals.css): thanh nhạc 1 hàng cao 58 px,
+// cách đáy 8 px, lề 2 bên 12 px. Mèo (+ cần câu) thò xuống dưới mép trên thanh thì thanh né sang bên
+// rộng hơn; bên đó hẹp hơn LOW_DOCK_MIN (không đủ chỗ cho các nút + tên bài) thì thanh ở giữa như cũ
+const LOWLAND_QUERY = '(orientation: landscape) and (max-height: 500px) and (max-width: 1023.98px)'
+const LOW_DOCK_TOP = 58 + 8 + 4
+const LOW_DOCK_PAD = 12
+const LOW_DOCK_MIN = 340
 // Điện thoại: hàng thông tin dưới thanh trên là chữ trơn, các mục cách nhau bằng dấu chấm giữa
 const INFO_ROW =
   'max-sm:text-white/65 max-sm:[&>span]:h-auto max-sm:[&>span]:rounded-none max-sm:[&>span]:bg-transparent max-sm:[&>span]:px-0 max-sm:[&>span]:text-inherit max-sm:[&>span]:backdrop-blur-none max-sm:[&>span+span]:before:mr-2 max-sm:[&>span+span]:before:content-["·"]'
@@ -522,6 +529,8 @@ export function ChillRoom({
   const [catBox, setCatBox] = useState<Box | null>(null)
   // Cần câu lông vũ dựng cạnh mèo: đang cầm (toyOut) · mèo vừa hết sức, ngủ bù (toyRest)
   const [toyBox, setToyBox] = useState<Box | null>(null)
+  // Kích thước khung khi màn thấp nằm ngang (LOWLAND_QUERY), null = màn khác → thanh nhạc như thường
+  const [lowView, setLowView] = useState<{w: number; h: number} | null>(null)
   // Phòng đang cầm cần câu (đổi phòng là cần câu về chỗ dựng của phòng mới)
   const [toyIn, setToyIn] = useState<ThemeId | null>(null)
   const [toyRest, setToyRest] = useState(false)
@@ -840,6 +849,7 @@ export function ChillRoom({
         return left + hit.w * k < 0 || left > cw ? null : {left, top, width: hit.w * k, height: hit.h * k}
       }
       setCatBox(toBox(scene.catHitBox))
+      setLowView(window.matchMedia(LOWLAND_QUERY).matches ? {w: cw, h: ch} : null)
       const tripHit = scene.tripHitBox
       setTripBox(tripHit ? toBox(tripHit) : null)
       setToyBox(toBox(scene.toyPropBox))
@@ -1473,6 +1483,25 @@ export function ChillRoom({
   // chủ yếu để làm việc, ẩn lúc Focus thì gần như không ai thấy)
   const toyAvailable = catToyOn && !groupView && !scenePaused && catTrip === 'home'
   const toyOut = toyAvailable && toyIn === theme
+  // Màn thấp nằm ngang: lề của thanh nhạc để né mèo và món dựng cạnh mèo (xem LOW_DOCK_TOP)
+  const dockDodge = useMemo(() => {
+    if (!lowView || !catBox || groupView) return null
+    let left = catBox.left
+    let right = catBox.left + catBox.width
+    let bottom = catBox.top + catBox.height
+    // Cạnh mèo: cần câu dựng chờ, hoặc mẩu giấy / ba lô + bưu thiếp lúc mèo đi chơi xa
+    for (const b of [toyAvailable ? toyBox : null, catTrip !== 'home' ? tripBox : null]) {
+      if (!b) continue
+      left = Math.min(left, b.left)
+      right = Math.max(right, b.left + b.width)
+      bottom = Math.max(bottom, b.top + b.height)
+    }
+    if (bottom <= lowView.h - LOW_DOCK_TOP) return null
+    const roomRight = lowView.w - right - 4 - LOW_DOCK_PAD
+    const roomLeft = left - 4 - LOW_DOCK_PAD
+    if (Math.max(roomLeft, roomRight) < LOW_DOCK_MIN) return null
+    return roomRight >= roomLeft ? {paddingLeft: Math.round(right + 4)} : {paddingRight: Math.round(lowView.w - left + 4)}
+  }, [lowView, catBox, toyBox, toyAvailable, tripBox, catTrip, groupView])
   useEffect(() => {
     sceneRef.current?.setToyProp(toyAvailable)
   }, [toyAvailable])
@@ -4767,17 +4796,20 @@ export function ChillRoom({
       )}
 
       {/* Dock nhạc nổi phía dưới. Đang mở Cài đặt trên màn hẹp hơn 800px (tablet dọc, cửa sổ hẹp) thì bảng
-          chỉ chừa ~300px, các nút nhạc rớt thành 3 hàng → ẩn dock như trên điện thoại (ở đó bảng đã che nó) */}
+          chỉ chừa ~300px, các nút nhạc rớt thành 3 hàng → ẩn dock như trên điện thoại (ở đó bảng đã che nó).
+          Màn thấp nằm ngang (lowland): thanh 1 hàng sát đáy, né mèo (dockDodge); mở Cài đặt thì cũng ẩn,
+          vì bảng 420px + lề né mèo không còn chỗ cho thanh */}
       <div
-        className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 ${
-          panelOpen ? 'sm:pr-[436px] max-[800px]:hidden' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''
+        style={dockDodge && !panelOpen ? dockDodge : undefined}
+        className={`absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-[padding] duration-300 sm:px-5 sm:pb-5 lowland:px-3 lowland:pb-[max(0.5rem,env(safe-area-inset-bottom))] ${
+          panelOpen ? 'sm:pr-[436px] max-[800px]:hidden lowland:hidden' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''
         } ${fade} ${brewing ? 'hidden' : ''}`}
       >
         <div
           {...hoverProps}
           // @container: các nút co theo bề ngang thật của thanh nhạc (bị bảng Cài đặt chiếm chỗ trên tablet
           // ngang), không theo bề ngang màn hình — để tên bài không bao giờ bị ép còn 1–2 chữ
-          className="@container relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4"
+          className="@container relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#16131a]/80 p-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-4 lowland:px-2 lowland:py-1.5"
         >
           {bannerOn && bannerLive && bannerUpdate && !zen && !panelOpen && !otherOverlay && !(resumeOffer && !started) && !(bannerUpdate.action === `station:${station}` && !showMine) && (
             <UpdateBanner
@@ -4806,8 +4838,9 @@ export function ChillRoom({
             </button>
           )}
           {/* Thanh hẹp (< 448px, điện thoại dọc): tên trạm + tên bài lên 1 hàng riêng phía trên các nút,
-              để tên bài đọc được trọn thay vì "Mornin…" */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 @md:flex-nowrap sm:gap-x-3">
+              để tên bài đọc được trọn thay vì "Mornin…". Màn thấp nằm ngang: luôn 1 hàng (tên bài chịu cắt)
+              để thanh thấp nhất có thể */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-2 @md:flex-nowrap sm:gap-x-3 lowland:flex-nowrap lowland:gap-x-1.5">
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               {/* Thanh nhạc hẹp (điện thoại, tablet / điện thoại ngang đang mở Cài đặt): nút bài trước nhường chỗ
                   khi có nút trăng hoặc nút tim (Bài của tôi), để các nút vẫn nằm trên 1 hàng */}
@@ -4829,13 +4862,13 @@ export function ChillRoom({
                 <NextIcon />
               </RoundButton>
             </div>
-            <div className="order-first min-w-0 basis-full px-1 @md:order-none @md:flex-1 @md:basis-auto @md:px-0">
+            <div className="order-first min-w-0 basis-full px-1 @md:order-none @md:flex-1 @md:basis-auto @md:px-0 lowland:order-none lowland:flex-1 lowland:basis-auto lowland:px-0.5">
               <p className="truncate font-mono text-[11px] uppercase tracking-[0.12em] text-[#a79e94]">
                 {stationLabel} · {playingPos + 1}/{playingList.length}
               </p>
               <p className="truncate font-semibold">{track.title}</p>
             </div>
-            <span aria-hidden className="flex-1 @md:hidden" />
+            <span aria-hidden className="flex-1 @md:hidden lowland:hidden" />
             {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             <Visualizer audioRef={audioRef} playing={playing} />
             <input
@@ -4883,7 +4916,7 @@ export function ChillRoom({
               )}
             </div>
             {sleepFlag && (
-              <div className={`relative shrink-0 ${sleepOnPhone ? '' : 'hidden sm:block'}`}>
+              <div className={`relative shrink-0 ${sleepOnPhone ? '' : 'hidden sm:block lowland:@max-[400px]:hidden'}`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -5024,8 +5057,9 @@ export function ChillRoom({
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tabular-nums text-[#a79e94]">
-            <span className="w-8">{formatTime(position)}</span>
+          {/* Màn thấp nằm ngang: hàng tua thu thành vạch tiến độ mảnh trên mép thanh (chưa chạm để tua được) */}
+          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tabular-nums text-[#a79e94] lowland:pointer-events-none lowland:absolute lowland:inset-x-4 lowland:top-0 lowland:mt-0">
+            <span className="w-8 lowland:hidden">{formatTime(position)}</span>
             <div
               role="slider"
               tabIndex={started ? 0 : -1}
@@ -5036,12 +5070,12 @@ export function ChillRoom({
               aria-valuetext={`${formatTime(position)} / ${formatTime(duration)}`}
               onClick={seek}
               onKeyDown={seekKey}
-              className="relative h-3 flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11"
+              className="relative h-3 flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11 lowland:my-0 lowland:h-[3px]"
             >
               <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
               <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]" style={{width: `${progress * 100}%`}} />
             </div>
-            <span className="w-8 text-right">{formatTime(duration)}</span>
+            <span className="w-8 text-right lowland:hidden">{formatTime(duration)}</span>
           </div>
         </div>
       </div>
@@ -5051,8 +5085,9 @@ export function ChillRoom({
           Studio tắt, phòng không phải café) thì hàng tự dồn lại.
           Điện thoại / màn dọc: hàng ngang nút tròn gọn ngay trên thanh nhạc.
           Màn ngang ≥1024px: cột dọc sát mép phải, đáy ngang đáy thanh nhạc (khoảng trống
-          bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi */}
-      <div className={`absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end ${brewing ? 'max-xl:hidden' : ''}`}>
+          bên phải thanh nhạc đủ rộng cho cột) — không đè thanh nhạc, ít che người ngồi.
+          Màn thấp nằm ngang (lowland): thanh nhạc chỉ cao 58px nên hàng nút hạ xuống theo */}
+      <div className={`absolute right-3 z-30 flex items-center gap-2.5 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+104px)] sm:right-5 sm:bottom-[124px] lg:bottom-5 lg:flex-col lg:items-end lowland:right-3 lowland:bottom-[calc(max(0.5rem,env(safe-area-inset-bottom))+66px)] ${brewing ? 'max-xl:hidden' : ''}`}>
         <div ref={setDiarySlot} className={lay.diary ? 'contents' : 'hidden'} />
         {/* Điện thoại: Góp ý + Mời bạn nằm trong Thực đơn; đang ngồi bàn nhóm thì nút bàn vẫn ở đây.
             Quán gọn: máy tính cũng vậy, Mời bạn + trò chuyện chỉ hiện khi khách bật Bàn nhóm */}

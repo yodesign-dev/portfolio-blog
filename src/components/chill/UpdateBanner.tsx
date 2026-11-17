@@ -9,6 +9,7 @@
 // thì cắt "…", bấm vào mở "Có gì mới") · nút chính · ẩn. `dimmed` = mèo đang nói ngay cạnh → banner
 // mờ đi, tạm không bấm được (không tính là đã đóng). Đang có focus bàn phím bên trong thì không mờ
 // Màn 640–1023 px: nút sổ tròn (ChillRoom, right-5 bottom-[124px]) nằm đúng mép phải dòng này → chừa chỗ
+// (màn thấp nằm ngang cũng vậy: nút sổ hạ xuống theo thanh nhạc 1 hàng, vẫn ở mép phải dòng này)
 
 import {useState} from 'react'
 import type {ChillUpdate} from './Changelog'
