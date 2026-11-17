@@ -159,6 +159,8 @@ const LOWLAND_QUERY = '(orientation: landscape) and (max-height: 500px) and (max
 const LOW_DOCK_TOP = 58 + 8 + 4
 const LOW_DOCK_PAD = 12
 const LOW_DOCK_MIN = 340
+// Ô đồng hồ Bàn pha phin cần rộng hơn: dưới 400px hàng nhạc của nó ép nút còn 21px
+const LOW_PLATE_MIN = 400
 // Điện thoại: hàng thông tin dưới thanh trên là chữ trơn, các mục cách nhau bằng dấu chấm giữa
 const INFO_ROW =
   'max-sm:text-white/65 max-sm:[&>span]:h-auto max-sm:[&>span]:rounded-none max-sm:[&>span]:bg-transparent max-sm:[&>span]:px-0 max-sm:[&>span]:text-inherit max-sm:[&>span]:backdrop-blur-none max-sm:[&>span+span]:before:mr-2 max-sm:[&>span+span]:before:content-["·"]'
@@ -1483,9 +1485,11 @@ export function ChillRoom({
   // chủ yếu để làm việc, ẩn lúc Focus thì gần như không ai thấy)
   const toyAvailable = catToyOn && !groupView && !scenePaused && catTrip === 'home'
   const toyOut = toyAvailable && toyIn === theme
-  // Màn thấp nằm ngang: lề của thanh nhạc để né mèo và món dựng cạnh mèo (xem LOW_DOCK_TOP)
-  const dockDodge = useMemo(() => {
-    if (!lowView || !catBox || groupView) return null
+  // Màn thấp nằm ngang: lề để né mèo và món dựng cạnh mèo (xem LOW_DOCK_TOP).
+  // dockDodge: cho thanh nhạc và thanh Ngắm cảnh (thấp, mèo ở cao hơn mép trên thanh thì khỏi né).
+  // plateDodge: cho ô đồng hồ Bàn pha phin (cao không cố định, tới 224px → luôn né khi đủ chỗ)
+  const [dockDodge, plateDodge] = useMemo(() => {
+    if (!lowView || !catBox || groupView) return [null, null]
     let left = catBox.left
     let right = catBox.left + catBox.width
     let bottom = catBox.top + catBox.height
@@ -1496,12 +1500,21 @@ export function ChillRoom({
       right = Math.max(right, b.left + b.width)
       bottom = Math.max(bottom, b.top + b.height)
     }
-    if (bottom <= lowView.h - LOW_DOCK_TOP) return null
     const roomRight = lowView.w - right - 4 - LOW_DOCK_PAD
     const roomLeft = left - 4 - LOW_DOCK_PAD
-    if (Math.max(roomLeft, roomRight) < LOW_DOCK_MIN) return null
-    return roomRight >= roomLeft ? {paddingLeft: Math.round(right + 4)} : {paddingRight: Math.round(lowView.w - left + 4)}
+    const room = Math.max(roomLeft, roomRight)
+    if (room < LOW_DOCK_MIN) return [null, null]
+    const dodge = roomRight >= roomLeft ? {paddingLeft: Math.round(right + 4)} : {paddingRight: Math.round(lowView.w - left + 4)}
+    return [bottom <= lowView.h - LOW_DOCK_TOP ? null : dodge, room < LOW_PLATE_MIN ? null : dodge]
   }, [lowView, catBox, toyBox, toyAvailable, tripBox, catTrip, groupView])
+  // Thanh Ngắm cảnh (rộng tối đa 420px, canh giữa bằng left-1/2) → canh giữa trong phần còn lại sau khi né
+  const zenDodge = useMemo(() => {
+    if (!dockDodge || !lowView) return undefined
+    const from = dockDodge.paddingLeft ?? LOW_DOCK_PAD
+    const to = lowView.w - (dockDodge.paddingRight ?? LOW_DOCK_PAD)
+    const width = Math.min(420, to - from)
+    return {left: Math.round(from + (to - from - width) / 2), width, translate: 'none'}
+  }, [dockDodge, lowView])
   useEffect(() => {
     sceneRef.current?.setToyProp(toyAvailable)
   }, [toyAvailable])
@@ -3906,11 +3919,13 @@ export function ChillRoom({
 
       {/* Ngắm cảnh: thanh nhạc gọn giữa đáy — lùi / phát / sang bài, tên bài, mở danh sách.
           Luôn hiện để đổi nhạc được ngay; để yên thì mờ còn 65% (vẫn đọc được tên bài),
-          rê chuột / chạm là rõ lại. Bấm ra ngoài là đóng danh sách */}
+          rê chuột / chạm là rõ lại. Bấm ra ngoài là đóng danh sách.
+          Màn thấp nằm ngang: sát đáy hơn và né mèo như thanh nhạc (zenDodge) */}
       {zen && (
         <div
           ref={zenBarRef}
-          className={`absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[min(420px,calc(100vw-24px))] -translate-x-1/2 transition-opacity duration-700 ${
+          style={zenDodge}
+          className={`absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[min(420px,calc(100vw-24px))] -translate-x-1/2 transition-opacity duration-700 lowland:bottom-[max(0.5rem,env(safe-area-inset-bottom))] ${
             idle && !zenTip && !zenList ? 'opacity-65 hover:opacity-100 focus-within:opacity-100' : 'opacity-100'
           }`}
         >
@@ -3979,8 +3994,12 @@ export function ChillRoom({
         <div
           ref={setBrewSlot}
           {...hoverProps}
-          className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3 sm:px-5 ${
-            zen ? 'bottom-[calc(max(1rem,env(safe-area-inset-bottom))+84px)]' : 'bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-5'
+          // Màn thấp nằm ngang: né mèo như thanh nhạc (đang mở Cài đặt thì thôi, bảng đã chiếm 436px)
+          style={plateDodge && !(panelOpen && !zen) ? plateDodge : undefined}
+          className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center px-3 sm:px-5 lowland:px-3 ${
+            zen
+              ? 'bottom-[calc(max(1rem,env(safe-area-inset-bottom))+84px)] lowland:bottom-[calc(max(0.5rem,env(safe-area-inset-bottom))+68px)]'
+              : 'bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-5 lowland:pb-[max(0.5rem,env(safe-area-inset-bottom))]'
           } ${panelOpen && !zen ? 'sm:pr-[436px]' : wishOpen || chatOpen ? 'lg:pr-[450px]' : ''}`}
         />
       )}
@@ -5057,8 +5076,10 @@ export function ChillRoom({
               )}
             </div>
           </div>
-          {/* Màn thấp nằm ngang: hàng tua thu thành vạch tiến độ mảnh trên mép thanh (chưa chạm để tua được) */}
-          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tabular-nums text-[#a79e94] lowland:pointer-events-none lowland:absolute lowland:inset-x-4 lowland:top-0 lowland:mt-0">
+          {/* Màn thấp nằm ngang: hàng tua thu thành vạch tiến độ 3px trên mép thanh. Vùng chạm để tua cao 16px:
+              12px nhô lên trên mép thanh + 4px bên trong — không hơn, vì banner / nút Nghe tiếp / bảng âm lượng
+              nằm cách mép thanh 12px (mb-3) và hàng nút bắt đầu cách mép 6px */}
+          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] tabular-nums text-[#a79e94] lowland:absolute lowland:inset-x-4 lowland:-top-3 lowland:mt-0">
             <span className="w-8 lowland:hidden">{formatTime(position)}</span>
             <div
               role="slider"
@@ -5070,10 +5091,10 @@ export function ChillRoom({
               aria-valuetext={`${formatTime(position)} / ${formatTime(duration)}`}
               onClick={seek}
               onKeyDown={seekKey}
-              className="relative h-3 flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11 lowland:my-0 lowland:h-[3px]"
+              className="relative h-3 flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11 lowland:my-0 lowland:h-4"
             >
-              <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
-              <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d]" style={{width: `${progress * 100}%`}} />
+              <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10 lowland:top-auto lowland:bottom-0 lowland:h-[3px] lowland:translate-y-0" />
+              <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d] lowland:top-auto lowland:bottom-0 lowland:h-[3px] lowland:translate-y-0" style={{width: `${progress * 100}%`}} />
             </div>
             <span className="w-8 text-right lowland:hidden">{formatTime(duration)}</span>
           </div>
