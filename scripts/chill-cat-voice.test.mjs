@@ -3,7 +3,7 @@
 
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {canSpeak, emptyLog, forcedGreeting, greetStyle, guideWait, logSpoken, pickGreeting, speakMs} from '../src/components/chill/cat-voice.ts'
+import {canSpeak, emptyLog, forcedGreeting, greetStyle, guideWait, logSpoken, pickChat, pickGreeting, speakMs} from '../src/components/chill/cat-voice.ts'
 
 const now = new Date(2026, 10, 16, 15, 0)
 const days = (...d) => d.map((n) => `2026-11-${String(n).padStart(2, '0')}`)
@@ -42,7 +42,8 @@ test('quay lại trong cùng ngày chỉ chào khi đã vắng ≥ 2 giờ', () 
 })
 
 test('kiểu diễn theo câu chào', () => {
-  assert.equal(greetStyle('lv7'), 'hearts')
+  assert.equal(greetStyle('lv3'), 'hearts')
+  assert.equal(greetStyle('lv7'), 'rub')
   assert.equal(greetStyle('gap'), 'stretch')
   assert.equal(greetStyle('same'), 'peek')
   assert.equal(greetStyle('new'), 'wave')
@@ -79,4 +80,23 @@ test('?catgreet chỉ nhận id hợp lệ', () => {
   assert.equal(forcedGreeting('?catgreet=lv7'), 'lv7')
   assert.equal(forcedGreeting('?catgreet=<script>'), null)
   assert.equal(forcedGreeting(''), null)
+})
+
+test('hỏi thăm: 1 lần mỗi lần ghé, cách câu trước ≥ 20 s', () => {
+  let log = {...emptyLog(), lastEnd: 1000}
+  assert.equal(canSpeak(log, 'chat', 15_000, false), false)
+  assert.equal(canSpeak(log, 'chat', 21_000, false), true)
+  log = logSpoken(log, 'chat', 21_000)
+  assert.equal(canSpeak(log, 'chat', 999_999, false), false)
+})
+
+test('hỏi thăm theo trời và giờ', () => {
+  const at = (h) => new Date(2026, 10, 16, h, 30)
+  assert.equal(pickChat(at(15), true), 'rain')
+  assert.equal(pickChat(at(6), false), 'morning')
+  assert.equal(pickChat(at(12), false), 'lunch')
+  assert.equal(pickChat(at(23), false), 'late')
+  assert.equal(pickChat(at(2), false), 'late')
+  assert.equal(pickChat(at(15), false), null)
+  assert.equal(pickChat(at(9), false), null)
 })

@@ -455,6 +455,16 @@ const en = {
     caught: 'Got it!',
     missed: 'Next time. That feather’s quick',
     tired: 'Out of juice. Nap time',
+    belly: 'The belly is a trap!',
+    chat: {
+      rain: 'It’s raining. Stay in and listen',
+      morning: 'Early start! Busy day ahead?',
+      lunch: 'Lunchtime. Have you eaten?',
+      late: 'It’s late. Finish this one, then sleep',
+    } as Record<'rain' | 'morning' | 'lunch' | 'late', string>,
+    setting: 'Café cat talks',
+    settingDesc: 'The cat greets you and shows you around. Off: it still naps and flicks its tail, just no words',
+    seeCat: 'Show the cat',
   },
   trip: {
     offerTag: 'A little trip',
@@ -1271,6 +1281,16 @@ const vi: typeof en = {
     caught: 'Bắt được rồi nè!',
     missed: 'Lần sau nha, lông vũ nhanh quá',
     tired: 'Hết pin rồi, cho mình ngủ chút',
+    belly: 'Bụng là bẫy đó nha!',
+    chat: {
+      rain: 'Mưa rồi, ngồi trong này nghe mưa cho đã',
+      morning: 'Sáng sớm đã ghé, hôm nay nhiều việc không?',
+      lunch: 'Trưa rồi, ăn gì chưa đó?',
+      late: 'Khuya rồi, xong việc này rồi ngủ nha',
+    },
+    setting: 'Mèo trò chuyện',
+    settingDesc: 'Mèo chào bạn và chỉ chỗ trong quán. Tắt thì mèo vẫn ngủ, vẫy đuôi, chỉ thôi nói',
+    seeCat: 'Xem mèo',
   },
   trip: {
     offerTag: 'Đi chơi xa',

@@ -59,6 +59,17 @@ const FRAMES = {
   'head-0': [2158, 302, 155, 124, 0],
   'head-1': [2317, 307, 183, 119, 28],
   'head-2': [2504, 296, 168, 130, 13],
+  // Hàng 3 — Mèo trò chuyện đợt 2 (Nano Banana 2.1 qua Weave): ngồi nói (meow-0 há miệng, meow-1
+  // khép miệng cười), nằm ngửa (belly-*), nhồi bột (knead-*), ngồi dụi đầu (rub-*)
+  'meow-0': [0, 432, 115, 153, -27],
+  'meow-1': [122, 432, 113, 153, -27],
+  'belly-0': [242, 491, 226, 94, 62],
+  'belly-1': [474, 467, 208, 118, 43],
+  'knead-0': [688, 465, 164, 120, 6],
+  'knead-1': [858, 475, 163, 110, 6],
+  'knead-2': [1028, 470, 155, 115, 6],
+  'rub-0': [1190, 449, 144, 136, -27],
+  'rub-1': [1340, 437, 130, 148, -14],
 } satisfies Record<string, [number, number, number, number, number]>
 
 type Frame = keyof typeof FRAMES
@@ -68,10 +79,10 @@ type Step = [Frame, number, boolean?] // khung, số giây, lật ngược hư�
 type Hunt = 'off' | 'sleep' | 'watch' | 'sit' | 'stalk' | 'pounce' | 'catch' | 'miss' | 'ignore' | 'turn' | 'tired' | 'home'
 export type ToyEvent = 'bat' | 'catch' | 'miss' | 'tired'
 // Sự kiện báo ra ngoài: trò cần câu + 'sulk' (bị vuốt quá tay, quay lưng ngủ)
-export type CatEvent = ToyEvent | 'sulk'
+export type CatEvent = ToyEvent | 'sulk' | 'belly'
 // Bong bóng biểu cảm pixel trên đầu mèo
 export type Emote = '!' | '?' | '…' | 'z' | '♥' | '♪'
-export type GreetStyle = 'wave' | 'hearts' | 'stretch' | 'peek'
+export type GreetStyle = 'wave' | 'hearts' | 'rub' | 'stretch' | 'peek'
 // Khung ôm: lông vũ kẹp giữa hai chân trước, chỗ này (px gốc từ chân sau, cao trên bậu)
 const HUG_AT: Partial<Record<Frame, [number, number]>> = {'hug-0': [25, 27], 'hug-1': [25, 75]}
 // Thân mèo nằm dài chừng này (px gốc): quay đầu thì chân sau đổi sang mút bên kia
@@ -82,6 +93,17 @@ const TIRED_AT = 18
 const SULK_TAPS = 6
 const SULK_WINDOW = 30
 const SULK_FOR = 20
+// Ngồi nói (meow-0 há miệng, meow-1 khép miệng) — 1 câu ~ vài lần mấp máy rồi ngồi cười
+const TALK: Step[] = [
+  ['paw-0', 0.3],
+  ['meow-0', 0.35],
+  ['meow-1', 0.3],
+  ['meow-0', 0.35],
+  ['meow-1', 0.9],
+]
+// Nhồi bột lúc gừ gừ lâu (nhấn giữ ≥ KNEAD_AFTER giây)
+const KNEAD: Frame[] = ['knead-0', 'knead-1', 'knead-2', 'knead-1']
+const KNEAD_AFTER = 4
 // Biểu cảm: sống bấy lâu (giây), 2 cái cách nhau ít nhất EMOTE_GAP, cùng loại thì EMOTE_SAME
 const EMOTE_LIFE = 1.6
 const EMOTE_GAP = 3
@@ -101,7 +123,7 @@ const EMOTE_INK: Partial<Record<Emote, string>> = {'!': '226,104,60', '♥': '24
 type Pt = {x: number; y: number}
 
 // shine / notes / purr chỉ diễn khi người xem chạm vào mèo (xem pet + setPurring)
-export type CatAction = 'tail' | 'stir' | 'look' | 'stretch' | 'groom' | 'paw' | 'pet' | 'shine' | 'notes' | 'purr'
+export type CatAction = 'tail' | 'stir' | 'look' | 'stretch' | 'groom' | 'paw' | 'pet' | 'shine' | 'notes' | 'purr' | 'chin' | 'stroke' | 'belly'
 type Mood = {night: boolean; rain: boolean; music: boolean}
 
 const repeat = (steps: Step[], n: number) => Array.from({length: n}, () => steps).flat()
@@ -181,6 +203,20 @@ const SEQUENCES: Record<CatAction, () => Step[]> = {
   ],
   // Nhấn giữ → gừ gừ: không theo chuỗi khung, xem setPurring
   purr: () => [],
+  // Mèo trò chuyện — gãi cằm (chạm vào đầu): nhắm mắt ngẩng cằm lên
+  chin: () => [
+    ['stir', 1.3],
+    ['look', 0.6],
+  ],
+  // Mèo trò chuyện — nằm ngửa mời gãi bụng (chuỗi đặt trong pet(), xem bellyUntil)
+  belly: () => [['belly-0', 2]],
+  // Mèo trò chuyện — vuốt dọc lưng: đuôi phẩy lên hai lần
+  stroke: () => [
+    ['tail', 0.45],
+    ['sleep', 0.15],
+    ['tail', 0.45],
+    ['look', 0.7],
+  ],
 }
 // Lúc bắt đầu lau mặt trong chuỗi `shine` (giây) — tia lấp lánh bung ra từ đây
 const SHINE_AT = 1.85
@@ -247,6 +283,7 @@ export class Cat {
   private emoteLast: Partial<Record<Emote, number>> = {}
   private tapTimes: number[] = []
   private sulkUntil = 0
+  private bellyUntil = 0
   onToy?: (e: CatEvent) => void
 
   setRear(p: Pt, room: [number, number] = [p.x - 40, p.x + BODY + 40]) {
@@ -310,6 +347,8 @@ export class Cat {
     if (this.purring) {
       const before = Math.floor(this.purrT / 0.45)
       this.purrT += dt
+      // Gừ lâu → nằm sấp nhồi bột
+      if (this.lively && this.purrT > KNEAD_AFTER) this.frame = KNEAD[Math.floor(this.purrT * 3) % KNEAD.length]
       if (Math.floor(this.purrT / 0.45) > before) this.addHeart(Math.floor(this.purrT / 0.45) % 3)
       return
     }
@@ -390,9 +429,13 @@ export class Cat {
       ['paw-5', 0.6],
       ['look', 0.6],
     ]
-    const look: Step[] = [
-      ['stir', 0.3],
-      ['head-1', 1.6],
+    const look: Step[] = [['stir', 0.3], ...TALK]
+    const rub: Step[] = [
+      ['rub-0', 0.45],
+      ['rub-1', 0.55],
+      ['rub-0', 0.4],
+      ['rub-1', 0.7],
+      ['paw-5', 0.4],
     ]
     const stretch: Step[] = [
       ['stir', 0.4],
@@ -405,9 +448,16 @@ export class Cat {
     this.action = 'look'
     this.then = null
     this.hold = 0
-    this.queue = style === 'peek' ? [...look, ['look', 0.8]] : style === 'stretch' ? [...stretch, ['head-1', 1.4], ...wave] : [...look, ...wave]
+    this.queue =
+      style === 'peek'
+        ? [['stir', 0.3], ['head-1', 1.6], ['look', 0.8]]
+        : style === 'stretch'
+          ? [...stretch, ...TALK, ...wave]
+          : style === 'rub'
+            ? [...look, ...rub, ['look', 0.6]]
+            : [...look, ...wave]
     this.next = 8
-    if (style === 'hearts') for (let i = 0; i < 3; i++) this.addHeart(i, -1.9 - i * 0.18)
+    if (style === 'hearts' || style === 'rub') for (let i = 0; i < 3; i++) this.addHeart(i, (style === 'rub' ? -3.4 : -2.4) - i * 0.18)
     return true
   }
 
@@ -416,15 +466,13 @@ export class Cat {
   // bong bóng lời nói đã nằm ngay trên đầu
   gaze(x: number | null) {
     if (!this.free) return false
-    const steps: Step[] = [
-      ['look', 0.35],
-      ['head-1', 1.8],
-    ]
+    const steps: Step[] = [['stir', 0.25], ...TALK]
     if (x !== null) {
+      // Ngồi quay đầu về phía món (paw-5 nhìn chếch ra trước), món sau lưng thì lật khung
       const behind = (x - this.at(60)) * this.dir < 0
-      steps.push(['head-0', 1.6, behind], ['head-1', 0.8])
+      steps.push(['paw-5', 1.6, behind], ['meow-1', 0.7])
     }
-    steps.push(['look', 0.6])
+    steps.push(['paw-5', 0.3], ['look', 0.6])
     this.action = 'look'
     this.then = null
     this.hold = 0
@@ -453,6 +501,17 @@ export class Cat {
     this.hold = frame ? 999 : 0
     this.emotes = frame && emote && this.lively ? [{kind: emote, age: 0.3}] : []
     if (!frame) this.hearts = []
+  }
+
+  // Vuốt dọc lưng (kéo tay qua thân mèo): đuôi phẩy, tim. Không tính vào "vuốt quá tay"
+  private strokeAt = -99
+  stroke() {
+    if (!this.lively || !this.free || this.breath - this.strokeAt < 1.2) return false
+    this.strokeAt = this.breath
+    this.play('stroke')
+    this.next = 6
+    this.emote('♥')
+    return true
   }
 
   // Vuốt quá tay → "…", quay lưng ngủ một lúc. Chạm lúc này chỉ được vẫy đuôi
@@ -485,7 +544,8 @@ export class Cat {
   // Người xem bấm vào mèo: mỗi lần một phản ứng — ngẩng lên nhìn, rửa mặt làm dáng, vươn vai
   // ngáp, hoặc (đang phát nhạc) ngồi dậy vờn nốt nhạc. Chọn theo không khí, không lặp lại
   // phản ứng vừa diễn. Tim bay lên ở mọi phản ứng
-  pet(): 'meow' | 'purr' | null {
+  // `part` = 'head' khi chạm đúng vùng đầu (Mèo trò chuyện): gãi cằm thay cho các phản ứng thường
+  pet(part: 'head' | 'body' = 'body'): 'meow' | 'purr' | null {
     if (this.lively && this.hunt === 'off') {
       const t = this.breath
       // Đang dỗi: chỉ phẩy đuôi (vẫn quay lưng), không tim, không kêu
@@ -504,7 +564,49 @@ export class Cat {
         return null
       }
     }
+    // Đang nằm ngửa mời gãi bụng mà khách chạm tiếp → "bẫy bụng": ôm tay, đạp chân
+    if (this.lively && this.hunt === 'off' && this.breath < this.bellyUntil) {
+      this.bellyUntil = 0
+      this.lastTap = 'pet'
+      this.action = 'pet'
+      this.queue = [
+        ['belly-1', 0.25],
+        ['belly-0', 0.18],
+        ['belly-1', 0.25],
+        ['belly-0', 0.18],
+        ['belly-1', 0.35],
+        ['stir', 0.3],
+        ['look', 0.6],
+      ]
+      this.hold = 0
+      this.then = null
+      this.emote('!', true)
+      this.onToy?.('belly')
+      return 'meow'
+    }
     this.pets++
+    // Thỉnh thoảng (ban ngày) lăn ra nằm ngửa mời gãi bụng — chạm tiếp trong 2 giây là dính bẫy
+    if (this.lively && part === 'body' && this.hunt === 'off' && !this.mood.night && this.lastTap !== 'belly' && Math.random() < 1 / 6) {
+      this.lastTap = 'belly'
+      this.action = 'pet'
+      this.queue = [
+        ['stir', 0.2],
+        ['belly-0', 2.4],
+        ['look', 0.5],
+      ]
+      this.hold = 0
+      this.then = null
+      this.bellyUntil = this.breath + 2.6
+      this.next = 6
+      return 'purr'
+    }
+    if (this.lively && part === 'head' && this.hunt === 'off') {
+      this.lastTap = 'chin'
+      this.play('chin')
+      this.next = 6
+      this.emote('♥', true)
+      return 'purr'
+    }
     const {music, night} = this.mood
     const options = TAP_REACTIONS.map(([a, quiet, withMusic, atNight]) => [a, a === this.lastTap ? 0 : (music ? withMusic : quiet) * (night ? atNight : 1)] as const)
     let r = Math.random() * options.reduce((s, [, w]) => s + w, 0)
@@ -926,7 +1028,7 @@ export class Cat {
     // Lật hướng nhìn mà thân đứng yên: vẽ như đã quay đầu (chân sau sang mút bên kia)
     const dir = this.mirror ? (this.dir === 1 ? -1 : 1) : this.dir
     const rx = (this.mirror ? this.x + this.dir * BODY : this.x) + shake
-    const sitting = this.frame.startsWith('paw') || this.frame === 'stretch-3'
+    const sitting = this.frame.startsWith('paw') || this.frame.startsWith('meow') || this.frame.startsWith('rub') || this.frame === 'stretch-3'
     // Bóng mềm dưới thân (nhỏ lại khi đang nhảy)
     ctx.fillStyle = 'rgba(40,20,10,0.22)'
     const shrink = Math.max(0.3, 1 - this.lift / 40)

@@ -6,9 +6,10 @@
 //   reply — đáp lại việc khách vừa làm (xong phin, cảm ơn, mèo về…): luôn được nói, như trước
 //   greet — chào lúc vào quán: 1 lần mỗi lần ghé
 //   guide — lời mời làm quen (guide.ts) do mèo nói: theo giới hạn của guide.ts, cách câu trước ≥ 20 s
+//   chat  — hỏi thăm theo giờ / trời: 1 lần mỗi lần ghé, sau khi đã ngồi ≥ 3 phút, cách câu trước ≥ 20 s
 //   play  — lúc vuốt / chơi cần câu: các câu cách nhau ≥ 60 s, không đọc lên trình đọc màn hình
 
-export type VoiceKind = 'reply' | 'greet' | 'guide' | 'play'
+export type VoiceKind = 'reply' | 'greet' | 'guide' | 'chat' | 'play'
 
 // new: lần đầu trong đời · lv3/lv7/lv30: lên Khách quen / Khách ruột / Người nhà · card: thẻ đủ
 // 10 dấu · gap: ≥ 7 ngày không ghé · streak: ≥ 2 ngày liền · back: các lần khác · same: quay
@@ -21,6 +22,8 @@ export const SAME_DAY_AWAY_MS = 2 * 3_600_000
 // Câu chào chờ được nói (bảng đang mở, đang Ngắm cảnh…) tối đa bấy lâu, quá thì bỏ
 export const GREET_WAIT_MS = 60_000
 export const GUIDE_GAP_MS = 20_000
+// Hỏi thăm sau khi khách đã ngồi bấy lâu
+export const CHAT_AFTER_MS = 3 * 60_000
 export const PLAY_GAP_MS = 60_000
 // Câu khi chơi cũng phải cách câu trước (bất kỳ loại nào) bấy lâu
 export const PLAY_AFTER_ANY_MS = 10_000
@@ -50,11 +53,13 @@ export function pickGreeting(before: {days: string[]; total: number}, now: Date,
   return 'back'
 }
 
-// Mèo diễn gì khi chào: vẫy chân, vẫy chân + tim (lên cấp / đủ thẻ), vươn vai rồi vẫy (lâu
+// Mèo diễn gì khi chào: vẫy chân, vẫy chân + tim (lên Khách quen / đủ thẻ), vươn vai rồi vẫy (lâu
 // không gặp), chỉ ngẩng lên nhìn (quay lại trong ngày)
-export type GreetStyle = 'wave' | 'hearts' | 'stretch' | 'peek'
+// `rub` = khách ruột / người nhà: ngồi dụi đầu
+export type GreetStyle = 'wave' | 'hearts' | 'rub' | 'stretch' | 'peek'
 export function greetStyle(id: GreetId): GreetStyle {
-  if (id === 'lv3' || id === 'lv7' || id === 'lv30' || id === 'card') return 'hearts'
+  if (id === 'lv7' || id === 'lv30') return 'rub'
+  if (id === 'lv3' || id === 'card') return 'hearts'
   if (id === 'gap') return 'stretch'
   if (id === 'same') return 'peek'
   return 'wave'
@@ -65,8 +70,8 @@ export function speakMs(text: string) {
   return Math.min(8000, 4500 + 60 * [...text].length)
 }
 
-export type VoiceLog = {greet: number; guide: number; lastPlay: number; lastEnd: number}
-export const emptyLog = (): VoiceLog => ({greet: 0, guide: 0, lastPlay: -Infinity, lastEnd: -Infinity})
+export type VoiceLog = {greet: number; guide: number; chat: number; lastPlay: number; lastEnd: number}
+export const emptyLog = (): VoiceLog => ({greet: 0, guide: 0, chat: 0, lastPlay: -Infinity, lastEnd: -Infinity})
 
 // Được nói câu loại `kind` lúc `now` không. `speaking` = mèo đang có bong bóng trên màn hình
 export function canSpeak(log: VoiceLog, kind: VoiceKind, now: number, speaking: boolean, guideMax = 3): boolean {
@@ -74,6 +79,7 @@ export function canSpeak(log: VoiceLog, kind: VoiceKind, now: number, speaking: 
   if (speaking) return false
   if (kind === 'greet') return log.greet < 1
   if (kind === 'guide') return log.guide < guideMax && now - log.lastEnd >= GUIDE_GAP_MS
+  if (kind === 'chat') return log.chat < 1 && now - log.lastEnd >= GUIDE_GAP_MS
   return now - log.lastPlay >= PLAY_GAP_MS && now - log.lastEnd >= PLAY_AFTER_ANY_MS
 }
 
@@ -81,6 +87,7 @@ export function canSpeak(log: VoiceLog, kind: VoiceKind, now: number, speaking: 
 export function logSpoken(log: VoiceLog, kind: VoiceKind, now: number): VoiceLog {
   if (kind === 'greet') return {...log, greet: log.greet + 1}
   if (kind === 'guide') return {...log, guide: log.guide + 1}
+  if (kind === 'chat') return {...log, chat: log.chat + 1}
   if (kind === 'play') return {...log, lastPlay: now}
   return log
 }
@@ -88,6 +95,36 @@ export function logSpoken(log: VoiceLog, kind: VoiceKind, now: number): VoiceLog
 // Còn phải đợi bao lâu (ms) trước khi mèo được nói câu mời làm quen tiếp theo
 export function guideWait(log: VoiceLog, now: number) {
   return Math.max(0, log.lastEnd + GUIDE_GAP_MS - now)
+}
+
+// Hỏi thăm theo trời / giờ máy khách: mưa · sáng sớm 5–9h · trưa 11–13h · khuya 22–4h. Giờ khác
+// không có câu nào (mèo không hỏi cho có)
+export type ChatId = 'rain' | 'morning' | 'lunch' | 'late'
+export function pickChat(now: Date, rain: boolean): ChatId | null {
+  if (rain) return 'rain'
+  const h = now.getHours()
+  if (h >= 5 && h < 9) return 'morning'
+  if (h >= 11 && h < 13) return 'lunch'
+  if (h >= 22 || h < 4) return 'late'
+  return null
+}
+
+// Khách tự tắt lời mèo trong Cài đặt › Không khí (mèo vẫn diễn, vẫn biểu cảm, chỉ thôi nói)
+const QUIET_KEY = 'chill:cat-quiet'
+export function loadCatQuiet() {
+  try {
+    return localStorage.getItem(QUIET_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+export function saveCatQuiet(quiet: boolean) {
+  try {
+    if (quiet) localStorage.setItem(QUIET_KEY, '1')
+    else localStorage.removeItem(QUIET_KEY)
+  } catch {
+    // Chặn storage — chỉ nhớ trong lần xem này
+  }
 }
 
 // Lần cuối khách còn ở quán (rời tab / đóng trang) — để biết "quay lại trong ngày sau 2 giờ".

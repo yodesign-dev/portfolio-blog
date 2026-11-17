@@ -2120,8 +2120,12 @@ export class ChillScene {
   }
 
   // Người xem bấm vào mèo (ChillRoom) → trả về tiếng kêu để phát
-  petCat() {
-    return this.cat.pet()
+  petCat(part: 'head' | 'body' = 'body') {
+    return this.cat.pet(part)
+  }
+  // Mèo trò chuyện: kéo tay dọc lưng mèo
+  strokeCat() {
+    return this.trip !== 'away' && this.cat.stroke()
   }
 
   noticeCat() {
@@ -2144,7 +2148,7 @@ export class ChillScene {
   }
   // Cảnh tạm dừng (giảm chuyển động): tư thế tĩnh lúc nói, null = về ngủ
   catStill(talking: boolean, emote?: Emote) {
-    if (this.trip !== 'away') this.cat.still(talking ? 'head-1' : null, emote)
+    if (this.trip !== 'away') this.cat.still(talking ? 'meow-1' : null, emote)
   }
 
   // Người xem nhấn giữ vào mèo → gừ gừ tới khi thả ra
