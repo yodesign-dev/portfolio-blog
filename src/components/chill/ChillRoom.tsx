@@ -4782,6 +4782,8 @@ export function ChillRoom({
           {bannerOn && bannerLive && bannerUpdate && !zen && !panelOpen && !otherOverlay && !(resumeOffer && !started) && !(bannerUpdate.action === `station:${station}` && !showMine) && (
             <UpdateBanner
               update={bannerUpdate}
+              // Mèo đang nói ngay cạnh mèo (không phải dòng trên cảnh ở màn dọc) → banner nhường chỗ
+              dimmed={catSay !== null && !!catBox && !groupView}
               onTry={tryBanner}
               onMore={() => {
                 closeBanner('more')
