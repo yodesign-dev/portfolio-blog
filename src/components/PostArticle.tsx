@@ -320,9 +320,13 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
     textColor: ({children, value}) => (
       <span style={{color: value?.color || undefined}}>{children}</span>
     ),
-    fontFamily: ({children, value}) => (
-      <span style={{fontFamily: value?.font || undefined}}>{children}</span>
-    ),
+    // Studio có lựa chọn "Inter (mặc định)" lưu giá trị 'Inter, sans-serif'. Trang không tải Inter,
+    // nên áp nguyên giá trị đó sẽ ra font hệ thống, lệch khỏi phần còn lại của bài. Coi nó đúng
+    // như tên gọi: "mặc định" = không đổi font (thừa hưởng font của trang).
+    fontFamily: ({children, value}) => {
+      const font = value?.font && !/^\s*inter\b/i.test(value.font) ? value.font : undefined
+      return <span style={{fontFamily: font}}>{children}</span>
+    },
   },
   }
 }

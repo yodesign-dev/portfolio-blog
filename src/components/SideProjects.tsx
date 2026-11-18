@@ -131,7 +131,9 @@ function SmallCard({
     <article className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-4 sm:gap-5">
       <CoverLink href={href} src={src} alt={alt} />
       <div>
-        <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">{label}</p>
+        {/* tracking-wider (không phải widest như các nhãn khác): cột này chỉ rộng ~187px ở màn
+            375px, với widest thì "NOTION TEMPLATE · FREE" dài đúng bằng cột và rớt xuống 2 dòng */}
+        <p className="font-mono text-xs uppercase tracking-wider text-neutral-500">{label}</p>
         <h3 className="mt-1.5 text-lg font-bold leading-snug text-neutral-900">{title}</h3>
         <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
         <a href={href} target="_blank" rel="noopener noreferrer" className={`sm:mt-3 ${ctaClass}`}>

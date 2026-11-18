@@ -49,7 +49,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
       <div className="flex items-center">
         <Link
           href="/"
-          className="font-sans text-xl font-bold tracking-tight text-neutral-900 transition hover:text-neutral-600"
+          className="inline-flex min-h-11 items-center font-sans text-xl font-bold tracking-tight text-neutral-900 transition hover:text-neutral-600"
         >
           {SITE_NAME}
         </Link>

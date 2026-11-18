@@ -27,13 +27,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Chỉ dùng cho nhãn nhỏ ở portfolio. Không preload: font khai ở layout gốc được preload trên
-// MỌI route, kể cả /chill là nơi không dùng tới nó.
+// Nhãn, nút, menu của portfolio. `subsets` là danh sách subset được PRELOAD, không phải danh sách
+// được hỗ trợ: chỉ preload latin (2 file, 400 và 700) để nút và nhãn ở màn đầu không nháy font
+// dự phòng. Chữ tiếng Việt vẫn hiện đúng: file vietnamese tải khi trang có ký tự cần tới nó.
+// Cái giá: font khai ở layout gốc nên /chill cũng preload 2 file này dù không dùng.
 const spaceMono = Space_Mono({
   variable: "--font-space-mono",
-  subsets: ["latin", "vietnamese"],
+  subsets: ["latin"],
   weight: ["400", "700"],
-  preload: false,
 });
 
 export const metadata: Metadata = {

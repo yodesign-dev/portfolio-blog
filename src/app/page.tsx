@@ -49,7 +49,8 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href: strin
       <h2 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">{title}</h2>
       <Link
         href={href}
-        className="shrink-0 text-sm font-semibold text-neutral-500 transition-colors hover:text-neutral-900"
+        // touch: vùng bấm cao 44px (20 + 2×12). Margin âm bù lại padding nên chữ không dịch chỗ
+        className="shrink-0 text-sm font-semibold text-neutral-500 transition-colors hover:text-neutral-900 touch:-my-3 touch:py-3"
       >
         {linkLabel} →
       </Link>
