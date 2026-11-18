@@ -16,7 +16,7 @@ export default async function WorkPage() {
   const [studies, behance] = await Promise.all([getCaseStudies(revalidate), getBehanceProjects()])
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900 antialiased">
+    <div className="min-h-screen bg-background text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
           <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">Work</h1>

@@ -25,7 +25,7 @@ export function JustForFun() {
   const gripe = GRIPES[active]
 
   return (
-    <section aria-labelledby="just-for-fun-title" className="overflow-hidden bg-white">
+    <section aria-labelledby="just-for-fun-title" className="overflow-hidden bg-background">
       <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 py-20 sm:px-8 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         {/* Chữ trên thẻ đã có ở dòng mô tả bên cạnh nên ẩn với trình đọc màn hình */}
         <div aria-hidden="true" className="relative mx-auto aspect-[3/4] w-52 sm:w-64">

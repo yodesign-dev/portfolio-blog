@@ -446,7 +446,7 @@ export function PostArticle({post}: {post: Post}) {
     .join(' · ')
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900 antialiased">
+    <div className="min-h-screen bg-background text-neutral-900 antialiased">
       <ViewTracker postId={post._id} slug={post.slug.current} />
       <ReadingProgress targetId={ARTICLE_BODY_ID} />
 

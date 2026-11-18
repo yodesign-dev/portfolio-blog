@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Mulish, Geist_Mono } from "next/font/google";
+import { Archivo, Mulish, Geist_Mono, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteAnalytics } from "@/components/SiteAnalytics";
 import { draftMode } from "next/headers";
@@ -14,17 +14,26 @@ const mulish = Mulish({
   subsets: ["latin", "vietnamese"],
 });
 
-// Font display cho headline lớn ở hero — trước đây khai báo "Inter" trong
-// style nhưng không tải, nên Mac hiện Helvetica Neue, Windows hiện Arial.
-const inter = Inter({
-  variable: "--font-inter",
+// Mulish + Geist Mono: /chill và Studio. Archivo + Space Mono: portfolio (khối
+// [data-skin="paper"] trong globals.css gán chúng vào font-sans / font-mono).
+// Archivo là variable font nên không khai weight: dùng được mọi độ đậm 100–900.
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin", "vietnamese"],
-  weight: ["500"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Chỉ dùng cho nhãn nhỏ ở portfolio. Không preload: font khai ở layout gốc được preload trên
+// MỌI route, kể cả /chill là nơi không dùng tới nó.
+const spaceMono = Space_Mono({
+  variable: "--font-space-mono",
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "700"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -69,7 +78,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${mulish.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${mulish.variable} ${archivo.variable} ${geistMono.variable} ${spaceMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SiteChrome showResume={hasPublicResume}>{children}</SiteChrome>

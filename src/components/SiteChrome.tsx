@@ -29,12 +29,17 @@ export function SiteChrome({
     return <>{children}</>
   }
 
+  // data-skin="paper": bật da "giấy" của portfolio (khối [data-skin="paper"] trong globals.css).
+  // Đặt ở đây chứ không ở <html> để /chill và Studio không dính. `contents`: khối bọc không
+  // tạo hộp nào nên bố cục flex cột của <body> (footer dính đáy) vẫn y như cũ.
   return (
     <ContactModalProvider>
-      <Navbar showResume={showResume} />
-      {children}
-      <SiteFooter showResume={showResume} />
-      <ContactModal />
+      <div data-skin="paper" className="contents">
+        <Navbar showResume={showResume} />
+        {children}
+        <SiteFooter showResume={showResume} />
+        <ContactModal />
+      </div>
     </ContactModalProvider>
   )
 }

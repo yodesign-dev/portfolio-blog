@@ -552,7 +552,7 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
       ref={ref}
       data-paused={paused || intro !== "done"}
       data-intro={intro !== "done" ? "on" : undefined}
-      className="relative aspect-[4/3] w-full"
+      className="skin-reset relative aspect-[4/3] w-full"
       style={{ "--pc-loop": `${PLAYBACK_SECONDS}s`, ...(handedOff && { "--pc-delay": "0s" }) } as React.CSSProperties}
     >
       {/* Đường nối Research → Wireframe → Hi-fi */}
@@ -639,7 +639,7 @@ export function ProcessCanvas({ study }: { study: HeroStudy | null }) {
 // Mobile: chỉ frame Hi-fi (đã duyệt) + con trỏ Bin đứng yên — màn nhỏ có chuyển động dễ rối
 export function ProcessCanvasCompact({ study }: { study: HeroStudy | null }) {
   return (
-    <div className="relative">
+    <div className="skin-reset relative">
       <HiFiFrame study={study} className="aspect-[16/10] w-full" />
       <Cursor label="Bin" tone={BIN_TONE} style={{ right: "18%", bottom: "-6px" }} />
     </div>
