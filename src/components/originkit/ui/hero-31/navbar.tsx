@@ -68,11 +68,13 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
           )}
         </div>
 
+        {/* Nền đen chứ không phải xanh brand như các nút chính khác: ở trang chủ ô này nằm ngay
+            trên hero xanh, cùng màu thì hai mảng dính vào nhau */}
         <button
           type="button"
           aria-haspopup="dialog"
           onClick={() => openModal(undefined, "nav")}
-          className="flex h-full items-center justify-center border-l-2 border-neutral-900 bg-brand px-6 lg:px-10 font-mono text-[13px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-brand-hover"
+          className="flex h-full items-center justify-center border-l-2 border-neutral-900 bg-neutral-900 px-6 lg:px-10 font-mono text-[13px] font-bold uppercase tracking-[0.08em] text-white transition hover:bg-neutral-700"
         >
           Get in touch
         </button>
