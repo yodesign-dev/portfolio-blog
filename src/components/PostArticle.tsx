@@ -180,7 +180,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
       const realDims = getImageDimensions(value)
       const dims = realDims ?? {width: 1200, height: 800}
       const inline = (
-        <div className="overflow-hidden rounded-lg bg-neutral-100">
+        <div className="overflow-hidden border-2 border-neutral-900 bg-neutral-100">
           <Image
             src={imageUrl}
             alt={value.alt || ''}
@@ -212,7 +212,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
           )}
           {/* MỚI: caption dưới ảnh — style giống Medium, in nghiêng, căn giữa */}
           {value.caption && (
-            <figcaption className="mt-3 text-center text-sm italic text-neutral-500">
+            <figcaption className="mt-3 text-center font-mono text-xs leading-relaxed text-neutral-500">
               {value.caption}
             </figcaption>
           )}
@@ -230,7 +230,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
           </div>
         )
       }
-      return <hr className="my-12 border-t border-neutral-200" />
+      return <hr className="my-12 border-t-2 border-neutral-900" />
     },
     table: ({value}) => {
       if (!value?.rows?.length) return null
@@ -243,7 +243,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
           role="region"
           aria-label="Table"
           tabIndex={0}
-          className="my-8 overflow-x-auto rounded-lg border border-neutral-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className="my-8 overflow-x-auto border-2 border-neutral-900 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
           <table className="min-w-full border-collapse text-left text-[15px] leading-snug sm:text-base">
             <tbody>
@@ -278,7 +278,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
     ),
     blockquote: ({children}) => (
       <blockquote
-        className={`${PROSE} my-10 border-l-4 border-neutral-900 pl-5 text-xl italic leading-relaxed text-neutral-700 sm:pl-6 sm:text-2xl`}
+        className={`${PROSE} my-10 border-l-4 border-brand pl-5 text-xl font-medium leading-snug tracking-tight text-neutral-900 sm:pl-6 sm:text-2xl`}
       >
         {children}
       </blockquote>
@@ -385,7 +385,7 @@ function CaseStudyMeta({post}: {post: Post}) {
   return (
     <div className="mt-8 border-y border-neutral-200 py-6">
       {glance.length > 0 && (
-        <dl className="mb-6 grid grid-cols-1 gap-5 rounded-xl bg-brand/5 p-5 sm:grid-cols-3 sm:p-6">
+        <dl className="mb-6 grid grid-cols-1 gap-5 border-2 border-neutral-900 bg-white p-5 sm:grid-cols-3 sm:p-6">
           {glance.map((item) => (
             <div key={item.label}>
               <dt className="font-mono text-xs font-bold uppercase tracking-widest text-brand">{item.label}</dt>
@@ -509,7 +509,7 @@ export function PostArticle({post}: {post: Post}) {
 
               {/* Case study mở bằng khối tóm tắt, ảnh đại diện chỉ dùng khi chia sẻ link */}
               {mainImageUrl && !post.isCaseStudy && (
-                <div className="mt-8 overflow-hidden rounded-lg bg-neutral-100">
+                <div className="mt-8 overflow-hidden border-2 border-neutral-900 bg-neutral-100">
                   <Image
                     src={mainImageUrl}
                     alt={post.mainImage?.alt || post.title}

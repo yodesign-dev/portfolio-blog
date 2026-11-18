@@ -6,7 +6,7 @@ export default function Loading() {
       <ParticleTether
         width={120}
         height={120}
-        dotColor="#171717"
+        dotColor="#101014"
         density={220}
         dotSize={100}
         speed={60}

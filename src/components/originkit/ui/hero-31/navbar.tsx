@@ -45,7 +45,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
   );
 
   return (
-    <header className="relative flex h-[80px] w-full items-center justify-between bg-white pl-[20px] md:pl-[56px] pr-0 text-[#1c1c1c] antialiased">
+    <header className="relative flex h-[80px] w-full items-center justify-between border-b-2 border-neutral-900 bg-white pl-[20px] md:pl-[56px] pr-0 text-neutral-900 antialiased">
       <div className="flex items-center">
         <Link
           href="/"
@@ -56,11 +56,13 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
       </div>
 
       <nav className="hidden md:flex items-center h-full">
-        <div className="flex items-center gap-8 mr-12">
+        {/* Chữ mono in hoa rộng hơn chữ thường: ở md (768–1023px) thu khoảng cách để 5 mục
+            (khi có Resume) vẫn vừa một hàng */}
+        <div className="mr-6 flex items-center gap-5 lg:mr-12 lg:gap-8">
           {navLinks.map((link) =>
             renderLink(
               link,
-              "text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition",
+              "font-mono text-xs uppercase tracking-[0.08em] text-neutral-600 hover:text-neutral-900 transition",
               "text-neutral-900 underline underline-offset-4 decoration-2 decoration-brand"
             )
           )}
@@ -70,7 +72,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
           type="button"
           aria-haspopup="dialog"
           onClick={() => openModal(undefined, "nav")}
-          className="flex h-full items-center justify-center bg-accent px-10 font-mono text-[13px] font-bold uppercase tracking-[0.08em] text-ink transition hover:bg-accent-hover"
+          className="flex h-full items-center justify-center border-l-2 border-neutral-900 bg-accent px-6 lg:px-10 font-mono text-[13px] font-bold uppercase tracking-[0.08em] text-ink transition hover:bg-accent-hover"
         >
           Get in touch
         </button>
@@ -104,7 +106,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
           {navLinks.map((link) =>
             renderLink(
               link,
-              "border-b border-neutral-100 py-4 text-base font-semibold text-neutral-700 transition hover:text-neutral-900",
+              "border-b border-neutral-200 py-4 font-mono text-sm uppercase tracking-[0.08em] text-neutral-700 transition hover:text-neutral-900",
               "text-neutral-900 bg-neutral-50",
               () => setIsMenuOpen(false)
             )

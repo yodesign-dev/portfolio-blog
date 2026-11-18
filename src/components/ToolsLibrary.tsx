@@ -19,12 +19,13 @@ type ToolsLibraryProps = {
 }
 
 const CATEGORY_STYLES: Record<string, string> = {
-  design: 'bg-pink-50 text-pink-700',
-  development: 'bg-emerald-50 text-emerald-700',
-  ai: 'bg-violet-50 text-violet-700',
-  productivity: 'bg-blue-50 text-blue-700',
-  marketing: 'bg-amber-50 text-amber-700',
-  other: 'bg-neutral-100 text-neutral-600',
+  // Viền + chữ cùng màu, không nền nhạt: nền pastel lạnh (pink-50, blue-50…) lạc tông trên thẻ giấy kem
+  design: 'border border-current text-pink-700',
+  development: 'border border-current text-emerald-700',
+  ai: 'border border-current text-brand',
+  productivity: 'border border-current text-sky-800',
+  marketing: 'border border-current text-amber-800',
+  other: 'border border-current text-neutral-600',
 }
 
 const PAGE_SIZE = 9

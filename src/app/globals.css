@@ -24,6 +24,8 @@
      portfolio. /chill và Studio nằm ngoài khối đó nên vẫn dùng Mulish + Geist Mono. */
   --sans-stack: var(--font-mulish), Helvetica, sans-serif;
   --mono-stack: var(--font-geist-mono);
+  /* Màu "mực" của token ink (nền footer, chữ trên nút cyan): cũng là biến để khối skin đổi được */
+  --ink: #0b1432;
 }
 
 /*
@@ -45,7 +47,7 @@
   --color-brand-hover: #0026cc;
   --color-accent: #00ddff;
   --color-accent-hover: #00c4e3;
-  --color-ink: #0b1432;
+  --color-ink: var(--ink);
 
   --font-sans: var(--sans-stack);
   --font-display: var(--font-archivo), "Helvetica Neue", Arial, sans-serif;
@@ -75,6 +77,7 @@ body {
 [data-skin="paper"] {
   --background: #ede9e0; /* nền trang */
   --foreground: #101014;
+  --ink: #101014; /* một màu đen duy nhất: footer, viền, bóng, chữ nút (trước là navy #0b1432) */
   --color-white: #f7f4ee; /* nền thẻ, và chữ trên nền đậm */
   --color-neutral-50: #e9e5db;
   --color-neutral-100: #e4dfd4;
@@ -164,6 +167,7 @@ body:has([data-skin="paper"]) {
 /* Khung minh hoạ ở hero (process-canvas.tsx) vẽ một giao diện app nền trắng, góc bo, trên nền
    xanh brand: trả các biến về mặc định của Tailwind để hình vẽ giữ nguyên như trước. */
 [data-skin="paper"] .skin-reset {
+  --ink: #0b1432;
   --color-white: #fff;
   --color-neutral-100: #f5f5f5;
   --color-neutral-400: #a1a1a1;

@@ -34,7 +34,7 @@ export function Background() {
             <li key={name} className="group flex min-w-0 items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-neutral-200 md:size-8"
+                className="flex size-7 shrink-0 items-center justify-center overflow-hidden bg-white ring-1 ring-neutral-900 md:size-8"
               >
                 {icon ? (
                   <Image

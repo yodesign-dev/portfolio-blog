@@ -87,8 +87,8 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
             className="w-full"
             onMouseLeave={() => setHoveredIndex(null)}
           >
-            <path d={totalPath} fill="none" stroke="#a3a3a3" strokeWidth={2} />
-            <path d={aiPath} fill="none" stroke="#7c3aed" strokeWidth={2} />
+            <path d={totalPath} fill="none" stroke="#646262" strokeWidth={2} />
+            <path d={aiPath} fill="none" stroke="#002fff" strokeWidth={2} />
             {chartData.map((d, i) => {
               const total = pointFor(i, d.total)
               const ai = pointFor(i, d.ai)
@@ -118,13 +118,13 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
                     cx={total.x}
                     cy={total.y}
                     r={isSelected || i === hoveredIndex ? 5 : 3}
-                    fill="#a3a3a3"
+                    fill="#646262"
                   />
                   <circle
                     cx={ai.x}
                     cy={ai.y}
                     r={isSelected || i === hoveredIndex ? 5 : 3}
-                    fill="#7c3aed"
+                    fill="#002fff"
                   />
                   <text
                     x={total.x}
@@ -166,7 +166,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
             <span className="h-2 w-2 rounded-full bg-neutral-400" /> Total tools
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-violet-600" /> AI tools
+            <span className="h-2 w-2 rounded-full bg-brand" /> AI tools
           </span>
         </div>
       </div>
@@ -206,7 +206,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
                 className="relative flex flex-col items-center gap-2 border-2 border-neutral-900 bg-white p-4 text-center shadow-hard-sm transition hover:-translate-y-0.5 hover:shadow-hard-lg motion-reduce:transform-none"
               >
                 {isNew && (
-                  <span className="absolute -top-2.5 -right-2.5 border-2 border-neutral-900 bg-violet-600 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.06em] text-white">
+                  <span className="absolute -top-2.5 -right-2.5 border-2 border-neutral-900 bg-brand px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.06em] text-white">
                     New
                   </span>
                 )}

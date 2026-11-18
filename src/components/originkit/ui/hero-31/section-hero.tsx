@@ -94,11 +94,13 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
 
           {/* H1 nói giá trị (làm gì, khác gì) thay cho slogan "Learn by
               Sharing" — người mới vào cần hiểu trong 5 giây. Slogan vẫn còn ở
-              footer. text-balance để các dòng dài ngắn đều khi xuống dòng. */}
+              footer. text-balance để các dòng dài ngắn đều khi xuống dòng.
+              Cỡ chữ tối thiểu 28px (không phải 32): chữ đậm rộng hơn, ở 32px tiêu đề
+              thành 4 dòng trên màn 375px; với 8vw nó giữ 3 dòng từ màn rộng ~345px trở lên. */}
           <h1
             aria-label={HEADLINE}
             style={{ "--hero-chars": HEADLINE.length } as CSSProperties}
-            className="mb-6 text-balance text-center font-display text-[clamp(32px,8vw,56px)] font-medium leading-[1.08] tracking-[-0.035em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]"
+            className="mb-6 text-balance text-center font-display text-[clamp(28px,8vw,56px)] font-bold leading-[1.04] tracking-[-0.04em] text-white antialiased md:text-left lg:text-[clamp(40px,3.6vw,64px)]"
           >
             <TypedText from={0} to={ACCENT_START} />
             {/* Từ cuối — gạch chân vẽ tay sau khi gõ xong.

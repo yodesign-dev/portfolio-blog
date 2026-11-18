@@ -148,7 +148,7 @@ function FeaturedPost({post, locale, viewsSuffix}: {post: Post; locale: Locale; 
   return (
     <Link href={`/blog/${post.slug.current}`} className="group block">
       <div className="flex flex-col gap-6 md:flex-row md:items-center">
-        <div className="overflow-hidden rounded-lg bg-neutral-100 md:w-1/2">
+        <div className="overflow-hidden border-2 border-neutral-900 bg-neutral-100 shadow-hard md:w-1/2">
           {imageUrl ? (
             <Image
               src={imageUrl}
@@ -206,7 +206,7 @@ function PostRow({post, locale, viewsSuffix}: {post: Post; locale: Locale; views
       href={`/blog/${post.slug.current}`}
       className="group flex items-start gap-5 border-b border-neutral-200 py-6 last:border-0"
     >
-      <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-md bg-neutral-100 sm:block">
+      <div className="hidden h-20 w-20 shrink-0 overflow-hidden border-2 border-neutral-900 bg-neutral-100 sm:block">
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -292,7 +292,7 @@ function MediumList({posts, locale}: {posts: MediumPost[]; locale: Locale}) {
             rel="noopener noreferrer"
             className="group flex items-start gap-5 border-b border-neutral-200 py-6 last:border-0"
           >
-            <div className="hidden h-20 w-20 shrink-0 overflow-hidden rounded-md bg-neutral-100 sm:block">
+            <div className="hidden h-20 w-20 shrink-0 overflow-hidden border-2 border-neutral-900 bg-neutral-100 sm:block">
               {post.image && (
                 <Image
                   src={post.image}
