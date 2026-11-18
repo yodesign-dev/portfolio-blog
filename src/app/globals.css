@@ -115,6 +115,15 @@ body {
   background: #002fff;
   color: #f7f4ee;
 }
+/* Giảm chuyển động: mọi transition trong portfolio thành tức thì (hover vẫn đổi màu/bóng, chỉ
+   không còn trượt). Animation của hero tự tắt riêng trong hero-31.css. */
+@media (prefers-reduced-motion: reduce) {
+  [data-skin="paper"] *,
+  [data-skin="paper"] *::before,
+  [data-skin="paper"] *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
 /* body nằm ngoài khối bọc: đổi nền để kéo quá mép trang không lộ nền trắng */
 body:has([data-skin="paper"]) {
   background: #ede9e0;

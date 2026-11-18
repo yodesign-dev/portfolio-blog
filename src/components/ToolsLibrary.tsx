@@ -100,7 +100,9 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                   }`}
                 >
                   <span>{t.all}</span>
-                  <span className="text-xs text-neutral-400">{tools.length}</span>
+                  {/* opacity thay cho màu xám cố định: số đếm ăn theo màu chữ của nút nên đọc được
+                      cả khi nút đang chọn có nền đen (xám cố định trên nền đen chỉ đạt 3.1:1) */}
+                  <span className="text-xs opacity-80">{tools.length}</span>
                 </button>
               </li>
               {categories.map((c) => (
@@ -115,7 +117,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                     }`}
                   >
                     <span>{CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] ?? c}</span>
-                    <span className="text-xs text-neutral-400">
+                    <span className="text-xs opacity-80">
                       {tools.filter((tool) => tool.category === c).length}
                     </span>
                   </button>
