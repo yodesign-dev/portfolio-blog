@@ -50,7 +50,7 @@ export default async function ResumePage() {
           target: '_blank',
           rel: 'noopener noreferrer',
           className:
-            'btn-hard flex-1 bg-neutral-900 px-6 py-3 text-white hover:bg-neutral-700',
+            'btn-hard flex min-h-12 flex-1 items-center justify-center bg-brand px-6 text-white hover:bg-brand-hover',
         },
         'Open PDF'
       )
@@ -63,7 +63,7 @@ export default async function ResumePage() {
           href: fileUrl,
           download: fileName,
           className:
-            'btn-hard flex-1 bg-white px-6 py-3 text-neutral-900 hover:bg-neutral-50',
+            'btn-hard flex min-h-12 flex-1 items-center justify-center bg-white px-6 text-neutral-900 hover:bg-neutral-50',
         },
         'Download'
       )
@@ -73,7 +73,7 @@ export default async function ResumePage() {
     <div className="min-h-screen bg-background text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
             Resume
           </h1>
         </div>

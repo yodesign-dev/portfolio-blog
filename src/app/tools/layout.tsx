@@ -11,7 +11,7 @@ export default async function ToolkitLayout({children}: {children: React.ReactNo
     <div className="min-h-screen bg-background text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 pt-10 sm:px-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
             {t.tools.title}
           </h1>
           <p className="mt-2 text-neutral-500">{t.tools.subtitle}</p>

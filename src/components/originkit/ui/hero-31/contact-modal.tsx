@@ -210,7 +210,7 @@ export function ContactModal() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <h2 id="contact-modal-title" className="text-2xl font-extrabold tracking-tight text-neutral-900">
+              <h2 id="contact-modal-title" className="text-2xl font-bold tracking-tight text-neutral-900">
                 Get in touch
               </h2>
               <p className="mt-2 max-w-sm text-base leading-relaxed text-neutral-500">
@@ -238,7 +238,7 @@ export function ContactModal() {
                 data-cal-link="yoshark-bin/30min"
                 onClick={() => trackEvent({ name: "Book Call Click" })}
                 data-cal-config='{"layout":"month_view"}'
-                className="btn-hard mt-6 flex w-full items-center justify-center gap-2 bg-brand px-4 py-3 text-white hover:bg-brand-hover"
+                className="btn-hard mt-6 flex w-full items-center justify-center gap-2 min-h-12 bg-brand px-6 text-white hover:bg-brand-hover"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -262,7 +262,7 @@ export function ContactModal() {
                   href={link.href}
                   target={link.href.startsWith("http") ? "_blank" : undefined}
                   rel={link.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                  className="flex items-center gap-2 text-base font-medium text-ink transition hover:opacity-70"
+                  className="flex items-center gap-2 text-base font-medium text-ink transition hover:text-brand"
                 >
                   {link.icon}
                   {link.label}
@@ -273,8 +273,8 @@ export function ContactModal() {
 
           {status === "success" ? (
             <div className="mt-8 flex flex-col items-center text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-emerald-700 bg-white">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -285,7 +285,7 @@ export function ContactModal() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="btn-hard mt-6 w-full bg-brand px-4 py-3 text-white hover:bg-brand-hover"
+                className="btn-hard mt-6 w-full min-h-12 bg-brand px-6 text-white hover:bg-brand-hover"
               >
                 Close
               </button>
@@ -372,7 +372,7 @@ export function ContactModal() {
               <div ref={turnstileContainerRef} />
 
               {status === "error" && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-base text-red-700">
+                <div className="flex items-center gap-2 border-2 border-red-700 bg-white px-3 py-2 text-base text-red-700">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                   </svg>
@@ -383,7 +383,7 @@ export function ContactModal() {
               <button
                 type="submit"
                 disabled={status === "submitting" || !captchaToken}
-                className="btn-hard mt-1 flex items-center justify-center gap-2 bg-brand px-4 py-3 text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-hard mt-1 flex items-center justify-center gap-2 min-h-12 bg-brand px-6 text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === "submitting" ? (
                   "Sending..."

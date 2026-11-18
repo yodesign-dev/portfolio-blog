@@ -93,10 +93,10 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                 <button
                   type="button"
                   onClick={() => changeCategory(null)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition touch:min-h-11 md:rounded-none md:border-l-2 md:pl-3 ${
+                  className={`flex w-full items-center justify-between gap-2 border-2 px-3 py-2 text-left font-mono text-xs uppercase tracking-[0.06em] transition touch:min-h-11 md:border-0 md:border-l-2 md:pl-3 ${
                     !category
-                      ? 'bg-neutral-900 text-white md:border-neutral-900 md:bg-neutral-50 md:text-neutral-900'
-                      : 'border border-neutral-200 text-neutral-600 hover:border-neutral-400 md:border-0 md:border-l-2 md:border-transparent'
+                      ? 'border-neutral-900 bg-neutral-900 text-white md:bg-neutral-50 md:text-neutral-900'
+                      : 'border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 md:border-transparent md:hover:border-neutral-300'
                   }`}
                 >
                   <span>{t.all}</span>
@@ -110,10 +110,10 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                   <button
                     type="button"
                     onClick={() => changeCategory(c)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium transition touch:min-h-11 md:rounded-none md:border-l-2 md:pl-3 ${
+                    className={`flex w-full items-center justify-between gap-2 border-2 px-3 py-2 text-left font-mono text-xs uppercase tracking-[0.06em] transition touch:min-h-11 md:border-0 md:border-l-2 md:pl-3 ${
                       category === c
-                        ? 'bg-neutral-900 text-white md:border-neutral-900 md:bg-neutral-50 md:text-neutral-900'
-                        : 'border border-neutral-200 text-neutral-600 hover:border-neutral-400 md:border-0 md:border-l-2 md:border-transparent'
+                        ? 'border-neutral-900 bg-neutral-900 text-white md:bg-neutral-50 md:text-neutral-900'
+                        : 'border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900 md:border-transparent md:hover:border-neutral-300'
                     }`}
                   >
                     <span>{CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] ?? c}</span>
@@ -191,7 +191,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                   <button
                     type="button"
                     onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                    className="btn-hard bg-white px-6 py-3 text-neutral-900"
+                    className="btn-hard min-h-12 bg-white px-6 text-neutral-900 hover:bg-neutral-50"
                   >
                     {t.loadMore} ({filtered.length - visibleCount} {t.itemsSuffix})
                   </button>

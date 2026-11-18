@@ -82,7 +82,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
       <div className="mb-16 grid grid-cols-1 items-center gap-10 md:gap-12 lg:mb-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div>
           <div className="mb-4 flex justify-center md:mb-6 md:justify-start">
-            <div className="h-14 w-14 shrink-0 md:h-28 md:w-28 overflow-hidden rounded-full shadow-lg ring-2 ring-white/20">
+            <div className="h-14 w-14 shrink-0 md:h-28 md:w-28 overflow-hidden rounded-full ring-2 ring-white/20">
               <AvatarLoop alt={SITE_NAME} />
             </div>
           </div>
@@ -135,7 +135,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
               <Link
                 href="/work"
                 onClick={() => trackEvent({ name: "CTA Click", props: { cta: "hero_view_work" } })}
-                className="btn-hard flex min-h-12 items-center justify-center bg-white px-6 text-brand hover:bg-white/90"
+                className="btn-hard flex min-h-12 items-center justify-center bg-white px-6 text-brand hover:bg-neutral-50"
               >
                 View my work
               </Link>

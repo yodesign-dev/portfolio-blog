@@ -11,7 +11,7 @@ export function BehanceArchive({projects, lead = false}: {projects: BehanceProje
     <section className={lead ? '' : 'mt-24 border-t border-neutral-200 pt-16'} aria-labelledby="behance-archive">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 id="behance-archive" className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+          <h2 id="behance-archive" className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
             {lead ? 'Projects' : 'More on Behance'}
           </h2>
           <p className="mt-2 max-w-2xl text-neutral-500">
@@ -24,7 +24,7 @@ export function BehanceArchive({projects, lead = false}: {projects: BehanceProje
           href={BEHANCE_PROFILE}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm font-semibold text-brand transition-colors hover:text-brand-hover"
+          className="text-sm font-semibold text-brand transition-colors hover:text-brand-hover touch:-my-3 touch:py-3"
         >
           View all on Behance ↗
         </a>

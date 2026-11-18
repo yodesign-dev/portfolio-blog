@@ -71,8 +71,16 @@ body {
  * dùng chúng bên trong khối, không phải sửa từng component.
  * KHÔNG theo biến (phải sửa tay): rounded trơn, rounded-full, border (1px), shadow-*.
  *
- * Màu nút chính: trên nền giấy dùng xanh brand (bg-brand, chữ text-white). Cyan (bg-accent) chỉ
- * dùng trên nền tối hoặc nền xanh (hero, footer): trên giấy kem nó chỉ đạt 1.4:1 và lạc tông.
+ * Quy ước nút (class btn-hard, cao tối thiểu 48px = min-h-12, đệm ngang px-6):
+ * - Nút chính trên nền giấy: xanh brand (bg-brand text-white hover:bg-brand-hover).
+ * - Nút phụ: nền thẻ (bg-white text-neutral-900 hover:bg-neutral-50).
+ * - Nút "Get in touch" của navbar (desktop và menu mobile): đen (bg-neutral-900), vì ở trang chủ
+ *   nó nằm sát hero xanh.
+ * - Trên nền tối hoặc nền xanh (hero, footer): cyan (bg-accent text-ink). Không dùng cyan trên
+ *   giấy kem: ở đó nó chỉ đạt 1.4:1 và lạc tông.
+ * Quy ước khác: tiêu đề trang (h1) và tiêu đề khối (h2) đậm 700, tiêu đề thẻ (h3) đậm 600; tiêu đề
+ * có link thì hover sang xanh brand; kẻ ngăn 1px màu neutral-200; chip bấm được viền 2px, tag tĩnh
+ * không viền; chữ nhỏ nhất 11px.
  *
  * Thang xám = mực #101014 pha vào giấy #ede9e0. neutral-400 trở lên đều đạt 4.5:1 trên giấy,
  * trên thẻ và trên neutral-50/100 (trước đây neutral-400 trên trắng chỉ 2.5:1).

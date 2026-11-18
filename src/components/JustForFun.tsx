@@ -17,7 +17,7 @@ const GRIPES = [
 ]
 
 const arrowClass =
-  'btn-hard flex size-11 items-center justify-center bg-white text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand'
+  'btn-hard flex size-11 items-center justify-center bg-white text-neutral-900 hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand'
 
 export function JustForFun() {
   const [active, setActive] = useState(0)

@@ -134,7 +134,7 @@ function SmallCard({
         {/* tracking-wider (không phải widest như các nhãn khác): cột này chỉ rộng ~187px ở màn
             375px, với widest thì "NOTION TEMPLATE · FREE" dài đúng bằng cột và rớt xuống 2 dòng */}
         <p className="font-mono text-xs uppercase tracking-wider text-neutral-500">{label}</p>
-        <h3 className="mt-1.5 text-lg font-bold leading-snug text-neutral-900">{title}</h3>
+        <h3 className="mt-1.5 text-lg font-semibold leading-snug text-neutral-900">{title}</h3>
         <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
         <a href={href} target="_blank" rel="noopener noreferrer" className={`sm:mt-3 ${ctaClass}`}>
           {cta}

@@ -21,7 +21,7 @@ export function ToolkitTabs() {
             href={tab.href}
             aria-current={isActive ? 'page' : undefined}
             // touch: vùng bấm cao 44px (34 + 10). -mt bù lại pt nên vị trí chữ và gạch chân không đổi
-            className={`-mb-px border-b-2 pb-3 text-sm font-semibold transition touch:-mt-2.5 touch:pt-2.5 ${
+            className={`-mb-px border-b-2 pb-3 font-mono text-xs uppercase leading-5 tracking-[0.08em] transition touch:-mt-2.5 touch:pt-2.5 ${
               isActive
                 ? 'border-neutral-900 text-neutral-900'
                 : 'border-transparent text-neutral-500 hover:text-neutral-900'

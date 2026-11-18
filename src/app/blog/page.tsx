@@ -76,7 +76,7 @@ export default async function BlogPage({
     <div className="min-h-screen bg-background text-neutral-900 antialiased">
       <header className="border-b border-neutral-200">
         <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
             {t.blog.title}
           </h1>
           <p className="mt-2 text-neutral-500">{t.blog.subtitle}</p>
@@ -177,7 +177,7 @@ function FeaturedPost({post, locale, viewsSuffix}: {post: Post; locale: Locale; 
             </div>
           )}
 
-          <h2 className="mt-3 text-2xl font-bold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600 sm:text-3xl">
+          <h2 className="mt-3 text-2xl font-bold leading-snug tracking-tight text-neutral-900 transition-colors group-hover:text-brand sm:text-3xl">
             {post.title}
           </h2>
 
@@ -234,7 +234,7 @@ function PostRow({post, locale, viewsSuffix}: {post: Post; locale: Locale; views
           </div>
         )}
 
-        <h3 className="text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
+        <h3 className="text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
           {post.title}
         </h3>
 
@@ -318,7 +318,7 @@ function MediumList({posts, locale}: {posts: MediumPost[]; locale: Locale}) {
                 </div>
               )}
 
-              <h3 className="text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-neutral-600">
+              <h3 className="text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
                 {post.title}
               </h3>
 
@@ -370,7 +370,7 @@ function EmptyWriting({locale}: {locale: Locale}) {
         )}
         <Link
           href="/work"
-          className="btn-hard flex min-h-12 items-center justify-center bg-white px-6 text-neutral-900"
+          className="btn-hard flex min-h-12 items-center justify-center bg-white px-6 text-neutral-900 hover:bg-neutral-50"
         >
           {f.seeWork} →
         </Link>

@@ -121,7 +121,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
               setIsMenuOpen(false);
               openModal(undefined, "nav_mobile");
             }}
-            className="btn-hard mt-4 w-full bg-brand px-6 py-4 text-white hover:bg-brand-hover"
+            className="btn-hard mt-4 min-h-12 w-full bg-neutral-900 px-6 text-white hover:bg-neutral-700"
           >
             Get in touch
           </button>

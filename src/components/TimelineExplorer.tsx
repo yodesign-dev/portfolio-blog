@@ -183,7 +183,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
           step={1}
           value={selectedIndex}
           onChange={(e) => setSelectedIndex(Number(e.target.value))}
-          className="w-full accent-brand"
+          className="w-full accent-brand touch:h-11"
         />
         <div className="mt-1 flex justify-between text-xs text-neutral-400">
           <span>{years[0].year}</span>
@@ -206,7 +206,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
                 className="relative flex flex-col items-center gap-2 border-2 border-neutral-900 bg-white p-4 text-center shadow-hard-sm transition hover:-translate-y-0.5 hover:shadow-hard-lg motion-reduce:transform-none"
               >
                 {isNew && (
-                  <span className="absolute -top-2.5 -right-2.5 border-2 border-neutral-900 bg-brand px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.06em] text-white">
+                  <span className="absolute -top-2.5 -right-2.5 border-2 border-neutral-900 bg-brand px-1.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-white">
                     New
                   </span>
                 )}

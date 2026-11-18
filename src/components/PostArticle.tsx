@@ -158,7 +158,7 @@ const PROSE = 'max-w-[38rem]'
 // Tiêu đề mục: có id cho mục lục; scroll-mt để khi nhảy tới không dính sát mép
 // trên (và không nằm dưới thanh tiến trình đọc).
 const SECTION_HEADING =
-  'mb-4 mt-12 scroll-mt-8 text-2xl font-semibold leading-snug tracking-tight text-neutral-900 sm:text-3xl'
+  'mb-4 mt-12 scroll-mt-8 text-2xl font-bold leading-snug tracking-tight text-neutral-900 sm:text-3xl'
 
 function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
   // H1 trong thân bài cũng vẽ thành <h2>: trang chỉ có một <h1> là tiêu đề bài.
@@ -252,7 +252,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
                   {row.cells?.map((cell: string, cellIndex: number) => (
                     <td
                       key={cellIndex}
-                      className="min-w-32 border-r border-neutral-200 px-4 py-2.5 align-top text-gray-800 last:border-r-0"
+                      className="min-w-32 border-r border-neutral-200 px-4 py-2.5 align-top text-neutral-800 last:border-r-0"
                     >
                       {cell}
                     </td>
@@ -274,7 +274,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
       </h3>
     ),
     normal: ({children}) => (
-      <p className={`${PROSE} mb-6 text-lg leading-[1.7] text-gray-800`}>{children}</p>
+      <p className={`${PROSE} mb-6 text-lg leading-[1.7] text-neutral-800`}>{children}</p>
     ),
     blockquote: ({children}) => (
       <blockquote
@@ -286,10 +286,10 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
   },
   list: {
     bullet: ({children}) => (
-      <ul className={`${PROSE} mb-6 list-disc space-y-2 pl-6 text-lg leading-[1.7] text-gray-800`}>{children}</ul>
+      <ul className={`${PROSE} mb-6 list-disc space-y-2 pl-6 text-lg leading-[1.7] text-neutral-800`}>{children}</ul>
     ),
     number: ({children}) => (
-      <ol className={`${PROSE} mb-6 list-decimal space-y-2 pl-6 text-lg leading-[1.7] text-gray-800`}>
+      <ol className={`${PROSE} mb-6 list-decimal space-y-2 pl-6 text-lg leading-[1.7] text-neutral-800`}>
         {children}
       </ol>
     ),
@@ -312,7 +312,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
         href={value?.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-neutral-900 underline decoration-neutral-300 underline-offset-4 [overflow-wrap:anywhere] transition-colors hover:decoration-neutral-900"
+        className="text-neutral-900 underline decoration-neutral-300 underline-offset-4 [overflow-wrap:anywhere] transition-colors hover:text-brand hover:decoration-brand"
       >
         {children}
       </a>
@@ -414,7 +414,7 @@ function CaseStudyMeta({post}: {post: Post}) {
       <ImpactStats
         metrics={impact}
         size="lg"
-        className={facts.length > 0 ? 'mt-6 border-t border-neutral-100 pt-6' : ''}
+        className={facts.length > 0 ? 'mt-6 border-t border-neutral-200 pt-6' : ''}
       />
     </div>
   )
@@ -495,7 +495,7 @@ export function PostArticle({post}: {post: Post}) {
                 )
               )}
 
-              <h1 className="text-3xl font-semibold leading-tight tracking-tight text-balance text-neutral-900 sm:text-4xl sm:leading-tight">
+              <h1 className="text-3xl font-bold leading-tight tracking-tight text-balance text-neutral-900 sm:text-4xl sm:leading-tight">
                 {post.title}
               </h1>
 
