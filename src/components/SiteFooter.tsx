@@ -23,10 +23,10 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
 
         <nav aria-label="Footer">
           <p className="font-mono text-xs uppercase tracking-widest text-white/60">Explore</p>
-          <ul className="mt-4 flex flex-col gap-3">
+          <ul className="mt-4 flex flex-col gap-3 touch:mt-2 touch:gap-0">
             {navLinks.map((link) => (
               <li key={link.href}>
-                <Link href={link.href} className="text-white/80 transition hover:text-white">
+                <Link href={link.href} className="text-white/80 transition hover:text-white touch:inline-flex touch:min-h-11 touch:items-center">
                   {link.label}
                 </Link>
               </li>
@@ -36,15 +36,15 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
 
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-white/60">Side projects</p>
-          <ul className="mt-4 flex flex-col gap-3">
+          <ul className="mt-4 flex flex-col gap-3 touch:mt-2 touch:gap-0">
             {SIDE_PROJECT_LINKS.map((link) => (
               <li key={link.label}>
                 {link.external ? (
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-white/80 transition hover:text-white">
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-white/80 transition hover:text-white touch:inline-flex touch:min-h-11 touch:items-center">
                     {link.label} ↗
                   </a>
                 ) : (
-                  <Link href={link.href} className="text-white/80 transition hover:text-white">
+                  <Link href={link.href} className="text-white/80 transition hover:text-white touch:inline-flex touch:min-h-11 touch:items-center">
                     {link.label}
                   </Link>
                 )}
@@ -56,7 +56,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
         {socialLinks.length > 0 && (
           <div>
             <p className="font-mono text-xs uppercase tracking-widest text-white/60">Elsewhere</p>
-            <ul className="mt-4 flex flex-col gap-3">
+            <ul className="mt-4 flex flex-col gap-3 touch:mt-2 touch:gap-0">
               {socialLinks.map((link) => (
                 <li key={link.label}>
                   <a
@@ -64,7 +64,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => trackEvent({name: 'Social Click', props: {network: link.label}})}
-                    className="text-white/80 transition hover:text-white"
+                    className="text-white/80 transition hover:text-white touch:inline-flex touch:min-h-11 touch:items-center"
                   >
                     {link.label} ↗
                   </a>
@@ -76,14 +76,14 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
       </div>
 
       <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-6 text-sm text-white/50 sm:px-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-6 text-sm text-white/50 touch:py-3 sm:px-8">
           <p>© {new Date().getFullYear()} {SITE_NAME}. Learn by sharing, share by learning.</p>
           {/* Điều khoản & quyền riêng tư hiện chỉ áp dụng cho quán /chill */}
           <p className="flex gap-4">
-            <Link href="/chill/terms" className="transition hover:text-white">
+            <Link href="/chill/terms" className="transition hover:text-white touch:inline-flex touch:min-h-11 touch:items-center">
               /chill terms
             </Link>
-            <Link href="/chill/privacy" className="transition hover:text-white">
+            <Link href="/chill/privacy" className="transition hover:text-white touch:inline-flex touch:min-h-11 touch:items-center">
               /chill privacy
             </Link>
           </p>

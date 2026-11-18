@@ -78,12 +78,13 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
         </button>
       </nav>
 
-      <div className="flex md:hidden pr-6">
+      {/* Nút 44×44 (trước là 40×40). pr-[22px] thay pr-6 để icon vẫn nằm đúng chỗ cũ */}
+      <div className="flex md:hidden pr-[22px]">
         <button
           aria-label="Toggle Menu"
           aria-expanded={isMenuOpen}
           onClick={() => setIsMenuOpen((prev) => !prev)}
-          className="p-2 text-neutral-700"
+          className="flex size-11 items-center justify-center text-neutral-700"
         >
           {isMenuOpen ? (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

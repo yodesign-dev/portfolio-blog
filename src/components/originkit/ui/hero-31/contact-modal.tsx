@@ -189,8 +189,11 @@ export function ContactModal() {
         onLoad={() => setScriptLoaded(true)}
       />
 
+      {/* Căn giữa dọc bằng my-auto trên hộp thoại, KHÔNG dùng items-center ở khung cuộn:
+          items-center cắt mất phần trên của hộp khi hộp cao hơn màn hình (không cuộn lên
+          được). Margin auto thì tự về 0 khi hết chỗ nên hộp bám mép trên và cuộn được hết. */}
       <div
-        className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 sm:items-center"
+        className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8"
         onClick={(e) => {
           // Chỉ đóng khi click ĐÚNG vào nền tối (không phải bất kỳ đâu bên
           // trong modal). Không dùng stopPropagation ở div con nữa — cách
@@ -203,7 +206,7 @@ export function ContactModal() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="contact-modal-title"
-          className="w-full max-w-lg border-2 border-neutral-900 bg-white p-6 text-neutral-900 shadow-hard-lg sm:p-8"
+          className="w-full max-w-lg border-2 border-neutral-900 bg-white p-6 text-neutral-900 shadow-hard-lg sm:my-auto sm:p-8"
         >
           <div className="flex items-start justify-between">
             <div>
