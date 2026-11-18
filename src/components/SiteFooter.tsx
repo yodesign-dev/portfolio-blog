@@ -22,7 +22,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
         </div>
 
         <nav aria-label="Footer">
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Explore</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-white/60">Explore</p>
           <ul className="mt-4 flex flex-col gap-3">
             {navLinks.map((link) => (
               <li key={link.href}>
@@ -35,7 +35,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
         </nav>
 
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Side projects</p>
+          <p className="font-mono text-xs uppercase tracking-widest text-white/60">Side projects</p>
           <ul className="mt-4 flex flex-col gap-3">
             {SIDE_PROJECT_LINKS.map((link) => (
               <li key={link.label}>
@@ -55,7 +55,7 @@ export function SiteFooter({showResume}: {showResume: boolean}) {
 
         {socialLinks.length > 0 && (
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Elsewhere</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-white/60">Elsewhere</p>
             <ul className="mt-4 flex flex-col gap-3">
               {socialLinks.map((link) => (
                 <li key={link.label}>
@@ -138,7 +138,7 @@ function ContactBlock({showResume, onMessage}: {showResume: boolean; onMessage: 
               data-cal-link="yoshark-bin/30min"
               data-cal-config='{"layout":"month_view"}'
               onClick={() => trackEvent({name: 'Book Call Click'})}
-              className="flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-sm font-bold text-ink transition hover:bg-accent-hover"
+              className="btn-hard flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-ink [--btn-edge:#f7f4ee] hover:bg-accent-hover"
             >
               Book a 30-min call
             </button>

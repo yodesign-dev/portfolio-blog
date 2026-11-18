@@ -17,7 +17,7 @@ const GRIPES = [
 ]
 
 const arrowClass =
-  'flex size-11 items-center justify-center rounded-full border border-neutral-300 text-neutral-700 transition-colors hover:border-neutral-900 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
+  'btn-hard flex size-11 items-center justify-center bg-white text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand'
 
 export function JustForFun() {
   const [active, setActive] = useState(0)
@@ -41,7 +41,7 @@ export function JustForFun() {
                   transform: `translateX(${distance * 26}px) rotate(${distance * 6}deg) scale(${1 - away * 0.06})`,
                   zIndex: count - away,
                 }}
-                className="absolute inset-0 overflow-hidden rounded-2xl border border-black/10 bg-neutral-200 shadow-md transition-transform duration-300 ease-out motion-reduce:transition-none"
+                className="absolute inset-0 overflow-hidden border-2 border-neutral-900 bg-neutral-200 shadow-hard transition-transform duration-300 ease-out motion-reduce:transition-none"
               >
                 <Image src={card.image} alt="" fill sizes="(min-width: 640px) 256px, 208px" className="object-cover" />
                 <span className="absolute inset-x-0 bottom-0 bg-black/70 px-3 py-2 text-center text-sm font-semibold text-white">
@@ -63,7 +63,7 @@ export function JustForFun() {
               className="h-auto w-16 shrink-0"
             />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Just for fun</p>
+              <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">Just for fun</p>
               <h2 id="just-for-fun-title" className="mt-1 text-[28px] font-extrabold leading-tight tracking-tight text-neutral-900">
                 Trút Giận Online
               </h2>

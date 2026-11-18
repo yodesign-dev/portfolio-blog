@@ -74,7 +74,7 @@ export function TocRail({items, label}: {items: TocItem[]; label: string}) {
 
   return (
     <nav aria-label={label} className="sticky top-8 max-h-[calc(100dvh-4rem)] overflow-y-auto">
-      <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{label}</p>
+      <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">{label}</p>
       <ol className="mt-4 space-y-1 border-l border-neutral-200">
         {items.map((item) => {
           const active = item.id === activeId

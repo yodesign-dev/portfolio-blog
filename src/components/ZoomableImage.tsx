@@ -89,7 +89,7 @@ export function ZoomableImage({
             máy có chuột chỉ hiện khi rê vào ảnh */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-2 bottom-2 flex size-8 items-center justify-center rounded-full bg-neutral-900/70 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 touch:opacity-100"
+          className="pointer-events-none absolute right-2 bottom-2 flex size-8 items-center justify-center bg-neutral-900/70 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 touch:opacity-100"
         >
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.75} className="size-4">
             <path strokeLinecap="round" d="M12.5 3.5h4v4M7.5 16.5h-4v-4M16.5 3.5l-5 5M3.5 16.5l5-5" />
@@ -137,7 +137,7 @@ export function ZoomableImage({
         )}
 
         <div className="pointer-events-none fixed inset-x-0 top-0 flex items-start justify-between gap-4 p-2">
-          <p className="pointer-events-auto min-h-11 rounded-full bg-black/60 px-4 py-3 text-xs leading-5 text-neutral-200">
+          <p className="pointer-events-auto min-h-11 bg-black/60 px-4 py-3 text-xs leading-5 text-neutral-200">
             {/* Lời nhắc theo kiểu trỏ: chạm trên màn chạm, bấm/kéo trên máy có chuột */}
             <span className="hidden touch:inline">{zoomed ? 'Drag to move · tap to fit' : 'Tap the image to zoom'}</span>
             <span className="touch:hidden">{zoomed ? 'Scroll to move · click to fit' : 'Click the image to zoom'}</span>
@@ -146,7 +146,7 @@ export function ZoomableImage({
             type="button"
             onClick={close}
             aria-label="Close"
-            className="pointer-events-auto flex size-11 shrink-0 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white"
+            className="pointer-events-auto flex size-11 shrink-0 items-center justify-center bg-black/60 text-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-white"
           >
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="size-5">
               <path strokeLinecap="round" d="M5 5l10 10M15 5L5 15" />
@@ -162,7 +162,7 @@ export function ZoomableImage({
                 Dùng pointer-coarse: chứ không dùng touch: — touch: gồm cả cửa sổ
                 máy tính hẹp dưới 1024px, ở đó "xoay điện thoại" là sai. */}
             {wide && (
-              <p className="hidden items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-neutral-100 pointer-coarse:portrait:flex">
+              <p className="hidden items-center gap-2 bg-white/10 px-4 py-2 text-sm text-neutral-100 pointer-coarse:portrait:flex">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="size-5 shrink-0">
                   <rect x="3" y="9" width="14" height="10" rx="2" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 3.5a7 7 0 0 1 7.5 6.5M20.5 10l1.5-2.5M20.5 10l-2.6-1.3" />

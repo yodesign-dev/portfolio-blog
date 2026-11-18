@@ -50,7 +50,7 @@ export default async function ResumePage() {
           target: '_blank',
           rel: 'noopener noreferrer',
           className:
-            'flex-1 rounded-md bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700',
+            'btn-hard flex-1 bg-neutral-900 px-6 py-3 text-white hover:bg-neutral-700',
         },
         'Open PDF'
       )
@@ -63,7 +63,7 @@ export default async function ResumePage() {
           href: fileUrl,
           download: fileName,
           className:
-            'flex-1 rounded-md border border-neutral-300 px-6 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50',
+            'btn-hard flex-1 bg-white px-6 py-3 text-neutral-900 hover:bg-neutral-50',
         },
         'Download'
       )
@@ -103,12 +103,12 @@ export default async function ResumePage() {
             <iframe
               src={`${fileUrl}#view=FitH`}
               title="Resume"
-              className="mx-auto h-[calc(100vh-180px)] w-full rounded-lg border border-neutral-200"
+              className="mx-auto h-[calc(100vh-180px)] w-full border-2 border-neutral-900 shadow-hard"
             />
           </main>
 
           <main className="mx-auto max-w-4xl px-6 py-16 sm:px-8 md:hidden">
-            <div className="flex flex-col items-center gap-4 rounded-lg border border-neutral-200 p-8 text-center">
+            <div className="flex flex-col items-center gap-4 border-2 border-neutral-900 bg-white p-8 text-center shadow-hard">
               <p className="text-neutral-600">
                 For the best reading experience on your phone, open the resume
                 in your device&apos;s PDF viewer.

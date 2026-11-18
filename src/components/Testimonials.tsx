@@ -101,7 +101,7 @@ function Featured({item}: {item: Testimonial}) {
 
 function Card({item}: {item: Testimonial}) {
   return (
-    <figure className="flex h-full flex-col rounded-2xl border border-neutral-200 bg-white p-6">
+    <figure className="flex h-full flex-col border-2 border-neutral-900 bg-white p-6 shadow-hard">
       <blockquote className="flex-1 text-[15px] leading-relaxed text-neutral-700">“{item.highlight?.trim() || item.quote}”</blockquote>
       <div className="mt-6 border-t border-neutral-100 pt-5">
         <Person item={item} />

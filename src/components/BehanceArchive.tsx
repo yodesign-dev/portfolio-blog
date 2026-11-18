@@ -52,7 +52,7 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
   return (
     <a href={project.url} target="_blank" rel="noopener noreferrer" className="group flex items-start gap-4 sm:block">
       {/* Hover: khung ảnh nhấc nhẹ + nhãn "View on Behance" trồi lên */}
-      <div className="relative w-32 shrink-0 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-black/5 transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-[0_22px_40px_-20px_rgb(11_20_50/0.45)] motion-reduce:transform-none sm:w-auto sm:rounded-xl">
+      <div className="relative w-32 shrink-0 overflow-hidden border-2 border-neutral-900 bg-neutral-100 shadow-hard-sm transition duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-hard-lg motion-reduce:transform-none sm:w-auto">
         {project.cover ? (
           <Image
             src={project.cover}
@@ -67,13 +67,13 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
         )}
         <span
           aria-hidden="true"
-          className="absolute bottom-3 left-3 hidden translate-y-2 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-ink opacity-0 shadow-sm transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none sm:block"
+          className="absolute bottom-3 left-3 hidden translate-y-2 border-2 border-neutral-900 bg-white px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.06em] text-neutral-900 opacity-0 transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none sm:block"
         >
           View on Behance ↗
         </span>
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 sm:mt-4">
+        <p className="font-mono text-xs uppercase tracking-widest text-neutral-400 sm:mt-4">
           Behance{project.year && ` · ${project.year}`}
         </p>
         <h3 className="mt-1 text-base font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand sm:text-lg">
@@ -84,7 +84,7 @@ export function BehanceCard({project, sizes = '(min-width: 1024px) 352px, (min-w
         {note && note.tags.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {note.tags.map((tag) => (
-              <li key={tag} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
+              <li key={tag} className="bg-neutral-100 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-neutral-600">
                 {tag}
               </li>
             ))}

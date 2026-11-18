@@ -52,7 +52,7 @@ export async function SideProjects() {
         <article className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
           <TeaserWindow />
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Web app · Live · Free</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">Web app · Live · Free</p>
             <h3 className="mt-1.5 text-[28px] font-extrabold leading-tight tracking-tight text-neutral-900">Lofi Pixel Café</h3>
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">
               A phin coffee timer by a café window, built with AI.
@@ -131,7 +131,7 @@ function SmallCard({
     <article className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-4 sm:gap-5">
       <CoverLink href={href} src={src} alt={alt} />
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{label}</p>
+        <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">{label}</p>
         <h3 className="mt-1.5 text-lg font-bold leading-snug text-neutral-900">{title}</h3>
         <p className="mt-2 text-[15px] leading-relaxed text-neutral-600">{body}</p>
         <a href={href} target="_blank" rel="noopener noreferrer" className={`sm:mt-3 ${ctaClass}`}>

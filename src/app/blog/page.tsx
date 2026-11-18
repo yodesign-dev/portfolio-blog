@@ -92,10 +92,10 @@ export default async function BlogPage({
           <div className="mb-10 flex flex-wrap gap-2">
             <Link
               href="/blog"
-              className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium transition touch:min-h-11 touch:px-4 ${
+              className={`inline-flex items-center border-2 px-3 py-1 font-mono text-xs uppercase tracking-[0.06em] transition touch:min-h-11 touch:px-4 ${
                 !tag
                   ? 'border-neutral-900 bg-neutral-900 text-white'
-                  : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
+                  : 'border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900'
               }`}
             >
               {t.common.all}
@@ -104,10 +104,10 @@ export default async function BlogPage({
               <Link
                 key={tg}
                 href={`/blog?tag=${encodeURIComponent(tg)}`}
-                className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium transition touch:min-h-11 touch:px-4 ${
+                className={`inline-flex items-center border-2 px-3 py-1 font-mono text-xs uppercase tracking-[0.06em] transition touch:min-h-11 touch:px-4 ${
                   tag === tg
                     ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
+                    : 'border-neutral-300 text-neutral-600 hover:border-neutral-900 hover:text-neutral-900'
                 }`}
               >
                 {tg}
@@ -169,7 +169,7 @@ function FeaturedPost({post, locale, viewsSuffix}: {post: Post; locale: Locale; 
               {post.tags.map((t) => (
                 <span
                   key={t}
-                  className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600"
+                  className="bg-neutral-100 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-neutral-600"
                 >
                   {t}
                 </span>
@@ -226,7 +226,7 @@ function PostRow({post, locale, viewsSuffix}: {post: Post; locale: Locale; views
             {post.tags.map((t) => (
               <span
                 key={t}
-                className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
+                className="bg-neutral-100 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-neutral-600"
               >
                 {t}
               </span>
@@ -310,7 +310,7 @@ function MediumList({posts, locale}: {posts: MediumPost[]; locale: Locale}) {
                   {post.tags.map((tg) => (
                     <span
                       key={tg}
-                      className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
+                      className="bg-neutral-100 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-neutral-600"
                     >
                       {tg}
                     </span>
@@ -363,14 +363,14 @@ function EmptyWriting({locale}: {locale: Locale}) {
             href={MEDIUM_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-h-12 items-center justify-center bg-brand px-6 text-base font-semibold text-white transition hover:bg-brand-hover"
+            className="btn-hard flex min-h-12 items-center justify-center bg-brand px-6 text-white hover:bg-brand-hover"
           >
             {f.readMedium} ↗
           </a>
         )}
         <Link
           href="/work"
-          className="flex min-h-12 items-center justify-center border border-neutral-300 px-6 text-base font-semibold text-neutral-900 transition hover:border-neutral-900"
+          className="btn-hard flex min-h-12 items-center justify-center bg-white px-6 text-neutral-900"
         >
           {f.seeWork} →
         </Link>

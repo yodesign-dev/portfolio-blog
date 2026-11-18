@@ -37,7 +37,7 @@ export function ToolIcon({name, url, size}: ToolIconProps) {
       <span
         aria-hidden="true"
         style={{width: size, height: size}}
-        className="flex items-center justify-center rounded bg-neutral-200 text-xs font-semibold uppercase text-neutral-600"
+        className="flex items-center justify-center bg-neutral-200 text-xs font-semibold uppercase text-neutral-600"
       >
         {name.trim().charAt(0)}
       </span>

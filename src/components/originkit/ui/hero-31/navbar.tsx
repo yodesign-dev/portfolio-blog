@@ -70,7 +70,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
           type="button"
           aria-haspopup="dialog"
           onClick={() => openModal(undefined, "nav")}
-          className="h-full px-10 font-sans text-sm font-bold bg-accent text-ink transition hover:bg-accent-hover flex items-center justify-center"
+          className="flex h-full items-center justify-center bg-accent px-10 font-mono text-[13px] font-bold uppercase tracking-[0.08em] text-ink transition hover:bg-accent-hover"
         >
           Get in touch
         </button>
@@ -96,7 +96,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
       </div>
 
       <div
-        className={`fixed left-0 right-0 top-[80px] z-40 h-[calc(100dvh-80px)] w-full overflow-y-auto bg-white shadow-lg transition-opacity duration-300 ease-in-out md:hidden ${
+        className={`fixed left-0 right-0 top-[80px] z-40 h-[calc(100dvh-80px)] w-full overflow-y-auto border-t-2 border-neutral-900 bg-white transition-opacity duration-300 ease-in-out md:hidden ${
           isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
@@ -116,7 +116,7 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
               setIsMenuOpen(false);
               openModal(undefined, "nav_mobile");
             }}
-            className="mt-4 w-full bg-accent px-6 py-4 font-sans text-sm font-bold text-ink transition hover:bg-accent-hover"
+            className="btn-hard mt-4 w-full bg-accent px-6 py-4 text-ink hover:bg-accent-hover"
           >
             Get in touch
           </button>

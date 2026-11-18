@@ -46,9 +46,9 @@ export function CaseStudyCard({study}: {study: CaseStudy}) {
   return (
     <Link
       href={`/work/${study.slug.current}`}
-      className="group block rounded-2xl border border-neutral-200 bg-white p-6 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-neutral-400 motion-reduce:transform-none sm:p-8"
+      className="group block border-2 border-neutral-900 bg-white p-6 shadow-hard transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-hard-lg motion-reduce:transform-none sm:p-8"
     >
-      {meta && <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{meta}</p>}
+      {meta && <p className="font-mono text-xs uppercase tracking-widest text-neutral-400">{meta}</p>}
       <h3 className="mt-2 text-xl font-semibold leading-snug tracking-tight text-neutral-900 transition-colors group-hover:text-brand sm:text-2xl">
         {study.title}
       </h3>
@@ -56,14 +56,14 @@ export function CaseStudyCard({study}: {study: CaseStudy}) {
       {hasStory ? (
         <div className="mt-6 grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] md:gap-3">
           <div className="rounded-xl bg-neutral-100 p-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Problem</p>
+            <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">Problem</p>
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-700">{study.cardProblem}</p>
           </div>
           <span aria-hidden="true" className="flex items-center justify-center text-xl text-brand">
             <span className="rotate-90 md:rotate-0">→</span>
           </span>
           <div className="rounded-xl bg-brand/10 p-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand">Solution</p>
+            <p className="font-mono text-xs font-bold uppercase tracking-widest text-brand">Solution</p>
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-800">{study.cardSolution}</p>
           </div>
         </div>

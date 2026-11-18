@@ -14,7 +14,7 @@ export function HowIWork() {
       <ol className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
         {STEPS.map((step, index) => (
           <li key={step.title} className="border-t border-neutral-200 pt-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand">
+            <p className="font-mono text-xs font-bold uppercase tracking-widest text-brand">
               {String(index + 1).padStart(2, '0')} · {step.title}
             </p>
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-700">{step.body}</p>

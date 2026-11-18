@@ -77,14 +77,14 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
           value={query}
           onChange={(e) => changeQuery(e.target.value)}
           placeholder={t.searchPlaceholder}
-          className="w-full rounded-md border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none"
+          className="w-full border-2 border-neutral-900 bg-white px-4 py-3 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-brand focus:shadow-hard focus:shadow-brand focus:outline-none"
         />
       </div>
 
       <div className="flex flex-col gap-10 md:flex-row">
         {categories.length > 0 && (
           <aside className="shrink-0 md:w-44">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
+            <p className="mb-3 font-mono text-xs uppercase tracking-widest text-neutral-400">
               {t.category}
             </p>
             <ul className="flex flex-row flex-wrap gap-1 md:flex-col md:flex-nowrap md:gap-0.5">
@@ -146,7 +146,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                       href={tool.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex items-start gap-4 rounded-xl border border-neutral-200 bg-white p-5 no-underline transition-all duration-150 ease-out hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md"
+                      className="group flex items-start gap-4 border-2 border-neutral-900 bg-white p-5 no-underline shadow-hard-sm transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-hard-lg motion-reduce:transform-none"
                     >
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-50 p-1.5">
                         <ToolIcon name={tool.name} url={tool.url} size={24} />
@@ -156,7 +156,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-semibold text-neutral-900">{tool.name}</h3>
                           <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${categoryStyle}`}
+                            className={`px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.06em] ${categoryStyle}`}
                           >
                             {CATEGORY_LABELS[tool.category as keyof typeof CATEGORY_LABELS] ?? tool.category}
                           </span>
@@ -188,7 +188,7 @@ export function ToolsLibrary({tools, locale}: ToolsLibraryProps) {
                   <button
                     type="button"
                     onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                    className="rounded-md border border-neutral-300 px-6 py-2.5 text-sm font-semibold text-neutral-900 transition hover:border-neutral-900"
+                    className="btn-hard bg-white px-6 py-3 text-neutral-900"
                   >
                     {t.loadMore} ({filtered.length - visibleCount} {t.itemsSuffix})
                   </button>

@@ -80,7 +80,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
 
   return (
     <div>
-      <div className="mb-8 rounded-lg border border-neutral-200 p-4">
+      <div className="mb-8 border-2 border-neutral-900 bg-white p-4 shadow-hard">
         <div className="relative">
           <svg
             viewBox={`0 0 ${width} ${height}`}
@@ -146,7 +146,7 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
               chứa vô tình ép overflow-y thành auto theo đặc tả CSS. */}
           {hoveredIndex !== null && (
             <div
-              className={`pointer-events-none absolute z-10 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs shadow-lg ${anchorClass}`}
+              className={`pointer-events-none absolute z-10 border-2 border-neutral-900 bg-white px-3 py-2 text-xs shadow-hard-sm ${anchorClass}`}
               style={{
                 left: `${(pointFor(hoveredIndex, chartData[hoveredIndex].total).x / width) * 100}%`,
                 top: `${(pointFor(hoveredIndex, chartData[hoveredIndex].total).y / height) * 100}%`,
@@ -203,10 +203,10 @@ export function TimelineExplorer({years}: TimelineExplorerProps) {
                 href={tool.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="relative flex flex-col items-center gap-2 rounded-lg border border-neutral-200 p-4 text-center transition hover:border-neutral-400"
+                className="relative flex flex-col items-center gap-2 border-2 border-neutral-900 bg-white p-4 text-center shadow-hard-sm transition hover:-translate-y-0.5 hover:shadow-hard-lg motion-reduce:transform-none"
               >
                 {isNew && (
-                  <span className="absolute -top-2 -right-2 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="absolute -top-2.5 -right-2.5 border-2 border-neutral-900 bg-violet-600 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.06em] text-white">
                     New
                   </span>
                 )}

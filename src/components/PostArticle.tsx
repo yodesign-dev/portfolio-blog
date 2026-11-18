@@ -303,7 +303,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
     // xuống dòng thay vì đẩy tràn khung 375px. 0.9em thay vì text-base để code
     // trong tiêu đề không bé hơn chữ xung quanh.
     code: ({children}) => (
-      <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[0.9em] text-neutral-800 [overflow-wrap:anywhere]">
+      <code className="bg-neutral-100 px-1.5 py-0.5 font-mono text-[0.9em] text-neutral-800 [overflow-wrap:anywhere]">
         {children}
       </code>
     ),
@@ -331,7 +331,7 @@ function buildComponents(idByKey: Map<string, string>): PortableTextComponents {
 // bàn phím sẵn. Hàng tiêu đề và từng mục cao tối thiểu 44px để dễ chạm.
 function TocDisclosure({items}: {items: TocItem[]}) {
   return (
-    <details className="group mt-8 rounded-lg border border-neutral-200 lg:hidden">
+    <details className="group mt-8 border-2 border-neutral-900 bg-white lg:hidden">
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 text-sm font-semibold text-neutral-900 [&::-webkit-details-marker]:hidden">
         {TOC_LABEL}
         <svg
@@ -388,7 +388,7 @@ function CaseStudyMeta({post}: {post: Post}) {
         <dl className="mb-6 grid grid-cols-1 gap-5 rounded-xl bg-brand/5 p-5 sm:grid-cols-3 sm:p-6">
           {glance.map((item) => (
             <div key={item.label}>
-              <dt className="text-xs font-semibold uppercase tracking-widest text-brand">{item.label}</dt>
+              <dt className="font-mono text-xs font-bold uppercase tracking-widest text-brand">{item.label}</dt>
               <dd className="mt-1.5 text-[15px] font-medium leading-snug text-neutral-900">{item.value}</dd>
             </div>
           ))}
@@ -398,7 +398,7 @@ function CaseStudyMeta({post}: {post: Post}) {
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
           {facts.map((fact) => (
             <div key={fact.label}>
-              <dt className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
+              <dt className="font-mono text-xs uppercase tracking-widest text-neutral-400">
                 {fact.label}
               </dt>
               <dd className="mt-1 text-base font-medium text-neutral-900">{fact.value}</dd>
@@ -469,7 +469,7 @@ export function PostArticle({post}: {post: Post}) {
           <div className="min-w-0">
             <article>
               {post.isCaseStudy ? (
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-brand">Case study</p>
+                <p className="mb-4 font-mono text-xs font-bold uppercase tracking-widest text-brand">Case study</p>
               ) : (
                 post.tags &&
                 post.tags.length > 0 && (
@@ -482,7 +482,7 @@ export function PostArticle({post}: {post: Post}) {
                         href={`/blog?tag=${encodeURIComponent(t)}`}
                         className="group inline-flex items-center touch:min-h-11"
                       >
-                        <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 transition group-hover:bg-neutral-200">
+                        <span className="bg-neutral-100 px-2 py-0.5 font-mono text-[11px] uppercase tracking-[0.06em] text-neutral-600 transition group-hover:bg-neutral-200">
                           {t}
                         </span>
                       </Link>
@@ -535,7 +535,7 @@ export function PostArticle({post}: {post: Post}) {
 
             {post.more && post.more.length > 0 && (
               <aside className="mt-16 border-t border-neutral-200 pt-10">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+                <h2 className="font-mono text-xs uppercase tracking-widest text-neutral-500">
                   {post.isCaseStudy ? 'More case studies' : 'Keep reading'}
                 </h2>
                 <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
@@ -543,7 +543,7 @@ export function PostArticle({post}: {post: Post}) {
                     <li key={item._id}>
                       <Link
                         href={postPath(item)}
-                        className="group block h-full rounded-xl border border-neutral-200 p-5 transition hover:border-neutral-400"
+                        className="group block h-full border-2 border-neutral-900 bg-white p-5 shadow-hard-sm transition hover:-translate-y-0.5 hover:shadow-hard-lg motion-reduce:transform-none"
                       >
                         <p className="font-semibold leading-snug text-neutral-900 transition-colors group-hover:text-brand">
                           {item.title}

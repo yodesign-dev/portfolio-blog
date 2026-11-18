@@ -190,7 +190,7 @@ export function ContactModal() {
       />
 
       <div
-        className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 backdrop-blur-sm sm:items-center"
+        className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-8 sm:items-center"
         onClick={(e) => {
           // Chỉ đóng khi click ĐÚNG vào nền tối (không phải bất kỳ đâu bên
           // trong modal). Không dùng stopPropagation ở div con nữa — cách
@@ -203,7 +203,7 @@ export function ContactModal() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="contact-modal-title"
-          className="w-full max-w-lg rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl sm:p-8"
+          className="w-full max-w-lg border-2 border-neutral-900 bg-white p-6 text-neutral-900 shadow-hard-lg sm:p-8"
         >
           <div className="flex items-start justify-between">
             <div>
@@ -218,7 +218,7 @@ export function ContactModal() {
               type="button"
               onClick={closeModal}
               aria-label="Close"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+              className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -235,7 +235,7 @@ export function ContactModal() {
                 data-cal-link="yoshark-bin/30min"
                 onClick={() => trackEvent({ name: "Book Call Click" })}
                 data-cal-config='{"layout":"month_view"}'
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-ink transition hover:bg-accent-hover"
+                className="btn-hard mt-6 flex w-full items-center justify-center gap-2 bg-accent px-4 py-3 text-ink hover:bg-accent-hover"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -282,7 +282,7 @@ export function ContactModal() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="mt-6 w-full rounded-lg bg-accent px-4 py-2.5 text-base font-semibold text-ink transition hover:bg-accent-hover"
+                className="btn-hard mt-6 w-full bg-accent px-4 py-3 text-ink hover:bg-accent-hover"
               >
                 Close
               </button>
@@ -315,7 +315,7 @@ export function ContactModal() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your full name"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    className="w-full border-2 border-neutral-900 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-brand focus:shadow-hard focus:shadow-brand focus:outline-none"
                   />
                 </div>
                 <div>
@@ -329,7 +329,7 @@ export function ContactModal() {
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     placeholder="Project collaboration"
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    className="w-full border-2 border-neutral-900 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-brand focus:shadow-hard focus:shadow-brand focus:outline-none"
                   />
                 </div>
               </div>
@@ -345,7 +345,7 @@ export function ContactModal() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@email.com"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  className="w-full border-2 border-neutral-900 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-brand focus:shadow-hard focus:shadow-brand focus:outline-none"
                 />
               </div>
 
@@ -360,7 +360,7 @@ export function ContactModal() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="What would you like to say?"
-                  className="w-full resize-none rounded-lg border border-neutral-300 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  className="w-full resize-none border-2 border-neutral-900 px-3 py-2.5 text-base text-neutral-900 placeholder:text-neutral-400 transition focus:border-brand focus:shadow-hard focus:shadow-brand focus:outline-none"
                 />
               </div>
 
@@ -380,7 +380,7 @@ export function ContactModal() {
               <button
                 type="submit"
                 disabled={status === "submitting" || !captchaToken}
-                className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-ink transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-hard mt-1 flex items-center justify-center gap-2 bg-accent px-4 py-3 text-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === "submitting" ? (
                   "Sending..."

@@ -26,7 +26,7 @@ export function Background() {
   return (
     <section aria-label="Background" className="border-b border-neutral-200">
       <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8 sm:py-12">
-        <h2 className="text-center text-xs font-semibold uppercase tracking-widest text-neutral-400">
+        <h2 className="text-center font-mono text-xs uppercase tracking-widest text-neutral-400">
           Products I&apos;ve worked on
         </h2>
         <ul className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 text-lg font-semibold tracking-tight text-neutral-700 sm:grid-cols-4 md:text-xl lg:text-2xl">
@@ -55,7 +55,7 @@ export function Background() {
         <div className="mt-8 flex flex-col gap-4 border-t border-neutral-200 pt-6 md:flex-row md:items-center md:justify-between">
           <ul aria-label="Domains" className="flex flex-wrap gap-2">
             {DOMAINS.map((domain) => (
-              <li key={domain} className="rounded-full border border-neutral-200 px-3 py-1 text-sm text-neutral-600">
+              <li key={domain} className="border border-neutral-300 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.06em] text-neutral-600">
                 {domain}
               </li>
             ))}

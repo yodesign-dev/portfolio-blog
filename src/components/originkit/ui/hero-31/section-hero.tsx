@@ -88,7 +88,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
           </div>
 
           {/* Định vị: người xem cần biết "ai, làm gì" trước khi đọc slogan */}
-          <p className="mb-4 text-center text-sm font-semibold uppercase tracking-[0.2em] text-white/80 md:text-left">
+          <p className="mb-4 text-center font-mono text-xs uppercase tracking-[0.2em] text-white/80 sm:text-sm md:text-left">
             {SITE_NAME} · {SITE_ROLE}
           </p>
 
@@ -132,7 +132,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
               <Link
                 href="/work"
                 onClick={() => trackEvent({ name: "CTA Click", props: { cta: "hero_view_work" } })}
-                className="flex min-h-12 items-center justify-center bg-white px-6 text-base font-semibold text-brand transition hover:bg-white/90"
+                className="btn-hard flex min-h-12 items-center justify-center bg-white px-6 text-brand hover:bg-white/90"
               >
                 View my work
               </Link>
@@ -143,7 +143,7 @@ export const SectionHero = ({ study }: { study: HeroStudy | null }) => {
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => openModal(undefined, "hero_book_call")}
-                className="flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-base font-semibold text-ink transition hover:bg-accent-hover"
+                className="btn-hard flex min-h-12 cursor-pointer items-center justify-center bg-accent px-6 text-ink hover:bg-accent-hover"
               >
                 Get in touch
               </button>
