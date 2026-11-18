@@ -105,7 +105,7 @@ function ContactBlock({showResume, onMessage}: {showResume: boolean; onMessage: 
         if (!entry.isIntersecting) return
         observer.disconnect()
         void getCalApi().then((cal) =>
-          cal('ui', {theme: 'light', styles: {branding: {brandColor: '#00ddff'}}, hideEventTypeDetails: false, layout: 'month_view'}),
+          cal('ui', {theme: 'light', styles: {branding: {brandColor: '#002fff'}}, hideEventTypeDetails: false, layout: 'month_view'}),
         )
       },
       {rootMargin: '300px'},

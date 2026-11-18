@@ -71,6 +71,9 @@ body {
  * dùng chúng bên trong khối, không phải sửa từng component.
  * KHÔNG theo biến (phải sửa tay): rounded trơn, rounded-full, border (1px), shadow-*.
  *
+ * Màu nút chính: trên nền giấy dùng xanh brand (bg-brand, chữ text-white). Cyan (bg-accent) chỉ
+ * dùng trên nền tối hoặc nền xanh (hero, footer): trên giấy kem nó chỉ đạt 1.4:1 và lạc tông.
+ *
  * Thang xám = mực #101014 pha vào giấy #ede9e0. neutral-400 trở lên đều đạt 4.5:1 trên giấy,
  * trên thẻ và trên neutral-50/100 (trước đây neutral-400 trên trắng chỉ 2.5:1).
  */

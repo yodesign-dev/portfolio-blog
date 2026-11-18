@@ -145,7 +145,7 @@ export function ContactModal() {
       const cal = await getCalApi();
       cal("ui", {
         theme: "light",
-        styles: {branding: {brandColor: "#00ddff"}},
+        styles: {branding: {brandColor: "#002fff"}},
         hideEventTypeDetails: false,
         layout: "month_view",
       });
@@ -238,7 +238,7 @@ export function ContactModal() {
                 data-cal-link="yoshark-bin/30min"
                 onClick={() => trackEvent({ name: "Book Call Click" })}
                 data-cal-config='{"layout":"month_view"}'
-                className="btn-hard mt-6 flex w-full items-center justify-center gap-2 bg-accent px-4 py-3 text-ink hover:bg-accent-hover"
+                className="btn-hard mt-6 flex w-full items-center justify-center gap-2 bg-brand px-4 py-3 text-white hover:bg-brand-hover"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -285,7 +285,7 @@ export function ContactModal() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="btn-hard mt-6 w-full bg-accent px-4 py-3 text-ink hover:bg-accent-hover"
+                className="btn-hard mt-6 w-full bg-brand px-4 py-3 text-white hover:bg-brand-hover"
               >
                 Close
               </button>
@@ -383,7 +383,7 @@ export function ContactModal() {
               <button
                 type="submit"
                 disabled={status === "submitting" || !captchaToken}
-                className="btn-hard mt-1 flex items-center justify-center gap-2 bg-accent px-4 py-3 text-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-hard mt-1 flex items-center justify-center gap-2 bg-brand px-4 py-3 text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === "submitting" ? (
                   "Sending..."
