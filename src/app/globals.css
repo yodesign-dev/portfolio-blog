@@ -348,6 +348,20 @@ body:has([data-skin="paper"]) {
   50% { opacity: 0.45; }
 }
 
+/* Nhạc kiểu pixel (MusicPixel.tsx): vạch nhãn đĩa than quay 4 nấc 90° quanh tâm lưới 16×16, cột
+   kim của thanh tua nhấp nháy, 5 ô sáng bung quanh tim vừa thả. Giảm chuyển động: quy tắc chung
+   cuối file dừng cả ba (đĩa về nấc đầu, tim không bung) */
+@keyframes chill-vinyl {
+  to { transform: rotate(360deg); }
+}
+.chill-vinyl-mark { transform-box: view-box; transform-origin: 8px 8px; animation: chill-vinyl 1.6s steps(4) infinite; }
+.chill-wave-now { animation: chill-brew-now 1.6s steps(2) infinite; }
+@keyframes chill-heart-burst {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.chill-heart-burst { animation: chill-heart-burst 0.36s steps(3) forwards; }
+
 /* Thanh equalizer nhỏ cạnh bài đang phát ở trang /chill */
 @keyframes chill-eq {
   0%, 100% { height: 25%; }

@@ -36,6 +36,7 @@ import {AddTrackButton, MusicChooser, MusicPicker, notifyBrew, useBrewMusic} fro
 import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, suggestQueue, totalSeconds, type MusicQueue} from './playlist'
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {favList, loadFavs, markPlayed, saveFavs, toggleFav, type Favs} from './favs'
+import {PixelHeart, VinylDisc, WaveSeek} from './MusicPixel'
 import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
@@ -268,6 +269,7 @@ export function ChillRoom({
   marketOn = false,
   sleepTimerOn = false,
   favOn = false,
+  musicPixelOn = false,
   brewDeskOn = false,
   welcomeObOn = false,
   compactOn = false,
@@ -317,6 +319,9 @@ export function ChillRoom({
   // Bài của tôi: thả tim bài, tab "Của tôi", phát lặp 1 bài (Studio "Chill · Cài đặt"), mặc
   // định tắt. ?fav=1 / ?fav=0 trên URL ghi đè. Xem favs.ts
   favOn?: boolean
+  // Nhạc kiểu pixel: đĩa than quay, thanh tua cột sóng, tim pixel (Studio "Chill · Cài đặt"), mặc
+  // định tắt. ?vinyl=1 / ?vinyl=0 trên URL ghi đè. Xem MusicPixel.tsx
+  musicPixelOn?: boolean
   brewDeskOn?: boolean
   // Màn chào kiểu onboarding: khách mới 2 bước, khách quay lại 1 chạm (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?ob=1 / ?ob=0 trên URL ghi đè. Xem Welcome.tsx
@@ -623,6 +628,15 @@ export function ChillRoom({
     // Lần trước đang nghe bộ "Của tôi" thì mở sẵn tab đó
     if (loadQueue()?.key === 'fav') setMineTab(true)
   }, [favOn])
+  // Nhạc kiểu pixel (musicPixelOpen). mineReveal: đếm lần thả tim đầu tiên, để dãy trạm cuộn về
+  // đầu cho khách thấy tab "Của tôi" vừa sinh ra (ScrollRow)
+  const [pixelFlag, setPixelFlag] = useState(false)
+  const [mineReveal, setMineReveal] = useState(0)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('vinyl')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setPixelFlag(param ? param === '1' : musicPixelOn)
+  }, [musicPixelOn])
   const favIds = useMemo(() => (favFlag ? favList(favs, tracks.map((tr) => tr.id)) : []), [favFlag, favs, tracks])
   const favRows = useMemo(
     () => favIds.map((id) => ({tr: tracks.find((tr) => tr.id === id)!, i: tracks.findIndex((tr) => tr.id === id)})),
@@ -2276,6 +2290,7 @@ export function ChillRoom({
     const next = toggleFav(favs, id)
     setFavs(next)
     saveFavs(next)
+    if (adding && pixelFlag && favIds.length === 0) setMineReveal((n) => n + 1)
     // Đang nghe bộ "Của tôi": bài mới thả tim vào đầu bộ (giống thứ tự trong tab)
     if (adding && queue?.key === 'fav') applyQueue({...queue, ids: [id, ...queue.ids.filter((x) => x !== id)]})
     // Bỏ tim bài cuối cùng → tab "Của tôi" biến mất, về tab trạm
@@ -3627,9 +3642,13 @@ export function ChillRoom({
           showMine ? 'border-rose-300/50 bg-rose-300/10 text-rose-100' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
         }`}
       >
-        <span className="text-rose-300">
-          <HeartIcon filled size={12} />
-        </span>
+        {pixelFlag ? (
+          <PixelHeart filled scale={2} />
+        ) : (
+          <span className="text-rose-300">
+            <HeartIcon filled size={12} />
+          </span>
+        )}
         {t.room.favTab}
         <span className="font-mono text-[11px] tabular-nums opacity-70">{favIds.length}</span>
         {playingFrom === 'mine' && <EqualizerIcon small />}
@@ -3643,7 +3662,7 @@ export function ChillRoom({
   // Dãy trạm nhạc (tab Music và danh sách Ngắm cảnh): một hàng cuộn ngang (ScrollRow). Chip của
   // nơi nhạc đang phát có 3 vạch sóng nhỏ, để đang xem trạm khác vẫn biết nhạc phát ở đâu
   const stationChips = (
-    <ScrollRow role="radiogroup" aria-label={t.room.stationAria} selectedKey={showMine ? 'mine' : station} className="flex-1">
+    <ScrollRow role="radiogroup" aria-label={t.room.stationAria} selectedKey={showMine ? 'mine' : station} revealStart={mineReveal} className="flex-1">
       {mineTabButton}
       {STATIONS.map((st) => {
         const count = tracks.filter((t) => stationOf(t) === st.id).length
@@ -3733,7 +3752,7 @@ export function ChillRoom({
             <PlayMeter stat={plays?.get(tr.id)} />
           </span>
         </button>
-        {favFlag && <FavButton on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
+        {favFlag && <FavButton pixel={pixelFlag} on={isFav(tr.id)} title={tr.title} onToggle={() => toggleFavId(tr.id, 'list')} />}
         {!zenRow && brewFlag && !favFlag && <AddTrackButton inList={brewMusicApi.prefs.lists[brewMusicApi.prefs.active].ids.includes(tr.id)} title={tr.title} onToggle={() => brewMusicApi.toggleInList(tr.id)} />}
       </li>
     )
@@ -3786,7 +3805,7 @@ export function ChillRoom({
       )}
       {/* Bật Bài của tôi: tim là nút lưu duy nhất ngoài bảng chọn nhạc của phin — nút "+" (thêm vào
           danh sách của phin) chỉ còn trong bảng chọn, để khách không gặp hai nút lưu cạnh nhau */}
-      {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
+      {favFlag && <FavButton pixel={pixelFlag} round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
       {queue?.key.startsWith('list:') && queueOn ? (
         <RoundButton label={t.brew.openList} onClick={() => brewMusicApi.setPickerOpen(true)}>
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" aria-hidden>
@@ -3836,7 +3855,7 @@ export function ChillRoom({
           {stationLabel} · {playingPos + 1}/{playingList.length}
         </span>
       </button>
-      {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
+      {favFlag && <FavButton pixel={pixelFlag} round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
     </div>
   )
   const hoverProps = {onPointerEnter: () => setHovering(true), onPointerLeave: () => setHovering(false)}
@@ -3954,7 +3973,7 @@ export function ChillRoom({
               <span className="block truncate font-mono text-[10px] uppercase tracking-[0.16em] text-[#a79e94]">{stationLabel}</span>
               <span className="block truncate text-sm text-[#ede6dd]">{track.title}</span>
             </span>
-            {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
+            {favFlag && <FavButton pixel={pixelFlag} round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             <button
               type="button"
               onClick={() => setZenList((o) => !o)}
@@ -4881,15 +4900,21 @@ export function ChillRoom({
                 <NextIcon />
               </RoundButton>
             </div>
-            <div className="order-first min-w-0 basis-full px-1 @md:order-none @md:flex-1 @md:basis-auto @md:px-0 lowland:order-none lowland:flex-1 lowland:basis-auto lowland:px-0.5">
-              <p className="truncate font-mono text-[11px] uppercase tracking-[0.12em] text-[#a79e94]">
-                {stationLabel} · {playingPos + 1}/{playingList.length}
-              </p>
-              <p className="truncate font-semibold">{track.title}</p>
+            <div className="order-first flex min-w-0 basis-full items-center gap-2 px-1 @md:order-none @md:flex-1 @md:basis-auto @md:px-0 lowland:order-none lowland:flex-1 lowland:basis-auto lowland:px-0.5">
+              {/* Đĩa than: nhạc đang kêu thì quay. Màn thấp nằm ngang không đủ chỗ */}
+              {pixelFlag && <VinylDisc spinning={playing} className="lowland:hidden" />}
+              <div className="min-w-0">
+                <p className="truncate font-mono text-[11px] uppercase tracking-[0.12em] text-[#a79e94]">
+                  {stationLabel} · {playingPos + 1}/{playingList.length}
+                </p>
+                <p className="truncate font-semibold">{track.title}</p>
+              </div>
             </div>
             <span aria-hidden className="flex-1 @md:hidden lowland:hidden" />
-            {favFlag && <FavButton round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
-            <Visualizer audioRef={audioRef} playing={playing} />
+            {/* Nhạc kiểu pixel: cột sóng nhập vào thanh tua, tim dời ra sau âm lượng để đứng liền
+                một nhóm với trăng và cài đặt */}
+            {!pixelFlag && favFlag && <FavButton pixel={pixelFlag} round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
+            {!pixelFlag && <Visualizer audioRef={audioRef} playing={playing} />}
             <input
               type="range"
               min={0}
@@ -4934,6 +4959,7 @@ export function ChillRoom({
                 </div>
               )}
             </div>
+            {pixelFlag && favFlag && <FavButton pixel round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             {sleepFlag && (
               <div className={`relative shrink-0 ${sleepOnPhone ? '' : 'hidden sm:block lowland:@max-[400px]:hidden'}`}>
                 <button
@@ -5091,10 +5117,12 @@ export function ChillRoom({
               aria-valuetext={`${formatTime(position)} / ${formatTime(duration)}`}
               onClick={seek}
               onKeyDown={seekKey}
-              className="relative h-3 flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11 lowland:my-0 lowland:h-4"
+              className={`relative flex-1 cursor-pointer rounded-full touch:-my-4 touch:h-11 lowland:my-0 lowland:h-4 ${pixelFlag ? 'h-4' : 'h-3'}`}
             >
-              <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10 lowland:top-auto lowland:bottom-0 lowland:h-[3px] lowland:translate-y-0" />
-              <div className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d] lowland:top-auto lowland:bottom-0 lowland:h-[3px] lowland:translate-y-0" style={{width: `${progress * 100}%`}} />
+              {/* Nhạc kiểu pixel: hàng cột sóng thay vạch tua (màn thấp nằm ngang vẫn giữ vạch 3px) */}
+              {pixelFlag && <WaveSeek audioRef={audioRef} playing={playing} started={started} progress={progress} trackId={track.id} className="absolute inset-x-0 top-1/2 -translate-y-1/2 lowland:hidden" />}
+              <div className={`absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10 lowland:top-auto lowland:bottom-0 lowland:h-[3px] lowland:translate-y-0 ${pixelFlag ? 'hidden lowland:block' : ''}`} />
+              <div className={`absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#e8b27d] lowland:top-auto lowland:bottom-0 lowland:h-[3px] lowland:translate-y-0 ${pixelFlag ? 'hidden lowland:block' : ''}`} style={{width: `${progress * 100}%`}} />
             </div>
             <span className="w-8 text-right lowland:hidden">{formatTime(duration)}</span>
           </div>
@@ -6186,13 +6214,23 @@ function ArrowIcon({dir}: {dir: 'left' | 'right'}) {
 }
 
 // Nút tim của Bài của tôi: trong dòng bài (size md, 40px) và cạnh tên bài đang phát
-function FavButton({on, title, onToggle, round = false}: {on: boolean; title: string; onToggle: () => void; round?: boolean}) {
+function FavButton({on, title, onToggle, round = false, pixel = false}: {on: boolean; title: string; onToggle: () => void; round?: boolean; pixel?: boolean}) {
   const t = useT()
   const label = on ? t.room.favRemove(title) : t.room.favAdd(title)
+  // Tim pixel bung sáng ngay sau cú thả (không bung lại khi đổi sang bài đã thả tim từ trước)
+  const [burst, setBurst] = useState(false)
+  useEffect(() => {
+    if (!burst) return
+    const timer = window.setTimeout(() => setBurst(false), 400)
+    return () => window.clearTimeout(timer)
+  }, [burst])
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={() => {
+        setBurst(!on)
+        onToggle()
+      }}
       aria-pressed={on}
       aria-label={label}
       title={label}
@@ -6200,7 +6238,7 @@ function FavButton({on, title, onToggle, round = false}: {on: boolean; title: st
         on ? 'text-rose-300 hover:bg-white/[0.06]' : 'text-[#a79e94] hover:bg-white/[0.06] hover:text-rose-200'
       }`}
     >
-      <HeartIcon filled={on} />
+      {pixel ? <PixelHeart filled={on} burst={burst} /> : <HeartIcon filled={on} />}
     </button>
   )
 }

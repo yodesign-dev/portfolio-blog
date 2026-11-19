@@ -13,15 +13,27 @@
 //   và biến mất hẳn, khách tưởng hết trạm. Máy có chuột bấm được (cuộn ~70% hàng); màn chạm chỉ
 //   là dấu hiệu (vuốt để cuộn), không chặn chạm vào chip bên dưới
 
-import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react'
 
 const FADE = 24
 // Khoảng trống bên trái chip đang chọn khi cuộn về trái. Mũi tên ‹ cùng quầng tối quanh nó phủ
 // ~38px tính từ mép, nên 56px mới chừa được ~12px viền chip trước nó (để biết còn chip bên trái)
 const PEEK = 56
 
-export function ScrollRow({children, selectedKey, className = '', ...aria}: {children: ReactNode; selectedKey: string; className?: string; role?: string; 'aria-label'?: string}) {
+// revealStart: tăng số này để cuộn về đầu hàng thay vì về chip đang chọn (lần đầu thả tim: tab "Của
+// tôi" chen vào đầu hàng, phải cho khách thấy nó chứ không chỉ một mẩu ló ra)
+export function ScrollRow({children, selectedKey, revealStart = 0, className = '', ...aria}: {children: ReactNode; selectedKey: string; revealStart?: number; className?: string; role?: string; 'aria-label'?: string}) {
   const ref = useRef<HTMLDivElement>(null)
+  // Layout effect chạy trước MutationObserver của lần vẽ đó, nên cờ kịp chặn cú kéo về chip đang chọn
+  const holdStart = useRef(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || revealStart === 0) return
+    holdStart.current = true
+    el.scrollTo({left: 0, behavior: 'instant'})
+    const frame = requestAnimationFrame(() => (holdStart.current = false))
+    return () => cancelAnimationFrame(frame)
+  }, [revealStart])
   const [edges, setEdges] = useState({start: false, end: false})
   const measure = useCallback(() => {
     const el = ref.current
@@ -43,7 +55,10 @@ export function ScrollRow({children, selectedKey, className = '', ...aria}: {chi
     // Chip thêm / bớt ngay trong hàng (vd thả tim bài đầu → tab "Của tôi" chen vào đầu) đẩy cả dãy
     // sang bên: kéo chip đang chọn về lại mép trái, đứng yên (không trượt)
     const mo = new MutationObserver((list) => {
-      if (list.some((m) => m.type === 'childList' && m.target === el)) alignSelected(el, false)
+      if (list.some((m) => m.type === 'childList' && m.target === el)) {
+        if (holdStart.current) el.scrollTo({left: 0, behavior: 'instant'})
+        else alignSelected(el, false)
+      }
       measure()
     })
     mo.observe(el, {childList: true, subtree: true, characterData: true})
