@@ -1,7 +1,7 @@
 'use client'
 
 // Nhạc kiểu pixel của /chill (công tắc Studio musicPixelOpen, thử bằng ?vinyl=1):
-// - VinylDisc: đĩa than 16×16 ô cạnh tên bài, vạch nhãn quay 4 nấc (90° mỗi nấc, ô luôn nằm
+// - VinylDisc: đĩa than 16×16 ô cạnh tên bài, vệt sáng và vạch nhãn quay 4 nấc (90° mỗi nấc, ô luôn nằm
 //   trên lưới) khi nhạc đang kêu, dừng nhạc thì đứng đúng chỗ
 // - WaveSeek: lớp vẽ của thanh tua, mỗi cột 4px. Cột đã nghe giữ mức âm ghi lại lúc kim đi qua;
 //   đoạn chưa nghe, đoạn tua bỏ qua và sau khi tải lại trang thì ở mức thấp nhất. Không vẽ sóng
@@ -23,36 +23,58 @@ function Cells({rows, palette}: Sprite) {
   )
 }
 
-// Thân, rãnh, viền lấy từ bảng màu phin (BrewDesk) và radio trên kệ (shelf.ts); nhãn là màu nhấn
+// Thân, viền lấy từ bảng màu phin (BrewDesk) và radio trên kệ (shelf.ts); nhãn là màu nhấn
 const DISC: Sprite = {
-  palette: {o: '#8a6a50', k: '#2c2523', g: '#574a44', L: '#e8b27d', l: '#c98f55', s: '#ede6dd'},
+  palette: {o: '#8a6a50', k: '#2c2523', L: '#e8b27d', l: '#c98f55', s: '#ede6dd'},
   rows: [
     '.....oooooo.....',
     '...ookkkkkkoo...',
     '..okkkkkkkkkko..',
-    '.okkggkkkkkkkko.',
-    '.okgkkkkkkkkkko.',
-    'okkgkkLLLLkkkkko',
+    '.okkkkkkkkkkkko.',
+    '.okkkkkkkkkkkko.',
+    'okkkkkLLLLkkkkko',
     'okkkkLLLLLLkkkko',
     'okkkkLLssLLkkkko',
     'okkkkLLssLLkkkko',
     'okkkkllLLLLkkkko',
-    'okkkkklllLkkgkko',
-    '.okkkkkkkkkkgko.',
-    '.okkkkkkkkkggko.',
+    'okkkkklllLkkkkko',
+    '.okkkkkkkkkkkko.',
+    '.okkkkkkkkkkkko.',
     '..okkkkkkkkkko..',
     '...ookkkkkkoo...',
     '.....oooooo.....',
   ],
 }
+// Lớp quay: 2 vệt sáng trên rãnh đĩa (đối xứng qua tâm) + góc tối trên nhãn. Vệt sáng nằm sát
+// mép nên thấy đĩa quay rõ hơn nhiều so với chỉ vạch nhãn ở tâm
+const SHINE: [number, number][] = [
+  [4, 3],
+  [5, 3],
+  [3, 4],
+  [3, 5],
+  [12, 10],
+  [12, 11],
+  [11, 12],
+  [10, 12],
+]
+const MARK: [number, number][] = [
+  [9, 6],
+  [10, 6],
+  [10, 7],
+]
 
+// Hiện 48px (mỗi ô 3px): 32px thì vòng quay quá nhỏ để nhận ra
 export function VinylDisc({spinning, className = ''}: {spinning: boolean; className?: string}) {
   return (
-    <svg aria-hidden viewBox="0 0 16 16" width={32} height={32} shapeRendering="crispEdges" className={`block shrink-0 ${className}`}>
+    <svg aria-hidden viewBox="0 0 16 16" width={48} height={48} shapeRendering="crispEdges" className={`block shrink-0 ${className}`}>
       <Cells {...DISC} />
       <g className="chill-vinyl-mark" style={{animationPlayState: spinning ? 'running' : 'paused'}}>
-        <rect x={9} y={6} width={1} height={1} fill="#2a1a10" />
-        <rect x={10} y={7} width={1} height={1} fill="#2a1a10" />
+        {SHINE.map(([x, y]) => (
+          <rect key={`s${x}-${y}`} x={x} y={y} width={1} height={1} fill="#8e8279" />
+        ))}
+        {MARK.map(([x, y]) => (
+          <rect key={`m${x}-${y}`} x={x} y={y} width={1} height={1} fill="#2a1a10" />
+        ))}
       </g>
     </svg>
   )
