@@ -1,6 +1,6 @@
 import {CaseStudyCard, getCaseStudies} from '@/components/CaseStudyCard'
 import {BehanceArchive} from '@/components/BehanceArchive'
-import {getBehanceProjects, showcaseId} from '@/lib/behance'
+import {getBehanceProjects, withoutCaseStudies} from '@/lib/behance'
 import {pageMetadata} from '@/lib/site'
 
 export const revalidate = 60
@@ -15,10 +15,8 @@ export default async function WorkPage() {
   // Behance RSS cache riêng 1 ngày (dự án cũ, ít thay đổi)
   const [studies, behance] = await Promise.all([getCaseStudies(revalidate), getBehanceProjects()])
 
-  // Project đã có thẻ case study trỏ sang Behance thì không lặp lại ở mục Behance
-  // (so theo mã project trong link, vì link dán vào Studio có thể khác đuôi)
-  const linked = new Set(studies.map((study) => showcaseId(study.externalUrl ?? '')).filter(Boolean))
-  const archive = behance.filter((project) => !linked.has(showcaseId(project.url)))
+  // Project đã có case study trên site thì không lặp lại ở mục Behance
+  const archive = withoutCaseStudies(behance, studies)
 
   return (
     <div className="min-h-screen bg-background text-neutral-900 antialiased">

@@ -18,11 +18,14 @@ export type BehanceProject = {
 // id = mã số project trong link Behance (/gallery/<mã>/…). Feed chỉ có tên + ảnh
 // bìa + năm, nên mô tả 1 dòng và tag viết tay theo nội dung từng project.
 // (Dùng mảng, không dùng object: key dạng số của object bị JS tự xếp tăng dần.)
-export const BEHANCE_SHOWCASE: {id: string; summary: string; tags: string[]}[] = [
+// caseStudySlug = slug của case study trên site kể cùng project này (nếu có): khi bài
+// đó đang xuất bản thì project không lặp lại ở mục Behance.
+export const BEHANCE_SHOWCASE: {id: string; summary: string; tags: string[]; caseStudySlug?: string}[] = [
   // Có My role, Results, User research, layout + flow đặt món tới checkout
   {
     id: '81566679',
-    summary: 'Research, flows and UI for ordering on web and mobile, for customers and drivers, while daily orders more than tripled.',
+    caseStudySlug: 'lala-food-delivery',
+    summary: 'Research, flows and UI for ordering on web and mobile, for customers and drivers.',
     tags: ['Web & mobile', 'Food delivery', 'User research'],
   },
   // Có Problem / Solution, user-flow và đủ các màn đăng ký tài xế
@@ -42,6 +45,21 @@ export const BEHANCE_SHOWCASE: {id: string; summary: string; tags: string[]}[] =
 export const showcaseId = (url: string) => url.match(/\/gallery\/(\d+)/)?.[1] ?? ''
 const showcaseIndex = (url: string) => BEHANCE_SHOWCASE.findIndex((p) => p.id === showcaseId(url))
 export const showcaseNote = (url: string) => BEHANCE_SHOWCASE[showcaseIndex(url)]
+
+// Bỏ các project Behance đã có case study trên site: thẻ trỏ thẳng sang Behance
+// (so theo mã project trong link, vì link dán vào Studio có thể khác đuôi) hoặc
+// bài có trang chi tiết riêng (so theo caseStudySlug ở trên).
+export function withoutCaseStudies<T extends {url: string}>(
+  projects: T[],
+  studies: {slug: {current: string}; externalUrl?: string}[],
+): T[] {
+  const ids = new Set(studies.map((study) => showcaseId(study.externalUrl ?? '')).filter(Boolean))
+  const slugs = new Set(studies.map((study) => study.slug.current))
+  return projects.filter((project) => {
+    const slug = showcaseNote(project.url)?.caseStudySlug
+    return !ids.has(showcaseId(project.url)) && !(slug && slugs.has(slug))
+  })
+}
 
 export const BEHANCE_PROFILE = SOCIAL_LINKS.find((l) => l.label === 'Behance')?.href || 'https://www.behance.net/applebin'
 const USERNAME = BEHANCE_PROFILE.replace(/\/+$/, '').split('/').pop()

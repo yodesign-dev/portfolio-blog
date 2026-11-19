@@ -7,7 +7,7 @@ import { JustForFun } from '@/components/JustForFun'
 import { HowIWork } from '@/components/HowIWork'
 import { Testimonials } from '@/components/Testimonials'
 import { BehanceCard } from '@/components/BehanceArchive'
-import { getBehanceProjects, showcaseId, showcaseNote } from '@/lib/behance'
+import { getBehanceProjects, showcaseNote, withoutCaseStudies } from '@/lib/behance'
 import { getMediumPosts } from '@/lib/medium'
 import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn import sang Hero 31
 
@@ -94,10 +94,9 @@ export default async function HomePage() {
     posts.length === 0 ? getMediumPosts() : [],
   ])
   // Có case study: dưới 3 thẻ là hàng nhỏ 3 ô: case study còn lại (thứ 4 trở đi) rồi
-  // tới Behance cho đủ 2 ô, chừa ô cuối cho quán /chill. Project Behance đã có thẻ
-  // case study trỏ tới thì không lặp lại.
-  const linkedBehance = new Set(studies.map((study) => showcaseId(study.externalUrl ?? '')).filter(Boolean))
-  const freshBehance = behance.filter((project) => !linkedBehance.has(showcaseId(project.url)))
+  // tới Behance cho đủ 2 ô, chừa ô cuối cho quán /chill. Project Behance đã có
+  // case study trên site thì không lặp lại.
+  const freshBehance = withoutCaseStudies(behance, studies)
   const moreStudies = studies.slice(3, 5)
   const featuredBehance = freshBehance.slice(0, featuredStudies.length > 0 ? 2 - moreStudies.length : 3)
   // Writing: danh sách gọn 3 bài (ảnh bìa Medium phần lớn là ảnh chụp chữ, xếp
