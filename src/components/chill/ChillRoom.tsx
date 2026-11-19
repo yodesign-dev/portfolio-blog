@@ -4915,19 +4915,22 @@ export function ChillRoom({
                 một nhóm với trăng và cài đặt */}
             {!pixelFlag && favFlag && <FavButton pixel={pixelFlag} round on={isFav(track.id)} title={track.title} onToggle={() => toggleFavId(track.id, 'bar')} />}
             {!pixelFlag && <Visualizer audioRef={audioRef} playing={playing} />}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              aria-label={t.room.volume}
-              className="hidden w-24 accent-[#e8b27d] @xl:block touch:-my-3.5 touch:h-11"
-            />
+            {!pixelFlag && (
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                aria-label={t.room.volume}
+                className="hidden w-24 accent-[#e8b27d] @xl:block touch:-my-3.5 touch:h-11"
+              />
+            )}
             {/* Thanh nhạc hẹp (điện thoại, tablet đang mở Cài đặt) không đủ chỗ cho thanh volume — nút loa
                 mở thanh trượt nổi phía trên */}
-            <div className="relative @xl:hidden">
+            {/* Nhạc kiểu pixel: máy tính cũng dùng nút loa cho gọn thanh nhạc, cả nhóm nút đứng liền nhau */}
+            <div className={`relative ${pixelFlag ? '' : '@xl:hidden'}`}>
               <button
                 type="button"
                 onClick={() => setVolumeOpen((o) => !o)}
