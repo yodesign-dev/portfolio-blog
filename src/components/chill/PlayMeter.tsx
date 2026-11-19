@@ -101,7 +101,8 @@ export function HotBadge({stat}: {stat?: PlayStat}) {
 // Sóng nhạc của bài đang phát. Mỗi vạch có chiều cao riêng: giảm chuyển động thì hiệu ứng tắt,
 // sóng đứng yên ở 3 mức cao thấp (không có chiều cao riêng thì vạch về 0, sóng biến mất).
 // `small`: bản nhỏ trên chip trạm đang phát. Dùng chung cho danh sách nhạc và cửa sổ nổi (MiniPlayer)
-export function EqualizerIcon({small}: {small?: boolean}) {
+// `dark`: vạch tối, cho ô trạm đang chọn tô đặc hổ phách (lưới trạm)
+export function EqualizerIcon({small, dark}: {small?: boolean; dark?: boolean}) {
   const t = useT()
   return (
     <span role="img" className={`flex items-end gap-[2px] ${small ? 'ml-1.5 h-2.5' : 'h-3'}`} aria-label={small ? `, ${t.room.playing}` : t.room.playing}>
@@ -112,7 +113,7 @@ export function EqualizerIcon({small}: {small?: boolean}) {
       ].map(([delay, height]) => (
         <span
           key={delay}
-          className={`animate-[chill-eq_0.9s_ease-in-out_infinite] rounded-full bg-[#e8b27d] ${small ? 'w-[2px]' : 'w-[3px]'}`}
+          className={`animate-[chill-eq_0.9s_ease-in-out_infinite] rounded-full ${dark ? 'bg-[#2a1a10]' : 'bg-[#e8b27d]'} ${small ? 'w-[2px]' : 'w-[3px]'}`}
           style={{animationDelay: `${delay}ms`, height}}
         />
       ))}

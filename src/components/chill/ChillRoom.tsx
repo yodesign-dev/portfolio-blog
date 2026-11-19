@@ -270,6 +270,7 @@ export function ChillRoom({
   sleepTimerOn = false,
   favOn = false,
   musicPixelOn = false,
+  stationGridOn = false,
   brewDeskOn = false,
   welcomeObOn = false,
   compactOn = false,
@@ -322,6 +323,9 @@ export function ChillRoom({
   // Nhạc kiểu pixel: đĩa than quay, thanh tua cột sóng, tim pixel (Studio "Chill · Cài đặt"), mặc
   // định tắt. ?vinyl=1 / ?vinyl=0 trên URL ghi đè. Xem MusicPixel.tsx
   musicPixelOn?: boolean
+  // Lưới trạm nhạc 4 cột thay hàng chip cuộn ngang (Studio "Chill · Cài đặt"), mặc định tắt.
+  // ?grid=1 / ?grid=0 trên URL ghi đè
+  stationGridOn?: boolean
   brewDeskOn?: boolean
   // Màn chào kiểu onboarding: khách mới 2 bước, khách quay lại 1 chạm (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?ob=1 / ?ob=0 trên URL ghi đè. Xem Welcome.tsx
@@ -637,6 +641,12 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
     setPixelFlag(param ? param === '1' : musicPixelOn)
   }, [musicPixelOn])
+  const [gridFlag, setGridFlag] = useState(false)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('grid')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setGridFlag(param ? param === '1' : stationGridOn)
+  }, [stationGridOn])
   const favIds = useMemo(() => (favFlag ? favList(favs, tracks.map((tr) => tr.id)) : []), [favFlag, favs, tracks])
   const favRows = useMemo(
     () => favIds.map((id) => ({tr: tracks.find((tr) => tr.id === id)!, i: tracks.findIndex((tr) => tr.id === id)})),
@@ -3703,6 +3713,70 @@ export function ChillRoom({
       })}
     </ScrollRow>
   )
+  // Lưới trạm (stationGridOpen): 4 cột đều nhau, thấy hết mọi trạm, không cuộn. Trạm đang chọn tô đặc
+  // hổ phách (chữ tối 8,85:1). Trạm có bài mới / trạm mới mở: chấm vuông xanh (chữ cho trình đọc màn
+  // hình). "Của tôi" là bộ của khách chứ không phải trạm nên lên dòng tiêu đề, cạnh `extra` (nút Lặp /
+  // Trộn của bảng Cài đặt). Noel trong mùa: một hàng riêng trên cùng. Vẫn là một radiogroup, phím mũi
+  // tên đi theo thứ tự Của tôi → Noel → các trạm
+  const stationGrid = (extra: React.ReactNode) => (
+    <div role="radiogroup" aria-label={t.room.stationAria} className="min-w-0 flex-1">
+      <div className="mb-2 flex min-h-9 items-center justify-between gap-2">
+        <span aria-hidden className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#a79e94]">
+          {t.room.stationAria}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {mineTabButton}
+          {extra}
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {STATIONS.map((st) => {
+          if (!tracks.some((tr) => stationOf(tr) === st.id)) return null
+          const on = !showMine && st.id === station
+          const noel = st.id === 'noel'
+          const fresh = freshStations.has(st.id)
+          return (
+            <button
+              key={st.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => pickStation(st.id)}
+              className={`flex h-9 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-xs transition sm:gap-1.5 sm:text-[13px] touch:h-11 ${
+                noel
+                  ? `col-span-4 border ${noelTabClass(on)}`
+                  : on
+                    ? 'bg-[#e8b27d] font-semibold text-[#2a1a10]'
+                    : 'bg-white/[0.07] text-[#c9c0b6] hover:bg-white/[0.12] hover:text-[#ede6dd]'
+              }`}
+            >
+              {noel && (
+                <>
+                  <NoelTabLights />
+                  <EventStar />
+                </>
+              )}
+              <span className="truncate">{stationName(st, lang, 'short')}</span>
+              {(fresh || hasUnseenNew(st.id)) && (
+                <>
+                  <span aria-hidden className={`size-1.5 shrink-0 ${on && !noel ? 'bg-[#1f5a3c]' : 'bg-[#9fdcbc]'}`} />
+                  <span className="sr-only">, {fresh ? t.room.newStation : t.room.newInStation}</span>
+                </>
+              )}
+              {/* Sóng nhỏ tự có lề trái 6px (dùng trong chip); ô lưới đã có gap nên bù lại, kẻo ô 79px
+                  trên điện thoại cắt mất chữ */}
+              {playingFrom === st.id && (
+                <span className="-ml-1.5 flex shrink-0">
+                  <EqualizerIcon small dark={on && !noel} />
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
   // Một hàng trong danh sách bài. Bài đang phát (đã bấm phát, kể cả đang tạm dừng): nền cam nhạt,
   // vạch cam mép trái, tên cam; đang kêu thì sóng nhạc thay số thứ tự, tạm dừng thì số màu cam.
   // Rê chuột / focus bàn phím: số thành ▶ (bài đang kêu thì ⏸). Màn chạm không có hover — cả hàng
@@ -3950,7 +4024,7 @@ export function ChillRoom({
         >
           {zenList && (
             <div data-list-scroll className="mb-2 max-h-[min(55dvh,420px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#16131a]/95 p-3 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md">
-              {stationChips}
+              {gridFlag ? stationGrid(null) : stationChips}
               <ol className="mt-1 divide-y divide-white/[0.06]">{shownList.map((row, pos) => trackRow(row, pos, true))}</ol>
             </div>
           )}
@@ -5346,9 +5420,9 @@ export function ChillRoom({
             <>
               {/* Trạm nhạc theo mood (mỗi trạm phát liền mạch như 1 bản mix) và 2 nút Lặp 1 bài / Trộn bài
                   chung một hàng, để màn hình thấy được nhiều bài hơn. Volume nằm trên thanh phát nhạc */}
-              <div className="flex items-center gap-2">
-                {stationChips}
-                <div className="flex shrink-0 items-center gap-1 border-l border-white/10 pl-2">
+              {gridFlag ? (
+                stationGrid(
+                  <>
                   {favFlag && (
                     <ToggleIconButton on={repeatOne} label={t.room.repeatOne} onClick={toggleRepeat}>
                       <RepeatOneIcon />
@@ -5357,8 +5431,23 @@ export function ChillRoom({
                   <ToggleIconButton on={shuffle} label={t.room.shuffle} onClick={() => setShuffle((s) => !s)}>
                     <ShuffleIcon />
                   </ToggleIconButton>
+                  </>,
+                )
+              ) : (
+                <div className="flex items-center gap-2">
+                  {stationChips}
+                  <div className="flex shrink-0 items-center gap-1 border-l border-white/10 pl-2">
+                    {favFlag && (
+                      <ToggleIconButton on={repeatOne} label={t.room.repeatOne} onClick={toggleRepeat}>
+                        <RepeatOneIcon />
+                      </ToggleIconButton>
+                    )}
+                    <ToggleIconButton on={shuffle} label={t.room.shuffle} onClick={() => setShuffle((s) => !s)}>
+                      <ShuffleIcon />
+                    </ToggleIconButton>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <ol className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">{shownList.map((row, pos) => trackRow(row, pos))}</ol>
             </>
