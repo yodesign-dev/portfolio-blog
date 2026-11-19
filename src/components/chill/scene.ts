@@ -266,6 +266,15 @@ const seeded = (i: number, k = 0) => {
 // Người ngồi dạng video (quán, …): cấu hình trong themes.ts (CharacterVideo)
 
 // Màu nhân cho sprite ngoài phố để hợp ánh sáng của ảnh nền
+// Lòng ly dưới phin theo từng hàng (px gốc, tính cả hai đầu), đo trên interior.webp so với góc
+// `coffee` của phòng: thân ly thẳng, thu dần ở chỗ cà phê giáp sữa và ở đáy bo. Dừng trước vệt
+// sáng bên phải của tranh để không tô đè lên nó
+function glassInner(glass: {coffee: {x: number; y: number}}, y: number): [number, number] {
+  const dy = y - glass.coffee.y
+  const [a, b] = dy <= 8 ? [-1, 18] : dy === 9 ? [1, 17] : dy <= 14 ? [0, 15] : dy === 15 ? [2, 14] : [4, 14]
+  return [glass.coffee.x + a, glass.coffee.x + b]
+}
+
 const SPRITE_TINT: Record<TimeOfDay, string | null> = {
   morning: null,
   afternoon: '#ffd6b4',
@@ -1227,39 +1236,69 @@ export class ChillScene {
   // Bàn pha phin: ly đầy dần theo thời gian của phin. Vẽ ngay trên tranh nội thất như món
   // khách chọn nên sáng / chiều / tối đều khớp màu. Sữa đặc có sẵn dưới đáy thì cà phê chỉ
   // dâng từ mặt sữa, như pha thật; ly đen và bạc xỉu dâng từ đáy.
+  // `top` = hàng trên cùng của cà phê trong tranh: phin xong (level 1) thì ly đúng như tranh gốc
   private brewSurface(glass: NonNullable<Theme['drink']>) {
-    const top = glass.coffee.y - 6
+    const top = glass.coffee.y - 1
     const hasMilk = !this.drink || this.drink === 'sua'
     const bottom = hasMilk ? glass.milk.y : glass.milk.y + glass.milk.h
     return {top, bottom, y: bottom - Math.round((this.brewLevel ?? 1) * (bottom - top))}
   }
 
+  // Phần ly còn rỗng (phía trên mặt cà phê): tô theo lòng ly từng hàng, màu gỗ phía sau nhìn xuyên
+  // qua kính + 1 vệt sáng dọc mép trái. Không tô ra ngoài lòng ly nên thành ly, vệt sáng bên phải
+  // và chân phin trong tranh vẫn còn. Bản đầu tô một khối chữ nhật phẳng: lệch dáng ly, hở cà phê
+  // ở góc đáy và che hết chi tiết kính
   private paintBrew(ctx: CanvasRenderingContext2D) {
     const glass = this.theme.drink
     if (!glass || this.brewLevel === null) return
     const {top, bottom, y} = this.brewSurface(glass)
-    const x = glass.coffee.x + 1
-    const w = glass.coffee.w - 3
-    if (y > top) {
-      ctx.fillStyle = '#5e4436'
-      ctx.fillRect(x * RES, top * RES, w * RES, (y - top) * RES)
+    const row = (color: string, at: number, x0: number, x1: number) => {
+      ctx.fillStyle = color
+      ctx.fillRect(x0 * RES, at * RES, (x1 - x0 + 1) * RES, RES)
     }
+    // Kính rỗng không phẳng một màu: 2 hàng trên cùng tối hơn (bóng đáy phin), dải 3 px bên phải
+    // sáng hơn (ánh sáng lọt qua thành ly), mép trái 1 px vệt sáng
+    for (let at = top; at < y; at++) {
+      const [x0, x1] = glassInner(glass, at)
+      row(at < top + 2 ? '#573019' : '#6f4128', at, x0, x1)
+      row('#875636', at, x1 - 2, x1)
+      row('#a8876a', at, x0, x0)
+    }
+    // Mặt cà phê: 1 hàng nâu sáng. Chưa có giọt nào (level 0) hoặc đã đầy như tranh thì không vẽ
     if (y > top && y < bottom) {
-      ctx.fillStyle = '#a06a3c'
-      ctx.fillRect(x * RES, y * RES, w * RES, RES)
+      const [x0, x1] = glassInner(glass, y)
+      row('#a06a3c', y, x0, x1)
     }
   }
 
-  // Giọt cà phê rơi từ phin xuống mặt ly. ctx đang ở px gốc 640×360
+  // Giọt cà phê rơi từ đáy phin xuống mặt ly, chạm mặt thì gợn 1 nhịp. Gần xong (75%, 90%) nhỏ
+  // thưa dần như phin sắp cạn. Tạm dừng: một giọt treo ở đáy phin. Cảnh đang dừng (giảm chuyển
+  // động): không vẽ giọt, mức cà phê vẫn dâng. ctx đang ở px gốc 640×360
   private drawBrewDrip(ctx: CanvasRenderingContext2D, t: number) {
     const glass = this.theme.drink
-    if (!glass || this.brewLevel === null || this.brewPaused) return
-    const {top, y} = this.brewSurface(glass)
+    if (!glass || this.brewLevel === null || this.brewLevel >= 1) return
+    const {top, bottom, y} = this.brewSurface(glass)
+    const from = glass.coffee.y - 6
     const x = glass.coffee.x + Math.floor(glass.coffee.w / 2) - 1
-    ctx.fillStyle = this.o('#2c1608')
-    for (let i = 0; i < 2; i++) {
-      const p = (t / 1.1 + i * 0.5) % 1
-      ctx.fillRect(x, Math.round(top + p * Math.max(2, y - top - 2)), 2, 2)
+    if (this.brewPaused) {
+      ctx.fillStyle = this.o('#2c1608')
+      ctx.fillRect(x, from, 2, 1)
+      ctx.fillRect(x, from + 1, 1, 1)
+      return
+    }
+    if (this.paused) return
+    const gap = this.brewLevel > 0.9 ? 3.2 : this.brewLevel > 0.75 ? 2 : 1.1
+    const at = t % gap
+    const fall = 0.7
+    const land = Math.min(y, bottom - 1)
+    if (at < fall) {
+      ctx.fillStyle = this.o('#2c1608')
+      ctx.fillRect(x, Math.round(from + (at / fall) * Math.max(1, land - from - 2)), 2, 2)
+    } else if (at < fall + 0.25 && y > top && y < bottom) {
+      ctx.fillStyle = this.o('#c98f55')
+      ctx.fillRect(x - 1, y, 4, 1)
+      ctx.fillStyle = this.o('#a06a3c')
+      ctx.fillRect(x, y - 1, 2, 1)
     }
   }
 
