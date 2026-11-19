@@ -21,5 +21,10 @@ export default async function CaseStudyPage({params}: {params: Promise<{slug: st
     redirect(`/blog/${post.slug.current}`)
   }
 
+  // Case study chỉ có thẻ, bài nằm ở nơi khác (Medium, Behance) → đi thẳng tới đó.
+  if (post.externalUrl?.startsWith('https://')) {
+    redirect(post.externalUrl)
+  }
+
   return <PostArticle post={post} />
 }

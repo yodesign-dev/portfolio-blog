@@ -16,6 +16,24 @@ const FONTS = [
   {title: 'Monospace', value: 'ui-monospace, monospace'},
 ]
 
+// Bộ nhãn đầu việc UX cố định cho thẻ case study
+const UX_WORK = [
+  'Requirements',
+  'MVP scoping',
+  'User research',
+  'User feedback',
+  'Competitor research',
+  'User flows',
+  'Site map',
+  'Onboarding guide',
+  'Prototype',
+  'Usability test',
+  'UX writing',
+  'Analytics',
+  'Event tracking',
+  'Heatmap tracking',
+]
+
 export default defineType({
   name: 'post',
   title: 'Bài viết',
@@ -275,6 +293,68 @@ export default defineType({
       description: 'VD: 2025 hoặc 2024 – 2025',
       hidden: ({document}) => !document?.isCaseStudy,
     }),
+    // Thông tin để người đọc sàng lọc nhanh trên thẻ: nền tảng, loại việc, trạng thái,
+    // đầu việc UX và UI tách riêng. Nhãn UX lấy từ danh sách cố định để các thẻ so sánh
+    // được với nhau; nhãn UI gõ tự do (thường là tên màn hình chính).
+    defineField({
+      name: 'platform',
+      title: 'Nền tảng',
+      type: 'string',
+      group: 'caseStudy',
+      description: 'VD: Web app · Web, mobile web, CRM · Web, customer app, driver app',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(60),
+    }),
+    defineField({
+      name: 'projectType',
+      title: 'Loại việc',
+      type: 'string',
+      group: 'caseStudy',
+      description: 'VD: Redesign · Flow redesign · MVP · 2 months · New feature',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(40),
+    }),
+    defineField({
+      name: 'projectStatus',
+      title: 'Trạng thái',
+      type: 'string',
+      group: 'caseStudy',
+      description: 'VD: Live · Shipped · Shipped, still live · Prototype, internal test',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(40),
+    }),
+    defineField({
+      name: 'uxWork',
+      title: 'Đầu việc UX',
+      type: 'array',
+      group: 'caseStudy',
+      of: [{type: 'string'}],
+      options: {list: UX_WORK.map((value) => ({title: value, value})), layout: 'grid'},
+      description: 'Chọn tối đa 5. Có chọn ở cả UX và UI thì thẻ ghi "UX + UI".',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(5).unique(),
+    }),
+    defineField({
+      name: 'uiWork',
+      title: 'Đầu việc UI',
+      type: 'array',
+      group: 'caseStudy',
+      of: [{type: 'string'}],
+      options: {layout: 'tags'},
+      description: 'Tối đa 5, gõ Enter để thêm. VD: Visual redesign, Landing page, Mobile app UI, Internal CRM, Brand.',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.max(5).unique(),
+    }),
+    defineField({
+      name: 'externalUrl',
+      title: 'Link bài ở nơi khác',
+      type: 'url',
+      group: 'caseStudy',
+      description:
+        'Chỉ điền khi chưa viết bài trên site: thẻ sẽ mở thẳng link này (Medium, Behance…) và trang /work/… chuyển hướng theo. Để trống thì thẻ mở bài trên site.',
+      hidden: ({document}) => !document?.isCaseStudy,
+      validation: (Rule) => Rule.uri({scheme: ['https']}),
+    }),
     // Thẻ case study ở trang chủ và /work: bài toán → giải pháp, thay cho ảnh bìa
     defineField({
       name: 'cardProblem',
@@ -287,7 +367,7 @@ export default defineType({
     }),
     defineField({
       name: 'cardSolution',
-      title: 'Thẻ: Solution',
+      title: 'Thẻ: Decision (Solution)',
       type: 'text',
       rows: 3,
       group: 'caseStudy',

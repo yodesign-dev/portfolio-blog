@@ -120,7 +120,7 @@ export default async function HomePage() {
   const heroStudy = latest
     ? {
         title: latest.company || latest.title,
-        href: `/work/${latest.slug.current}`,
+        href: latest.externalUrl || `/work/${latest.slug.current}`,
       }
     : null
 

@@ -39,6 +39,7 @@ const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
   excerpt,
   body,
   isCaseStudy,
+  externalUrl,
   role,
   company,
   year,
@@ -68,6 +69,7 @@ export type Post = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   body: any
   isCaseStudy?: boolean
+  externalUrl?: string
   role?: string
   company?: string
   year?: string

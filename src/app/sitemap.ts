@@ -9,7 +9,7 @@ type SitemapPost = {slug: string; isCaseStudy?: boolean; _updatedAt: string}
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await client
     .fetch<SitemapPost[]>(
-      `*[_type == "post" && defined(slug.current)]{"slug": slug.current, isCaseStudy, _updatedAt}`,
+      `*[_type == "post" && defined(slug.current) && !defined(externalUrl)]{"slug": slug.current, isCaseStudy, _updatedAt}`,
       {},
       {next: {revalidate}}
     )

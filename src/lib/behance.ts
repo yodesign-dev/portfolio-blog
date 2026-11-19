@@ -22,7 +22,7 @@ export const BEHANCE_SHOWCASE: {id: string; summary: string; tags: string[]}[] =
   // Có My role, Results, User research, layout + flow đặt món tới checkout
   {
     id: '81566679',
-    summary: 'Research, flows and UI for ordering on web and mobile — more completed orders, fewer cancellations.',
+    summary: 'Research, flows and UI for ordering on web and mobile, for customers and drivers, while daily orders more than tripled.',
     tags: ['Web & mobile', 'Food delivery', 'User research'],
   },
   // Có Problem / Solution, user-flow và đủ các màn đăng ký tài xế
@@ -39,7 +39,7 @@ export const BEHANCE_SHOWCASE: {id: string; summary: string; tags: string[]}[] =
   },
 ]
 
-const showcaseId = (url: string) => url.match(/\/gallery\/(\d+)/)?.[1] ?? ''
+export const showcaseId = (url: string) => url.match(/\/gallery\/(\d+)/)?.[1] ?? ''
 const showcaseIndex = (url: string) => BEHANCE_SHOWCASE.findIndex((p) => p.id === showcaseId(url))
 export const showcaseNote = (url: string) => BEHANCE_SHOWCASE[showcaseIndex(url)]
 
