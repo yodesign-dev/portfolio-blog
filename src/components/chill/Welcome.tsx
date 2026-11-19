@@ -13,6 +13,7 @@ import {useEffect, useEffectEvent, useState, type ReactNode} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {CUSTOM_MAX, CUSTOM_MIN} from './BrewDesk'
 import {OPTIONS as FOCUS_OPTIONS} from './Focus'
+import {DiscSleeve} from './MusicPixel'
 import {useT} from './i18n'
 import {SeatToggle} from './SeatToggle'
 import type {Seat} from './themes'
@@ -56,7 +57,7 @@ function PrimaryButton({item, busy, onChoose, className = ''}: {item: Goal; busy
       onClick={() => onChoose(item.goal)}
       // Trang chưa tải xong script thì bấm chưa có tác dụng → nút mờ + con trỏ chờ
       aria-busy={busy}
-      className={`flex h-16 min-w-0 items-center gap-3.5 rounded-[18px] bg-[#e8b27d] pl-5 pr-7 text-left text-[#1a1410] shadow-[0_16px_40px_-12px_rgba(232,178,125,0.7)] transition hover:bg-[#f0c294] motion-safe:hover:-translate-y-0.5 ${ring} ${busy ? 'cursor-progress opacity-60' : ''} ${className}`}
+      className={`group flex h-16 min-w-0 items-center gap-3.5 rounded-[18px] bg-[#e8b27d] pl-5 pr-7 text-left text-[#1a1410] shadow-[0_16px_40px_-12px_rgba(232,178,125,0.7)] transition hover:bg-[#f0c294] motion-safe:hover:-translate-y-0.5 ${ring} ${busy ? 'cursor-progress opacity-60' : ''} ${className}`}
     >
       {item.icon('size-[26px] shrink-0')}
       <span className="flex min-w-0 flex-col">
@@ -101,6 +102,7 @@ export function Welcome({
   station,
   track,
   customMinutes,
+  pixelMusic,
   loaded,
   onGoal,
   top,
@@ -123,6 +125,8 @@ export function Welcome({
   track: string
   // Bàn pha phin đang bật: đồng hồ phin nhận số phút tuỳ chỉnh, không chỉ 15 / 25 / 45
   customMinutes: boolean
+  // Nhạc kiểu pixel (musicPixelOpen): nút chính nghe nhạc có bao đĩa thay nốt nhạc
+  pixelMusic: boolean
   loaded: boolean
   onGoal: (goal: WelcomeGoal) => void
   // Hàng trên cùng (về trang Bin + EN/VI) và dòng điều khoản
@@ -160,7 +164,7 @@ export function Welcome({
 
   // Nút chính: khách quay lại lần trước hẹn giờ thì là Tập trung, còn lại là nghe nhạc
   const focusFirst = returning === true && last === 'focus'
-  const music: Goal = {goal: 'music', icon: (c) => <NoteIcon className={c} />, title: returning && !focusFirst ? w.continueMusic : w.music, sub: focusFirst ? station : `${station} · ${track}`}
+  const music: Goal = {goal: 'music', icon: (c) => (pixelMusic && !focusFirst ? <DiscSleeve out={returning === true} /> : <NoteIcon className={c} />), title: returning && !focusFirst ? w.continueMusic : w.music, sub: focusFirst ? station : `${station} · ${track}`}
   const focus: Goal = {goal: 'focus', icon: (c) => <TimerIcon className={c} />, title: focusFirst ? w.continueFocus(minutes) : w.focusMin(minutes), sub: w.focus}
   const look: Goal = {goal: 'look', icon: (c) => <EyeIcon className={c} />, title: w.lookShort, sub: w.lookSub}
   const primary = focusFirst ? focus : music

@@ -5682,6 +5682,7 @@ export function ChillRoom({
           station={stationLabel}
           track={track.title}
           customMinutes={brewFlag}
+          pixelMusic={pixelFlag}
           loaded={loaded}
           onGoal={(goal) => {
             enter(goal !== 'look')
