@@ -43,6 +43,7 @@ export default defineType({
     defineField({name: 'musicPixelOpen', title: 'Nhạc kiểu pixel (đĩa than quay, thanh tua cột sóng, tim pixel)', type: 'boolean', initialValue: false}),
     defineField({name: 'tripOpen', title: 'Mèo đi chơi xa (bưu thiếp)', type: 'boolean', initialValue: false}),
     defineField({name: 'tripPhins', title: 'Số phin trong ngày để mèo muốn đi', type: 'number', initialValue: 3, validation: (rule) => rule.integer().min(1).max(8)}),
+    defineField({name: 'phinMoodOpen', title: 'Hỏi tâm trạng sau phin (một chạm là có mẩu trong sổ)', type: 'boolean', initialValue: false}),
     defineField({name: 'catTalkOpen', title: 'Mèo trò chuyện (chào khách, dẫn đường, biểu cảm)', type: 'boolean', initialValue: false}),
     defineField({name: 'seasonsOpen', title: 'Theme theo mùa (lịch ở Chill · Mùa)', type: 'boolean', initialValue: false}),
     defineField({name: 'liveOpen', title: 'Huy hiệu LIVE (lịch ở Chill · Live)', type: 'boolean', initialValue: false}),

@@ -60,7 +60,7 @@ export type AnalyticsEvent =
   | {name: 'Chill Place'; props: {place: string; how: 'pick' | 'stop'}}
   | {name: 'Chill Stay'; props: {place: string; minutes: number}}
   // Bảng nhật ký: mở bảng / treo mẩu lên tường / cất mẩu vào sổ / báo cáo mẩu
-  | {name: 'Chill Diary'; props: {action: 'open' | 'pin' | 'keep' | 'report'}}
+  | {name: 'Chill Diary'; props: {action: 'open' | 'pin' | 'keep' | 'report' | 'phin-mood' | 'phin-write'}}
   // Khách chọn món cà phê cho ly trên bàn nhật ký
   | {name: 'Chill Drink'; props: {drink: 'den' | 'sua' | 'bacxiu'}}
   | {name: 'Chill Layout'; props: {group: 'shelf' | 'diary' | 'table' | 'hints'; on: boolean; by: 'user' | 'auto' | 'preset'}}

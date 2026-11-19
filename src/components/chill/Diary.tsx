@@ -17,12 +17,13 @@
 
 import {Playpen_Sans} from 'next/font/google'
 import Script from 'next/script'
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
 import {useLang, useT} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
+import {PHIN_MOOD_EVENT, type PhinMoodDetail} from './PhinMood'
 import {KEEP_DAYS, MOODS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, cafeNoteOf, cafeQuestionOf, cafeQuoteOf, dayOf, isMood, recentDays, type DiaryNote, type Mood, type Quote} from './diary-shared'
 
 // Chữ cho cuốn sổ: Playpen Sans — viết tay nhưng dễ đọc, dấu tiếng Việt to và tách khỏi chữ.
@@ -49,7 +50,10 @@ const PICK_KEY = 'chill:diary-pick'
 const SPARKLE_MS = 9000
 
 type Kind = 'wall' | 'book'
-type MyNote = DiaryNote & {kind: Kind}
+// `auto` = mẩu một chạm sau phin (PhinMood.tsx): chỉ có tâm trạng, không tính vào hạn 2 mẩu / ngày
+type MyNote = DiaryNote & {kind: Kind; auto?: boolean}
+// Một ngày giữ tối đa bấy nhiêu mẩu một chạm, kẻo khách pha nhiều phin thì sổ toàn dòng trùng nhau
+const AUTO_PER_DAY = 6
 // Mẩu đang hiện trong sổ: của tường (kind trống), hoặc của mình (mine) — kể cả mẩu cất riêng
 type ShownNote = DiaryNote & {kind?: Kind; mine?: boolean}
 // `read` = id các mẩu quán đã đưa cho khách này đọc (mẩu "người trước để lại")
@@ -140,6 +144,9 @@ export function Diary({
   const [now, setNow] = useState(0)
   const [mood, setMood] = useState<Mood | null>(null)
   const [composing, setComposing] = useState(false)
+  // Tâm trạng chọn sẵn cho form viết khi mở từ tổng kết phin, và mẩu một chạm sẽ được thay
+  const [preset, setPreset] = useState<Mood | null>(null)
+  const pendingAuto = useRef<string | null>(null)
   // ?slip=new / ?slip=old để so trên máy; không có thì theo công tắc Studio
   const [slipParam, setSlipParam] = useState<boolean | null>(null)
 
@@ -205,7 +212,7 @@ export function Diary({
     return [...byId.values()].sort((a, b) => a.ts - b.ts)
   }, [room, store, days, now])
 
-  const usedToday = store.mine.filter((n) => n.day === today).length
+  const usedToday = store.mine.filter((n) => n.day === today && !n.auto).length
   const left = Math.max(0, NOTES_PER_DAY - usedToday)
   const todayCount = notes.filter((n) => n.day === today && n.kind !== 'book').length
   const unseen = (room?.notes ?? []).some((n) => n.ts > store.seen && !store.mine.some((m) => m.id === n.id))
@@ -331,15 +338,23 @@ export function Diary({
 
   const setOpen = (next: boolean) => {
     if (next) update((s) => ({...s, seen: Date.now()}))
-    else setComposing(false)
+    else {
+      setComposing(false)
+      setPreset(null)
+      pendingAuto.current = null
+    }
     onOpenChange(next)
   }
 
   const addMine = (note: MyNote) => {
     // Bấm đúp nút gửi cũng không lọt mẩu thứ 3 trong ngày
-    update((s) => (s.mine.filter((n) => n.day === note.day).length >= NOTES_PER_DAY ? s : {...s, mine: [...s.mine, note].slice(-BOOK_MAX)}))
+    // Mẩu có chữ viết từ "Thêm một câu" thay cho mẩu một chạm của phin đó
+    const replaced = pendingAuto.current
+    pendingAuto.current = null
+    update((s) => (s.mine.filter((n) => n.day === note.day && !n.auto).length >= NOTES_PER_DAY ? s : {...s, mine: [...s.mine.filter((n) => n.id !== replaced), note].slice(-BOOK_MAX)}))
     setNow(Date.now())
     setComposing(false)
+    setPreset(null)
   }
   const removeMine = (id: string) => update((s) => ({...s, mine: s.mine.filter((n) => n.id !== id)}))
   const report = (id: string) => {
@@ -347,6 +362,32 @@ export function Diary({
     void fetch('/api/chill-diary', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'report', id})}).catch(() => {})
     trackEvent({name: 'Chill Diary', props: {action: 'report'}})
   }
+
+  // Tổng kết phin hỏi "Phin này thế nào?" (PhinMood.tsx): ghi mẩu một chạm vào sổ riêng, hoàn tác,
+  // hoặc mở sổ ở form viết với tâm trạng đã chọn
+  const onPhinMood = useEffectEvent((e: Event) => {
+    const d = (e as CustomEvent<PhinMoodDetail>).detail
+    if (!room?.open || !d) return
+    if (d.action === 'undo') return removeMine(d.id)
+    if (d.action === 'write') {
+      pendingAuto.current = d.id
+      setPreset(d.mood)
+      setOpen(true)
+      if (left > 0) setComposing(true)
+      trackEvent({name: 'Chill Diary', props: {action: 'phin-write'}})
+      return
+    }
+    const ts = Date.now()
+    const note: MyNote = {id: d.id, text: t.diary.phinNote(d.minutes), mood: d.mood, name: loadMe().name, day: dayOf(ts), ts, kind: 'book', auto: true}
+    update((s) => (s.mine.filter((n) => n.day === note.day && n.auto).length >= AUTO_PER_DAY ? s : {...s, mine: [...s.mine, note].slice(-BOOK_MAX)}))
+    setNow(ts)
+    trackEvent({name: 'Chill Diary', props: {action: 'phin-mood'}})
+  })
+  useEffect(() => {
+    const on = (e: Event) => onPhinMood(e)
+    window.addEventListener(PHIN_MOOD_EVENT, on)
+    return () => window.removeEventListener(PHIN_MOOD_EVENT, on)
+  }, [])
 
   if (!room?.open || !now) return null
 
@@ -435,7 +476,7 @@ export function Diary({
           style={{background: topPaper.bg, color: topPaper.ink}}
         >
           <span
-            className="flex items-center justify-between gap-2 border-b border-dashed px-3 pb-1.5 pt-3.5 font-mono text-[9px] uppercase tracking-[0.18em]"
+            className="flex items-center justify-between gap-2 border-b border-dashed px-3 pb-1.5 pt-3.5 font-mono text-[11px] uppercase tracking-[0.08em]"
             style={{color: topPaper.soft, borderColor: `${topPaper.soft}88`}}
           >
             <span className="truncate">{top ? t.diary.slipFrom : t.diary.slipFromCat}</span>
@@ -483,7 +524,7 @@ export function Diary({
       >
         {sparkle && <Sparkles />}
         <span className="relative block border-2 border-[#2a1a10] px-2.5 pb-2 pt-1.5" style={{background: topPaper.bg, color: topPaper.ink}}>
-          <span className="flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-[0.16em]" style={{color: topPaper.soft}}>
+          <span className="flex items-center justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.06em]" style={{color: topPaper.soft}}>
             <span className="truncate">{top ? t.diary.slipFrom : t.diary.slipFromCat}</span>
             <span aria-hidden className="shrink-0 text-[11px] leading-none">→</span>
           </span>
@@ -503,7 +544,7 @@ export function Diary({
           onMouseLeave={() => setHold(false)}
           onFocus={() => setHold(true)}
           onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setHold(false)}
-          className={`group/slip absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+204px)] left-3 z-10 w-[200px] transition-opacity duration-300 sm:bottom-auto sm:left-[26px] sm:top-[4.75rem] sm:w-[164px] ${
+          className={`group/slip absolute bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+204px)] left-3 z-10 w-[212px] transition-opacity duration-300 sm:bottom-auto sm:left-[26px] sm:top-[4.75rem] sm:w-[188px] ${
             slipUp ? (dimmed ? 'opacity-60 hover:opacity-100' : 'opacity-100') : 'pointer-events-none opacity-0'
           }`}
         >
@@ -523,13 +564,13 @@ export function Diary({
             }`}
             style={{background: slipPaper.bg, color: slipPaper.ink}}
           >
-            <span className="hidden items-center justify-between gap-1.5 font-mono text-[9px] uppercase tracking-[0.08em] sm:flex" style={{color: slipPaper.soft}}>
+            <span className="hidden items-center justify-between gap-1.5 text-[12px] font-semibold leading-[16px] sm:flex" style={{color: slipPaper.soft}}>
               <span className="truncate">{slipNote ? t.diary.slipFrom : slipQuestion ? t.diary.slipQuestion : t.diary.slipFromCat}</span>
               <span className="shrink-0 tabular-nums">{slipNote && slipNote.day === today ? clock(slipNote.ts) : `${slipDay.slice(8, 10)}.${slipDay.slice(5, 7)}`}</span>
             </span>
-            <span className={`${hand.className} line-clamp-2 break-words text-[12px] font-semibold leading-[16px] sm:mt-1 sm:line-clamp-3 sm:min-h-[51px] sm:text-[12.5px] sm:leading-[17px]`}>{slipText}</span>
+            <span className={`${hand.className} line-clamp-2 break-words text-[13.5px] font-semibold leading-[18px] sm:mt-1 sm:line-clamp-3 sm:min-h-[57px] sm:text-[14px] sm:leading-[19px]`}>{slipText}</span>
             <span className="mt-1.5 hidden items-center justify-between gap-2 sm:flex" style={{color: slipPaper.soft}}>
-              <span className="min-w-0 truncate text-[10px] font-semibold">{slipNote ? `— ${slipNote.name || t.diary.guest} ${MOOD_ICON[slipNote.mood]}` : ''}</span>
+              <span className="min-w-0 truncate text-[12px] font-semibold">{slipNote ? `— ${slipNote.name || t.diary.guest} ${MOOD_ICON[slipNote.mood]}` : ''}</span>
               {slipKeys.length > 1 && (
                 <span role="img" aria-label={t.diary.slipOf((at % slipKeys.length) + 1, slipKeys.length)} className="flex shrink-0 gap-[3px]">
                   {slipKeys.map((k) => (
@@ -546,8 +587,8 @@ export function Diary({
             tabIndex={brewing ? 0 : -1}
             aria-hidden={!brewing}
             aria-label={brewing ? `${t.diary.title}: ${t.diary.slipTape(weekCount)}` : undefined}
-            className={`absolute left-1/2 top-[-7px] z-20 flex h-3 min-w-9 -translate-x-1/2 -rotate-3 items-center justify-center whitespace-nowrap border border-[#2a1a10]/35 bg-[repeating-linear-gradient(90deg,rgba(232,178,125,0.88)_0_6px,rgba(240,194,148,0.88)_6px_12px)] px-1.5 font-mono text-[9px] font-bold text-[#2a1a10] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:top-[-9px] sm:h-[17px] sm:min-w-[54px] ${
-              brewing ? 'cursor-pointer' : 'pointer-events-none'
+            className={`absolute left-1/2 top-[-7px] z-20 flex h-3 min-w-9 -translate-x-1/2 -rotate-3 items-center justify-center whitespace-nowrap border border-[#2a1a10]/35 before:absolute before:-inset-x-2 before:-inset-y-3.5 before:content-[''] bg-[repeating-linear-gradient(90deg,rgba(232,178,125,0.88)_0_6px,rgba(240,194,148,0.88)_6px_12px)] px-1.5 text-[12px] font-bold text-[#2a1a10] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:top-[-9px] sm:h-[17px] sm:min-w-[54px] ${
+              brewing ? 'h-[22px] cursor-pointer px-2 sm:h-6' : 'pointer-events-none'
             }`}
           >
             {brewing && `✎ ${t.diary.slipTape(weekCount)}`}
@@ -556,8 +597,8 @@ export function Diary({
             type="button"
             onClick={openToWrite}
             tabIndex={brewing ? -1 : 0}
-            className={`absolute left-2 top-full mt-1.5 hidden whitespace-nowrap border-[1.5px] border-[#2a1a10] bg-[#e8b27d] px-[7px] py-[3px] text-[10.5px] font-bold text-[#2a1a10] transition duration-200 hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:block ${
-              brewing ? 'pointer-events-none opacity-0' : 'pointer-events-none -translate-y-1 opacity-0 group-hover/slip:pointer-events-auto group-hover/slip:translate-y-0 group-hover/slip:opacity-100 group-focus-within/slip:pointer-events-auto group-focus-within/slip:translate-y-0 group-focus-within/slip:opacity-100'
+            className={`absolute left-2 top-full mt-1.5 hidden whitespace-nowrap border-[1.5px] border-[#2a1a10] bg-[#e8b27d] px-2 py-1 text-[12px] font-bold text-[#2a1a10] transition duration-200 hover:bg-[#f0c294] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d] sm:block touch:min-h-11 touch:px-3 ${
+              brewing ? 'pointer-events-none opacity-0' : 'opacity-95 hover:opacity-100'
             }`}
           >
             {left > 0 ? t.diary.slipLeave : t.diary.slipWeek(weekCount)}
@@ -580,7 +621,7 @@ export function Diary({
             type="button"
             onClick={() => setOpen(false)}
             aria-label={t.diary.close}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d]"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#c9c0b6] transition hover:bg-white/[0.06] hover:text-[#ede6dd] focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:h-11 touch:w-11"
           >
             <svg width="12" height="12" viewBox="0 0 10 10" aria-hidden>
               <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -594,7 +635,7 @@ export function Diary({
                 role="radio"
                 aria-checked={mood === m}
                 onClick={() => setMood(m)}
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] ${
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[13px] transition focus-visible:outline-2 focus-visible:outline-[#e8b27d] touch:min-h-11 touch:px-3.5 ${
                   mood === m ? 'border-[#e8b27d]/70 bg-[#e8b27d]/15 text-[#f3cfa8]' : 'border-white/10 text-[#a79e94] hover:border-white/25 hover:text-[#ede6dd]'
                 }`}
               >
@@ -616,7 +657,12 @@ export function Diary({
           composing={composing}
           onCompose={() => setComposing(true)}
           onDone={addMine}
-          onCancel={() => setComposing(false)}
+          onCancel={() => {
+            setComposing(false)
+            setPreset(null)
+            pendingAuto.current = null
+          }}
+          presetMood={preset}
           onReport={report}
           onRemove={removeMine}
         />
@@ -689,6 +735,7 @@ function Book({
   onCompose,
   onDone,
   onCancel,
+  presetMood,
   onReport,
   onRemove,
 }: {
@@ -705,6 +752,8 @@ function Book({
   onCompose: () => void
   onDone: (note: MyNote) => void
   onCancel: () => void
+  // Mở từ tổng kết phin: chọn sẵn tâm trạng này và "cất vào sổ"
+  presetMood: Mood | null
   onReport: (id: string) => void
   onRemove: (id: string) => void
 }) {
@@ -1025,7 +1074,7 @@ function Book({
                     const cell = (
                       <>
                         <span className="block text-[14px] leading-[18px] text-[#8a5f5a]">{cap(fmt(d, {weekday: 'short'}))}</span>
-                        <span className={`mx-auto flex h-[28px] w-[28px] items-center justify-center rounded-full text-[18px] leading-none ${d === today ? 'bg-[#e4574c] text-white' : ''}`}>
+                        <span className={`mx-auto flex h-[28px] w-[28px] items-center justify-center rounded-full text-[18px] leading-none ${d === today ? 'bg-[#c23b30] text-white' : ''}`}>
                           {Number(d.slice(8, 10))}
                         </span>
                         <span aria-hidden className={`mx-auto mt-[2px] block h-[5px] w-[5px] rounded-full ${has(d) ? 'bg-[#e4574c]' : 'bg-transparent'}`} />
@@ -1078,7 +1127,7 @@ function Book({
               {!filtered && (
                 <figure className="break-inside-avoid pb-[24px]">
                   <div className="relative mx-auto w-[90%] rotate-[1.5deg] border-2 border-[#2a1a10] bg-[#fffaf0] px-4 pb-3 pt-4 font-serif text-[#3a2a20] shadow-[0_10px_14px_-10px_rgba(60,40,20,0.55)]">
-                    <p className="font-mono text-[10px] uppercase leading-[16px] tracking-[0.16em] text-[#8a6a55]">
+                    <p className="font-mono text-[12px] uppercase leading-[16px] tracking-[0.1em] text-[#7a5d4a]">
                       {t.diary.quoteLabel} · {today.slice(8, 10)}.{today.slice(5, 7)}
                     </p>
                     <blockquote className="mt-2">
@@ -1105,7 +1154,7 @@ function Book({
                       <span aria-hidden className="text-[20px]">▸</span>
                       {cap(fmt(day, {weekday: 'long'}))}
                       <span className="flex h-[30px] min-w-[30px] items-center justify-center rounded-full bg-[#f49b8f] px-1 text-[19px] leading-none text-[#5a1c16]">{Number(day.slice(8, 10))}</span>
-                      {isToday && <span className={`${hand.className} text-[17px] text-[#8b8794]`}>· {t.diary.dayToday.toLowerCase()}</span>}
+                      {isToday && <span className={`${hand.className} text-[17px] text-[#6d6a75]`}>· {t.diary.dayToday.toLowerCase()}</span>}
                     </h3>
                     {/* Câu hỏi quán hỏi cả quán ngày hôm đó — các mẩu bên dưới là câu trả lời */}
                     {question(day) && (
@@ -1131,7 +1180,7 @@ function Book({
                             <span aria-hidden className="shrink-0 text-[#e4574c]">•</span>
                             <span className={`min-w-0 whitespace-pre-wrap break-words ${n.kind === 'book' ? 'text-[#6d6a75]' : ''}`}>{n.text}</span>
                           </p>
-                          <p className="flex items-center gap-2 pl-[18px] text-[15px] text-[#8b8794]">
+                          <p className="flex items-center gap-2 pl-[18px] text-[15px] text-[#6d6a75]">
                             <span className="shrink-0 whitespace-nowrap px-1.5 text-[14px] leading-[20px]" style={{background: PAPER[n.mood].bg, color: PAPER[n.mood].ink}}>
                               {MOOD_ICON[n.mood]} {t.diary.moods[n.mood]}
                             </span>
@@ -1141,7 +1190,7 @@ function Book({
                           </p>
                         </li>
                       ))}
-                      {isToday && list.length === 0 && !composing && <li className="pb-[24px] text-[#8b8794]">{filtered ? t.diary.emptyMood : t.diary.emptyDay}</li>}
+                      {isToday && list.length === 0 && !composing && <li className="pb-[24px] text-[#6d6a75]">{filtered ? t.diary.emptyMood : t.diary.emptyDay}</li>}
                       {isToday && (
                         <li className="clear-both break-inside-avoid pb-[24px] pt-1">
                           {/* Thẻ caro hồng "Ghi chú": chỗ khách viết mẩu của mình */}
@@ -1152,12 +1201,12 @@ function Book({
                               <span aria-hidden> ☆</span>
                             </p>
                             {composing ? (
-                              <Compose open={open} question={question(today)} onDone={onDone} onCancel={onCancel} />
+                              <Compose open={open} question={question(today)} presetMood={presetMood} onDone={onDone} onCancel={onCancel} />
                             ) : left > 0 ? (
                               <button
                                 type="button"
                                 onClick={onCompose}
-                                className="group/write block w-full rounded-[10px] border-2 border-[#3a2a33] bg-white/75 px-3 pb-2 pt-1 text-left text-[#8b8794] transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e4574c]"
+                                className="group/write block w-full rounded-[10px] border-2 border-[#3a2a33] bg-white/75 px-3 pb-2 pt-1 text-left text-[#6d6a75] transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e4574c]"
                               >
                                 <span className="block border-b-2 border-dashed border-[#3a2a33]/55 leading-[30px] text-[#5d5866] group-hover/write:text-[#e4574c]">✎ {question(today) ?? `${t.diary.write}…`}</span>
                                 <span aria-hidden className="block h-[26px] border-b-2 border-dashed border-[#3a2a33]/55" />
@@ -1200,16 +1249,16 @@ function Book({
           </p>
 
           {/* Lật trang */}
-          <div className="absolute inset-x-0 bottom-[10px] flex items-center justify-between px-5 text-[17px] leading-[24px] text-[#e4574c]">
-            <button type="button" onClick={() => setSpread(Math.max(at - 1, 0))} disabled={at === 0} className="px-1 transition-opacity hover:underline disabled:opacity-0 focus-visible:outline-2 focus-visible:outline-[#e4574c]">
+          <div className="absolute inset-x-0 bottom-[10px] flex items-center justify-between px-5 text-[17px] leading-[24px] text-[#c23b30]">
+            <button type="button" onClick={() => setSpread(Math.max(at - 1, 0))} disabled={at === 0} className="px-1 transition-opacity hover:underline disabled:opacity-0 focus-visible:outline-2 focus-visible:outline-[#e4574c] touch:-my-2.5 touch:min-h-11 touch:px-2">
               ← {t.diary.prevPage}
             </button>
             {/* Số trang nằm cạnh nút lật (giữa sổ là lò xo) */}
             <span className="flex items-center gap-3">
-              <span aria-live="polite" className="text-[15px] tabular-nums text-[#8b8794]">
+              <span aria-live="polite" className="text-[15px] tabular-nums text-[#6d6a75]">
                 {t.diary.pageOf(at + 1, spreads)}
               </span>
-              <button type="button" onClick={() => setSpread(Math.min(at + 1, spreads - 1))} disabled={at >= spreads - 1} className="px-1 transition-opacity hover:underline disabled:opacity-0 focus-visible:outline-2 focus-visible:outline-[#e4574c]">
+              <button type="button" onClick={() => setSpread(Math.min(at + 1, spreads - 1))} disabled={at >= spreads - 1} className="px-1 transition-opacity hover:underline disabled:opacity-0 focus-visible:outline-2 focus-visible:outline-[#e4574c] touch:-my-2.5 touch:min-h-11 touch:px-2">
                 {t.diary.nextPage} →
               </button>
             </span>
@@ -1450,7 +1499,7 @@ function LineAction({note, onReport, onRemove}: {note: ShownNote; onReport: (id:
   const [asking, setAsking] = useState(false)
   if (note.kind === 'book')
     return (
-      <button type="button" onClick={() => onRemove(note.id)} aria-label={t.diary.remove} title={t.diary.remove} className="shrink-0 px-1 opacity-50 hover:opacity-100 focus-visible:opacity-100">
+      <button type="button" onClick={() => onRemove(note.id)} aria-label={t.diary.remove} title={t.diary.remove} className="shrink-0 px-1 opacity-70 hover:opacity-100 focus-visible:opacity-100 touch:-my-2 touch:min-h-11 touch:min-w-11">
         ✕
       </button>
     )
@@ -1458,7 +1507,7 @@ function LineAction({note, onReport, onRemove}: {note: ShownNote; onReport: (id:
   if (asking)
     return (
       <span className="flex shrink-0 items-center gap-2">
-        <button type="button" onClick={() => onReport(note.id)} className="text-[#e4574c] underline underline-offset-2">
+        <button type="button" onClick={() => onReport(note.id)} className="text-[#c23b30] underline underline-offset-2 touch:min-h-11 touch:px-1">
           {t.diary.reportYes}
         </button>
         <button type="button" onClick={() => setAsking(false)}>
@@ -1472,7 +1521,7 @@ function LineAction({note, onReport, onRemove}: {note: ShownNote; onReport: (id:
       onClick={() => setAsking(true)}
       aria-label={t.diary.report}
       title={t.diary.report}
-      className="shrink-0 px-1 opacity-0 transition group-hover/line:opacity-60 hover:!opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-40"
+      className="shrink-0 px-1 opacity-0 transition group-hover/line:opacity-70 hover:!opacity-100 focus-visible:opacity-100 touch:-my-2 touch:min-h-11 touch:min-w-11 [@media(hover:none)]:opacity-60"
     >
       ⚑
     </button>
@@ -1480,11 +1529,11 @@ function LineAction({note, onReport, onRemove}: {note: ShownNote; onReport: (id:
 }
 
 // Mẩu giấy đang viết: chữ, tâm trạng, treo lên tường hay cất vào sổ
-function Compose({open, question, onDone, onCancel}: {open: boolean; question: string | null; onDone: (note: MyNote) => void; onCancel: () => void}) {
+function Compose({open, question, presetMood, onDone, onCancel}: {open: boolean; question: string | null; presetMood: Mood | null; onDone: (note: MyNote) => void; onCancel: () => void}) {
   const t = useT()
   const [text, setText] = useState('')
-  const [mood, setMood] = useState<Mood>('calm')
-  const [kind, setKind] = useState<Kind>('wall')
+  const [mood, setMood] = useState<Mood>(presetMood ?? 'calm')
+  const [kind, setKind] = useState<Kind>(presetMood ? 'book' : 'wall')
   const [name, setName] = useState('')
   const [company, setCompany] = useState('')
   const [token, setToken] = useState<string | null>(null)
@@ -1589,7 +1638,7 @@ function Compose({open, question, onDone, onCancel}: {open: boolean; question: s
         className="block w-full resize-none bg-transparent text-[15px] leading-snug outline-none placeholder:opacity-50"
         style={{color: paper.ink}}
       />
-      <p className="text-right text-[11px] tabular-nums" style={{color: paper.soft}}>
+      <p className="text-right text-[12px] tabular-nums" style={{color: paper.soft}}>
         {text.length}/{NOTE_MAX}
       </p>
 
@@ -1629,7 +1678,7 @@ function Compose({open, question, onDone, onCancel}: {open: boolean; question: s
             ▾
           </span>
         </label>
-        <p className="col-span-2 text-[11px] leading-tight" style={{color: paper.soft}}>
+        <p className="col-span-2 text-[12px] leading-tight" style={{color: paper.soft}}>
           {kind === 'wall' ? t.diary.toWallDesc : t.diary.toBookDesc}
         </p>
       </div>
@@ -1662,7 +1711,7 @@ function Compose({open, question, onDone, onCancel}: {open: boolean; question: s
             style={kind === k ? {borderColor: paper.ink, background: `${paper.ink}12`} : {borderColor: `${paper.soft}55`}}
           >
             <span className="block text-[13px] font-semibold">{k === 'wall' ? t.diary.toWall : `🔒 ${t.diary.toBook}`}</span>
-            <span className="block text-[11px] leading-tight" style={{color: paper.soft}}>
+            <span className="block text-[12px] leading-tight" style={{color: paper.soft}}>
               {k === 'wall' ? t.diary.toWallDesc : t.diary.toBookDesc}
             </span>
           </button>

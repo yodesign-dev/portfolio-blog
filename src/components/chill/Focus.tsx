@@ -89,6 +89,7 @@ export function Focus({
   onStart,
   quest = null,
   contrib = null,
+  phinMood,
   brew = false,
   brewSlot = null,
   brewMusic = null,
@@ -134,6 +135,9 @@ export function Focus({
   quest?: ReactNode
   // Dòng "phin của bạn đã góp cho quán" + tên trên bảng, hiện trong tổng kết phin
   contrib?: ReactNode
+  // "Phin này thế nào?" trong tổng kết phin (PhinMood.tsx). `at` = lúc phin xong, làm key để phin
+  // sau hỏi lại từ đầu
+  phinMood?: (minutes: number, at: number) => ReactNode
   // Bàn pha phin đang bật
   brew?: boolean
   // Chỗ đặt tấm đồng hồ (thay thanh nhạc); null = chưa vào quán
@@ -168,7 +172,7 @@ export function Focus({
   const [session, setSession] = useState<Session | null>(null)
   const [now, setNow] = useState(0)
   // Phin vừa xong (số phút + việc đã dành cho nó) — còn giữ thì bảng hiện tổng kết; đóng bảng là xoá
-  const [finished, setFinished] = useState<{minutes: number; todo?: string; late?: boolean} | null>(null)
+  const [finished, setFinished] = useState<{minutes: number; todo?: string; late?: boolean; at: number} | null>(null)
   const [todos, setTodos] = useState<Todo[]>([])
   // Việc dành cho phin sắp pha
   const [picked, setPicked] = useState<string | null>(null)
@@ -341,7 +345,7 @@ export function Focus({
     const nextChain = s.minutes >= MIN_FULL_PHIN ? {count: chainCount(chain, s.endsAt - s.minutes * 60_000) + 1, lastAt: at} : (chain ?? {count: 0, lastAt: at})
     setChain(nextChain)
     store(CHAIN_KEY, nextChain)
-    setFinished({minutes: s.minutes, todo: s.todo, ...(late ? {late} : {})})
+    setFinished({minutes: s.minutes, todo: s.todo, at: Date.now(), ...(late ? {late} : {})})
     setAskSkipped(false)
     // Việc chưa gạch thì giữ cho phin sau
     if (s.todo) setPicked(s.todo)
@@ -567,6 +571,7 @@ export function Focus({
           )}
         </div>
       )}
+      {phinMood?.(finished.minutes, finished.at)}
       <dl className="mt-3 grid grid-cols-3 gap-1.5">
         {[
           {value: today.phins, label: t.focus.todayPhins(today.phins)},

@@ -37,6 +37,7 @@ import {addSkip, loadQueue, loadRecent, loadSkips, pushRecent, saveQueue, sugges
 import {MiniPlayer, canMiniPlayer, openMiniWindow} from './MiniPlayer'
 import {favList, loadFavs, markPlayed, saveFavs, toggleFav, type Favs} from './favs'
 import {PixelHeart, VinylDisc, WaveSeek} from './MusicPixel'
+import {PhinMood} from './PhinMood'
 import {MiniVideo, canVideoPiP, type MiniVideoTimer} from './MiniVideo'
 import {QuestCard} from './QuestCard'
 import {NameField} from './NameField'
@@ -271,6 +272,7 @@ export function ChillRoom({
   favOn = false,
   musicPixelOn = false,
   stationGridOn = false,
+  phinMoodOn = false,
   brewDeskOn = false,
   welcomeObOn = false,
   compactOn = false,
@@ -326,6 +328,9 @@ export function ChillRoom({
   // Lưới trạm nhạc 4 cột thay hàng chip cuộn ngang (Studio "Chill · Cài đặt"), mặc định tắt.
   // ?grid=1 / ?grid=0 trên URL ghi đè
   stationGridOn?: boolean
+  // Hỏi "Phin này thế nào?" trong tổng kết phin (Studio "Chill · Cài đặt", cần Bảng nhật ký), mặc
+  // định tắt. ?phinmood=1 / ?phinmood=0 trên URL ghi đè. Xem PhinMood.tsx
+  phinMoodOn?: boolean
   brewDeskOn?: boolean
   // Màn chào kiểu onboarding: khách mới 2 bước, khách quay lại 1 chạm (Studio "Chill · Cài đặt"),
   // mặc định tắt. ?ob=1 / ?ob=0 trên URL ghi đè. Xem Welcome.tsx
@@ -641,6 +646,12 @@ export function ChillRoom({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
     setPixelFlag(param ? param === '1' : musicPixelOn)
   }, [musicPixelOn])
+  const [phinMoodFlag, setPhinMoodFlag] = useState(false)
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('phinmood')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đọc URL sau khi hydrate
+    setPhinMoodFlag(param ? param === '1' : phinMoodOn)
+  }, [phinMoodOn])
   const [gridFlag, setGridFlag] = useState(false)
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('grid')
@@ -4821,7 +4832,7 @@ export function ChillRoom({
               điểm đến + toàn màn hình là nhóm nền tối ở cuối. Điện thoại: đang đếm thì giờ còn
               lại thế chỗ giờ điểm đến cho thanh trên khỏi tràn.
               Nút dừng cảnh đã chuyển vào Cài đặt › Không khí */}
-          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} startSignal={focusStart} gift={gift} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={focusLite ? brewMusicLite : brewMusic} lite={focusLite} regularsSignal={regularsSignal} musicSettings={focusLite ? <MusicChooser part="settings" api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} /> : null} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser part={focusLite ? 'music' : 'all'} api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
+          <Focus regular={regular} onPrime={primeAudio} onDone={onFocusDone} onBreakDone={onBreakDone} onTick={setFocusLabel} onOpenChange={onFocusOpen} hint={guideOn('phin') ? t.room.guidePhin : null} openSignal={focusSignal} startSignal={focusStart} gift={gift} phinMood={phinMoodFlag && diaryAvailable ? (minutes, at) => <PhinMood key={at} minutes={minutes} at={at} /> : undefined} tripSlot={tripOffer ? <TripOffer place={placeOf(tripOffer)} sent={catTrip !== 'home'} onSend={sendCat} onLater={declineCat} /> : null} shelfCount={shelfOn ? shelf.owned.length : null} onOpenShelf={() => openShelf(gift ?? undefined)} onStart={onQuestStart} brew={brewFlag} brewSlot={entered ? brewSlot : null} brewMusic={focusLite ? brewMusicLite : brewMusic} lite={focusLite} regularsSignal={regularsSignal} musicSettings={focusLite ? <MusicChooser part="settings" api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} /> : null} zen={zen} dimmed={hideUi} onBrew={onBrew} musicSetup={<MusicChooser part={focusLite ? 'music' : 'all'} api={brewMusicApi} currentTitle={track.title} currentStation={stationLabel} canMini={miniFlag && canMini} onPrepareMini={prepareMini} />} onBrewBegin={(manual, minutes) => {
             onBrewBegin(manual, minutes)
             // Trình duyệt chỉ cho mở cửa sổ nổi ngay trong cú bấm của khách
             if (manual && brewMusicApi.prefs.miniOnStart && miniFlag && canMini && !miniOpen) openMini('brew')

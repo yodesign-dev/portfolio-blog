@@ -87,6 +87,7 @@ const CHILL_QUERY = `{
   "tripOpen": *[_id == "chillSettings"][0].tripOpen,
   "tripPhins": *[_id == "chillSettings"][0].tripPhins,
   "catTalkOpen": *[_id == "chillSettings"][0].catTalkOpen,
+  "phinMoodOpen": *[_id == "chillSettings"][0].phinMoodOpen,
   "seasonsOpen": *[_id == "chillSettings"][0].seasonsOpen,
   "seasons": *[_type == "chillSeason" && enabled == true && defined(start) && defined(end) && defined(key.current)] | order(start asc) {
     "id": key.current,
@@ -147,6 +148,7 @@ type ChillContent = {
   tripOpen?: boolean | null
   tripPhins?: number | null
   catTalkOpen?: boolean | null
+  phinMoodOpen?: boolean | null
   seasonsOpen?: boolean | null
   seasons?: {id: string; pack?: string; start: string; end: string; layers?: Partial<SeasonLayers> | null; moments?: SeasonMoment[] | null}[] | null
   liveOpen?: boolean | null
@@ -315,7 +317,9 @@ export async function getChillContent(revalidate: number) {
   const tripPhins = Math.min(8, Math.max(1, Math.round(content.tripPhins ?? 3)))
   // Mèo trò chuyện: chào khách, dẫn đường cho lời mời làm quen, biểu cảm pixel. Máy dev: CHILL_DEV_CATTALK=1
   const catTalkOn = content.catTalkOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_CATTALK === '1')
+  // Hỏi "Phin này thế nào?" trong tổng kết phin, một chạm là có mẩu trong sổ. Máy dev: CHILL_DEV_PHINMOOD=1
+  const phinMoodOn = content.phinMoodOpen === true || (process.env.NODE_ENV === 'development' && process.env.CHILL_DEV_PHINMOOD === '1')
   // Huy hiệu LIVE: công tắc tổng + lịch trong "Chill · Live". Xem trước bằng ?live=1 hoặc ?live=soon
   const lives: ChillLive[] = content.liveOpen === true ? (content.lives ?? []).filter((l) => isLiveUrl(l.url)) : []
-  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, musicPixelOn, stationGridOn, brewDeskOn, welcomeObOn, compactOn, focusLiteOn, tripOn, tripPhins, catTalkOn}
+  return {lives, seasons, tracks, destinations, updates, shelfOn, playCountsOn, questOn, catToyOn, seatPickOn, streetMotionOn, stringLightsOn, sketchOn, miniPlayerOn, facadeOn, highlandOn, marketOn, sleepTimerOn, favOn, musicPixelOn, stationGridOn, brewDeskOn, welcomeObOn, compactOn, focusLiteOn, tripOn, tripPhins, catTalkOn, phinMoodOn}
 }
