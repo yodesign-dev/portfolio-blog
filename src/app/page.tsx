@@ -7,7 +7,7 @@ import { JustForFun } from '@/components/JustForFun'
 import { HowIWork } from '@/components/HowIWork'
 import { Testimonials } from '@/components/Testimonials'
 import { BehanceCard } from '@/components/BehanceArchive'
-import { getBehanceProjects, showcaseNote } from '@/lib/behance'
+import { getBehanceProjects, showcaseId, showcaseNote } from '@/lib/behance'
 import { getMediumPosts } from '@/lib/medium'
 import Hero31 from '@/components/originkit/hero-31' // 1. Đổi đường dẫn import sang Hero 31
 
@@ -90,11 +90,16 @@ export default async function HomePage() {
   // viết → lấy tạm bài Medium (giống /work và /blog), để trang chủ không nhảy
   // thẳng từ hero xuống footer.
   const [behance, mediumPosts] = await Promise.all([
-    featuredStudies.length < 3 ? getBehanceProjects() : [],
+    getBehanceProjects(),
     posts.length === 0 ? getMediumPosts() : [],
   ])
-  // Có case study: Behance chỉ còn hàng nhỏ, chừa 1 chỗ cho quán /chill
-  const featuredBehance = behance.slice(0, featuredStudies.length > 0 ? 2 : 3)
+  // Có case study: dưới 3 thẻ là hàng nhỏ 3 ô: case study còn lại (thứ 4 trở đi) rồi
+  // tới Behance cho đủ 2 ô, chừa ô cuối cho quán /chill. Project Behance đã có thẻ
+  // case study trỏ tới thì không lặp lại.
+  const linkedBehance = new Set(studies.map((study) => showcaseId(study.externalUrl ?? '')).filter(Boolean))
+  const freshBehance = behance.filter((project) => !linkedBehance.has(showcaseId(project.url)))
+  const moreStudies = studies.slice(3, 5)
+  const featuredBehance = freshBehance.slice(0, featuredStudies.length > 0 ? 2 - moreStudies.length : 3)
   // Writing: danh sách gọn 3 bài (ảnh bìa Medium phần lớn là ảnh chụp chữ, xếp
   // thành thẻ trông rối)
   const writing =
@@ -143,6 +148,15 @@ export default async function HomePage() {
                 ))}
               </div>
               <ul className="mt-12 grid grid-cols-1 border-t border-neutral-200 sm:grid-cols-3 sm:gap-8">
+                {moreStudies.map((study) => (
+                  <MoreWorkItem
+                    key={study._id}
+                    href={study.externalUrl || `/work/${study.slug.current}`}
+                    external={Boolean(study.externalUrl)}
+                    title={study.company || study.title}
+                    detail={[study.projectType, study.year].filter(Boolean).join(' · ')}
+                  />
+                ))}
                 {featuredBehance.map((project) => (
                   <MoreWorkItem
                     key={project.url}

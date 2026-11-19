@@ -50,7 +50,8 @@ const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]{
   "more": *[
     _type == "post" &&
     _id != ^._id &&
-    coalesce(isCaseStudy, false) == coalesce(^.isCaseStudy, false)
+    coalesce(isCaseStudy, false) == coalesce(^.isCaseStudy, false) &&
+    !defined(externalUrl)
   ] | order(publishedAt desc)[0...2]{_id, title, slug, isCaseStudy, excerpt, publishedAt}
 }`
 
