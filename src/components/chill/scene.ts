@@ -269,9 +269,15 @@ const seeded = (i: number, k = 0) => {
 // Lòng ly dưới phin theo từng hàng (px gốc, tính cả hai đầu), đo trên interior.webp so với góc
 // `coffee` của phòng: thân ly thẳng, thu dần ở chỗ cà phê giáp sữa và ở đáy bo. Dừng trước vệt
 // sáng bên phải của tranh để không tô đè lên nó
-function glassInner(glass: {coffee: {x: number; y: number}}, y: number): [number, number] {
+function glassInner(glass: {coffee: {x: number; y: number}; milk: {x: number; y: number; w: number}}, y: number, drink: Drink | null): [number, number] {
+  // Ly đen: paintDrink đã tô đen nguyên khối lớp sữa (cả mép phải lẫn đáy bo) → phần rỗng phải
+  // phủ đúng khối đó, không thì cà phê đen hở ra quanh phần kính rỗng
+  if (drink === 'den' && y >= glass.milk.y) return [glass.milk.x, glass.milk.x + glass.milk.w - 1]
   const dy = y - glass.coffee.y
-  const [a, b] = dy <= 8 ? [-1, 18] : dy === 9 ? [1, 17] : dy <= 14 ? [0, 15] : dy === 15 ? [2, 14] : [4, 14]
+  // Ly sữa giữ lớp sữa đáy của tranh nên chỉ cần phần thân. Bạc xỉu (và hàng giáp sữa của ly đen)
+  // rỗng tới đáy: phủ rộng hơn, kể cả mấy vệt phản chiếu màu kem bên phải, kẻo trông như sữa còn sót
+  const milky = !drink || drink === 'sua'
+  const [a, b] = dy <= 8 ? [-1, 18] : dy === 9 ? (milky ? [1, 17] : [0, 18]) : dy <= 14 ? (milky ? [0, 15] : [0, 19]) : dy === 15 ? [2, 17] : [4, 15]
   return [glass.coffee.x + a, glass.coffee.x + b]
 }
 
@@ -1259,14 +1265,14 @@ export class ChillScene {
     // Kính rỗng không phẳng một màu: 2 hàng trên cùng tối hơn (bóng đáy phin), dải 3 px bên phải
     // sáng hơn (ánh sáng lọt qua thành ly), mép trái 1 px vệt sáng
     for (let at = top; at < y; at++) {
-      const [x0, x1] = glassInner(glass, at)
+      const [x0, x1] = glassInner(glass, at, this.drink)
       row(at < top + 2 ? '#573019' : '#6f4128', at, x0, x1)
       row('#875636', at, x1 - 2, x1)
       row('#a8876a', at, x0, x0)
     }
     // Mặt cà phê: 1 hàng nâu sáng. Chưa có giọt nào (level 0) hoặc đã đầy như tranh thì không vẽ
     if (y > top && y < bottom) {
-      const [x0, x1] = glassInner(glass, y)
+      const [x0, x1] = glassInner(glass, y, this.drink)
       row('#a06a3c', y, x0, x1)
     }
   }
