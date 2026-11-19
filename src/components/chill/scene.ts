@@ -1199,29 +1199,28 @@ export class ChillScene {
     this.wash(ctx, this.interiorLayer.width, this.interiorLayer.height)
   }
 
-  // Tô lại nước trong ly dưới phin theo món khách chọn, ngay trên tranh nội thất (trước khi
-  // phủ màu theo giờ nên sáng / chiều / tối đều khớp). Tranh gốc là cà phê sữa: đen ở trên,
-  // sữa đặc dưới đáy → "sua" để nguyên; "den" tô đen lớp sữa; "bacxiu" tô sữa lên gần hết
-  // phần cà phê, chừa 1 lớp cà phê mỏng trên mặt.
+  // Đổi nước trong ly dưới phin theo món khách chọn, ngay trên tranh nội thất (trước khi phủ màu
+  // theo giờ nên sáng / chiều / tối đều khớp). Tranh gốc là cà phê sữa: đen ở trên, sữa đặc dưới
+  // đáy → "sua" để nguyên; "den" phủ sprite đổi lớp sữa thành cà phê; "bacxiu" phủ sprite đổi thân
+  // ly thành sữa, giữ lớp bọt nâu trên mặt. Sprite cắt theo đúng lòng ly (bản đầu tô khối chữ
+  // nhật: góc vuông đè lên đáy ly bo, hở sọc cà phê hai bên)
+  private glassArt = new Map<string, HTMLImageElement>()
+  private glassSprite(src: string) {
+    let img = this.glassArt.get(src)
+    if (!img) {
+      img = loadImage(src, () => (this.dirty = true))
+      this.glassArt.set(src, img)
+    }
+    return ready(img) ? img : null
+  }
+
   private paintDrink(ctx: CanvasRenderingContext2D) {
     const glass = this.theme.drink
     if (!glass || !this.drink || this.drink === 'sua') return
-    const {coffee, milk} = glass
-    const fill = (color: string, x: number, y: number, w: number, h: number) => {
-      ctx.fillStyle = color
-      ctx.fillRect(x * RES, y * RES, w * RES, h * RES)
-    }
-    if (this.drink === 'den') {
-      fill('#100705', milk.x, milk.y, milk.w, milk.h)
-      // Vệt sáng dọc thành ly chạy tiếp xuống đáy
-      fill('#2f1d13', milk.x + milk.w - 5, milk.y, 2, milk.h)
-    } else {
-      fill('#ddbf70', coffee.x, coffee.y, coffee.w, coffee.h)
-      fill('#ddbf70', milk.x, milk.y, milk.w, 2)
-      // Chỗ cà phê loang vào sữa + vệt sáng thành ly
-      fill('#a67c45', coffee.x, coffee.y - 2, coffee.w, 2)
-      fill('#ecdba6', coffee.x + coffee.w - 3, coffee.y, 2, coffee.h + 2)
-    }
+    const img = this.glassSprite(glass.sprites[this.drink])
+    if (!img) return
+    const k = this.interiorLayer.width / 1280
+    ctx.drawImage(img, glass.sprites.x * k, glass.sprites.y * k, img.naturalWidth * k, img.naturalHeight * k)
   }
 
   // Bàn pha phin: ly đầy dần theo thời gian của phin. Vẽ ngay trên tranh nội thất như món
@@ -1240,17 +1239,16 @@ export class ChillScene {
   // phin giữ nguyên. Trước khi phủ thì trả vùng đó về tranh gốc: lớp tô món của paintDrink (đen,
   // bạc xỉu) là khối chữ nhật, để lại sẽ hở ra quanh sprite. Hai bản đầu tô màu thẳng lên tranh
   // bằng ô px gốc: răng cưa trên nét vẽ mượt và không khít lòng ly
-  private glassEmpty: {src: string; img: HTMLImageElement; rows: [number, number][] | null} | null = null
+  private glassRowsOf = new Map<HTMLImageElement, [number, number][]>()
 
   private paintBrew(ctx: CanvasRenderingContext2D) {
     const glass = this.theme.drink
     if (!glass || this.brewLevel === null || !ready(this.interior)) return
     const {top, bottom, y} = this.brewSurface(glass)
     if (y <= top) return
-    const at = glass.empty
-    if (this.glassEmpty?.src !== at.src) this.glassEmpty = {src: at.src, img: loadImage(at.src, () => (this.dirty = true)), rows: null}
-    const {img} = this.glassEmpty
-    if (!ready(img)) return
+    const at = glass.sprites
+    const img = this.glassSprite(at.empty)
+    if (!img) return
     // px ảnh 1280×720 → px lớp nội thất
     const k = this.interiorLayer.width / 1280
     const cut = y * RES
@@ -1271,8 +1269,8 @@ export class ChillScene {
 
   // Bề ngang lòng ly theo từng hàng của sprite (cột đầu / cuối có điểm ảnh đục), đọc một lần
   private glassRows(img: HTMLImageElement) {
-    const cache = this.glassEmpty!
-    if (cache.rows) return cache.rows
+    const known = this.glassRowsOf.get(img)
+    if (known) return known
     const c = document.createElement('canvas')
     c.width = img.naturalWidth
     c.height = img.naturalHeight
@@ -1290,7 +1288,7 @@ export class ChillScene {
       }
       if (first >= 0) rows[r] = [first, last]
     }
-    cache.rows = rows
+    this.glassRowsOf.set(img, rows)
     return rows
   }
 
@@ -1317,11 +1315,21 @@ export class ChillScene {
     if (at < fall) {
       ctx.fillStyle = this.o('#2c1608')
       ctx.fillRect(x, Math.round(from + (at / fall) * Math.max(1, land - from - 2)), 2, 2)
-    } else if (at < fall + 0.25 && y > top && y < bottom) {
-      ctx.fillStyle = this.o('#c98f55')
-      ctx.fillRect(x - 1, y, 4, 1)
-      ctx.fillStyle = this.o('#a06a3c')
-      ctx.fillRect(x, y - 1, 2, 1)
+    } else if (y > top && y < bottom) {
+      // Gợn: giọt chạm mặt thì mặt cà phê nhô lên và sáng hẳn ở giữa, nhịp sau loang ra hai bên.
+      // Bản đầu chỉ sáng hơn vạch mặt một chút (4 ô, 1 nhịp): có vẽ mà mắt không thấy
+      const since = at - fall
+      if (since < 0.14) {
+        ctx.fillStyle = this.o('#f3cfa8')
+        ctx.fillRect(x - 1, y, 4, 1)
+        ctx.fillRect(x, y - 1, 2, 1)
+      } else if (since < 0.34) {
+        ctx.fillStyle = this.o('#e0ad74')
+        ctx.fillRect(x - 3, y, 8, 1)
+        ctx.fillStyle = this.o('#f3cfa8')
+        ctx.fillRect(x - 4, y - 1, 1, 1)
+        ctx.fillRect(x + 5, y - 1, 1, 1)
+      }
     }
   }
 
