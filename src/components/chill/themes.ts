@@ -107,7 +107,9 @@ export type Theme = {
   // Ly thuỷ tinh dưới phin (px gốc 640×360): `hit` = vùng bấm để đổi món (cả phin lẫn ly),
   // `coffee` / `milk` = phần cà phê đen ở trên / lớp sữa đặc ở đáy trong tranh, để scene tô
   // lại theo món khách chọn. null = phòng không có ly trong (cốc sứ không thấy nước bên trong)
-  drink: {hit: Rect; coffee: Rect; milk: Rect} | null
+  // `empty` = sprite ly rỗng nhìn xuyên cho lúc đang pha phin, đặt tại (x, y) px ảnh 1280×720
+  // (scripts/chill-glass-empty.py)
+  drink: {hit: Rect; coffee: Rect; milk: Rect; empty: {src: string; x: number; y: number}} | null
   lamp: Pt
   // Đèn luôn sáng (đèn bàn, đèn lồng) hay chỉ bật khi chiều/tối/mưa (đèn thả của quán)
   lampAlways: boolean
@@ -196,7 +198,7 @@ export const THEMES: Theme[] = [
     // Gờ dưới khung cửa sổ: ô giữa (sau phin, trên cuốn sổ) rồi ô trái (trên đầu mèo)
     shelf: [296, 326, 356, 386, 86, 114, 142, 170].map((x) => ({x, y: 249})),
     steam: {x: 127, y: 113},
-    drink: {hit: {x: 230, y: 226, w: 44, h: 72}, coffee: {x: 242, y: 274, w: 19, h: 10}, milk: {x: 242, y: 284, w: 21, h: 7}},
+    drink: {hit: {x: 230, y: 226, w: 44, h: 72}, coffee: {x: 242, y: 274, w: 19, h: 10}, milk: {x: 242, y: 284, w: 21, h: 7}, empty: {src: '/chill/scenes/interior-glass-empty.webp', x: 470, y: 540}},
     lamp: {x: 63, y: 42},
     lampAlways: false,
     laptop: {x: 235, y: 119},

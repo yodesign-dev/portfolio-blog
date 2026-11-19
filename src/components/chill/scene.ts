@@ -266,21 +266,6 @@ const seeded = (i: number, k = 0) => {
 // Người ngồi dạng video (quán, …): cấu hình trong themes.ts (CharacterVideo)
 
 // Màu nhân cho sprite ngoài phố để hợp ánh sáng của ảnh nền
-// Lòng ly dưới phin theo từng hàng (px gốc, tính cả hai đầu), đo trên interior.webp so với góc
-// `coffee` của phòng: thân ly thẳng, thu dần ở chỗ cà phê giáp sữa và ở đáy bo. Dừng trước vệt
-// sáng bên phải của tranh để không tô đè lên nó
-function glassInner(glass: {coffee: {x: number; y: number}; milk: {x: number; y: number; w: number}}, y: number, drink: Drink | null): [number, number] {
-  // Ly đen: paintDrink đã tô đen nguyên khối lớp sữa (cả mép phải lẫn đáy bo) → phần rỗng phải
-  // phủ đúng khối đó, không thì cà phê đen hở ra quanh phần kính rỗng
-  if (drink === 'den' && y >= glass.milk.y) return [glass.milk.x, glass.milk.x + glass.milk.w - 1]
-  const dy = y - glass.coffee.y
-  // Ly sữa giữ lớp sữa đáy của tranh nên chỉ cần phần thân. Bạc xỉu (và hàng giáp sữa của ly đen)
-  // rỗng tới đáy: phủ rộng hơn, kể cả mấy vệt phản chiếu màu kem bên phải, kẻo trông như sữa còn sót
-  const milky = !drink || drink === 'sua'
-  const [a, b] = dy <= 8 ? [-1, 18] : dy === 9 ? (milky ? [1, 17] : [0, 18]) : dy <= 14 ? (milky ? [0, 15] : [0, 19]) : dy === 15 ? [2, 17] : [4, 15]
-  return [glass.coffee.x + a, glass.coffee.x + b]
-}
-
 const SPRITE_TINT: Record<TimeOfDay, string | null> = {
   morning: null,
   afternoon: '#ffd6b4',
@@ -1250,31 +1235,63 @@ export class ChillScene {
     return {top, bottom, y: bottom - Math.round((this.brewLevel ?? 1) * (bottom - top))}
   }
 
-  // Phần ly còn rỗng (phía trên mặt cà phê): tô theo lòng ly từng hàng, màu gỗ phía sau nhìn xuyên
-  // qua kính + 1 vệt sáng dọc mép trái. Không tô ra ngoài lòng ly nên thành ly, vệt sáng bên phải
-  // và chân phin trong tranh vẫn còn. Bản đầu tô một khối chữ nhật phẳng: lệch dáng ly, hở cà phê
-  // ở góc đáy và che hết chi tiết kính
+  // Phần ly còn rỗng (phía trên mặt cà phê): sprite kính rỗng nhìn xuyên, cắt ngang tại mặt cà phê.
+  // Sprite ở độ phân giải của tranh và khít từng điểm ảnh lòng ly, nên thành ly, vệt sáng, chân
+  // phin giữ nguyên. Trước khi phủ thì trả vùng đó về tranh gốc: lớp tô món của paintDrink (đen,
+  // bạc xỉu) là khối chữ nhật, để lại sẽ hở ra quanh sprite. Hai bản đầu tô màu thẳng lên tranh
+  // bằng ô px gốc: răng cưa trên nét vẽ mượt và không khít lòng ly
+  private glassEmpty: {src: string; img: HTMLImageElement; rows: [number, number][] | null} | null = null
+
   private paintBrew(ctx: CanvasRenderingContext2D) {
     const glass = this.theme.drink
-    if (!glass || this.brewLevel === null) return
+    if (!glass || this.brewLevel === null || !ready(this.interior)) return
     const {top, bottom, y} = this.brewSurface(glass)
-    const row = (color: string, at: number, x0: number, x1: number) => {
-      ctx.fillStyle = color
-      ctx.fillRect(x0 * RES, at * RES, (x1 - x0 + 1) * RES, RES)
+    if (y <= top) return
+    const at = glass.empty
+    if (this.glassEmpty?.src !== at.src) this.glassEmpty = {src: at.src, img: loadImage(at.src, () => (this.dirty = true)), rows: null}
+    const {img} = this.glassEmpty
+    if (!ready(img)) return
+    // px ảnh 1280×720 → px lớp nội thất
+    const k = this.interiorLayer.width / 1280
+    const cut = y * RES
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(at.x * k, at.y * k, img.naturalWidth * k, cut - at.y * k)
+    ctx.clip()
+    ctx.drawImage(this.interior, 0, 0, this.interiorLayer.width, this.interiorLayer.height)
+    ctx.drawImage(img, at.x * k, at.y * k, img.naturalWidth * k, img.naturalHeight * k)
+    ctx.restore()
+    // Mặt cà phê: vạch nâu sáng theo đúng bề ngang lòng ly ở hàng đó. Chưa có giọt nào thì không vẽ
+    if (y >= bottom) return
+    const span = this.glassRows(img)[Math.round(cut / k) - at.y]
+    if (!span) return
+    ctx.fillStyle = '#a06a3c'
+    ctx.fillRect((at.x + span[0]) * k, cut, (span[1] - span[0] + 1) * k, RES)
+  }
+
+  // Bề ngang lòng ly theo từng hàng của sprite (cột đầu / cuối có điểm ảnh đục), đọc một lần
+  private glassRows(img: HTMLImageElement) {
+    const cache = this.glassEmpty!
+    if (cache.rows) return cache.rows
+    const c = document.createElement('canvas')
+    c.width = img.naturalWidth
+    c.height = img.naturalHeight
+    const cx = c.getContext('2d')!
+    cx.drawImage(img, 0, 0)
+    const data = cx.getImageData(0, 0, c.width, c.height).data
+    const rows: [number, number][] = []
+    for (let r = 0; r < c.height; r++) {
+      let first = -1
+      let last = -1
+      for (let x = 0; x < c.width; x++) {
+        if (data[(r * c.width + x) * 4 + 3] < 128) continue
+        if (first < 0) first = x
+        last = x
+      }
+      if (first >= 0) rows[r] = [first, last]
     }
-    // Kính rỗng không phẳng một màu: 2 hàng trên cùng tối hơn (bóng đáy phin), dải 3 px bên phải
-    // sáng hơn (ánh sáng lọt qua thành ly), mép trái 1 px vệt sáng
-    for (let at = top; at < y; at++) {
-      const [x0, x1] = glassInner(glass, at, this.drink)
-      row(at < top + 2 ? '#573019' : '#6f4128', at, x0, x1)
-      row('#875636', at, x1 - 2, x1)
-      row('#a8876a', at, x0, x0)
-    }
-    // Mặt cà phê: 1 hàng nâu sáng. Chưa có giọt nào (level 0) hoặc đã đầy như tranh thì không vẽ
-    if (y > top && y < bottom) {
-      const [x0, x1] = glassInner(glass, y, this.drink)
-      row('#a06a3c', y, x0, x1)
-    }
+    cache.rows = rows
+    return rows
   }
 
   // Giọt cà phê rơi từ đáy phin xuống mặt ly, chạm mặt thì gợn 1 nhịp. Gần xong (75%, 90%) nhỏ
