@@ -63,7 +63,9 @@ export async function SideProjects() {
           aria-labelledby="cafe-title"
           className="border-2 border-neutral-900 bg-[#16131a] p-5 text-white shadow-hard sm:p-8"
         >
-          <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
+          {/* Hai cột từ md (không đợi lg): điện thoại xoay ngang rộng ~800px mà chỉ cao ~375px, để một
+              cột thì cửa sổ quán chiếm trọn màn hình, không thấy tên project */}
+          <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-8 lg:gap-10">
             <TeaserWindow />
             <div>
               <p className="font-mono text-xs uppercase tracking-widest text-white/60">Web app · Live · Free</p>
@@ -74,13 +76,14 @@ export async function SideProjects() {
                 A phin coffee timer by a café window, built with AI.
               </p>
               {stats.length > 0 && (
-                <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-3 sm:gap-x-8">
+                <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-3 lg:gap-x-8">
                   {stats.map((stat) => (
                     <div key={stat.label} className="flex flex-col-reverse">
-                      {/* Màn 320px: bỏ chữ "shipped" để 3 số nằm vừa một hàng */}
+                      {/* Dưới lg cột chữ hẹp (điện thoại, tablet, xoay ngang): bỏ chữ "shipped" để 3 số
+                          nằm vừa một hàng */}
                       <dt className="text-sm text-white/60">
                         {stat.label}
-                        {stat.more && <span className="max-sm:hidden">{stat.more}</span>}
+                        {stat.more && <span className="max-lg:hidden">{stat.more}</span>}
                       </dt>
                       <dd className="text-4xl font-extrabold leading-[1.1] tracking-[-0.04em] text-white">
                         <CountUp value={stat.value as number} />

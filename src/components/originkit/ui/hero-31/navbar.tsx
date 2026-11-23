@@ -58,11 +58,13 @@ export const Navbar = ({ showResume }: { showResume: boolean }) => {
       <nav className="hidden md:flex items-center h-full">
         {/* Chữ mono in hoa rộng hơn chữ thường: ở md (768–1023px) thu khoảng cách để 5 mục
             (khi có Resume) vẫn vừa một hàng */}
-        <div className="mr-6 flex items-center gap-5 lg:mr-12 lg:gap-8">
+        {/* Mỗi link cao hết thanh (80px) chứ không chỉ cao bằng dòng chữ 16px: điện thoại xoay
+            ngang và tablet rộng hơn md nên thấy menu này mà vẫn bấm bằng ngón tay */}
+        <div className="mr-6 flex h-full items-center gap-5 lg:mr-12 lg:gap-8">
           {navLinks.map((link) =>
             renderLink(
               link,
-              "font-mono text-xs uppercase tracking-[0.08em] text-neutral-600 hover:text-neutral-900 transition",
+              "inline-flex h-full items-center font-mono text-xs uppercase tracking-[0.08em] text-neutral-600 hover:text-neutral-900 transition",
               "text-neutral-900 underline underline-offset-4 decoration-2 decoration-brand"
             )
           )}

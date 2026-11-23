@@ -20,7 +20,7 @@ const PRODUCTS: {name: string; icon?: string}[] = [
 const DOMAINS = ['Recruitment', 'B2B marketplace', 'E-commerce', 'Food delivery', 'Logistics', 'Social']
 
 const linkClass =
-  'inline-flex min-h-11 items-center text-sm font-semibold text-neutral-900 underline decoration-neutral-300 underline-offset-4 transition-colors hover:text-brand hover:decoration-brand sm:min-h-0'
+  'inline-flex min-h-11 items-center text-sm font-semibold text-neutral-900 underline decoration-neutral-300 underline-offset-4 transition-colors hover:text-brand hover:decoration-brand sm:pointer-fine:min-h-0'
 
 export function Background() {
   return (
