@@ -2,6 +2,7 @@ import {createHash} from "node:crypto";
 import {NextRequest, NextResponse} from "next/server";
 import {client} from "@/sanity/lib/client";
 import {overLimit, redis} from "@/lib/chillChat";
+import {microCache} from "@/lib/microCache";
 
 // Lượt nghe từng bài của trang /chill.
 //
@@ -44,7 +45,8 @@ export async function GET() {
   const r = redis();
   if (!open || !r) return NextResponse.json({open: false, counts: {}}, {headers: cache});
   try {
-    const raw = (await r.hgetall<Record<string, number | string>>(PREFIX)) ?? {};
+    // `?x=…` lọt qua CDN → mỗi instance đọc Redis tối đa 1 lần / 60 giây (src/lib/microCache.ts)
+    const raw = (await microCache("plays", 60_000, () => r.hgetall<Record<string, number | string>>(PREFIX))) ?? {};
     const counts = Object.fromEntries(Object.entries(raw).map(([id, n]) => [id, Number(n) || 0]));
     return NextResponse.json({open: true, counts}, {headers: cache});
   } catch (error) {

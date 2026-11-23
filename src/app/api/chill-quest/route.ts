@@ -3,6 +3,7 @@ import type {Redis} from "@upstash/redis";
 import {NextRequest, NextResponse} from "next/server";
 import {client} from "@/sanity/lib/client";
 import {checkText, clean, overLimit, redis} from "@/lib/chillChat";
+import {microCache} from "@/lib/microCache";
 import {PEOPLE_MAX, QUEST_MIN_PHIN_MS, QUEST_UID_RE, type QuestOption, type QuestState} from "@/components/chill/quest-shared";
 
 // Thử thách chung "Cả quán cùng pha phin" của trang /chill (xem quest-shared.ts).
@@ -114,7 +115,8 @@ export async function GET() {
   const r = redis();
   if (!s.open || !r) return NextResponse.json({open: false}, {headers: cache});
   try {
-    return NextResponse.json(await stateOf(r, s), {headers: cache});
+    // `?x=…` lọt qua CDN → mỗi instance đọc Redis tối đa 1 lần / 10 giây (src/lib/microCache.ts)
+    return NextResponse.json(await microCache(`quest:${s.season}`, 10_000, () => stateOf(r, s)), {headers: cache});
   } catch (error) {
     console.error("chill-quest GET error:", error);
     return NextResponse.json({open: false}, {headers: {"Cache-Control": "no-store"}});

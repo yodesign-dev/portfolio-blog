@@ -21,6 +21,7 @@ import {useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef
 import {createPortal} from 'react-dom'
 import {PixelIcon, TOKEN_CLASS, TokenChip, TokenLabel, TokenNewDot} from './pixel-icons'
 import {trackEvent} from '@/lib/analytics'
+import {useTurnstile} from './useTurnstile'
 import {useLang, useT} from './i18n'
 import {DRINKS, chooseDrink, useDrink, type Drink} from './drink'
 import {PHIN_MOOD_EVENT, type PhinMoodDetail} from './PhinMood'
@@ -138,6 +139,8 @@ export function Diary({
   onAvailable?: (available: boolean) => void
 }) {
   const t = useT()
+  // Chỉ tải Turnstile khi sổ đang mở (để báo cáo mẩu)
+  const {getToken, node: captcha} = useTurnstile({enabled: open, className: 'shrink-0 px-5 empty:hidden'})
   const lang = useLang()
   const [room, setRoom] = useState<Room | null>(null)
   const [store, setStore] = useState<Store>(EMPTY)
@@ -357,10 +360,16 @@ export function Diary({
     setPreset(null)
   }
   const removeMine = (id: string) => update((s) => ({...s, mine: s.mine.filter((n) => n.id !== id)}))
+  // Báo cáo cần token Turnstile (API chặn bot đổi IP ẩn mẩu hàng loạt). Mẩu ẩn ngay trên máy
+  // mình; lấy được token hay không thì việc báo lên server vẫn im lặng
   const report = (id: string) => {
     update((s) => ({...s, hidden: [...s.hidden, id].slice(-200)}))
-    void fetch('/api/chill-diary', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'report', id})}).catch(() => {})
     trackEvent({name: 'Chill Diary', props: {action: 'report'}})
+    void (async () => {
+      const captchaToken = await getToken()
+      if (!captchaToken) return
+      await fetch('/api/chill-diary', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'report', id, captchaToken})})
+    })().catch(() => {})
   }
 
   // Tổng kết phin hỏi "Phin này thế nào?" (PhinMood.tsx): ghi mẩu một chạm vào sổ riêng, hoàn tác,
@@ -666,6 +675,7 @@ export function Diary({
           onReport={report}
           onRemove={removeMine}
         />
+        {captcha}
       </section>
     </>
   )

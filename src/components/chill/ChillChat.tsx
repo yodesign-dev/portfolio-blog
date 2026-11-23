@@ -134,7 +134,13 @@ export function ChillChat({
       const res = await fetch(`/api/chill-chat${fresh ? `?fresh=${Date.now()}` : ''}`)
       if (!res.ok) return
       const data = (await res.json()) as Room
-      setRoom(data)
+      // Server cache GET tối đa vài giây (microCache) → bản vừa đọc có thể chưa có tin mình vừa
+      // gửi (đã thêm sẵn ở onSent). Giữ lại tin mới hơn mọi tin trong bản đọc, gửi chưa quá 15 giây
+      setRoom((prev) => {
+        const newest = data.messages?.reduce((max, m) => Math.max(max, m.ts), 0) ?? 0
+        const pending = (prev?.messages ?? []).filter((m) => m.ts > newest && Date.now() - m.ts < 15_000 && !data.messages?.some((x) => x.id === m.id))
+        return pending.length ? {...data, messages: [...(data.messages ?? []), ...pending]} : data
+      })
     } catch {
       // Mạng chập chờn — lần sau hỏi lại
     }

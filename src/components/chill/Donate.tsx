@@ -15,10 +15,10 @@
 // bảng chỉ cập nhật sau khi Bin đối chiếu và tick "Đã nhận tiền" trong Studio.
 // Trang không biết tiền có về thật hay không (tài khoản cá nhân) — Bin tự đối chiếu.
 
-import Script from 'next/script'
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {tServer, useLang, useT} from './i18n'
+import {useTurnstile, type GetToken} from './useTurnstile'
 import {DONATE, DONATE_TIERS, hasMomo, hasVcb, loadIntent, saveCup, saveIntent, shortVnd, vietQrUrl, type DonateIntent} from './donate-config'
 
 type Method = 'vcb' | 'momo'
@@ -43,72 +43,7 @@ const field =
 const primary =
   'w-full rounded-full bg-[#e8b27d] py-3 font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]'
 
-// Turnstile cho các bước tạo bản ghi mới (intent / sent không có id) — API bắt buộc để bot
-// không bắn được mail báo Bin + dòng "có người mời Bin cà phê" trong chat. Chạy ngầm
-// (execution: "execute"), chỉ xác minh lúc bấm nút → token luôn mới dù khách sang app ngân
-// hàng cả chục phút (token hết hạn sau 5 phút). Khung chỉ hiện khi Cloudflare cần khách bấm.
-type GetToken = () => Promise<string | null>
-
-function useTurnstile() {
-  const box = useRef<HTMLDivElement>(null)
-  const widget = useRef<string | undefined>(undefined)
-  const waiter = useRef<((token: string | null) => void) | null>(null)
-  const [scriptReady, setScriptReady] = useState(false)
-
-  useEffect(() => {
-    // Script có thể đã tải sẵn (sổ góp ý, Nhật ký, form Contact) → dùng luôn
-    if (window.turnstile) setScriptReady(true) // eslint-disable-line react-hooks/set-state-in-effect
-  }, [])
-
-  useEffect(() => {
-    const sitekey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-    if (!scriptReady || !box.current || !window.turnstile || !sitekey) return
-    const settle = (token: string | null) => waiter.current?.(token)
-    widget.current = window.turnstile.render(box.current, {
-      sitekey,
-      execution: 'execute',
-      appearance: 'interaction-only',
-      size: 'flexible',
-      theme: 'dark',
-      callback: (token: string) => settle(token),
-      'error-callback': () => settle(null),
-      'timeout-callback': () => settle(null),
-    })
-    return () => {
-      settle(null)
-      if (window.turnstile && widget.current) window.turnstile.remove(widget.current)
-      widget.current = undefined
-    }
-  }, [scriptReady])
-
-  const getToken: GetToken = () =>
-    new Promise((resolve) => {
-      const ts = window.turnstile
-      if (!ts || !widget.current || !box.current) return resolve(null)
-      // Lần bấm trước còn chờ → cho nó trả null
-      waiter.current?.(null)
-      // finish chỉ được gọi sau khi `timer` đã gán (qua hẹn giờ hoặc callback của Turnstile)
-      const finish = (token: string | null) => {
-        clearTimeout(timer)
-        if (waiter.current === finish) waiter.current = null
-        resolve(token)
-      }
-      // Cloudflare im quá lâu → thôi, không bắt khách chờ mãi
-      const timer = setTimeout(() => finish(null), 30_000)
-      waiter.current = finish
-      // Mỗi token chỉ dùng được 1 lần → reset rồi xác minh lại
-      ts.reset(widget.current)
-      ts.execute(box.current)
-    })
-
-  const node = (
-    <>
-      {!scriptReady && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
-      <div ref={box} className="shrink-0 px-5" />
-    </>
-  )
-  return {getToken, node}
-}
+// Turnstile cho các bước tạo bản ghi mới (intent / sent không có id) — xem useTurnstile.tsx
 
 async function post(body: Record<string, unknown>) {
   const res = await fetch('/api/chill-support', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})

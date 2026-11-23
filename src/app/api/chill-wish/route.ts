@@ -21,6 +21,9 @@ const RATE = {count: 3, minutes: 10};
 // Thả/bỏ ❤️: mỗi IP tối đa 30 lần / 10 phút; mỗi IP chỉ tính 1 tim cho mỗi góp ý
 const HEART_RATE = {count: 30, seconds: 600};
 const HEART_TTL_S = 365 * 24 * 60 * 60;
+// ?mine=: mỗi IP tối đa 30 lần / 10 phút
+const MINE_RATE = {count: 30, seconds: 600};
+let lastShippedCheck = 0;
 
 type Wish = {
   id: string;
@@ -40,10 +43,15 @@ const LIST_QUERY = `*[_type == "chillWish" && status in $statuses] | order(_crea
 
 export async function GET(request: NextRequest) {
   const mine = request.nextUrl.searchParams.get("mine");
-  if (mine !== null) return mineStatuses(mine);
+  if (mine !== null) return mineStatuses(request, mine);
   try {
-    const wishes = await writeClient.fetch<Wish[]>(LIST_QUERY, {statuses: PUBLIC});
-    after(notifyShipped);
+    // Data Cache 15s như CDN: `?x=…` lọt qua CDN cũng không chạm Sanity mỗi lần
+    const wishes = await writeClient.fetch<Wish[]>(LIST_QUERY, {statuses: PUBLIC}, {next: {revalidate: 15}});
+    // Dò góp ý vừa "Đã làm" tối đa 1 lần / phút mỗi instance (trước đây chạy sau MỌI GET)
+    if (Date.now() - lastShippedCheck > 60_000) {
+      lastShippedCheck = Date.now();
+      after(notifyShipped);
+    }
     return NextResponse.json(
       {wishes},
       // CDN giữ 15s, hết hạn thì trả bản cũ trong lúc lấy bản mới → ít gọi Sanity
@@ -67,9 +75,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function mineStatuses(param: string) {
+async function mineStatuses(request: NextRequest, param: string) {
   const ids = param.split(",").filter((id) => ID_RE.test(id)).slice(0, 20);
   if (!ids.length) return NextResponse.json({statuses: {}});
+  // Mỗi tổ hợp id là 1 query Sanity không cache được → giới hạn theo IP (trang chỉ hỏi khi mở sổ góp ý)
+  if (await overLimit(redis(), `chill:wish:rl:mine:${hashIp(request)}`, MINE_RATE.count, MINE_RATE.seconds)) {
+    return NextResponse.json({statuses: {}}, {status: 429});
+  }
   try {
     const found = await writeClient.fetch<{_id: string; status: string}[]>(`*[_id in $ids]{_id, status}`, {ids});
     // Không có trong kết quả = đã bị xoá

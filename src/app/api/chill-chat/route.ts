@@ -21,12 +21,15 @@ import {
   type ChatMessage,
   whoOf,
 } from "@/lib/chillChat";
+import {microCache} from "@/lib/microCache";
 
 // Phòng chat trang /chill (src/lib/chillChat.ts). Tin tự xoá sau 24 giờ.
 //
 // GET  → {open, online, messages, reactions} (chat tắt vẫn có `online`) — CDN giữ 3s nên dù bao nhiêu người
 //        đang mở chat thì Redis cũng chỉ bị đọc ~1 lần / 3s. `?fresh=1` bỏ qua CDN
-//        (chỉ dùng ngay sau khi chính mình gửi).
+//        (chỉ dùng ngay sau khi chính mình gửi). Query lạ (`?x=…`) cũng lọt qua CDN nên
+//        phía server còn microCache: mỗi instance đọc Redis tối đa 1 lần / giây (fresh)
+//        hoặc / 3 giây (thường), xem src/lib/microCache.ts.
 // POST {action: "hello", uid}             nhịp "đang ở quán" ~1 phút/lần (tab đang mở hoặc
 //                                          đang nghe nhạc ở tab nền) → đếm online,
 //                                          khách mới → dòng "Có người vừa ghé quán"
@@ -69,35 +72,40 @@ export async function GET(request: NextRequest) {
   const open = await chatOpen();
   if (!r) return NextResponse.json({open: false, online: 0, messages: [], reactions: {}}, {headers: cache});
   try {
-    const now = Date.now();
-    // Chat bị tắt trong Studio → vẫn trả số người đang ở quán (trang hiện ở thanh trên)
-    if (!open) {
-      const online = await r.zcount(K.online, now - ONLINE_WINDOW_MS, "+inf");
-      return NextResponse.json({open: false, online: Math.max(online, 0), messages: [], reactions: {}}, {headers: cache});
-    }
-    const p = r.pipeline();
-    p.zrange(K.msgs, now - DAY_MS, "+inf", {byScore: true});
-    p.hgetall(K.rx);
-    p.zcount(K.online, now - ONLINE_WINDOW_MS, "+inf");
-    p.zrange(K.typing, now - TYPING_MS, "+inf", {byScore: true});
-    const [rows, rx, online, typingRaw] = (await p.exec()) as [unknown[], Record<string, number> | null, number, unknown[]];
-    const typing = (typingRaw ?? []).filter((w): w is string => typeof w === "string");
-    const messages = rows
-      .map((row) => (typeof row === "string" ? (JSON.parse(row) as ChatMessage) : (row as ChatMessage)))
-      .filter((m) => m && m.ts > now - DAY_MS)
-      .slice(-120);
-    const alive = new Set(messages.map((m) => m.id));
-    const reactions: Record<string, Record<string, number>> = {};
-    for (const [field, count] of Object.entries(rx ?? {})) {
-      const [id, emoji] = field.split("|");
-      if (!alive.has(id) || Number(count) <= 0) continue;
-      (reactions[id] ??= {})[emoji] = Number(count);
-    }
-    return NextResponse.json({open: true, online: Math.max(online, 0), messages, reactions, typing}, {headers: cache});
+    const body = await microCache(`chat:${open ? "open" : "closed"}:${fresh ? "fresh" : "cdn"}`, fresh ? 1000 : 3000, () => readRoom(r, open));
+    return NextResponse.json(body, {headers: cache});
   } catch (error) {
     console.error("chill-chat GET error:", error);
     return NextResponse.json({open: true, online: 0, messages: [], reactions: {}, error: true}, {status: 500});
   }
+}
+
+async function readRoom(r: NonNullable<ReturnType<typeof redis>>, open: boolean) {
+  const now = Date.now();
+  // Chat bị tắt trong Studio → vẫn trả số người đang ở quán (trang hiện ở thanh trên)
+  if (!open) {
+    const online = await r.zcount(K.online, now - ONLINE_WINDOW_MS, "+inf");
+    return {open: false, online: Math.max(online, 0), messages: [], reactions: {}};
+  }
+  const p = r.pipeline();
+  p.zrange(K.msgs, now - DAY_MS, "+inf", {byScore: true});
+  p.hgetall(K.rx);
+  p.zcount(K.online, now - ONLINE_WINDOW_MS, "+inf");
+  p.zrange(K.typing, now - TYPING_MS, "+inf", {byScore: true});
+  const [rows, rx, online, typingRaw] = (await p.exec()) as [unknown[], Record<string, number> | null, number, unknown[]];
+  const typing = (typingRaw ?? []).filter((w): w is string => typeof w === "string");
+  const messages = rows
+    .map((row) => (typeof row === "string" ? (JSON.parse(row) as ChatMessage) : (row as ChatMessage)))
+    .filter((m) => m && m.ts > now - DAY_MS)
+    .slice(-120);
+  const alive = new Set(messages.map((m) => m.id));
+  const reactions: Record<string, Record<string, number>> = {};
+  for (const [field, count] of Object.entries(rx ?? {})) {
+    const [id, emoji] = field.split("|");
+    if (!alive.has(id) || Number(count) <= 0) continue;
+    (reactions[id] ??= {})[emoji] = Number(count);
+  }
+  return {open: true, online: Math.max(online, 0), messages, reactions, typing};
 }
 
 export async function POST(request: NextRequest) {

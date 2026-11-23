@@ -65,7 +65,8 @@ type BoardRow = {id: string; name?: string; message?: string; amount?: number; a
 
 export async function GET() {
   try {
-    const {cups, supporters} = await writeClient.fetch<{cups: number; supporters: BoardRow[]}>(BOARD_QUERY);
+    // Data Cache của Next 30s: `?x=…` lọt qua CDN cũng không chạm Sanity mỗi lần
+    const {cups, supporters} = await writeClient.fetch<{cups: number; supporters: BoardRow[]}>(BOARD_QUERY, {}, {next: {revalidate: 30}});
     return NextResponse.json(
       {
         cups,

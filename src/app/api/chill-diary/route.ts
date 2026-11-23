@@ -12,7 +12,9 @@ import {KEEP_DAYS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, dayOf, isMood, type DiaryN
 //        trả uidHash / ipHash) + câu riêng của quán / câu danh ngôn nếu Studio có điền. CDN giữ 15s.
 // POST {action: "post", uid, name, text, mood, captchaToken} → treo 1 mẩu lên bảng
 //        (hiện ngay, không chờ duyệt). Mỗi người 2 mẩu / ngày theo giờ Hà Nội.
-// POST {action: "report", id} → báo cáo; đủ 2 máy khác nhau thì mẩu tự ẩn.
+// POST {action: "report", id, captchaToken} → báo cáo; đủ 2 máy khác nhau thì mẩu tự ẩn + mail báo
+//        Bin (gỡ ẩn trong Studio nếu bị báo oan). Cần Turnstile: không có thì 1 người đổi IP
+//        (bật/tắt 4G) là ẩn được bất kỳ mẩu nào. Không có Redis thì không đếm (không chống trùng được).
 // Lỗi trả kèm `code` (closed / short / bad / captcha / slow / full) để giao diện dịch.
 //
 // Mẩu "cất vào sổ" không đi qua đây — chỉ nằm trên máy người viết.
@@ -63,8 +65,11 @@ export async function GET() {
   const {open, slipNew, cafe, quote} = await settings();
   if (!open) return NextResponse.json({open: false, slipNew: false, notes: [], cafe: null, quote: null}, {headers: cache});
   try {
-    const since = new Date(Date.now() - KEEP_MS).toISOString();
-    const rows = await writeClient.fetch<(Omit<DiaryNote, "ts"> & {ts: string})[]>(LIST_QUERY, {since});
+    // `since` làm tròn theo giờ để khoá Data Cache không đổi mỗi request (mẩu quá 7 ngày đã bị dọn,
+    // lệch ≤1 giờ không sao). Cache 15s như CDN: `?x=…` lọt qua CDN cũng không chạm Sanity mỗi lần
+    const hour = 60 * 60 * 1000;
+    const since = new Date(Math.floor((Date.now() - KEEP_MS) / hour) * hour).toISOString();
+    const rows = await writeClient.fetch<(Omit<DiaryNote, "ts"> & {ts: string})[]>(LIST_QUERY, {since}, {next: {revalidate: 15}});
     const notes: DiaryNote[] = rows
       .filter((n) => isMood(n.mood) && typeof n.text === "string")
       .map((n) => ({...n, ts: Date.parse(n.ts), day: n.day || dayOf(Date.parse(n.ts))}));
@@ -153,25 +158,50 @@ async function post(request: NextRequest, {uid, name, text, mood, captchaToken, 
   return NextResponse.json({success: true, note: created});
 }
 
-async function report(request: NextRequest, {id}: Record<string, unknown>) {
+async function report(request: NextRequest, {id, captchaToken}: Record<string, unknown>) {
   if (typeof id !== "string" || !ID_RE.test(id)) return NextResponse.json({error: "Invalid id"}, {status: 400});
+  if (typeof captchaToken !== "string" || !captchaToken) return NextResponse.json({error: "Captcha required", code: "captcha"}, {status: 401});
   const r = redis();
+  // Không có Redis → không biết máy nào đã báo → không đếm (trước đây cộng luôn: 1 người gửi 2 lần là ẩn)
+  if (!r) return NextResponse.json({ok: true});
   const ipHash = hashIp(request);
   // Quá nhịp → lặng lẽ bỏ qua (người báo cáo vẫn thấy mẩu biến mất trên máy mình)
   if (await overLimit(r, `chill:diary:rl:report:${ipHash}`, REPORT_RATE.count, REPORT_RATE.seconds)) return NextResponse.json({ok: true});
-  // Mỗi máy chỉ tính 1 lượt cho mỗi mẩu. Không có Redis thì không đếm được máy → vẫn cộng
-  if (r) {
-    const key = `chill:diary:rep:${id}`;
-    const fresh = await r
-      .sadd(key, ipHash)
-      .then(async (n) => (await r.expire(key, KEEP_DAYS * 24 * 60 * 60), n))
-      .catch(() => 1);
-    if (!fresh) return NextResponse.json({ok: true});
-  }
-  const exists = await writeClient.fetch<string | null>(`*[_id == $id && _type == "chillNote"][0]._id`, {id});
-  if (!exists) return NextResponse.json({ok: true});
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  if (!(await verifyTurnstile(captchaToken, ip))) return NextResponse.json({error: "Captcha failed", code: "captcha"}, {status: 401});
+  // Mỗi máy chỉ tính 1 lượt cho mỗi mẩu
+  const key = `chill:diary:rep:${id}`;
+  const fresh = await r
+    .sadd(key, ipHash)
+    .then(async (n) => (await r.expire(key, KEEP_DAYS * 24 * 60 * 60), n))
+    .catch(() => 0);
+  if (!fresh) return NextResponse.json({ok: true});
+  const note = await writeClient.fetch<{text?: string; name?: string; hidden?: boolean} | null>(`*[_id == $id && _type == "chillNote"][0]{text, name, hidden}`, {id});
+  if (!note || note.hidden) return NextResponse.json({ok: true});
   const doc = await writeClient.patch(id).setIfMissing({reports: 0}).inc({reports: 1}).commit<{reports: number}>();
-  if (doc.reports >= REPORTS_TO_HIDE) await writeClient.patch(id).set({hidden: true}).commit();
+  if (doc.reports >= REPORTS_TO_HIDE) {
+    await writeClient.patch(id).set({hidden: true}).commit();
+    // Báo Bin để gỡ ẩn nếu bị báo oan (mẩu hiện ngay không qua duyệt, nên ẩn cũng tự động)
+    after(async () => {
+      try {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: "Bin Nguyen Contact <onboarding@resend.dev>",
+          to: "nguyenbinhdesign@gmail.com",
+          subject: `[Chill nhật ký] Mẩu bị ẩn sau ${doc.reports} báo cáo`,
+          text: [
+            `Người viết: ${note.name || "Khách"}`,
+            "",
+            note.text ?? "",
+            "",
+            "Bị báo oan thì bỏ tick “Ẩn khỏi bảng” trong Studio → Chill · Nhật ký: https://applebin.me/studio",
+          ].join("\n"),
+        });
+      } catch (error) {
+        console.error("chill-diary hidden notify error:", error);
+      }
+    });
+  }
   return NextResponse.json({ok: true});
 }
 
