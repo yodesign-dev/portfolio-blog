@@ -50,7 +50,7 @@ export default defineType({
       validation: (rule) => rule.required(),
     }),
     defineField({name: 'enabled', group: 'schedule', title: 'Bật mùa này', type: 'boolean', initialValue: false, description: 'Tắt khẩn cấp: bỏ chọn rồi Publish. Khách thấy sau khoảng 1 phút, tab đang mở sau tối đa 30 phút.'}),
-    defineField({name: 'start', group: 'schedule', title: 'Bắt đầu', type: 'datetime', initialValue: '2026-12-10T17:00:00.000Z', description: 'Mặc định 00:00 ngày 11/12/2026 giờ Việt Nam, trước Noel 2 tuần.', validation: (rule) => rule.required()}),
+    defineField({name: 'start', group: 'schedule', title: 'Bắt đầu', type: 'datetime', initialValue: '2026-11-26T17:00:00.000Z', description: 'Mặc định 00:00 ngày 27/11/2026 giờ Việt Nam, sau Lễ Tạ ơn của Mỹ.', validation: (rule) => rule.required()}),
     defineField({name: 'end', group: 'schedule', title: 'Kết thúc', type: 'datetime', initialValue: '2027-01-01T17:00:00.000Z', description: 'Mặc định 00:00 ngày 2/1/2027 giờ Việt Nam, sau Noel 1 tuần.', validation: (rule) => rule.required().custom((end, ctx) => {
       const start = (ctx.document as {start?: string} | undefined)?.start
       return !start || !end || Date.parse(end as string) > Date.parse(start) ? true : 'Kết thúc phải sau Bắt đầu'

@@ -36,12 +36,13 @@ export type Season = {
 
 export const ALL_LAYERS: SeasonLayers = {lights: true, roomLights: true, snow: true, meteors: true, tree: true, catHat: true, seat: true, santa: true, trainLights: true, shelf: true}
 
-// Bật trước Noel 2 tuần, tắt sau 1 tuần: 11/12/2026 00:00 → hết 1/1/2027 (giờ Việt Nam).
+// Bật sau Lễ Tạ ơn của Mỹ, cùng ngày video Noel 2 giờ lên YouTube, tắt sau Noel 1 tuần:
+// 27/11/2026 00:00 → hết 1/1/2027 (giờ Việt Nam).
 // Tuyết bọt tối 24–25/12, mưa sao băng đêm 13–14/12 (đỉnh Song Tử)
 export const NOEL_2026: Season = {
   id: 'noel-2026',
   pack: 'noel',
-  start: '2026-12-11T00:00:00+07:00',
+  start: '2026-11-27T00:00:00+07:00',
   end: '2027-01-02T00:00:00+07:00',
   layers: ALL_LAYERS,
   moments: [
