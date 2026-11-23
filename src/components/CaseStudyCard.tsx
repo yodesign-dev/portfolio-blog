@@ -23,6 +23,7 @@ export type CaseStudy = {
   uiWork?: string[]
   externalUrl?: string
   impact?: ImpactMetric[]
+  bodyImages?: {_key: string; asset?: {_ref: string}}[]
 }
 
 const CASE_STUDIES_QUERY = `*[_type == "post" && isCaseStudy == true] | order(publishedAt desc) {
@@ -42,7 +43,8 @@ const CASE_STUDIES_QUERY = `*[_type == "post" && isCaseStudy == true] | order(pu
   uxWork,
   uiWork,
   externalUrl,
-  impact[]{_key, value, label}
+  impact[]{_key, value, label},
+  "bodyImages": body[_type == "image"]{_key, asset}
 }`
 
 export async function getCaseStudies(revalidate: number): Promise<CaseStudy[]> {

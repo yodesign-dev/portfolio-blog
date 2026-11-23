@@ -35,11 +35,15 @@ type CafeInfo = {
 const cafeLinkClass =
   'inline-flex min-h-11 items-center text-sm font-semibold text-[#e8b27d] transition-colors hover:text-[#f0c294] focus-visible:underline sm:pointer-fine:min-h-0'
 
+// Ba bước quét ảnh, đúng thứ tự trong app: chiều tiền do người dùng chọn TRƯỚC (AI không biết
+// ai là chủ tài khoản nên không đoán vào/ra), AI điền form, người dùng kiểm tra rồi mới lưu.
+const FINANCE_SCAN_STEPS = ['Pick money in or out', 'Snap the transfer screenshot', 'Check the filled form, then save']
+
 const FINANCE_FEATURES = [
-  {title: 'Scan a transfer', body: 'Snap a bank transfer screenshot and AI fills in the amount, date, recipient and bank.'},
   {title: 'Search and filter', body: 'By transaction code, bank, month or a custom date range.'},
   {title: 'Monthly chart', body: 'Money in against money out for the last six months.'},
   {title: 'Excel export', body: 'The filtered list with its totals, ready to share.'},
+  {title: 'Saved recipients', body: 'Name, account and bank saved once, then picked from a searchable list.'},
 ]
 
 export async function SideProjects() {
@@ -166,17 +170,38 @@ export async function SideProjects() {
               I built this to keep track of my own money: every transfer in and out, in one place. I log a
               transaction in a few seconds on my phone, then see where the month went.
             </p>
-            {/* Cột chữ chỉ còn 5/12 từ lg (ảnh chụp màn hình rộng cần chỗ) nên 4 tính năng xếp dọc */}
-            <ul className="mt-6 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-1">
+            <h4 className="mt-6 font-mono text-xs uppercase tracking-widest text-neutral-500">How a scan works</h4>
+            <ol className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {FINANCE_SCAN_STEPS.map((step, index) => (
+                <li key={step} className="flex gap-2 border-2 border-neutral-900 bg-neutral-50 px-3 py-2.5 text-sm leading-snug text-neutral-800 sm:flex-col sm:gap-1">
+                  <span aria-hidden="true" className="font-mono text-xs font-bold text-brand">
+                    0{index + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <h4 className="mt-6 font-mono text-xs uppercase tracking-widest text-neutral-500">Also in the app</h4>
+            <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               {FINANCE_FEATURES.map((feature) => (
-                <li key={feature.title} className="border-t-2 border-neutral-900 pt-3">
-                  <h4 className="text-sm font-semibold text-neutral-900">{feature.title}</h4>
+                <li key={feature.title} className="border-t-2 border-neutral-900 pt-2.5">
+                  <p className="text-sm font-semibold text-neutral-900">{feature.title}</p>
                   <p className="mt-1 text-sm leading-relaxed text-neutral-600">{feature.body}</p>
                 </li>
               ))}
             </ul>
-            {/* Không có link: app chỉ có màn đăng nhập, dẫn sang đó là ngõ cụt */}
-            <p className="mt-6 font-mono text-xs uppercase tracking-wider text-neutral-500">Sign-in only · No public demo</p>
+            {/* Không có link: app chỉ có màn đăng nhập, dẫn sang đó là ngõ cụt. Ghi "AI" chung,
+                không nêu tên model (theo ý Bin 2026-11-23). */}
+            <dl className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-neutral-200 pt-4 font-mono text-xs uppercase tracking-wider text-neutral-500">
+              <div className="flex gap-2">
+                <dt>Built with</dt>
+                <dd className="text-neutral-900">Next.js · Supabase · AI vision</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="sr-only">Access</dt>
+                <dd>Sign-in only · No public demo</dd>
+              </div>
+            </dl>
           </div>
         </article>
       </div>
@@ -239,35 +264,51 @@ function CafeCard({
   )
 }
 
-// Ảnh chụp Finance Tracker: từ sm trở lên bản máy tính làm nền, bản điện thoại đè ở góc phải dưới
-// để thấy app chạy được cả hai. Điện thoại dọc (dưới sm) chỉ hiện bản điện thoại cho to: thu ảnh
-// máy tính về ~300px thì không đọc được chữ nào. Số liệu trong ảnh là số mẫu (xem đầu file).
+// Ảnh chụp Finance Tracker trong khung thiết bị dựng bằng CSS (không dùng ảnh mockup tải về:
+// nét ở mọi độ phân giải, nhẹ, không vướng bản quyền). Từ sm: laptop làm nền, điện thoại đè
+// góc phải dưới. Điện thoại dọc (dưới sm) chỉ hiện điện thoại cho to: thu ảnh máy tính về
+// ~300px thì không đọc được chữ nào. Số liệu trong ảnh là số mẫu (xem đầu file).
 function FinancePreview() {
   return (
     <figure className="mx-auto w-full max-w-2xl">
-      <div className="relative sm:pb-14 sm:pr-12">
-        <div className="overflow-hidden border-2 border-neutral-900 bg-[#f4f2ee] max-sm:hidden">
-          <Image
-            src="/side/finance-desktop.jpg"
-            alt="Finance Tracker on desktop: this month's balance, money in and money out, recent transactions, quick add and a six-month chart"
-            width={1204}
-            height={993}
-            sizes="(min-width: 1152px) 600px, (min-width: 1024px) 52vw, (min-width: 640px) 80vw, 1px"
-            className="h-auto w-full"
-          />
+      <div className="relative sm:pb-12 sm:pr-10">
+        {/* Laptop: viền màn hình + camera, rồi đế máy rộng hơn màn một chút. px-[5%] chừa chỗ
+            cho phần đế thò ra hai bên, kẻo đế chạm viền thẻ */}
+        <div className="px-[5%] max-sm:hidden">
+          <div className="rounded-t-[14px] border-2 border-neutral-900 bg-neutral-900 px-[2.2%] pb-[2.2%] pt-[3%]">
+            <span aria-hidden="true" className="mx-auto mb-[1.6%] block size-1.5 rounded-full bg-neutral-600" />
+            <div className="overflow-hidden rounded-[3px] bg-[#f4f2ee]">
+              <Image
+                src="/side/finance-desktop.jpg"
+                alt="Finance Tracker on desktop: this month's balance, money in and money out, recent transactions, quick add and a six-month chart"
+                width={1204}
+                height={993}
+                sizes="(min-width: 1152px) 560px, (min-width: 1024px) 48vw, (min-width: 640px) 76vw, 1px"
+                className="h-auto w-full"
+              />
+            </div>
+          </div>
+          <div aria-hidden="true" className="relative -mx-[6%] h-3 rounded-b-xl border-2 border-t-0 border-neutral-900 bg-neutral-300 sm:h-4">
+            <span className="absolute left-1/2 top-0 h-1.5 w-[16%] -translate-x-1/2 rounded-b-md bg-neutral-400" />
+          </div>
         </div>
-        <div className="mx-auto w-[68%] max-w-64 overflow-hidden rounded-2xl border-2 border-neutral-900 bg-[#f4f2ee] shadow-hard sm:absolute sm:bottom-0 sm:right-0 sm:mx-0 sm:w-[30%] sm:max-w-none">
-          <Image
-            src="/side/finance-mobile.jpg"
-            alt="Finance Tracker on a phone: balance card, recent transactions and Scan and manual entry buttons"
-            width={780}
-            height={1506}
-            sizes="(min-width: 1152px) 190px, (min-width: 1024px) 16vw, (min-width: 640px) 28vw, 256px"
-            className="h-auto w-full"
-          />
+        {/* Điện thoại: viền dày bo tròn + "đảo" camera */}
+        <div className="mx-auto w-[64%] max-w-60 rounded-[2rem] border-2 border-neutral-900 bg-neutral-900 p-[3.5%] shadow-hard sm:absolute sm:bottom-0 sm:right-0 sm:mx-0 sm:w-[27%] sm:max-w-none sm:rounded-[1.4rem] sm:p-[2.2%]">
+          {/* Dải trên cùng thay cho thanh trạng thái, để "đảo" camera không che header của app */}
+          <div className="relative overflow-hidden rounded-[1.5rem] bg-[#f4f2ee] pt-[11%] sm:rounded-[1rem]">
+            <span aria-hidden="true" className="absolute left-1/2 top-[2.2%] h-[3.2%] w-[30%] -translate-x-1/2 rounded-full bg-neutral-900" />
+            <Image
+              src="/side/finance-mobile.jpg"
+              alt="Finance Tracker on a phone: balance card, recent transactions and Scan and manual entry buttons"
+              width={780}
+              height={1506}
+              sizes="(min-width: 1152px) 180px, (min-width: 1024px) 15vw, (min-width: 640px) 27vw, 240px"
+              className="h-auto w-full"
+            />
+          </div>
         </div>
       </div>
-      <figcaption className="mt-3 text-center font-mono text-xs text-neutral-500">
+      <figcaption className="mt-4 text-center font-mono text-xs text-neutral-500">
         Screenshots of the app, with sample data
       </figcaption>
     </figure>

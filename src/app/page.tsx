@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { client } from '@/sanity/lib/client'
-import { CaseStudyCard, getCaseStudies } from '@/components/CaseStudyCard'
+import { getCaseStudies, type CaseStudy } from '@/components/CaseStudyCard'
+import { SelectedWork, type SelectedWorkItem } from '@/components/SelectedWork'
+import { getImageDimensions, urlFor } from '@/sanity/lib/image'
 import { Background } from '@/components/Background'
 import { SideProjects } from '@/components/SideProjects'
 import { JustForFun } from '@/components/JustForFun'
@@ -41,6 +43,38 @@ function formatDate(dateString: string) {
     month: 'long',
     year: 'numeric',
   })
+}
+
+// Ảnh bìa thẻ Selected work: ảnh bìa riêng (mainImage) nếu bài có; bài chưa có thì lấy một
+// ảnh chụp giao diện trong bài (chọn tay theo _key, ảnh nhìn ra sản phẩm nhất) đặt trên nền
+// xanh. Nhập ảnh bìa trong Studio là ảnh đó được dùng thay.
+const COVER_FALLBACK: Record<string, string> = {
+  'doctranslate-redesign': '6e23b113a018', // The redesigned interface
+  'lala-food-delivery': '1beeb59a0720', // Home screen: delivery address first
+}
+
+function toSelectedWorkItem(study: CaseStudy): SelectedWorkItem {
+  const ux = study.uxWork ?? []
+  const ui = study.uiWork ?? []
+  const external = study.externalUrl?.startsWith('https://') ? study.externalUrl : null
+  const fallback = study.bodyImages?.find((image) => image._key === COVER_FALLBACK[study.slug.current])
+  const source = study.mainImage?.asset ? study.mainImage : fallback?.asset ? fallback : null
+  const dims = source ? getImageDimensions(source) : null
+  return {
+    key: study._id,
+    href: external ?? `/work/${study.slug.current}`,
+    external: Boolean(external),
+    meta: [study.company, study.year].filter(Boolean).join(' · '),
+    title: study.title,
+    summary: study.excerpt,
+    scope: ux.length > 0 && ui.length > 0 ? 'UX + UI' : ux.length > 0 ? 'UX' : ui.length > 0 ? 'UI' : '',
+    platform: study.platform,
+    // alt rỗng: ảnh bìa chỉ để nhìn, tên link đã là tiêu đề case study
+    cover:
+      source && dims
+        ? {src: urlFor(source).width(800).fit('max').url(), width: dims.width, height: dims.height, alt: '', framed: source === fallback}
+        : null,
+  }
 }
 
 function SectionHeading({ title, href, linkLabel }: { title: string; href: string; linkLabel: string }) {
@@ -85,7 +119,7 @@ function MoreWorkItem({href, title, detail, external = false}: {href: string; ti
 
 export default async function HomePage() {
   const [studies, posts] = await Promise.all([getCaseStudies(revalidate), getPosts()])
-  const featuredStudies = studies.slice(0, 3)
+  const featuredStudies = studies.slice(0, 4)
   // Chưa đủ 3 case study → thêm project Behance cho đủ hàng; Sanity chưa có bài
   // viết → lấy tạm bài Medium (giống /work và /blog), để trang chủ không nhảy
   // thẳng từ hero xuống footer.
@@ -93,11 +127,11 @@ export default async function HomePage() {
     getBehanceProjects(),
     posts.length === 0 ? getMediumPosts() : [],
   ])
-  // Có case study: dưới 3 thẻ là hàng nhỏ 3 ô: case study còn lại (thứ 4 trở đi) rồi
+  // Có case study: dưới 4 thẻ là hàng nhỏ 3 ô: case study còn lại (thứ 5 trở đi) rồi
   // tới Behance cho đủ 2 ô, chừa ô cuối cho quán /chill. Project Behance đã có
   // case study trên site thì không lặp lại.
   const freshBehance = withoutCaseStudies(behance, studies)
-  const moreStudies = studies.slice(3, 5)
+  const moreStudies = studies.slice(4, 6)
   const featuredBehance = freshBehance.slice(0, featuredStudies.length > 0 ? 2 - moreStudies.length : 3)
   // Writing: danh sách gọn 3 bài (ảnh bìa Medium phần lớn là ảnh chụp chữ, xếp
   // thành thẻ trông rối)
@@ -141,11 +175,7 @@ export default async function HomePage() {
           <SectionHeading title="Selected work" href="/work" linkLabel="All work" />
           {featuredStudies.length > 0 ? (
             <>
-              <div className="flex flex-col gap-6">
-                {featuredStudies.map((study) => (
-                  <CaseStudyCard key={study._id} study={study} />
-                ))}
-              </div>
+              <SelectedWork items={featuredStudies.map(toSelectedWorkItem)} />
               <ul className="mt-12 grid grid-cols-1 border-t border-neutral-200 sm:grid-cols-3 sm:gap-8">
                 {moreStudies.map((study) => (
                   <MoreWorkItem
