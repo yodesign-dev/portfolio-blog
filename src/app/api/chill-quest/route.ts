@@ -1,10 +1,10 @@
-import {createHash} from "node:crypto";
 import type {Redis} from "@upstash/redis";
 import {NextRequest, NextResponse} from "next/server";
 import {client} from "@/sanity/lib/client";
 import {checkText, clean, overLimit, redis} from "@/lib/chillChat";
 import {microCache} from "@/lib/microCache";
 import {PEOPLE_MAX, QUEST_MIN_PHIN_MS, QUEST_UID_RE, type QuestOption, type QuestState} from "@/components/chill/quest-shared";
+import {hashIp} from "@/lib/guard";
 
 // Thử thách chung "Cả quán cùng pha phin" của trang /chill (xem quest-shared.ts).
 //
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
   const r = redis();
   // Tắt / không có Redis / thiếu mã máy → im lặng bỏ qua, phin vẫn chạy bình thường
   if (!s.open || !r || !uid) return NextResponse.json({ok: false});
-  const ipHash = hashIp(request);
+  const ipHash = hashIp(request, "quest");
 
   try {
     if (body?.action === "start") {
@@ -177,12 +177,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ok: false});
   }
   return NextResponse.json({ok: false});
-}
-
-function hashIp(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  return createHash("sha256")
-    .update(`quest:${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
 }

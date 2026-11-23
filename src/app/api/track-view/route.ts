@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { writeClient } from "@/sanity/lib/writeClient";
 import { overLimit, redis } from "@/lib/chillChat";
+import {hashIp} from "@/lib/guard";
 
 // +1 lượt xem cho bài blog (ViewTracker.tsx gọi 1 lần khi mở bài).
 //
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const r = redis();
     if (!r) return NextResponse.json({ counted: false });
-    const ipHash = hashIp(request);
+    const ipHash = hashIp(request, "views");
     if (await overLimit(r, `${PREFIX}:rl:${ipHash}`, VIEW_RATE.count, VIEW_RATE.seconds)) {
       return NextResponse.json({ counted: false });
     }
@@ -49,12 +49,4 @@ export async function POST(request: NextRequest) {
     console.error("track-view error:", error);
     return NextResponse.json({ error: "Không thể cập nhật lượt xem" }, { status: 500 });
   }
-}
-
-function hashIp(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  return createHash("sha256")
-    .update(`views:${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
 }

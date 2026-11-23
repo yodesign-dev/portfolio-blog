@@ -4,6 +4,7 @@ import {Resend} from "resend";
 import {writeClient} from "@/sanity/lib/writeClient";
 import {drinkFor} from "@/components/chill/donate-config";
 import {overLimit, pushChatEvent, redis} from "@/lib/chillChat";
+import {hashIp, verifyTurnstile} from "@/lib/guard";
 
 // Người ủng hộ ở mục "Buy Bin a coffee" trang /chill (Studio: "Chill · Supporters").
 //
@@ -111,7 +112,7 @@ async function intent(request: NextRequest, body: Body) {
   if (!token) return NextResponse.json({error: "Please complete the captcha.", needCaptcha: true}, {status: 401});
   const ipHash = hashIp(request);
   if (await limited(ipHash)) return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
-  if (!(await verifyTurnstile(token, clientIp(request)))) {
+  if (!(await verifyTurnstile(token, request))) {
     return NextResponse.json({error: "Captcha check failed, please try again.", needCaptcha: true}, {status: 401});
   }
 
@@ -135,7 +136,9 @@ async function intent(request: NextRequest, body: Body) {
 }
 
 async function sent(request: NextRequest, body: Body) {
-  if (await overLimit(redis(), `chill:support:rl:${hashIp(request)}`, NOTIFY_RATE.count, NOTIFY_RATE.seconds)) {
+  // failOpen: Redis sự cố thì vẫn ghi nhận người ủng hộ thật (bản ghi mới đã cần Turnstile,
+  // bản ghi có sẵn chỉ báo được 1 lần); trần mail trong notify() vẫn chặn khi Redis lỗi
+  if (await overLimit(redis(), `chill:support:rl:${hashIp(request)}`, NOTIFY_RATE.count, NOTIFY_RATE.seconds, {failOpen: true})) {
     return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
   }
   const name = clean(body.name, 40);
@@ -170,7 +173,7 @@ async function sent(request: NextRequest, body: Body) {
     if (!token) return NextResponse.json({error: "Please complete the captcha.", needCaptcha: true}, {status: 401});
     const ipHash = hashIp(request);
     if (await limited(ipHash)) return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
-    if (!(await verifyTurnstile(token, clientIp(request)))) {
+    if (!(await verifyTurnstile(token, request))) {
       return NextResponse.json({error: "Captcha check failed, please try again.", needCaptcha: true}, {status: 401});
     }
     id = `chillSupporter.${randomUUID()}`;
@@ -243,16 +246,6 @@ async function update(request: NextRequest, body: Body) {
   return NextResponse.json({success: true});
 }
 
-const clientIp = (request: NextRequest) => request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
-
-function hashIp(request: NextRequest) {
-  const ip = clientIp(request) ?? "unknown";
-  return createHash("sha256")
-    .update(`${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
-}
-
 async function limited(ipHash: string) {
   const since = new Date(Date.now() - RATE.minutes * 60_000).toISOString();
   const recent = await writeClient.fetch<number>(
@@ -260,25 +253,6 @@ async function limited(ipHash: string) {
     {ipHash, since},
   );
   return recent >= RATE.count;
-}
-
-async function verifyTurnstile(token: string, ip: string | null) {
-  try {
-    const form = new URLSearchParams();
-    form.append("secret", process.env.TURNSTILE_SECRET_KEY ?? "");
-    form.append("response", token);
-    if (ip) form.append("remoteip", ip);
-    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: {"Content-Type": "application/x-www-form-urlencoded"},
-      body: form,
-    });
-    const data = await res.json();
-    return data.success === true;
-  } catch (error) {
-    console.error("chill-support turnstile error:", error);
-    return false;
-  }
 }
 
 async function notify(subject: string, lines: string[]) {

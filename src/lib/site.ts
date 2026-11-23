@@ -13,6 +13,22 @@ export const SITE_DESCRIPTION =
 export const SITE_URL = 'https://applebin.me'
 
 // Ảnh OG tạo động (src/app/og/route.tsx) — dùng khi trang/bài không có ảnh riêng.
+// /og chỉ vẽ chữ có thật trên site: tiêu đề trang trong OG_PAGE_TITLES hoặc tiêu đề bài
+// trong Sanity, loại trong OG_KINDS. Chữ khác → chuyển về ảnh mặc định, để không ai mượn
+// được ảnh mang thương hiệu applebin.me với nội dung tuỳ ý. Thêm trang mới dùng ảnh chữ
+// (pageMetadata không có `image`) thì thêm tiêu đề vào đây.
+export const OG_PAGE_TITLES = [
+  'Work',
+  'Writing',
+  'Toolkit',
+  'Timeline · Toolkit',
+  'Resume',
+  'Chill for work',
+  'Chill · Privacy',
+  'Chill · Terms & copyright',
+]
+export const OG_KINDS = ['Case study', 'Writing']
+
 export function ogImageUrl(title?: string, kind?: string) {
   const params = new URLSearchParams()
   if (title) params.set('title', title)
@@ -35,6 +51,9 @@ export function pageMetadata({
   // Ảnh OG riêng 1200×630 (vd. ảnh chụp cảnh /chill); không có thì dùng ảnh chữ từ /og
   image?: string
 }): Metadata {
+  if (!imageUrl && process.env.NODE_ENV === 'development' && !OG_PAGE_TITLES.includes(title)) {
+    console.warn(`[og] "${title}" chưa có trong OG_PAGE_TITLES (src/lib/site.ts) → ảnh chia sẻ sẽ là ảnh mặc định`)
+  }
   const image = {url: imageUrl ?? ogImageUrl(title), width: 1200, height: 630}
   return {
     title,

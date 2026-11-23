@@ -32,10 +32,15 @@ export const K = {
   act: (action: string, ip: string) => `chill:chat:rl:${action}:${ip}`,
 };
 
-// Đếm số lần trong cửa sổ `seconds`; true = đã vượt `count`. Không có Redis (hoặc Redis
-// lỗi) thì cho qua — mời cà phê / thả tim không được hỏng chỉ vì bộ đếm.
-export async function overLimit(r: Redis | null, key: string, count: number, seconds: number) {
-  if (!r) return false;
+// Đếm số lần trong cửa sổ `seconds`; true = đã vượt `count`.
+// Redis lỗi → coi như đã vượt (fail-closed): trước đây cho qua, nên đúng lúc Redis sập thì
+// mọi giới hạn biến mất và bot bắn thoải mái. Chưa cấu hình Redis: máy dev cho qua,
+// production cũng coi như vượt. Các thao tác chính (nghe nhạc, xem trang) không phụ thuộc vào
+// đây; chỉ thao tác ghi (gửi tin, thả tim, báo cáo, mail báo Bin…) tạm ngừng khi Redis có sự cố.
+// `failOpen`: chỉ cho thao tác đã có lớp chặn khác (Turnstile + giới hạn lưu trong Sanity) mà
+// chặn nhầm khách thật thì thiệt hơn (báo đã mời cà phê, treo mẩu nhật ký).
+export async function overLimit(r: Redis | null, key: string, count: number, seconds: number, {failOpen = false} = {}) {
+  if (!r) return failOpen ? false : process.env.NODE_ENV === "production";
   try {
     const p = r.pipeline();
     p.incr(key);
@@ -44,7 +49,7 @@ export async function overLimit(r: Redis | null, key: string, count: number, sec
     return n > count;
   } catch (error) {
     console.error("chill rate limit error:", error);
-    return false;
+    return !failOpen;
   }
 }
 

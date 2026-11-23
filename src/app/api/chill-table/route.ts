@@ -1,7 +1,7 @@
-import {createHash} from "node:crypto";
 import {NextRequest, NextResponse} from "next/server";
 import {client} from "@/sanity/lib/client";
 import {checkText, clean, redis} from "@/lib/chillChat";
+import {hashIp} from "@/lib/guard";
 import {
   CHARACTERS,
   DEFAULT_MAX_MEMBERS,
@@ -33,14 +33,6 @@ import {
 const UID_RE = /^[a-z0-9]{8,32}$/i;
 // Mỗi máy tạo tối đa 10 bàn / giờ
 const CREATE_RATE = {count: 10, seconds: 3600};
-
-const ipHash = (request: NextRequest) => {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  return createHash("sha256")
-    .update(`table:${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
-};
 
 async function settings() {
   try {
@@ -97,8 +89,8 @@ export async function POST(request: NextRequest) {
 
       if (body.action === "create") {
         const p = r.pipeline();
-        p.incr(TK.rate(ipHash(request)));
-        p.expire(TK.rate(ipHash(request)), CREATE_RATE.seconds, "NX");
+        p.incr(TK.rate(hashIp(request, "table")));
+        p.expire(TK.rate(hashIp(request, "table")), CREATE_RATE.seconds, "NX");
         const [count] = (await p.exec()) as [number, number];
         if (count > CREATE_RATE.count) return NextResponse.json({error: "Bạn tạo nhiều bàn quá rồi, thử lại sau nha."}, {status: 429});
         const tableId = newTableId();

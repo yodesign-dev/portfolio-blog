@@ -1,8 +1,8 @@
-import {createHash} from "node:crypto";
 import {NextRequest, NextResponse} from "next/server";
 import {client} from "@/sanity/lib/client";
 import {overLimit, redis} from "@/lib/chillChat";
 import {microCache} from "@/lib/microCache";
+import {hashIp} from "@/lib/guard";
 
 // Lượt nghe từng bài của trang /chill.
 //
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   // Tắt / không có Redis / bài lạ → im lặng bỏ qua, nhạc vẫn phát bình thường
   if (!open || !r || !ids.has(id)) return NextResponse.json({counted: false});
 
-  const ipHash = hashIp(request);
+  const ipHash = hashIp(request, "plays");
   if (await overLimit(r, `${PREFIX}:rl:${ipHash}`, POST_RATE.count, POST_RATE.seconds)) {
     return NextResponse.json({counted: false});
   }
@@ -76,12 +76,4 @@ export async function POST(request: NextRequest) {
     console.error("chill-plays POST error:", error);
     return NextResponse.json({counted: false});
   }
-}
-
-function hashIp(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  return createHash("sha256")
-    .update(`plays:${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
 }

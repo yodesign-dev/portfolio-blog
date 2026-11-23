@@ -1,4 +1,4 @@
-import {createHash, randomBytes} from "node:crypto";
+import {randomBytes} from "node:crypto";
 import {NextRequest, NextResponse} from "next/server";
 import {client} from "@/sanity/lib/client";
 import {
@@ -22,6 +22,7 @@ import {
   whoOf,
 } from "@/lib/chillChat";
 import {microCache} from "@/lib/microCache";
+import {hashIp, verifyTurnstile} from "@/lib/guard";
 
 // Phòng chat trang /chill (src/lib/chillChat.ts). Tin tự xoá sau 24 giờ.
 //
@@ -47,14 +48,6 @@ const REPORTS_TO_HIDE = 3;
 // Còn "đang gõ" bao lâu sau lần gõ cuối
 const TYPING_MS = 6000;
 const UID_RE = /^[a-z0-9]{8,32}$/i;
-
-const ipHash = (request: NextRequest) => {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  return createHash("sha256")
-    .update(`chat:${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
-};
 
 async function chatOpen() {
   try {
@@ -137,7 +130,7 @@ export async function POST(request: NextRequest) {
   async function hello(request: NextRequest, uid: string) {
     if (!uid || !r) return NextResponse.json({ok: true});
     // Quá nhịp → lặng lẽ bỏ qua (uid giả hàng loạt không bơm được số online)
-    if (await overLimit(r, K.act("hello", ipHash(request)), ACT_RATE.hello, ACT_RATE.seconds)) return NextResponse.json({ok: true});
+    if (await overLimit(r, K.act("hello", hashIp(request, "chat")), ACT_RATE.hello, ACT_RATE.seconds)) return NextResponse.json({ok: true});
     const now = Date.now();
     const p = r.pipeline();
     p.zremrangebyscore(K.online, 0, now - ONLINE_WINDOW_MS);
@@ -165,7 +158,7 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
   const bad = checkText(`${name} ${text}`);
   if (bad) return NextResponse.json({error: bad}, {status: 400});
 
-  const ip = ipHash(request);
+  const ip = hashIp(request, "chat");
   // Vé chat còn hạn → khỏi Turnstile; chưa có → xác minh rồi cấp vé 24h
   let pass = typeof body.pass === "string" && /^[0-9a-f]{32}$/.test(body.pass) ? body.pass : "";
   let issued: string | undefined;
@@ -174,7 +167,7 @@ async function send(request: NextRequest, uid: string, body: Record<string, unkn
   const owner = pass ? await r.get<string>(K.pass(pass)) : null;
   if (!pass || (owner !== `ip:${ip}` && owner !== ip)) {
     const token = typeof body.captchaToken === "string" ? body.captchaToken : "";
-    if (!token || !(await verifyTurnstile(token, request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null))) {
+    if (!token || !(await verifyTurnstile(token, request))) {
       return NextResponse.json({error: "Xác minh giúp mình bạn không phải robot nha.", needCaptcha: true}, {status: 401});
     }
     pass = randomBytes(16).toString("hex");
@@ -209,7 +202,7 @@ async function typing(request: NextRequest, uid: string) {
   const r = redis()!;
   if (!uid || !(await chatOpen())) return NextResponse.json({ok: true});
   // Tối đa 1 nhịp "đang gõ" / 2 giây mỗi máy
-  if (!(await r.set(K.act("typing", ipHash(request)), "1", {nx: true, px: 2000}))) return NextResponse.json({ok: true});
+  if (!(await r.set(K.act("typing", hashIp(request, "chat")), "1", {nx: true, px: 2000}))) return NextResponse.json({ok: true});
   const now = Date.now();
   const p = r.pipeline();
   p.zremrangebyscore(K.typing, 0, now - TYPING_MS);
@@ -224,7 +217,7 @@ async function react(request: NextRequest, uid: string, body: Record<string, unk
   const id = typeof body.id === "string" && ID_RE.test(body.id) ? body.id : "";
   const emoji = typeof body.emoji === "string" && REACTIONS.includes(body.emoji) ? body.emoji : "";
   if (!uid || !id || !emoji || idTime(id) < Date.now() - DAY_MS) return NextResponse.json({error: "Bad reaction"}, {status: 400});
-  const ip = ipHash(request);
+  const ip = hashIp(request, "chat");
   if (await overLimit(r, K.act("react", ip), ACT_RATE.react, ACT_RATE.seconds)) {
     return NextResponse.json({error: "Chậm lại chút nha ☕"}, {status: 429});
   }
@@ -244,7 +237,7 @@ async function report(request: NextRequest, body: Record<string, unknown>) {
   const r = redis()!;
   const id = typeof body.id === "string" && ID_RE.test(body.id) ? body.id : "";
   if (!id) return NextResponse.json({error: "Bad id"}, {status: 400});
-  const ip = ipHash(request);
+  const ip = hashIp(request, "chat");
   // Chỉ tính báo cáo từ máy đã qua Turnstile trong 24h (người đã từng gửi tin) —
   // 3 IP bất kỳ không xoá được tin của người khác. Bin vẫn đóng chat được trong Studio.
   if (!(await r.get(K.verified(ip)))) return NextResponse.json({ok: true});
@@ -263,18 +256,4 @@ async function report(request: NextRequest, body: Record<string, unknown>) {
     if (row) await r.zrem(K.msgs, typeof row === "string" ? row : JSON.stringify(row));
   }
   return NextResponse.json({ok: true});
-}
-
-async function verifyTurnstile(token: string, ip: string | null) {
-  const form = new URLSearchParams();
-  form.append("secret", process.env.TURNSTILE_SECRET_KEY ?? "");
-  form.append("response", token);
-  if (ip) form.append("remoteip", ip);
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-    body: form,
-  });
-  const data = await res.json();
-  return data.success === true;
 }

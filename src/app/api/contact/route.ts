@@ -1,24 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { verifyTurnstile } from "@/lib/guard";
 
-// Gọi API xác minh của Cloudflare — bắt buộc phải verify ở SERVER, verify
-// ở client chỉ là UI, bot hoàn toàn có thể bỏ qua giao diện và gọi thẳng
-// /api/contact nếu server không tự kiểm tra lại token.
-async function verifyTurnstile(token: string, ip: string | null): Promise<boolean> {
-  const formData = new URLSearchParams();
-  formData.append("secret", process.env.TURNSTILE_SECRET_KEY ?? "");
-  formData.append("response", token);
-  if (ip) formData.append("remoteip", ip);
-
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: formData,
-  });
-
-  const data = await res.json();
-  return data.success === true;
-}
+// Turnstile phải verify ở SERVER (src/lib/guard.ts) — verify ở client chỉ là UI, bot có
+// thể bỏ qua giao diện và gọi thẳng /api/contact.
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,8 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Vui lòng xác minh captcha" }, { status: 400 });
     }
 
-    const ip = request.headers.get("x-forwarded-for");
-    const isHuman = await verifyTurnstile(captchaToken, ip);
+    const isHuman = await verifyTurnstile(captchaToken, request);
     if (!isHuman) {
       return NextResponse.json({ error: "Xác minh captcha thất bại, thử lại nhé" }, { status: 400 });
     }

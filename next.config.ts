@@ -16,9 +16,18 @@ import type { NextConfig } from "next";
 // - fonts.googleapis.com / fonts.gstatic.com: 1 trong 2 script trên tự chèn thêm
 //   stylesheet Google Fonts riêng, không phải do next/font (next/font tự host font
 //   nội bộ nên bình thường không cần dòng này).
-const csp = (frameAncestors: string) => `
+//
+// 'unsafe-eval': React/Next chỉ cần ở bản dev (dựng lại stack lỗi), production thì không →
+// chỉ bật khi dev và ở /studio (Sanity Studio, đã có đăng nhập Sanity riêng).
+// 'unsafe-inline' vẫn GIỮ: bỏ được thì phải dùng nonce, mà nonce bắt MỌI trang render động
+// mỗi request (Next không chèn nonce vào trang tĩnh) — /chill, /work, /blog… đang là trang tĩnh
+// qua CDN. Lớp chống XSS chính vẫn là React tự escape + không có dangerouslySetInnerHTML với
+// dữ liệu của khách (chỉ có đoạn gtag cố định trong GoogleTag.tsx).
+// object-src 'none': chặn <object>/<embed> (Flash, PDF plugin) — site không dùng.
+const isDev = process.env.NODE_ENV === "development";
+const csp = (frameAncestors: string, {eval: allowEval = isDev} = {}) => `
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://app.cal.com https://www.googletagmanager.com https://*.googleadservices.com https://*.doubleclick.net;
+  script-src 'self' 'unsafe-inline'${allowEval ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com https://app.cal.com https://www.googletagmanager.com https://*.googleadservices.com https://*.doubleclick.net;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   img-src 'self' blob: data: https://cdn.sanity.io https://www.google.com https://*.gstatic.com https://img.vietqr.io https://www.googletagmanager.com https://*.google-analytics.com https://*.doubleclick.net https://*.google.com.vn;
   font-src 'self' https://fonts.gstatic.com;
@@ -28,6 +37,7 @@ const csp = (frameAncestors: string) => `
   frame-ancestors ${frameAncestors};
   form-action 'self';
   base-uri 'self';
+  object-src 'none';
 `.replace(/\n/g, " ").trim();
 
 const nextConfig: NextConfig = {
@@ -100,6 +110,12 @@ const nextConfig: NextConfig = {
       {
         source: "/chill/embed",
         headers: [{ key: "Content-Security-Policy", value: csp("'self' https:") }],
+      },
+      // Sanity Studio: giữ 'unsafe-eval' cho chắc (Studio đã sau đăng nhập Sanity). Đứng SAU
+      // khối chung ở trên nên ghi đè CSP của khối đó cho /studio
+      {
+        source: "/studio/:path*",
+        headers: [{ key: "Content-Security-Policy", value: csp("'self'", { eval: true }) }],
       },
     ];
   },

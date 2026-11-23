@@ -1,8 +1,9 @@
-import {createHash, randomUUID} from "node:crypto";
+import {randomUUID} from "node:crypto";
 import {after, NextRequest, NextResponse} from "next/server";
 import {Resend} from "resend";
 import {writeClient} from "@/sanity/lib/writeClient";
 import {overLimit, redis} from "@/lib/chillChat";
+import {hashIp, verifyTurnstile} from "@/lib/guard";
 
 // Wishlist của trang /chill.
 // GET  → danh sách góp ý đã duyệt (không bao giờ trả email / ipHash).
@@ -110,14 +111,14 @@ async function heart(request: NextRequest, {id, on}: {id?: unknown; on?: unknown
   if (!current) return NextResponse.json({error: "Not found"}, {status: 404});
   const delta = on === false ? -1 : 1;
   if (delta < 0 && current.hearts <= 0) return NextResponse.json({hearts: 0});
-  // Cùng 1 IP thả tim lần nữa (hoặc bỏ tim chưa từng thả) → không đổi số
-  if (r) {
-    const key = `chill:wish:hearts:${id}`;
-    const changed = await (delta > 0 ? r.sadd(key, ip) : r.srem(key, ip))
-      .then(async (n) => (await r.expire(key, HEART_TTL_S), n))
-      .catch(() => 1);
-    if (!changed) return NextResponse.json({hearts: current.hearts});
-  }
+  // Cùng 1 IP thả tim lần nữa (hoặc bỏ tim chưa từng thả) → không đổi số. Không có Redis /
+  // Redis lỗi thì không biết IP đã thả chưa → không đổi số (trước đây cộng luôn, bấm mãi được)
+  if (!r) return NextResponse.json({hearts: current.hearts});
+  const key = `chill:wish:hearts:${id}`;
+  const changed = await (delta > 0 ? r.sadd(key, ip) : r.srem(key, ip))
+    .then(async (n) => (await r.expire(key, HEART_TTL_S), n))
+    .catch(() => 0);
+  if (!changed) return NextResponse.json({hearts: current.hearts});
   const doc = await writeClient.patch(id).setIfMissing({hearts: 0}).inc({hearts: delta}).commit<{hearts: number}>();
   return NextResponse.json({hearts: doc.hearts});
 }
@@ -144,8 +145,7 @@ async function submit(
     return NextResponse.json({error: "Please complete the captcha."}, {status: 400});
   }
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-  if (!(await verifyTurnstile(captchaToken, ip))) {
+  if (!(await verifyTurnstile(captchaToken, request))) {
     return NextResponse.json({error: "Captcha check failed, please try again."}, {status: 400});
   }
 
@@ -202,27 +202,6 @@ async function submit(
 }
 
 // Cùng công thức băm với bản ghi cũ (ipHash trong Sanity) để giới hạn vẫn khớp
-function hashIp(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  return createHash("sha256")
-    .update(`${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
-}
-
-async function verifyTurnstile(token: string, ip: string | null) {
-  const form = new URLSearchParams();
-  form.append("secret", process.env.TURNSTILE_SECRET_KEY ?? "");
-  form.append("response", token);
-  if (ip) form.append("remoteip", ip);
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-    body: form,
-  });
-  const data = await res.json();
-  return data.success === true;
-}
 
 // Góp ý vừa chuyển sang "Đã làm" mà người gửi có để email → mail báo 1 lần.
 // Chạy "ké" sau mỗi lần GET (không cần webhook). Cần CHILL_WISH_FROM là địa chỉ

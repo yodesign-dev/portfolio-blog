@@ -5,6 +5,7 @@ import {client} from "@/sanity/lib/client";
 import {writeClient} from "@/sanity/lib/writeClient";
 import {checkText, clean, overLimit, redis} from "@/lib/chillChat";
 import {KEEP_DAYS, NOTE_MAX, NOTE_MIN, NOTES_PER_DAY, dayOf, isMood, type DiaryNote, type Quote} from "@/components/chill/diary-shared";
+import {hashIp, verifyTurnstile} from "@/lib/guard";
 
 // Bảng nhật ký của trang /chill (xem src/components/chill/diary-shared.ts).
 //
@@ -109,12 +110,12 @@ async function post(request: NextRequest, {uid, name, text, mood, captchaToken, 
     return NextResponse.json({error: "Chưa xác minh được bạn là người thật — tải lại trang rồi thử lại nha.", code: "captcha"}, {status: 400});
   }
 
-  const ipHash = hashIp(request);
-  if (await overLimit(redis(), `chill:diary:rl:post:${ipHash}`, POST_RATE.count, POST_RATE.seconds)) {
+  const ipHash = hashIp(request, "diary");
+  // failOpen: treo mẩu đã cần Turnstile + giới hạn mỗi ngày đếm trong Sanity, Redis sự cố không nên khoá bảng
+  if (await overLimit(redis(), `chill:diary:rl:post:${ipHash}`, POST_RATE.count, POST_RATE.seconds, {failOpen: true})) {
     return NextResponse.json({error: "Từ từ thôi nha, lát nữa viết tiếp ☕", code: "slow"}, {status: 429});
   }
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-  if (!(await verifyTurnstile(captchaToken, ip))) {
+  if (!(await verifyTurnstile(captchaToken, request))) {
     return NextResponse.json({error: "Chưa xác minh được bạn là người thật — tải lại trang rồi thử lại nha.", code: "captcha"}, {status: 400});
   }
 
@@ -164,11 +165,10 @@ async function report(request: NextRequest, {id, captchaToken}: Record<string, u
   const r = redis();
   // Không có Redis → không biết máy nào đã báo → không đếm (trước đây cộng luôn: 1 người gửi 2 lần là ẩn)
   if (!r) return NextResponse.json({ok: true});
-  const ipHash = hashIp(request);
+  const ipHash = hashIp(request, "diary");
   // Quá nhịp → lặng lẽ bỏ qua (người báo cáo vẫn thấy mẩu biến mất trên máy mình)
   if (await overLimit(r, `chill:diary:rl:report:${ipHash}`, REPORT_RATE.count, REPORT_RATE.seconds)) return NextResponse.json({ok: true});
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-  if (!(await verifyTurnstile(captchaToken, ip))) return NextResponse.json({error: "Captcha failed", code: "captcha"}, {status: 401});
+  if (!(await verifyTurnstile(captchaToken, request))) return NextResponse.json({error: "Captcha failed", code: "captcha"}, {status: 401});
   // Mỗi máy chỉ tính 1 lượt cho mỗi mẩu
   const key = `chill:diary:rep:${id}`;
   const fresh = await r
@@ -203,26 +203,4 @@ async function report(request: NextRequest, {id, captchaToken}: Record<string, u
     });
   }
   return NextResponse.json({ok: true});
-}
-
-function hashIp(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  return createHash("sha256")
-    .update(`diary:${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
-    .digest("hex")
-    .slice(0, 24);
-}
-
-async function verifyTurnstile(token: string, ip: string | null) {
-  const form = new URLSearchParams();
-  form.append("secret", process.env.TURNSTILE_SECRET_KEY ?? "");
-  form.append("response", token);
-  if (ip) form.append("remoteip", ip);
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: {"Content-Type": "application/x-www-form-urlencoded"},
-    body: form,
-  });
-  const data = await res.json();
-  return data.success === true;
 }
