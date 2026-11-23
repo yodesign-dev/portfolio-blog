@@ -10,7 +10,9 @@ import {CHILL_EXTENSION_URL, NOTION_TEMPLATE_URL, YOUTUBE_URL} from '@/lib/site'
 //    cùng project (kênh YouTube, Chrome extension, Notion template), để người xem thấy đây
 //    là một thứ chứ không phải 4 project rời.
 // 2. Finance Tracker: thẻ giấy sáng như phần còn lại của trang. App chỉ vào được khi có tài
-//    khoản nên thẻ tự kể mục đích + tính năng, không dẫn link sang tường đăng nhập.
+//    khoản nên thẻ tự kể mục đích + tính năng, không dẫn link sang tường đăng nhập. Ảnh là
+//    ảnh chụp app thật (bản máy tính + điện thoại) nhưng số liệu đã thay bằng số mẫu trước
+//    khi chụp: tên người nhận, số tài khoản, số tiền thật không được lên trang công khai.
 // Số liệu của quán đọc từ Studio với cùng điều kiện như /chill, nên thêm cảnh hay đăng cập
 // nhật là trang chủ tự đổi theo.
 
@@ -144,7 +146,7 @@ export async function SideProjects() {
 
         <article
           aria-labelledby="finance-title"
-          className="mt-10 grid grid-cols-1 items-center gap-8 border-2 border-neutral-900 bg-white p-5 shadow-hard sm:p-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10"
+          className="mt-10 grid grid-cols-1 items-center gap-8 border-2 border-neutral-900 bg-white p-5 shadow-hard sm:p-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10"
         >
           {/* Điện thoại: tên + mô tả trước rồi mới tới hình, kẻo gặp một giao diện lạ chưa có tên */}
           <div className="order-2 lg:order-1">
@@ -164,7 +166,8 @@ export async function SideProjects() {
               I built this to keep track of my own money: every transfer in and out, in one place. I log a
               transaction in a few seconds on my phone, then see where the month went.
             </p>
-            <ul className="mt-6 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
+            {/* Cột chữ chỉ còn 5/12 từ lg (ảnh chụp màn hình rộng cần chỗ) nên 4 tính năng xếp dọc */}
+            <ul className="mt-6 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-1">
               {FINANCE_FEATURES.map((feature) => (
                 <li key={feature.title} className="border-t-2 border-neutral-900 pt-3">
                   <h4 className="text-sm font-semibold text-neutral-900">{feature.title}</h4>
@@ -236,74 +239,36 @@ function CafeCard({
   )
 }
 
-// Hình minh hoạ Finance Tracker dựng bằng HTML theo bố cục thật của app (3 ô tổng, biểu đồ
-// tiền vào/ra theo tháng, danh sách giao dịch). Số liệu là số mẫu: ảnh chụp thật sẽ lộ
-// giao dịch cá nhân. Có ảnh chụp bằng dữ liệu mẫu thì thay khối này bằng ảnh.
-const FINANCE_MONTHS = [
-  {label: 'Jun', moneyIn: 62, moneyOut: 48},
-  {label: 'Jul', moneyIn: 70, moneyOut: 58},
-  {label: 'Aug', moneyIn: 55, moneyOut: 66},
-  {label: 'Sep', moneyIn: 82, moneyOut: 52},
-  {label: 'Oct', moneyIn: 74, moneyOut: 61},
-  {label: 'Nov', moneyIn: 90, moneyOut: 57},
-]
-const FINANCE_ROWS = [
-  {name: 'Salary', bank: 'Bank A', amount: '+32,000,000', positive: true},
-  {name: 'Rent', bank: 'Bank B', amount: '−8,500,000', positive: false},
-  {name: 'Lunch', bank: 'E-wallet', amount: '−65,000', positive: false},
-]
-
+// Ảnh chụp Finance Tracker: từ sm trở lên bản máy tính làm nền, bản điện thoại đè ở góc phải dưới
+// để thấy app chạy được cả hai. Điện thoại dọc (dưới sm) chỉ hiện bản điện thoại cho to: thu ảnh
+// máy tính về ~300px thì không đọc được chữ nào. Số liệu trong ảnh là số mẫu (xem đầu file).
 function FinancePreview() {
   return (
-    <figure className="mx-auto w-full max-w-sm">
-      <div aria-hidden="true" className="border-2 border-neutral-900 bg-[#f7f8fb] p-3 sm:p-4">
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            {label: 'In', value: '42.5M', color: 'text-[#15803d]'},
-            {label: 'Out', value: '31.2M', color: 'text-[#b91c1c]'},
-            {label: 'Net', value: '11.3M', color: 'text-neutral-900'},
-          ].map((tile) => (
-            <div key={tile.label} className="rounded-lg border border-neutral-200 bg-white px-1.5 py-2 sm:px-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{tile.label}</p>
-              <p className={`mt-1 text-sm font-bold leading-none sm:text-base ${tile.color}`}>{tile.value}</p>
-            </div>
-          ))}
+    <figure className="mx-auto w-full max-w-2xl">
+      <div className="relative sm:pb-14 sm:pr-12">
+        <div className="overflow-hidden border-2 border-neutral-900 bg-[#f4f2ee] max-sm:hidden">
+          <Image
+            src="/side/finance-desktop.jpg"
+            alt="Finance Tracker on desktop: this month's balance, money in and money out, recent transactions, quick add and a six-month chart"
+            width={1204}
+            height={993}
+            sizes="(min-width: 1152px) 600px, (min-width: 1024px) 52vw, (min-width: 640px) 80vw, 1px"
+            className="h-auto w-full"
+          />
         </div>
-
-        <div className="mt-2 flex items-center justify-between rounded-lg border border-dashed border-[#2f6fed]/50 bg-[#2f6fed]/5 px-3 py-2">
-          <p className="text-xs font-semibold text-neutral-800">Scan a transfer screenshot</p>
-          <span className="rounded-md bg-[#2f6fed] px-2 py-1 text-[11px] font-semibold text-white">Scan</span>
+        <div className="mx-auto w-[68%] max-w-64 overflow-hidden rounded-2xl border-2 border-neutral-900 bg-[#f4f2ee] shadow-hard sm:absolute sm:bottom-0 sm:right-0 sm:mx-0 sm:w-[30%] sm:max-w-none">
+          <Image
+            src="/side/finance-mobile.jpg"
+            alt="Finance Tracker on a phone: balance card, recent transactions and Scan and manual entry buttons"
+            width={780}
+            height={1506}
+            sizes="(min-width: 1152px) 190px, (min-width: 1024px) 16vw, (min-width: 640px) 28vw, 256px"
+            className="h-auto w-full"
+          />
         </div>
-
-        <div className="mt-2 rounded-lg border border-neutral-200 bg-white p-3">
-          <p className="text-[11px] font-semibold text-neutral-800">Money in / money out by month</p>
-          <div className="mt-2 flex h-20 items-end justify-between gap-2">
-            {FINANCE_MONTHS.map((month) => (
-              <div key={month.label} className="flex h-full flex-1 flex-col justify-end">
-                <div className="flex flex-1 items-end justify-center gap-0.5">
-                  <span className="w-2 rounded-t-sm bg-[#15803d]" style={{height: `${month.moneyIn}%`}} />
-                  <span className="w-2 rounded-t-sm bg-[#b91c1c]" style={{height: `${month.moneyOut}%`}} />
-                </div>
-                <p className="mt-1 text-center text-[11px] text-neutral-400">{month.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <ul className="mt-2 divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white px-3">
-          {FINANCE_ROWS.map((row) => (
-            <li key={row.name} className="flex items-center justify-between gap-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-neutral-800">{row.name}</p>
-                <p className="text-[11px] text-neutral-400">{row.bank}</p>
-              </div>
-              <p className={`shrink-0 text-xs font-bold ${row.positive ? 'text-[#15803d]' : 'text-[#b91c1c]'}`}>{row.amount}</p>
-            </li>
-          ))}
-        </ul>
       </div>
       <figcaption className="mt-3 text-center font-mono text-xs text-neutral-500">
-        Illustration of the app, with sample data
+        Screenshots of the app, with sample data
       </figcaption>
     </figure>
   )
