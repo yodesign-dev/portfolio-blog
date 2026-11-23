@@ -264,51 +264,54 @@ function CafeCard({
   )
 }
 
-// Ảnh chụp Finance Tracker trong khung thiết bị dựng bằng CSS (không dùng ảnh mockup tải về:
-// nét ở mọi độ phân giải, nhẹ, không vướng bản quyền). Từ sm: laptop làm nền, điện thoại đè
-// góc phải dưới. Điện thoại dọc (dưới sm) chỉ hiện điện thoại cho to: thu ảnh máy tính về
-// ~300px thì không đọc được chữ nào. Số liệu trong ảnh là số mẫu (xem đầu file).
+// Ảnh chụp Finance Tracker trong khung thiết bị dựng bằng CSS, theo da "giấy" của site: nền
+// sân khấu xanh brand (cùng tông ảnh bìa case study), thân máy màu giấy viền mực 2px, bóng cứng.
+// - Laptop chỉ có màn hình (không vẽ thân máy), viền mỏng, đúng tỉ lệ 16:10; ảnh chụp cao hơn
+//   nên cắt từ trên xuống (object-top).
+// - Từ sm: điện thoại đứng góc phải dưới, chỉ chồng lên mép phải màn laptop.
+// - Dưới sm: chỉ điện thoại, cỡ to: thu ảnh máy tính về ~300px thì không đọc được chữ nào.
+// Số liệu trong ảnh là số mẫu (xem đầu file).
+const DEVICE_BODY = 'border-2 border-neutral-900 bg-white shadow-hard'
+
 function FinancePreview() {
   return (
     <figure className="mx-auto w-full max-w-2xl">
-      <div className="relative sm:pb-12 sm:pr-10">
-        {/* Laptop: viền màn hình + camera, rồi đế máy rộng hơn màn một chút. px-[5%] chừa chỗ
-            cho phần đế thò ra hai bên, kẻo đế chạm viền thẻ */}
-        <div className="px-[5%] max-sm:hidden">
-          <div className="rounded-t-[14px] border-2 border-neutral-900 bg-neutral-900 px-[2.2%] pb-[2.2%] pt-[3%]">
-            <span aria-hidden="true" className="mx-auto mb-[1.6%] block size-1.5 rounded-full bg-neutral-600" />
-            <div className="overflow-hidden rounded-[3px] bg-[#f4f2ee]">
+      <div className="relative overflow-hidden border-2 border-neutral-900 bg-brand bg-[radial-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] bg-size-[16px_16px] px-[9%] pb-[10%] pt-[9%] sm:px-[6%] sm:pb-[8%] sm:pt-[7%]">
+        <div className="relative sm:pb-[6%]">
+          {/* Laptop: chỉ màn hình, viền mỏng màu giấy, chấm camera mực */}
+          <div className={`relative w-[86%] rounded-[1.6%_1.6%_1.2%_1.2%/2.6%_2.6%_2%_2%] p-[1.2%] pt-[2.4%] max-sm:hidden ${DEVICE_BODY}`}>
+            <span aria-hidden="true" className="absolute left-1/2 top-[0.8%] size-1 -translate-x-1/2 rounded-full bg-neutral-900" />
+            <div className="relative aspect-[16/10] overflow-hidden border border-neutral-900 bg-[#f4f2ee]">
               <Image
                 src="/side/finance-desktop.jpg"
                 alt="Finance Tracker on desktop: this month's balance, money in and money out, recent transactions, quick add and a six-month chart"
-                width={1204}
-                height={993}
-                sizes="(min-width: 1152px) 560px, (min-width: 1024px) 48vw, (min-width: 640px) 76vw, 1px"
-                className="h-auto w-full"
+                fill
+                sizes="(min-width: 1152px) 500px, (min-width: 1024px) 42vw, 64vw"
+                className="object-cover object-top"
               />
             </div>
           </div>
-          <div aria-hidden="true" className="relative -mx-[6%] h-3 rounded-b-xl border-2 border-t-0 border-neutral-900 bg-neutral-300 sm:h-4">
-            <span className="absolute left-1/2 top-0 h-1.5 w-[16%] -translate-x-1/2 rounded-b-md bg-neutral-400" />
-          </div>
-        </div>
-        {/* Điện thoại: viền dày bo tròn + "đảo" camera */}
-        <div className="mx-auto w-[64%] max-w-60 rounded-[2rem] border-2 border-neutral-900 bg-neutral-900 p-[3.5%] shadow-hard sm:absolute sm:bottom-0 sm:right-0 sm:mx-0 sm:w-[27%] sm:max-w-none sm:rounded-[1.4rem] sm:p-[2.2%]">
-          {/* Dải trên cùng thay cho thanh trạng thái, để "đảo" camera không che header của app */}
-          <div className="relative overflow-hidden rounded-[1.5rem] bg-[#f4f2ee] pt-[11%] sm:rounded-[1rem]">
-            <span aria-hidden="true" className="absolute left-1/2 top-[2.2%] h-[3.2%] w-[30%] -translate-x-1/2 rounded-full bg-neutral-900" />
-            <Image
-              src="/side/finance-mobile.jpg"
-              alt="Finance Tracker on a phone: balance card, recent transactions and Scan and manual entry buttons"
-              width={780}
-              height={1506}
-              sizes="(min-width: 1152px) 180px, (min-width: 1024px) 15vw, (min-width: 640px) 27vw, 240px"
-              className="h-auto w-full"
-            />
+
+          {/* Điện thoại: viền mỏng màu giấy, "đảo" camera mực */}
+          <div className="mx-auto w-[66%] max-w-60 sm:absolute sm:bottom-0 sm:right-0 sm:mx-0 sm:w-[23%] sm:max-w-none">
+            <div className={`relative rounded-[13%/6.4%] p-[3%] ${DEVICE_BODY}`}>
+              <div className="relative overflow-hidden rounded-[10.5%/5%] border border-neutral-900 bg-[#f4f2ee] pt-[10%]">
+                {/* Dải trên cùng thay thanh trạng thái, để "đảo" camera không che header của app */}
+                <span aria-hidden="true" className="absolute left-1/2 top-[1.8%] h-[2.4%] w-[28%] -translate-x-1/2 rounded-full bg-neutral-900" />
+                <Image
+                  src="/side/finance-mobile.jpg"
+                  alt="Finance Tracker on a phone: balance card, recent transactions and Scan and manual entry buttons"
+                  width={780}
+                  height={1506}
+                  sizes="(min-width: 1152px) 150px, (min-width: 1024px) 13vw, (min-width: 640px) 20vw, 240px"
+                  className="h-auto w-full"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <figcaption className="mt-4 text-center font-mono text-xs text-neutral-500">
+      <figcaption className="mt-3 text-center font-mono text-xs text-neutral-500">
         Screenshots of the app, with sample data
       </figcaption>
     </figure>
