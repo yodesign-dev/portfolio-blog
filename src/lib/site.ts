@@ -56,7 +56,7 @@ export const NAV_LINKS = [
   {href: '/work', label: 'Work'},
   {href: '/blog', label: 'Writing'},
   {href: '/tools', label: 'Toolkit'},
-  // Mục Side projects trang chủ: quán lofi /chill, Notion template, kênh YouTube
+  // Mục Side projects trang chủ: quán lofi /chill (kèm YouTube, extension, Notion) và Finance Tracker
   {href: '/#side-projects', label: 'Side projects'},
   {href: '/resume', label: 'Resume'},
 ]
