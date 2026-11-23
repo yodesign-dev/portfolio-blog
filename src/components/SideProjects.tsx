@@ -28,9 +28,10 @@ type CafeInfo = {
   updates: number
 }
 
-// Link chữ cao 44 px trên mobile cho dễ bấm, từ sm trở lên về đúng cỡ chữ
+// Link chữ cao 44 px cho dễ bấm; chỉ về đúng cỡ chữ khi màn rộng VÀ dùng chuột, vì điện thoại
+// xoay ngang cũng rộng hơn sm mà vẫn bấm bằng ngón tay
 const cafeLinkClass =
-  'inline-flex min-h-11 items-center text-sm font-semibold text-[#e8b27d] transition-colors hover:text-[#f0c294] focus-visible:underline sm:min-h-0'
+  'inline-flex min-h-11 items-center text-sm font-semibold text-[#e8b27d] transition-colors hover:text-[#f0c294] focus-visible:underline sm:pointer-fine:min-h-0'
 
 const FINANCE_FEATURES = [
   {title: 'Scan a transfer', body: 'Snap a bank transfer screenshot and AI fills in the amount, date, recipient and bank.'},
@@ -45,7 +46,7 @@ export async function SideProjects() {
   const stats = [
     {value: cafe?.places, label: 'places'},
     {value: cafe?.tracks, label: 'tracks'},
-    {value: cafe?.updates, label: 'updates shipped'},
+    {value: cafe?.updates, label: 'updates', more: ' shipped'},
   ].filter((stat) => stat.value)
 
   return (
@@ -73,10 +74,14 @@ export async function SideProjects() {
                 A phin coffee timer by a café window, built with AI.
               </p>
               {stats.length > 0 && (
-                <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
+                <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-3 sm:gap-x-8">
                   {stats.map((stat) => (
                     <div key={stat.label} className="flex flex-col-reverse">
-                      <dt className="text-sm text-white/60">{stat.label}</dt>
+                      {/* Màn 320px: bỏ chữ "shipped" để 3 số nằm vừa một hàng */}
+                      <dt className="text-sm text-white/60">
+                        {stat.label}
+                        {stat.more && <span className="max-sm:hidden">{stat.more}</span>}
+                      </dt>
                       <dd className="text-4xl font-extrabold leading-[1.1] tracking-[-0.04em] text-white">
                         <CountUp value={stat.value as number} />
                       </dd>
@@ -91,9 +96,11 @@ export async function SideProjects() {
           </div>
 
           {/* Dải nối: nói thẳng 3 thẻ dưới là cùng một quán ở nơi khác */}
-          <div className="mt-8 flex items-center gap-4 sm:mt-10">
+          <div className="mt-8 flex items-center gap-3 sm:mt-10 sm:gap-4">
             <span aria-hidden="true" className="h-px flex-1 bg-white/15" />
-            <p className="font-mono text-xs uppercase tracking-widest text-[#e8b27d]">Same café, other places</p>
+            <p className="whitespace-nowrap font-mono text-xs uppercase tracking-wider text-[#e8b27d] sm:tracking-widest">
+              Same café, other places
+            </p>
             <span aria-hidden="true" className="h-px flex-1 bg-white/15" />
           </div>
 
@@ -238,7 +245,7 @@ const FINANCE_MONTHS = [
   {label: 'Nov', moneyIn: 90, moneyOut: 57},
 ]
 const FINANCE_ROWS = [
-  {name: 'Salary, November', bank: 'Bank A', amount: '+32,000,000', positive: true},
+  {name: 'Salary', bank: 'Bank A', amount: '+32,000,000', positive: true},
   {name: 'Rent', bank: 'Bank B', amount: '−8,500,000', positive: false},
   {name: 'Lunch', bank: 'E-wallet', amount: '−65,000', positive: false},
 ]
@@ -249,20 +256,20 @@ function FinancePreview() {
       <div aria-hidden="true" className="border-2 border-neutral-900 bg-[#f7f8fb] p-3 sm:p-4">
         <div className="grid grid-cols-3 gap-2">
           {[
-            {label: 'Money in', value: '42.5M', color: 'text-[#15803d]'},
-            {label: 'Money out', value: '31.2M', color: 'text-[#b91c1c]'},
-            {label: 'Balance', value: '11.3M', color: 'text-neutral-900'},
+            {label: 'In', value: '42.5M', color: 'text-[#15803d]'},
+            {label: 'Out', value: '31.2M', color: 'text-[#b91c1c]'},
+            {label: 'Net', value: '11.3M', color: 'text-neutral-900'},
           ].map((tile) => (
             <div key={tile.label} className="rounded-lg border border-neutral-200 bg-white px-1.5 py-2 sm:px-2">
-              <p className="whitespace-nowrap text-[10px] font-semibold uppercase text-neutral-400">{tile.label}</p>
-              <p className={`mt-1 text-base font-bold leading-none ${tile.color}`}>{tile.value}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">{tile.label}</p>
+              <p className={`mt-1 text-sm font-bold leading-none sm:text-base ${tile.color}`}>{tile.value}</p>
             </div>
           ))}
         </div>
 
         <div className="mt-2 flex items-center justify-between rounded-lg border border-dashed border-[#2f6fed]/50 bg-[#2f6fed]/5 px-3 py-2">
           <p className="text-xs font-semibold text-neutral-800">Scan a transfer screenshot</p>
-          <span className="rounded-md bg-[#2f6fed] px-2 py-1 text-[10px] font-semibold text-white">Scan</span>
+          <span className="rounded-md bg-[#2f6fed] px-2 py-1 text-[11px] font-semibold text-white">Scan</span>
         </div>
 
         <div className="mt-2 rounded-lg border border-neutral-200 bg-white p-3">
@@ -274,7 +281,7 @@ function FinancePreview() {
                   <span className="w-2 rounded-t-sm bg-[#15803d]" style={{height: `${month.moneyIn}%`}} />
                   <span className="w-2 rounded-t-sm bg-[#b91c1c]" style={{height: `${month.moneyOut}%`}} />
                 </div>
-                <p className="mt-1 text-center text-[10px] text-neutral-400">{month.label}</p>
+                <p className="mt-1 text-center text-[11px] text-neutral-400">{month.label}</p>
               </div>
             ))}
           </div>
@@ -285,7 +292,7 @@ function FinancePreview() {
             <li key={row.name} className="flex items-center justify-between gap-3 py-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold text-neutral-800">{row.name}</p>
-                <p className="text-[10px] text-neutral-400">{row.bank}</p>
+                <p className="text-[11px] text-neutral-400">{row.bank}</p>
               </div>
               <p className={`shrink-0 text-xs font-bold ${row.positive ? 'text-[#15803d]' : 'text-[#b91c1c]'}`}>{row.amount}</p>
             </li>
