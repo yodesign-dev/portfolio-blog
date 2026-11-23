@@ -17,11 +17,16 @@ declare global {
           sitekey: string;
           callback: (token: string) => void;
           "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+          "timeout-callback"?: () => void;
           appearance?: "always" | "execute" | "interaction-only";
+          // "execute": chỉ xác minh khi gọi execute() (Donate.tsx)
+          execution?: "render" | "execute";
           size?: "normal" | "flexible" | "compact";
           theme?: "auto" | "light" | "dark";
         }
       ) => string;
+      execute: (container: string | HTMLElement, options?: object) => void;
       reset: (widgetId?: string) => void;
       remove: (widgetId?: string) => void;
     };

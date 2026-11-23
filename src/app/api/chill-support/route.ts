@@ -10,13 +10,21 @@ import {overLimit, pushChatEvent, redis} from "@/lib/chillChat";
 // GET → lọ tip + bảng cảm ơn trong cảnh: số ly đã nhận (Bin tick "Đã nhận tiền")
 //   và danh sách người đồng ý hiện tên. Chỉ trả tên, lời nhắn, đồ uống, ngày —
 //   không bao giờ trả số tiền, mã đối chiếu, ipHash.
-// POST {action: "intent", name, message, amount, method, context}
+// POST {action: "intent", name, message, amount, method, context, captchaToken}
 //   Bước 1 — người xem để lại tên / lời nhắn TRƯỚC khi chuyển → tạo bản ghi
 //   "Chờ đối chiếu" + mã riêng (vd. K7Q2) để gắn vào nội dung chuyển khoản.
 //   Người chuyển xong rồi đóng trang luôn thì Bin vẫn có bản ghi để khớp sao kê.
-// POST {action: "sent", id?, method, amount, name, note, context}
+// POST {action: "sent", id?, method, amount, name, note, context, captchaToken?}
 //   Bấm "I've sent it" → "Đã báo chuyển" + mail báo Bin. Không có id (người bỏ qua
-//   bước 1) thì tạo bản ghi mới.
+//   bước 1) thì tạo bản ghi mới — trường hợp này bắt buộc qua Turnstile.
+//
+// Chống spam (mỗi bản ghi mới = 1 mail + 1 dòng chat, không có captcha thì 1 IP bắn
+// được vài chục mail/giờ, hết hạn mức Resend → form Contact chết theo):
+// - Tạo bản ghi mới (intent / sent không id) phải có token Turnstile hợp lệ. id cấp ra
+//   là "chìa khoá" cho sent / update về sau nên các bước đó không cần xác minh lại.
+// - Mail báo Bin có trần chung cho cả site (MAIL_CAP) — vượt trần thì bản ghi vẫn lưu
+//   trong Studio, chỉ không gửi mail.
+// - Dòng "có người mời Bin cà phê" trong chat tối đa 1 lần / CHAT_EVENT_GAP_S.
 // POST {action: "update", id, name, message, board}
 //   Người bỏ qua bước 1 bổ sung tên / lời nhắn ở màn cảm ơn.
 //
@@ -34,6 +42,10 @@ const UPDATE_WINDOW_MS = 2 * 60 * 60 * 1000;
 // mỗi bản ghi tối đa 3 lần "update"
 const NOTIFY_RATE = {count: 10, seconds: 600};
 const UPDATES_PER_DOC = 3;
+// Trần mail báo Bin từ route này, tính chung mọi IP (Resend gói free ~100 mail/ngày,
+// chia với form Contact, Wishlist, Nhật ký)
+const MAIL_CAP = {hour: 10, day: 30};
+const CHAT_EVENT_GAP_S = 10 * 60;
 
 type Body = Record<string, unknown>;
 
@@ -94,8 +106,13 @@ async function intent(request: NextRequest, body: Body) {
   const name = clean(body.name, 40);
   const message = clean(body.message, 300);
   if (hasLink(`${name} ${message}`)) return NextResponse.json({error: "Please leave out links."}, {status: 400});
+  const token = typeof body.captchaToken === "string" ? body.captchaToken : "";
+  if (!token) return NextResponse.json({error: "Please complete the captcha.", needCaptcha: true}, {status: 401});
   const ipHash = hashIp(request);
   if (await limited(ipHash)) return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
+  if (!(await verifyTurnstile(token, clientIp(request)))) {
+    return NextResponse.json({error: "Captcha check failed, please try again.", needCaptcha: true}, {status: 401});
+  }
 
   const code = Array.from({length: 4}, () => CODE_CHARS[randomInt(CODE_CHARS.length)]).join("");
   const id = `chillSupporter.${randomUUID()}`;
@@ -148,8 +165,13 @@ async function sent(request: NextRequest, body: Body) {
       .commit();
   } else {
     // Bỏ qua bước 1 → bản ghi mới, chưa có tên
+    const token = typeof body.captchaToken === "string" ? body.captchaToken : "";
+    if (!token) return NextResponse.json({error: "Please complete the captcha.", needCaptcha: true}, {status: 401});
     const ipHash = hashIp(request);
     if (await limited(ipHash)) return NextResponse.json({error: "Got it already — thank you so much ☕"}, {status: 429});
+    if (!(await verifyTurnstile(token, clientIp(request)))) {
+      return NextResponse.json({error: "Captcha check failed, please try again.", needCaptcha: true}, {status: 401});
+    }
     id = `chillSupporter.${randomUUID()}`;
     await writeClient.create({
       _id: id,
@@ -171,7 +193,13 @@ async function sent(request: NextRequest, body: Body) {
   const who = doc?.name || name;
   const vnd = amount || doc?.amount || 0;
   // Báo vào phòng chat (không nêu tên / số tiền — Bin chưa đối chiếu)
-  after(() => pushChatEvent("Có người vừa mời Bin 1 ly cà phê ☕ Cảm ơn nha!"));
+  after(async () => {
+    // Không có Redis thì pushChatEvent cũng bỏ qua
+    const r = redis();
+    if (r && (await r.set("chill:support:chatev", "1", {nx: true, ex: CHAT_EVENT_GAP_S}).catch(() => null))) {
+      await pushChatEvent("Có người vừa mời Bin 1 ly cà phê ☕ Cảm ơn nha!");
+    }
+  });
   after(() =>
     notify(
       `[Chill ☕] ${who || "Someone"} bought you a coffee${vnd ? ` · ${vnd.toLocaleString("vi-VN")}đ` : ""}`,
@@ -214,8 +242,10 @@ async function update(request: NextRequest, body: Body) {
   return NextResponse.json({success: true});
 }
 
+const clientIp = (request: NextRequest) => request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+
 function hashIp(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIp(request) ?? "unknown";
   return createHash("sha256")
     .update(`${ip}:${process.env.TURNSTILE_SECRET_KEY ?? ""}`)
     .digest("hex")
@@ -231,7 +261,34 @@ async function limited(ipHash: string) {
   return recent >= RATE.count;
 }
 
+async function verifyTurnstile(token: string, ip: string | null) {
+  try {
+    const form = new URLSearchParams();
+    form.append("secret", process.env.TURNSTILE_SECRET_KEY ?? "");
+    form.append("response", token);
+    if (ip) form.append("remoteip", ip);
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: form,
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch (error) {
+    console.error("chill-support turnstile error:", error);
+    return false;
+  }
+}
+
 async function notify(subject: string, lines: string[]) {
+  const r = redis();
+  if (
+    (await overLimit(r, "chill:support:mail:h", MAIL_CAP.hour, 3600)) ||
+    (await overLimit(r, "chill:support:mail:d", MAIL_CAP.day, 24 * 3600))
+  ) {
+    console.warn("chill-support notify skipped: mail cap reached");
+    return;
+  }
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({

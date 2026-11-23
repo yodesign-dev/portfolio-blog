@@ -15,6 +15,7 @@
 // bảng chỉ cập nhật sau khi Bin đối chiếu và tick "Đã nhận tiền" trong Studio.
 // Trang không biết tiền có về thật hay không (tài khoản cá nhân) — Bin tự đối chiếu.
 
+import Script from 'next/script'
 import {useEffect, useRef, useState} from 'react'
 import {trackEvent} from '@/lib/analytics'
 import {tServer, useLang, useT} from './i18n'
@@ -42,6 +43,73 @@ const field =
 const primary =
   'w-full rounded-full bg-[#e8b27d] py-3 font-semibold text-[#2a1a10] transition hover:bg-[#f0c294] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b27d]'
 
+// Turnstile cho các bước tạo bản ghi mới (intent / sent không có id) — API bắt buộc để bot
+// không bắn được mail báo Bin + dòng "có người mời Bin cà phê" trong chat. Chạy ngầm
+// (execution: "execute"), chỉ xác minh lúc bấm nút → token luôn mới dù khách sang app ngân
+// hàng cả chục phút (token hết hạn sau 5 phút). Khung chỉ hiện khi Cloudflare cần khách bấm.
+type GetToken = () => Promise<string | null>
+
+function useTurnstile() {
+  const box = useRef<HTMLDivElement>(null)
+  const widget = useRef<string | undefined>(undefined)
+  const waiter = useRef<((token: string | null) => void) | null>(null)
+  const [scriptReady, setScriptReady] = useState(false)
+
+  useEffect(() => {
+    // Script có thể đã tải sẵn (sổ góp ý, Nhật ký, form Contact) → dùng luôn
+    if (window.turnstile) setScriptReady(true) // eslint-disable-line react-hooks/set-state-in-effect
+  }, [])
+
+  useEffect(() => {
+    const sitekey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    if (!scriptReady || !box.current || !window.turnstile || !sitekey) return
+    const settle = (token: string | null) => waiter.current?.(token)
+    widget.current = window.turnstile.render(box.current, {
+      sitekey,
+      execution: 'execute',
+      appearance: 'interaction-only',
+      size: 'flexible',
+      theme: 'dark',
+      callback: (token: string) => settle(token),
+      'error-callback': () => settle(null),
+      'timeout-callback': () => settle(null),
+    })
+    return () => {
+      settle(null)
+      if (window.turnstile && widget.current) window.turnstile.remove(widget.current)
+      widget.current = undefined
+    }
+  }, [scriptReady])
+
+  const getToken: GetToken = () =>
+    new Promise((resolve) => {
+      const ts = window.turnstile
+      if (!ts || !widget.current || !box.current) return resolve(null)
+      // Lần bấm trước còn chờ → cho nó trả null
+      waiter.current?.(null)
+      // finish chỉ được gọi sau khi `timer` đã gán (qua hẹn giờ hoặc callback của Turnstile)
+      const finish = (token: string | null) => {
+        clearTimeout(timer)
+        if (waiter.current === finish) waiter.current = null
+        resolve(token)
+      }
+      // Cloudflare im quá lâu → thôi, không bắt khách chờ mãi
+      const timer = setTimeout(() => finish(null), 30_000)
+      waiter.current = finish
+      // Mỗi token chỉ dùng được 1 lần → reset rồi xác minh lại
+      ts.reset(widget.current)
+      ts.execute(box.current)
+    })
+
+  const node = (
+    <>
+      {!scriptReady && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" onReady={() => setScriptReady(true)} />}
+      <div ref={box} className="shrink-0 px-5" />
+    </>
+  )
+  return {getToken, node}
+}
+
 async function post(body: Record<string, unknown>) {
   const res = await fetch('/api/chill-support', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
   const data = (await res.json()) as {id?: string; code?: string; error?: string}
@@ -54,6 +122,7 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
   const [step, setStep] = useState<Step>('note')
   const [intent, setIntent] = useState<DonateIntent | null>(null)
   const [resumed, setResumed] = useState(false)
+  const {getToken, node: captcha} = useTurnstile()
 
   // Quay lại trang sau khi sang app ngân hàng → tiếp tục ở bước QR
   useEffect(() => {
@@ -73,14 +142,16 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
     setResumed(false)
   }
 
-  if (step === 'note' || !intent) return <NoteStep initial={intent} context={context} onNext={toPay} />
-  if (step === 'pay')
-    return (
+  let view
+  if (step === 'note' || !intent) view = <NoteStep initial={intent} context={context} getToken={getToken} onNext={toPay} />
+  else if (step === 'pay')
+    view = (
       <PayStep
         intent={intent}
         methods={methods}
         context={context}
         resumed={resumed}
+        getToken={getToken}
         onBack={() => setStep('note')}
         onSent={(id) => {
           setIntent({...intent, id})
@@ -91,12 +162,28 @@ export function Donate({onThanks, context}: {onThanks: () => void; context: stri
         }}
       />
     )
-  return <ThanksStep intent={intent} onBack={() => setStep('pay')} />
+  else view = <ThanksStep intent={intent} onBack={() => setStep('pay')} />
+  return (
+    <>
+      {view}
+      {captcha}
+    </>
+  )
 }
 
 // ---------- Bước 1: lời nhắn (không bắt buộc) ----------
 
-function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; context: string; onNext: (i: DonateIntent) => void}) {
+function NoteStep({
+  initial,
+  context,
+  getToken,
+  onNext,
+}: {
+  initial: DonateIntent | null
+  context: string
+  getToken: GetToken
+  onNext: (i: DonateIntent) => void
+}) {
   const t = useT()
   const preset = DONATE_TIERS.some((d) => d.amount === initial?.amount)
   const [tier, setTier] = useState(preset ? initial!.amount : DONATE_TIERS[0].amount)
@@ -120,7 +207,9 @@ function NoteStep({initial, context, onNext}: {initial: DonateIntent | null; con
     if (initial?.id) return onNext({...base, id: initial.id, code: initial.code})
     setBusy(true)
     try {
-      const {id, code} = await post({action: 'intent', ...base, method: 'vcb', context, company})
+      // Không lấy được token thì API từ chối → nhánh catch, sang QR; bước "sent" tạo bản ghi sau
+      const captchaToken = await getToken()
+      const {id, code} = await post({action: 'intent', ...base, method: 'vcb', context, company, captchaToken})
       onNext({...base, id, code})
     } catch {
       // Lỗi thì vẫn cho sang QR — ủng hộ quan trọng hơn bản ghi
@@ -220,6 +309,7 @@ function PayStep({
   methods,
   context,
   resumed,
+  getToken,
   onBack,
   onSent,
 }: {
@@ -227,6 +317,7 @@ function PayStep({
   methods: Method[]
   context: string
   resumed: boolean
+  getToken: GetToken
   onBack: () => void
   onSent: (id?: string) => void
 }) {
@@ -262,7 +353,9 @@ function PayStep({
     trackEvent({name: 'Chill Donate Thanks', props: {method}})
     let id = intent.id
     try {
-      ;({id} = await post({action: 'sent', id: intent.id, method, amount: intent.amount, name: intent.name, board: intent.board, note, context}))
+      // Có id (bản ghi từ bước 1) thì id là chìa khoá, khỏi xác minh; không có thì API sẽ tạo bản ghi mới → cần token
+      const captchaToken = intent.id ? undefined : await getToken()
+      ;({id} = await post({action: 'sent', id: intent.id, method, amount: intent.amount, name: intent.name, board: intent.board, note, context, captchaToken}))
     } catch {
       // Ghi nhận lỗi cũng không chặn lời cảm ơn
     }

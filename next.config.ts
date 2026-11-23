@@ -34,9 +34,14 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   images: {
     remotePatterns: [
+      // Chỉ ảnh của đúng project/dataset Sanity của site. Không có pathname thì
+      // /_next/image tải giúp attacker ảnh (kể cả SVG) từ BẤT KỲ project Sanity nào.
+      // Project ID + dataset vốn công khai (NEXT_PUBLIC_*) nên ghi thẳng ở đây; đổi
+      // project thì sửa cả dòng này. Không đặt `search`: urlFor() có gắn ?w=…&auto=format.
       {
         protocol: "https",
         hostname: "cdn.sanity.io",
+        pathname: "/images/9os2xcca/production/**",
       },
       // Ảnh cover project Behance (section "More on Behance" ở /work)
       {
