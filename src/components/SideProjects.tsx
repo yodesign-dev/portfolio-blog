@@ -37,7 +37,14 @@ const cafeLinkClass =
 
 // Ba bước quét ảnh, đúng thứ tự trong app: chiều tiền do người dùng chọn TRƯỚC (AI không biết
 // ai là chủ tài khoản nên không đoán vào/ra), AI điền form, người dùng kiểm tra rồi mới lưu.
-const FINANCE_SCAN_STEPS = ['Pick money in or out', 'Snap the transfer screenshot', 'Check the filled form, then save']
+const FINANCE_SCAN_STEPS = ['Pick money in or out', 'Add the transfer screenshot', 'Check the AI-tagged fields, then save']
+
+// Chiều tiền quyết định AI đọc bên nào: tiền vào thì người CHUYỂN + ngân hàng của họ, tiền ra
+// thì người NHẬN + ngân hàng của họ (đúng như lời nhắc trong app finance, lib/scan-bill.ts).
+const FINANCE_SCAN_SIDES = [
+  {key: 'in', arrow: '↓', label: 'Money in', body: 'AI reads who sent the money and from which bank.'},
+  {key: 'out', arrow: '↑', label: 'Money out', body: 'AI reads who you paid and which bank they use.'},
+]
 
 const FINANCE_FEATURES = [
   {title: 'Search and filter', body: 'By transaction code, bank, month or a custom date range.'},
@@ -150,15 +157,16 @@ export async function SideProjects() {
 
         <article
           aria-labelledby="finance-title"
-          className="mt-10 grid grid-cols-1 items-center gap-8 border-2 border-neutral-900 bg-white p-5 shadow-hard sm:p-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10"
+          className="mt-10 border-2 border-neutral-900 bg-white p-5 shadow-hard sm:p-8"
         >
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-10">
           {/* Điện thoại: tên + mô tả trước rồi mới tới hình, kẻo gặp một giao diện lạ chưa có tên */}
           <div className="order-2 lg:order-1">
             <FinancePreview />
           </div>
           <div className="order-1 lg:order-2">
             <div className="flex items-center gap-3">
-              <Image src="/side/finance-logo.png" alt="" width={450} height={465} sizes="40px" className="h-auto w-10 shrink-0" />
+              <Image src="/side/finance-icon.png" alt="" width={160} height={160} sizes="40px" className="h-auto w-10 shrink-0" />
               <div>
                 <p className="font-mono text-xs uppercase tracking-widest text-neutral-500">Web app · Private · Personal use</p>
                 <h3 id="finance-title" className="mt-1 text-[28px] font-extrabold leading-tight tracking-tight text-neutral-900">
@@ -170,17 +178,6 @@ export async function SideProjects() {
               I built this to keep track of my own money: every transfer in and out, in one place. I log a
               transaction in a few seconds on my phone, then see where the month went.
             </p>
-            <h4 className="mt-6 font-mono text-xs uppercase tracking-widest text-neutral-500">How a scan works</h4>
-            <ol className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {FINANCE_SCAN_STEPS.map((step, index) => (
-                <li key={step} className="flex gap-2 border-2 border-neutral-900 bg-neutral-50 px-3 py-2.5 text-sm leading-snug text-neutral-800 sm:flex-col sm:gap-1">
-                  <span aria-hidden="true" className="font-mono text-xs font-bold text-brand">
-                    0{index + 1}
-                  </span>
-                  {step}
-                </li>
-              ))}
-            </ol>
             <h4 className="mt-6 font-mono text-xs uppercase tracking-widest text-neutral-500">Also in the app</h4>
             <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               {FINANCE_FEATURES.map((feature) => (
@@ -203,6 +200,59 @@ export async function SideProjects() {
               </div>
             </dl>
           </div>
+          </div>
+
+          {/* Điểm nhấn: tính năng scan. Màn chọn Tiền vào / Tiền ra là ảnh chụp thật (không có dữ liệu
+              cá nhân trên màn này) */}
+          <section
+            aria-labelledby="finance-scan-title"
+            className="mt-10 grid grid-cols-1 items-center gap-8 border-t-2 border-neutral-900 pt-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10"
+          >
+            <div className="order-2 lg:order-1">
+              <ScanPreview />
+            </div>
+            <div className="order-1 lg:order-2">
+              <p className="font-mono text-xs font-bold uppercase tracking-widest text-brand">Highlight · Scan a transfer</p>
+              <h4 id="finance-scan-title" className="mt-2 text-2xl font-extrabold leading-tight tracking-tight text-neutral-900">
+                Snap the bank screenshot. The form fills itself.
+              </h4>
+              <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-neutral-600">
+                Pick whether the money came in or went out, then add the transfer screenshot: choose it, drag it in or
+                paste it. In about 10 seconds AI fills the form, and every field it filled carries an AI tag until you
+                check it.
+              </p>
+              <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {FINANCE_SCAN_SIDES.map((side) => (
+                  <div key={side.key} className="border-2 border-neutral-900 bg-neutral-50 px-4 py-3">
+                    <dt className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+                      <span aria-hidden="true" className="flex size-6 items-center justify-center bg-brand text-xs font-bold text-white">
+                        {side.arrow}
+                      </span>
+                      {side.label}
+                    </dt>
+                    <dd className="mt-1.5 text-sm leading-relaxed text-neutral-600">{side.body}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-3 text-sm leading-relaxed text-neutral-600">
+                <span className="font-semibold text-neutral-900">Either way:</span> amount, date, time and the transfer note.
+              </p>
+              <ol className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6">
+                {FINANCE_SCAN_STEPS.map((step, index) => (
+                  <li key={step} className="flex items-baseline gap-2 text-sm text-neutral-800">
+                    <span aria-hidden="true" className="font-mono text-xs font-bold text-brand">
+                      0{index + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-5 border-t border-neutral-200 pt-4 text-sm leading-relaxed text-neutral-500">
+                Not a transfer or a balance alert? It says so. Nothing readable? It switches to manual entry and keeps the
+                image attached.
+              </p>
+            </div>
+          </section>
         </article>
       </div>
     </section>
@@ -283,8 +333,8 @@ function FinancePreview() {
             <span aria-hidden="true" className="absolute left-1/2 top-[0.8%] size-1 -translate-x-1/2 rounded-full bg-neutral-900" />
             <div className="relative aspect-[16/10] overflow-hidden border border-neutral-900 bg-[#f4f2ee]">
               <Image
-                src="/side/finance-desktop.jpg"
-                alt="Finance Tracker on desktop: this month's balance, money in and money out, recent transactions, quick add and a six-month chart"
+                src="/side/finance-overview-desktop.jpg"
+                alt="Finance Tracker on desktop: current balance, money in and money out this month, recent transactions and the scan or manual entry shortcuts"
                 fill
                 sizes="(min-width: 1152px) 500px, (min-width: 1024px) 42vw, 64vw"
                 className="object-cover object-top"
@@ -294,20 +344,11 @@ function FinancePreview() {
 
           {/* Điện thoại: viền mỏng màu giấy, "đảo" camera mực */}
           <div className="mx-auto w-[66%] max-w-60 sm:absolute sm:bottom-0 sm:right-0 sm:mx-0 sm:w-[23%] sm:max-w-none">
-            <div className={`relative rounded-[13%/6.4%] p-[3%] ${DEVICE_BODY}`}>
-              <div className="relative overflow-hidden rounded-[10.5%/5%] border border-neutral-900 bg-[#f4f2ee] pt-[10%]">
-                {/* Dải trên cùng thay thanh trạng thái, để "đảo" camera không che header của app */}
-                <span aria-hidden="true" className="absolute left-1/2 top-[1.8%] h-[2.4%] w-[28%] -translate-x-1/2 rounded-full bg-neutral-900" />
-                <Image
-                  src="/side/finance-mobile.jpg"
-                  alt="Finance Tracker on a phone: balance card, recent transactions and Scan and manual entry buttons"
-                  width={780}
-                  height={1506}
-                  sizes="(min-width: 1152px) 150px, (min-width: 1024px) 13vw, (min-width: 640px) 20vw, 240px"
-                  className="h-auto w-full"
-                />
-              </div>
-            </div>
+            <PhoneFrame
+              src="/side/finance-overview-mobile.jpg"
+              alt="Finance Tracker on a phone: balance with money in and out this month, recent transactions, and Scan and manual entry buttons"
+              sizes="(min-width: 1152px) 150px, (min-width: 1024px) 13vw, (min-width: 640px) 20vw, 240px"
+            />
           </div>
         </div>
       </div>
@@ -315,5 +356,34 @@ function FinancePreview() {
         Screenshots of the app, with sample data
       </figcaption>
     </figure>
+  )
+}
+
+// Khung điện thoại dùng chung: viền mỏng màu giấy, viền mực 2px, bóng cứng, "đảo" camera mực.
+// Dải trên cùng thay thanh trạng thái để "đảo" không che header của app.
+function PhoneFrame({src, alt, sizes}: {src: string; alt: string; sizes: string}) {
+  return (
+    <div className={`relative rounded-[13%/6.4%] p-[3%] ${DEVICE_BODY}`}>
+      <div className="relative overflow-hidden rounded-[10.5%/5%] border border-neutral-900 bg-[#f4f2ee] pt-[10%]">
+        <span aria-hidden="true" className="absolute left-1/2 top-[1.8%] h-[2.4%] w-[28%] -translate-x-1/2 rounded-full bg-neutral-900" />
+        <Image src={src} alt={alt} width={780} height={1482} sizes={sizes} className="h-auto w-full" />
+      </div>
+    </div>
+  )
+}
+
+// Ảnh màn "Giao dịch mới": chọn Tiền vào / Tiền ra rồi thả ảnh để scan. Cùng sân khấu xanh với
+// khối ảnh phía trên để hai khối nhìn là một bộ.
+function ScanPreview() {
+  return (
+    <div className="relative overflow-hidden border-2 border-neutral-900 bg-brand bg-[radial-gradient(rgba(255,255,255,0.16)_1px,transparent_1px)] bg-size-[16px_16px] px-[14%] py-[9%]">
+      <div className="mx-auto w-full max-w-56">
+        <PhoneFrame
+          src="/side/finance-scan-mobile.jpg"
+          alt="Finance Tracker new transaction screen: choose money in or money out, then drop or pick a transfer screenshot to scan"
+          sizes="(min-width: 1024px) 224px, 60vw"
+        />
+      </div>
+    </div>
   )
 }
